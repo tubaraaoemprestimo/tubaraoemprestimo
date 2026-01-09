@@ -1,6 +1,9 @@
 
 // 🔔 Notification Service - Sistema de Notificações Push
 // Tubarão Empréstimos - Notificações em Tempo Real
+// Migrado para Supabase
+
+import { supabase } from './supabaseClient';
 
 export interface Notification {
     id: string;
@@ -26,6 +29,16 @@ export interface NotificationPreferences {
 const STORAGE_KEY = 'tubarao_notifications';
 const PREFS_KEY = 'tubarao_notification_prefs';
 const MAX_NOTIFICATIONS = 50;
+
+// Get current user from localStorage
+const getCurrentUserId = (): string | null => {
+    try {
+        const user = JSON.parse(localStorage.getItem('tubarao_user') || '{}');
+        return user.id || null;
+    } catch {
+        return null;
+    }
+};
 
 const loadNotifications = (): Notification[] => {
     try {
@@ -62,6 +75,7 @@ const loadPreferences = (): NotificationPreferences => {
         };
     }
 };
+
 
 // Som de notificação
 const playNotificationSound = (): void => {

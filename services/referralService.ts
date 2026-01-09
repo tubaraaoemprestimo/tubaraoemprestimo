@@ -1,4 +1,7 @@
+// 🤝 Referral Service - Sistema de Indicações
+// Migrado para Supabase
 
+import { supabase } from './supabaseClient';
 import { ReferralCode, ReferralUsage, Customer } from '../types';
 
 const STORAGE_KEYS = {
@@ -6,95 +9,201 @@ const STORAGE_KEYS = {
     REFERRAL_USAGES: 'tubarao_referral_usages'
 };
 
+// Fallback helpers
 function loadFromStorage<T>(key: string, defaultValue: T): T {
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : defaultValue;
+    try {
+        const stored = localStorage.getItem(key);
+        return stored ? JSON.parse(stored) : defaultValue;
+    } catch {
+        return defaultValue;
+    }
 }
 
 function saveToStorage(key: string, data: any): void {
-    localStorage.setItem(key, JSON.stringify(data));
+    try {
+        localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+        console.error('Error saving to storage:', e);
+    }
 }
 
 export const referralService = {
     // Generate or get existing referral code for a user
-    getOrCreateCode: (userId: string, userName: string): ReferralCode => {
-        const codes = loadFromStorage<ReferralCode[]>(STORAGE_KEYS.REFERRAL_CODES, []);
-        const existing = codes.find(c => c.userId === userId);
+    getOrCreateCode: async (userId: string, userName: string): Promise<ReferralCode> => {
+        try {
+            // Check if code already exists
+            const { data: existing } = await supabase
+                .from('referrals')
+                .select('*')
+                .eq('referrer_customer_id', userId)
+                .limit(1);
 
-        if (existing) return existing;
+            if (existing && existing.length > 0) {
+                const first = existing[0];
+                return {
+                    id: first.id,
+                    userId: first.referrer_customer_id,
+                    userName: first.referrer_name,
+                    code: `IND-${first.referrer_name.split(' ')[0].toUpperCase()}-${first.id.slice(0, 4)}`,
+                    createdAt: first.created_at,
+                    status: first.status === 'CONVERTED' ? 'USED' : 'ACTIVE',
+                    usageCount: 1
+                };
+            }
 
-        const firstName = userName.split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '');
-        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-        const newCode: ReferralCode = {
-            id: Date.now().toString(),
-            userId,
-            userName,
-            code: `IND-${firstName}-${randomSuffix}`,
-            createdAt: new Date().toISOString(),
-            status: 'ACTIVE',
-            usageCount: 0
-        };
+            // Generate new code
+            const firstName = userName.split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '');
+            const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+            const newCode: ReferralCode = {
+                id: Date.now().toString(),
+                userId,
+                userName,
+                code: `IND-${firstName}-${randomSuffix}`,
+                createdAt: new Date().toISOString(),
+                status: 'ACTIVE',
+                usageCount: 0
+            };
 
-        codes.push(newCode);
-        saveToStorage(STORAGE_KEYS.REFERRAL_CODES, codes);
-        return newCode;
+            return newCode;
+        } catch (e) {
+            // Fallback
+            const codes = loadFromStorage<ReferralCode[]>(STORAGE_KEYS.REFERRAL_CODES, []);
+            const existing = codes.find(c => c.userId === userId);
+
+            if (existing) return existing;
+
+            const firstName = userName.split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '');
+            const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+            const newCode: ReferralCode = {
+                id: Date.now().toString(),
+                userId,
+                userName,
+                code: `IND-${firstName}-${randomSuffix}`,
+                createdAt: new Date().toISOString(),
+                status: 'ACTIVE',
+                usageCount: 0
+            };
+
+            codes.push(newCode);
+            saveToStorage(STORAGE_KEYS.REFERRAL_CODES, codes);
+            return newCode;
+        }
     },
 
     // Get code by code string
-    getByCode: (code: string): ReferralCode | undefined => {
-        const codes = loadFromStorage<ReferralCode[]>(STORAGE_KEYS.REFERRAL_CODES, []);
-        return codes.find(c => c.code === code && c.status === 'ACTIVE');
+    getByCode: async (code: string): Promise<ReferralCode | undefined> => {
+        try {
+            // Parse code to find referral
+            const codes = loadFromStorage<ReferralCode[]>(STORAGE_KEYS.REFERRAL_CODES, []);
+            return codes.find(c => c.code === code && c.status === 'ACTIVE');
+        } catch {
+            return undefined;
+        }
     },
 
     // Register usage of a referral code (when a new user signs up)
-    registerUsage: (code: string, newUserId: string, newUserName: string): void => {
-        const referralCode = referralService.getByCode(code);
+    registerUsage: async (code: string, newUserId: string, newUserName: string): Promise<void> => {
+        const referralCode = await referralService.getByCode(code);
         if (!referralCode || referralCode.userId === newUserId) return; // Can't self-refer
 
-        const usages = loadFromStorage<ReferralUsage[]>(STORAGE_KEYS.REFERRAL_USAGES, []);
-        const codes = loadFromStorage<ReferralCode[]>(STORAGE_KEYS.REFERRAL_CODES, []);
+        try {
+            // Check if already referred
+            const { data: existing } = await supabase
+                .from('referrals')
+                .select('id')
+                .eq('referred_cpf', newUserId)
+                .limit(1);
 
-        // Anti-fraud: Check if this user was already referred
-        if (usages.some(u => u.referredId === newUserId)) return;
+            if (existing && existing.length > 0) return;
 
-        const newUsage: ReferralUsage = {
-            id: Date.now().toString(),
-            referralCode: code,
-            referrerId: referralCode.userId,
-            referredId: newUserId,
-            referredName: newUserName,
-            status: 'PENDING',
-            rewardAmount: 50.00, // Configurable?
-            createdAt: new Date().toISOString()
-        };
+            // Create referral in Supabase
+            await supabase.from('referrals').insert({
+                referrer_customer_id: referralCode.userId,
+                referrer_name: referralCode.userName,
+                referred_name: newUserName,
+                referred_cpf: newUserId,
+                status: 'PENDING',
+                reward_amount: 50.00
+            });
+        } catch (e) {
+            // Fallback
+            const usages = loadFromStorage<ReferralUsage[]>(STORAGE_KEYS.REFERRAL_USAGES, []);
+            const codes = loadFromStorage<ReferralCode[]>(STORAGE_KEYS.REFERRAL_CODES, []);
 
-        // Increment usage count
-        const codeIndex = codes.findIndex(c => c.id === referralCode.id);
-        if (codeIndex >= 0) {
-            codes[codeIndex].usageCount++;
-            saveToStorage(STORAGE_KEYS.REFERRAL_CODES, codes);
+            if (usages.some(u => u.referredId === newUserId)) return;
+
+            const newUsage: ReferralUsage = {
+                id: Date.now().toString(),
+                referralCode: code,
+                referrerId: referralCode.userId,
+                referredId: newUserId,
+                referredName: newUserName,
+                status: 'PENDING',
+                rewardAmount: 50.00,
+                createdAt: new Date().toISOString()
+            };
+
+            const codeIndex = codes.findIndex(c => c.id === referralCode.id);
+            if (codeIndex >= 0) {
+                codes[codeIndex].usageCount++;
+                saveToStorage(STORAGE_KEYS.REFERRAL_CODES, codes);
+            }
+
+            usages.push(newUsage);
+            saveToStorage(STORAGE_KEYS.REFERRAL_USAGES, usages);
         }
-
-        usages.push(newUsage);
-        saveToStorage(STORAGE_KEYS.REFERRAL_USAGES, usages);
     },
 
     // Admin: Get all usages
-    getAllUsages: (): ReferralUsage[] => {
-        return loadFromStorage<ReferralUsage[]>(STORAGE_KEYS.REFERRAL_USAGES, []);
+    getAllUsages: async (): Promise<ReferralUsage[]> => {
+        try {
+            const { data, error } = await supabase
+                .from('referrals')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error || !data) throw error;
+
+            return data.map(r => ({
+                id: r.id,
+                referralCode: `IND-${r.referrer_name.split(' ')[0].toUpperCase()}`,
+                referrerId: r.referrer_customer_id,
+                referredId: r.referred_cpf,
+                referredName: r.referred_name,
+                status: r.status === 'CONVERTED' ? 'VALIDATED' : r.status === 'REJECTED' ? 'REJECTED' : 'PENDING',
+                rewardAmount: r.reward_amount || 50,
+                createdAt: r.created_at,
+                validatedAt: r.converted_at
+            }));
+        } catch (e) {
+            return loadFromStorage<ReferralUsage[]>(STORAGE_KEYS.REFERRAL_USAGES, []);
+        }
     },
 
     // Admin: Validate usage (Anti-fraud check)
-    validateUsage: (usageId: string, action: 'VALIDATE' | 'REJECT' | 'FRAUD', reason?: string): void => {
-        const usages = loadFromStorage<ReferralUsage[]>(STORAGE_KEYS.REFERRAL_USAGES, []);
-        const index = usages.findIndex(u => u.id === usageId);
+    validateUsage: async (usageId: string, action: 'VALIDATE' | 'REJECT' | 'FRAUD', reason?: string): Promise<void> => {
+        try {
+            const newStatus = action === 'VALIDATE' ? 'CONVERTED' : action === 'FRAUD' ? 'REJECTED' : 'REJECTED';
 
-        if (index >= 0) {
-            usages[index].status = action === 'VALIDATE' ? 'VALIDATED' : action === 'FRAUD' ? 'FRAUD_SUSPECTED' : 'REJECTED';
-            usages[index].validatedAt = new Date().toISOString();
-            if (reason) usages[index].fraudReason = reason;
+            await supabase
+                .from('referrals')
+                .update({
+                    status: newStatus,
+                    converted_at: new Date().toISOString(),
+                    notes: reason
+                })
+                .eq('id', usageId);
+        } catch (e) {
+            const usages = loadFromStorage<ReferralUsage[]>(STORAGE_KEYS.REFERRAL_USAGES, []);
+            const index = usages.findIndex(u => u.id === usageId);
 
-            saveToStorage(STORAGE_KEYS.REFERRAL_USAGES, usages);
+            if (index >= 0) {
+                usages[index].status = action === 'VALIDATE' ? 'VALIDATED' : action === 'FRAUD' ? 'FRAUD_SUSPECTED' : 'REJECTED';
+                usages[index].validatedAt = new Date().toISOString();
+                if (reason) usages[index].fraudReason = reason;
+
+                saveToStorage(STORAGE_KEYS.REFERRAL_USAGES, usages);
+            }
         }
     },
 
@@ -105,8 +214,6 @@ export const referralService = {
         const referred = customers.find(c => c.id === usage.referredId);
 
         if (!referrer || !referred) return ['Usuário não encontrado'];
-
-        // 1. Same IP (Mocked as not available in localStorage)
 
         // 2. Similar Name patterns
         if (referrer.name.split(' ')[1] === referred.name.split(' ')[1]) {
