@@ -1,6 +1,7 @@
 // 🔧 Admin Service - Gerenciamento completo para o administrador
 // Inclui: Blacklist, Auditoria, Permissões, Score, Renegociação, Templates, Documentos
 
+import { supabase } from './supabaseClient';
 import {
     BlacklistEntry, AuditLog, UserPermission, PermissionLevel, ClientScore,
     RenegotiationProposal, MessageTemplate, MassMessage, ConversationMessage,
@@ -8,7 +9,7 @@ import {
     Customer, Loan
 } from '../types';
 
-// Storage keys
+// Storage keys (fallback for non-DB data)
 const STORAGE_KEYS = {
     BLACKLIST: 'tubarao_blacklist',
     AUDIT_LOGS: 'tubarao_audit_logs',
@@ -23,7 +24,7 @@ const STORAGE_KEYS = {
     DECLARATIONS: 'tubarao_declarations'
 };
 
-// Helper functions
+// Helper functions (fallback for local storage)
 const loadFromStorage = <T>(key: string, defaultValue: T): T => {
     try {
         const stored = localStorage.getItem(key);
@@ -41,116 +42,272 @@ const saveToStorage = (key: string, data: any) => {
     }
 };
 
+// Get current user from localStorage
+const getCurrentUser = () => {
+    try {
+        return JSON.parse(localStorage.getItem('tubarao_user') || '{}');
+    } catch {
+        return {};
+    }
+};
+
+
 // ==========================================
 // 📛 BLACKLIST MANAGEMENT
 // ==========================================
 export const blacklistService = {
-    getAll: (): BlacklistEntry[] => {
-        return loadFromStorage(STORAGE_KEYS.BLACKLIST, []);
-    },
+    getAll: async (): Promise<BlacklistEntry[]> => {
+        try {
+            const { data, error } = await supabase
+                .from('blacklist')
+                .select('*')
+                .order('added_at', { ascending: false });
 
-    add: (entry: Omit<BlacklistEntry, 'id' | 'addedAt' | 'active'>): BlacklistEntry => {
-        const list = loadFromStorage<BlacklistEntry[]>(STORAGE_KEYS.BLACKLIST, []);
-        const newEntry: BlacklistEntry = {
-            ...entry,
-            id: Date.now().toString(),
-            addedAt: new Date().toISOString(),
-            active: true
-        };
-        list.push(newEntry);
-        saveToStorage(STORAGE_KEYS.BLACKLIST, list);
-        auditService.log('CREATE', 'BLACKLIST', newEntry.id, `CPF ${entry.cpf} adicionado à blacklist: ${entry.reason}`);
-        return newEntry;
-    },
+            if (error || !data) {
+                console.error('Error fetching blacklist:', error);
+                return loadFromStorage(STORAGE_KEYS.BLACKLIST, []);
+            }
 
-    remove: (id: string): boolean => {
-        const list = loadFromStorage<BlacklistEntry[]>(STORAGE_KEYS.BLACKLIST, []);
-        const entry = list.find(e => e.id === id);
-        const filtered = list.filter(e => e.id !== id);
-        saveToStorage(STORAGE_KEYS.BLACKLIST, filtered);
-        if (entry) {
-            auditService.log('DELETE', 'BLACKLIST', id, `CPF ${entry.cpf} removido da blacklist`);
+            return data.map(item => ({
+                id: item.id,
+                cpf: item.cpf,
+                name: item.name,
+                reason: item.reason,
+                addedBy: item.added_by,
+                addedAt: item.added_at,
+                active: item.active
+            }));
+        } catch (e) {
+            return loadFromStorage(STORAGE_KEYS.BLACKLIST, []);
         }
-        return true;
     },
 
-    toggle: (id: string): boolean => {
-        const list = loadFromStorage<BlacklistEntry[]>(STORAGE_KEYS.BLACKLIST, []);
-        const index = list.findIndex(e => e.id === id);
-        if (index >= 0) {
-            list[index].active = !list[index].active;
+    add: async (entry: Omit<BlacklistEntry, 'id' | 'addedAt' | 'active'>): Promise<BlacklistEntry> => {
+        const user = getCurrentUser();
+
+        try {
+            const { data, error } = await supabase
+                .from('blacklist')
+                .insert({
+                    cpf: entry.cpf,
+                    name: entry.name,
+                    reason: entry.reason,
+                    added_by: user.name || 'Admin',
+                    active: true
+                })
+                .select()
+                .single();
+
+            if (error || !data) {
+                throw error;
+            }
+
+            const newEntry: BlacklistEntry = {
+                id: data.id,
+                cpf: data.cpf,
+                name: data.name,
+                reason: data.reason,
+                addedBy: data.added_by,
+                addedAt: data.added_at,
+                active: data.active
+            };
+
+            await auditService.log('CREATE', 'BLACKLIST', newEntry.id, `CPF ${entry.cpf} adicionado à blacklist: ${entry.reason}`);
+            return newEntry;
+        } catch (e) {
+            // Fallback to localStorage
+            const list = loadFromStorage<BlacklistEntry[]>(STORAGE_KEYS.BLACKLIST, []);
+            const newEntry: BlacklistEntry = {
+                ...entry,
+                id: Date.now().toString(),
+                addedAt: new Date().toISOString(),
+                active: true
+            };
+            list.push(newEntry);
             saveToStorage(STORAGE_KEYS.BLACKLIST, list);
-            auditService.log('UPDATE', 'BLACKLIST', id, `Status alterado para ${list[index].active ? 'ativo' : 'inativo'}`);
-            return list[index].active;
+            return newEntry;
         }
-        return false;
     },
 
-    check: (cpf: string): boolean => {
-        const list = loadFromStorage<BlacklistEntry[]>(STORAGE_KEYS.BLACKLIST, []);
-        return list.some(e => e.cpf.replace(/\D/g, '') === cpf.replace(/\D/g, '') && e.active);
+    remove: async (id: string): Promise<boolean> => {
+        try {
+            const { data: entry } = await supabase
+                .from('blacklist')
+                .select('cpf')
+                .eq('id', id)
+                .single();
+
+            const { error } = await supabase
+                .from('blacklist')
+                .delete()
+                .eq('id', id);
+
+            if (!error && entry) {
+                await auditService.log('DELETE', 'BLACKLIST', id, `CPF ${entry.cpf} removido da blacklist`);
+            }
+            return !error;
+        } catch (e) {
+            const list = loadFromStorage<BlacklistEntry[]>(STORAGE_KEYS.BLACKLIST, []);
+            saveToStorage(STORAGE_KEYS.BLACKLIST, list.filter(e => e.id !== id));
+            return true;
+        }
+    },
+
+    toggle: async (id: string): Promise<boolean> => {
+        try {
+            const { data: current } = await supabase
+                .from('blacklist')
+                .select('active')
+                .eq('id', id)
+                .single();
+
+            if (!current) return false;
+
+            const newActive = !current.active;
+            const { error } = await supabase
+                .from('blacklist')
+                .update({ active: newActive })
+                .eq('id', id);
+
+            if (!error) {
+                await auditService.log('UPDATE', 'BLACKLIST', id, `Status alterado para ${newActive ? 'ativo' : 'inativo'}`);
+            }
+            return newActive;
+        } catch (e) {
+            return false;
+        }
+    },
+
+    check: async (cpf: string): Promise<boolean> => {
+        try {
+            const cleanCpf = cpf.replace(/\D/g, '');
+            const { data } = await supabase
+                .from('blacklist')
+                .select('id')
+                .eq('cpf', cleanCpf)
+                .eq('active', true)
+                .limit(1);
+
+            return (data && data.length > 0);
+        } catch (e) {
+            const list = loadFromStorage<BlacklistEntry[]>(STORAGE_KEYS.BLACKLIST, []);
+            return list.some(e => e.cpf.replace(/\D/g, '') === cpf.replace(/\D/g, '') && e.active);
+        }
     }
 };
+
 
 // ==========================================
 // 📋 AUDIT LOG
 // ==========================================
 export const auditService = {
-    log: (
+    log: async (
         action: AuditLog['action'],
         entity: string,
         entityId: string | undefined,
         details: string
-    ): void => {
-        const logs = loadFromStorage<AuditLog[]>(STORAGE_KEYS.AUDIT_LOGS, []);
-        const user = JSON.parse(localStorage.getItem('tubarao_user') || '{}');
+    ): Promise<void> => {
+        const user = getCurrentUser();
 
-        const newLog: AuditLog = {
-            id: Date.now().toString(),
-            userId: user.id || 'system',
-            userName: user.name || 'Sistema',
-            action,
-            entity,
-            entityId,
-            details,
-            timestamp: new Date().toISOString()
-        };
-
-        logs.unshift(newLog); // Add to beginning
-        // Keep only last 1000 logs
-        const trimmed = logs.slice(0, 1000);
-        saveToStorage(STORAGE_KEYS.AUDIT_LOGS, trimmed);
+        try {
+            await supabase.from('audit_logs').insert({
+                user_id: user.id || 'system',
+                user_name: user.name || 'Sistema',
+                action,
+                entity,
+                entity_id: entityId,
+                details
+            });
+        } catch (e) {
+            // Fallback to localStorage
+            const logs = loadFromStorage<AuditLog[]>(STORAGE_KEYS.AUDIT_LOGS, []);
+            const newLog: AuditLog = {
+                id: Date.now().toString(),
+                userId: user.id || 'system',
+                userName: user.name || 'Sistema',
+                action,
+                entity,
+                entityId,
+                details,
+                timestamp: new Date().toISOString()
+            };
+            logs.unshift(newLog);
+            saveToStorage(STORAGE_KEYS.AUDIT_LOGS, logs.slice(0, 1000));
+        }
     },
 
-    getAll: (filters?: {
+    getAll: async (filters?: {
         action?: AuditLog['action'];
         entity?: string;
         startDate?: string;
         endDate?: string;
         limit?: number;
-    }): AuditLog[] => {
-        let logs = loadFromStorage<AuditLog[]>(STORAGE_KEYS.AUDIT_LOGS, []);
+    }): Promise<AuditLog[]> => {
+        try {
+            let query = supabase
+                .from('audit_logs')
+                .select('*')
+                .order('timestamp', { ascending: false })
+                .limit(filters?.limit || 100);
 
-        if (filters?.action) {
-            logs = logs.filter(l => l.action === filters.action);
-        }
-        if (filters?.entity) {
-            logs = logs.filter(l => l.entity === filters.entity);
-        }
-        if (filters?.startDate) {
-            logs = logs.filter(l => l.timestamp >= filters.startDate!);
-        }
-        if (filters?.endDate) {
-            logs = logs.filter(l => l.timestamp <= filters.endDate!);
-        }
+            if (filters?.action) {
+                query = query.eq('action', filters.action);
+            }
+            if (filters?.entity) {
+                query = query.eq('entity', filters.entity);
+            }
+            if (filters?.startDate) {
+                query = query.gte('timestamp', filters.startDate);
+            }
+            if (filters?.endDate) {
+                query = query.lte('timestamp', filters.endDate);
+            }
 
-        return logs.slice(0, filters?.limit || 100);
+            const { data, error } = await query;
+
+            if (error || !data) {
+                throw error;
+            }
+
+            return data.map(log => ({
+                id: log.id,
+                userId: log.user_id,
+                userName: log.user_name,
+                action: log.action,
+                entity: log.entity,
+                entityId: log.entity_id,
+                details: log.details,
+                timestamp: log.timestamp
+            }));
+        } catch (e) {
+            let logs = loadFromStorage<AuditLog[]>(STORAGE_KEYS.AUDIT_LOGS, []);
+
+            if (filters?.action) {
+                logs = logs.filter(l => l.action === filters.action);
+            }
+            if (filters?.entity) {
+                logs = logs.filter(l => l.entity === filters.entity);
+            }
+            if (filters?.startDate) {
+                logs = logs.filter(l => l.timestamp >= filters.startDate!);
+            }
+            if (filters?.endDate) {
+                logs = logs.filter(l => l.timestamp <= filters.endDate!);
+            }
+
+            return logs.slice(0, filters?.limit || 100);
+        }
     },
 
-    clear: (): void => {
-        saveToStorage(STORAGE_KEYS.AUDIT_LOGS, []);
+    clear: async (): Promise<void> => {
+        try {
+            await supabase.from('audit_logs').delete().neq('id', '');
+        } catch (e) {
+            saveToStorage(STORAGE_KEYS.AUDIT_LOGS, []);
+        }
     }
 };
+
 
 // ==========================================
 // 👥 USER PERMISSIONS
@@ -402,46 +559,120 @@ export const renegotiationService = {
 // 📝 MESSAGE TEMPLATES
 // ==========================================
 export const templateService = {
-    getAll: (): MessageTemplate[] => {
-        return loadFromStorage<MessageTemplate[]>(STORAGE_KEYS.TEMPLATES, getDefaultTemplates());
-    },
+    getAll: async (): Promise<MessageTemplate[]> => {
+        try {
+            const { data, error } = await supabase
+                .from('message_templates')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-    save: (template: Omit<MessageTemplate, 'id' | 'createdAt' | 'variables'>): MessageTemplate => {
-        const templates = loadFromStorage<MessageTemplate[]>(STORAGE_KEYS.TEMPLATES, []);
-        const variables = extractVariables(template.content);
-
-        const newTemplate: MessageTemplate = {
-            ...template,
-            id: Date.now().toString(),
-            variables,
-            createdAt: new Date().toISOString()
-        };
-
-        templates.push(newTemplate);
-        saveToStorage(STORAGE_KEYS.TEMPLATES, templates);
-        auditService.log('CREATE', 'TEMPLATE', newTemplate.id, `Template "${template.name}" criado`);
-        return newTemplate;
-    },
-
-    update: (id: string, data: Partial<MessageTemplate>): void => {
-        const templates = loadFromStorage<MessageTemplate[]>(STORAGE_KEYS.TEMPLATES, []);
-        const index = templates.findIndex(t => t.id === id);
-        if (index >= 0) {
-            templates[index] = { ...templates[index], ...data };
-            if (data.content) {
-                templates[index].variables = extractVariables(data.content);
+            if (error || !data || data.length === 0) {
+                return getDefaultTemplates();
             }
-            saveToStorage(STORAGE_KEYS.TEMPLATES, templates);
-            auditService.log('UPDATE', 'TEMPLATE', id, `Template atualizado`);
+
+            return data.map(t => ({
+                id: t.id,
+                name: t.name,
+                category: t.category,
+                content: t.content,
+                variables: t.variables || [],
+                isActive: t.is_active,
+                createdAt: t.created_at
+            }));
+        } catch (e) {
+            return loadFromStorage<MessageTemplate[]>(STORAGE_KEYS.TEMPLATES, getDefaultTemplates());
         }
     },
 
-    delete: (id: string): void => {
-        const templates = loadFromStorage<MessageTemplate[]>(STORAGE_KEYS.TEMPLATES, []);
-        saveToStorage(STORAGE_KEYS.TEMPLATES, templates.filter(t => t.id !== id));
-        auditService.log('DELETE', 'TEMPLATE', id, `Template removido`);
+    save: async (template: Omit<MessageTemplate, 'id' | 'createdAt' | 'variables'>): Promise<MessageTemplate> => {
+        const variables = extractVariables(template.content);
+
+        try {
+            const { data, error } = await supabase
+                .from('message_templates')
+                .insert({
+                    name: template.name,
+                    category: template.category,
+                    content: template.content,
+                    variables: variables,
+                    is_active: template.isActive
+                })
+                .select()
+                .single();
+
+            if (error || !data) throw error;
+
+            const newTemplate: MessageTemplate = {
+                id: data.id,
+                name: data.name,
+                category: data.category,
+                content: data.content,
+                variables: data.variables || [],
+                isActive: data.is_active,
+                createdAt: data.created_at
+            };
+
+            await auditService.log('CREATE', 'TEMPLATE', newTemplate.id, `Template "${template.name}" criado`);
+            return newTemplate;
+        } catch (e) {
+            const templates = loadFromStorage<MessageTemplate[]>(STORAGE_KEYS.TEMPLATES, []);
+            const newTemplate: MessageTemplate = {
+                ...template,
+                id: Date.now().toString(),
+                variables,
+                createdAt: new Date().toISOString()
+            };
+            templates.push(newTemplate);
+            saveToStorage(STORAGE_KEYS.TEMPLATES, templates);
+            return newTemplate;
+        }
+    },
+
+    update: async (id: string, data: Partial<MessageTemplate>): Promise<void> => {
+        try {
+            const updateData: any = {};
+            if (data.name) updateData.name = data.name;
+            if (data.category) updateData.category = data.category;
+            if (data.content) {
+                updateData.content = data.content;
+                updateData.variables = extractVariables(data.content);
+            }
+            if (data.isActive !== undefined) updateData.is_active = data.isActive;
+
+            await supabase
+                .from('message_templates')
+                .update(updateData)
+                .eq('id', id);
+
+            await auditService.log('UPDATE', 'TEMPLATE', id, `Template atualizado`);
+        } catch (e) {
+            const templates = loadFromStorage<MessageTemplate[]>(STORAGE_KEYS.TEMPLATES, []);
+            const index = templates.findIndex(t => t.id === id);
+            if (index >= 0) {
+                templates[index] = { ...templates[index], ...data };
+                if (data.content) {
+                    templates[index].variables = extractVariables(data.content);
+                }
+                saveToStorage(STORAGE_KEYS.TEMPLATES, templates);
+            }
+        }
+    },
+
+    delete: async (id: string): Promise<void> => {
+        try {
+            await supabase
+                .from('message_templates')
+                .delete()
+                .eq('id', id);
+
+            await auditService.log('DELETE', 'TEMPLATE', id, `Template removido`);
+        } catch (e) {
+            const templates = loadFromStorage<MessageTemplate[]>(STORAGE_KEYS.TEMPLATES, []);
+            saveToStorage(STORAGE_KEYS.TEMPLATES, templates.filter(t => t.id !== id));
+        }
     }
 };
+
 
 function extractVariables(content: string): string[] {
     const matches = content.match(/\{[^}]+\}/g);
