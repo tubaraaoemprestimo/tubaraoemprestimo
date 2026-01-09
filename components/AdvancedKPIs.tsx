@@ -30,38 +30,38 @@ interface KPIData {
     monthlyGrowth: number;
 }
 
-// Dados para gráficos (simulados para demo - em produção viria do banco)
-const monthlyData = [
-    { name: 'Jan', emprestado: 45000, recebido: 38000, clientes: 12 },
-    { name: 'Fev', emprestado: 52000, recebido: 42000, clientes: 18 },
-    { name: 'Mar', emprestado: 68000, recebido: 55000, clientes: 24 },
-    { name: 'Abr', emprestado: 75000, recebido: 62000, clientes: 28 },
-    { name: 'Mai', emprestado: 89000, recebido: 71000, clientes: 35 },
-    { name: 'Jun', emprestado: 95000, recebido: 78000, clientes: 42 },
-    { name: 'Jul', emprestado: 110000, recebido: 88000, clientes: 48 },
+// Dados zerados como default - serão preenchidos com dados reais do banco
+const emptyMonthlyData = [
+    { name: 'Jan', emprestado: 0, recebido: 0, clientes: 0 },
+    { name: 'Fev', emprestado: 0, recebido: 0, clientes: 0 },
+    { name: 'Mar', emprestado: 0, recebido: 0, clientes: 0 },
+    { name: 'Abr', emprestado: 0, recebido: 0, clientes: 0 },
+    { name: 'Mai', emprestado: 0, recebido: 0, clientes: 0 },
+    { name: 'Jun', emprestado: 0, recebido: 0, clientes: 0 },
+    { name: 'Jul', emprestado: 0, recebido: 0, clientes: 0 },
 ];
 
-const projectionData = [
-    { name: 'Jul', real: 110000, projetado: 110000 },
-    { name: 'Ago', real: null, projetado: 125000 },
-    { name: 'Set', real: null, projetado: 142000 },
-    { name: 'Out', real: null, projetado: 158000 },
-    { name: 'Nov', real: null, projetado: 175000 },
-    { name: 'Dez', real: null, projetado: 195000 },
+const emptyProjectionData = [
+    { name: 'Jul', real: 0, projetado: 0 },
+    { name: 'Ago', real: null, projetado: 0 },
+    { name: 'Set', real: null, projetado: 0 },
+    { name: 'Out', real: null, projetado: 0 },
+    { name: 'Nov', real: null, projetado: 0 },
+    { name: 'Dez', real: null, projetado: 0 },
 ];
 
-const funnelData = [
-    { name: 'Visitantes', value: 1000, color: '#3B82F6' },
-    { name: 'Simulações', value: 450, color: '#8B5CF6' },
-    { name: 'Cadastros', value: 180, color: '#D4AF37' },
-    { name: 'Aprovados', value: 85, color: '#22C55E' },
+const emptyFunnelData = [
+    { name: 'Visitantes', value: 0, color: '#3B82F6' },
+    { name: 'Simulações', value: 0, color: '#8B5CF6' },
+    { name: 'Cadastros', value: 0, color: '#D4AF37' },
+    { name: 'Aprovados', value: 0, color: '#22C55E' },
 ];
 
-const statusDistribution = [
-    { name: 'Aprovados', value: 45, color: '#22C55E' },
-    { name: 'Pendentes', value: 25, color: '#EAB308' },
-    { name: 'Rejeitados', value: 15, color: '#EF4444' },
-    { name: 'Quitados', value: 15, color: '#3B82F6' },
+const emptyStatusDistribution = [
+    { name: 'Aprovados', value: 0, color: '#22C55E' },
+    { name: 'Pendentes', value: 0, color: '#EAB308' },
+    { name: 'Rejeitados', value: 0, color: '#EF4444' },
+    { name: 'Quitados', value: 0, color: '#3B82F6' },
 ];
 
 export const AdvancedKPIs: React.FC = () => {
@@ -120,18 +120,22 @@ export const AdvancedKPIs: React.FC = () => {
             const projectedRevenue = goalsData.projections.reduce((acc, p) => acc + p.target, 0) / 12;
 
             setKpis({
-                totalLent: totalLent || 534000,
-                totalReceived: totalReceived || 425000,
-                totalPending: pending.reduce((a, r) => a + r.amount, 0) || 89000,
-                totalDefaulted: lateAmount || 12500,
-                activeClients: customers.filter(c => c.status === 'ACTIVE').length || 48,
-                newClientsThisMonth: 8,
-                approvalRate: requests.length > 0 ? Math.round((approved.length / requests.length) * 100) : 72,
-                defaultRate: totalLent > 0 ? Number(((lateAmount / totalLent) * 100).toFixed(1)) : 2.3,
-                avgLoanAmount: approved.length > 0 ? Math.round(totalLent / approved.length) : 5500,
-                avgInstallments: 12,
-                projectedRevenue: projectedRevenue || 195000,
-                monthlyGrowth: goalsData.expectedGrowthRate || 12.5
+                totalLent: totalLent,
+                totalReceived: totalReceived,
+                totalPending: pending.reduce((a, r) => a + r.amount, 0),
+                totalDefaulted: lateAmount,
+                activeClients: customers.filter(c => c.status === 'ACTIVE').length,
+                newClientsThisMonth: customers.filter(c => {
+                    const joinDate = new Date(c.joinedAt);
+                    const now = new Date();
+                    return joinDate.getMonth() === now.getMonth() && joinDate.getFullYear() === now.getFullYear();
+                }).length,
+                approvalRate: requests.length > 0 ? Math.round((approved.length / requests.length) * 100) : 0,
+                defaultRate: totalLent > 0 ? Number(((lateAmount / totalLent) * 100).toFixed(1)) : 0,
+                avgLoanAmount: approved.length > 0 ? Math.round(totalLent / approved.length) : 0,
+                avgInstallments: loans.length > 0 ? Math.round(loans.reduce((a, l) => a + l.installments.length, 0) / loans.length) : 0,
+                projectedRevenue: projectedRevenue || 0,
+                monthlyGrowth: goalsData?.expectedGrowthRate || 0
             });
         } catch (error) {
             console.error('Error loading KPIs:', error);
@@ -220,7 +224,7 @@ export const AdvancedKPIs: React.FC = () => {
                     <p className="text-zinc-500 text-sm mb-6">Emprestado vs Recebido</p>
                     <div className="h-[280px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={monthlyData}>
+                            <AreaChart data={emptyMonthlyData}>
                                 <defs>
                                     <linearGradient id="colorEmprestado" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.3} />
@@ -257,8 +261,8 @@ export const AdvancedKPIs: React.FC = () => {
                             <LineChart data={goals?.projections.map((p, i) => ({
                                 name: p.month,
                                 projetado: p.target,
-                                real: i < 7 ? monthlyData[i]?.emprestado : null
-                            })) || projectionData}>
+                                real: i < 7 ? emptyMonthlyData[i]?.emprestado : null
+                            })) || emptyProjectionData}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                                 <XAxis dataKey="name" stroke="#666" axisLine={false} tickLine={false} />
                                 <YAxis stroke="#666" axisLine={false} tickLine={false} tickFormatter={(v) => `${v / 1000}K`} />
@@ -280,10 +284,10 @@ export const AdvancedKPIs: React.FC = () => {
                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
                     <h3 className="text-lg font-bold text-white mb-6">Funil de Conversão</h3>
                     <div className="space-y-4">
-                        {funnelData.map((item, index) => {
-                            const percentage = (item.value / funnelData[0].value) * 100;
+                        {emptyFunnelData.map((item, index) => {
+                            const percentage = (item.value / emptyFunnelData[0].value) * 100;
                             const conversionRate = index > 0
-                                ? ((item.value / funnelData[index - 1].value) * 100).toFixed(0)
+                                ? ((item.value / emptyFunnelData[index - 1].value) * 100).toFixed(0)
                                 : '100';
 
                             return (
@@ -327,7 +331,7 @@ export const AdvancedKPIs: React.FC = () => {
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
-                                    data={statusDistribution}
+                                    data={emptyStatusDistribution}
                                     cx="50%"
                                     cy="50%"
                                     innerRadius={50}
@@ -335,7 +339,7 @@ export const AdvancedKPIs: React.FC = () => {
                                     paddingAngle={3}
                                     dataKey="value"
                                 >
-                                    {statusDistribution.map((entry, index) => (
+                                    {emptyStatusDistribution.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
                                 </Pie>
@@ -347,7 +351,7 @@ export const AdvancedKPIs: React.FC = () => {
                         </ResponsiveContainer>
                     </div>
                     <div className="grid grid-cols-2 gap-2 mt-4">
-                        {statusDistribution.map((item) => (
+                        {emptyStatusDistribution.map((item) => (
                             <div key={item.name} className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
                                 <span className="text-xs text-zinc-400">{item.name}</span>
@@ -362,7 +366,7 @@ export const AdvancedKPIs: React.FC = () => {
                     <h3 className="text-lg font-bold text-white mb-6">Novos Clientes</h3>
                     <div className="h-[200px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={monthlyData}>
+                            <BarChart data={emptyMonthlyData}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                                 <XAxis dataKey="name" stroke="#666" axisLine={false} tickLine={false} />
                                 <YAxis stroke="#666" axisLine={false} tickLine={false} />

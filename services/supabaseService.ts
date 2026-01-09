@@ -127,31 +127,9 @@ export const supabaseService = {
                 });
 
                 if (authError) {
-                    // Fallback: Check if it's the admin demo user
-                    if (credentials.identifier === 'admin' && credentials.password === 'admin') {
-                        const adminUser = {
-                            id: 'admin_demo',
-                            name: 'Administrador',
-                            email: 'admin@tubarao.com',
-                            role: 'ADMIN' as UserRole,
-                            token: 'demo_token_' + Date.now(),
-                            avatarUrl: null
-                        };
-                        saveToStorage(STORAGE_KEYS.USER, adminUser);
-                        return { user: adminUser, error: null };
-                    }
-
-                    // For demo purposes, allow any login as client
-                    const clientUser = {
-                        id: 'client_demo_' + Date.now(),
-                        name: credentials.identifier,
-                        email: credentials.identifier.includes('@') ? credentials.identifier : `${credentials.identifier}@client.com`,
-                        role: 'CLIENT' as UserRole,
-                        token: 'demo_token_' + Date.now(),
-                        avatarUrl: null
-                    };
-                    saveToStorage(STORAGE_KEYS.USER, clientUser);
-                    return { user: clientUser, error: null };
+                    // Retorna erro de autenticação - sem fallbacks demo
+                    console.error('Auth error:', authError);
+                    return { user: null, error: authError };
                 }
 
                 // Get user profile from database
