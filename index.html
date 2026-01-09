@@ -1,0 +1,106 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦈</text></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Plataforma de Crédito" />
+    
+    <!-- PWA iOS Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Tubarão" />
+    <link rel="apple-touch-icon" href="https://cdn.jsdelivr.net/npm/twemoji@11.3.0/2/72x72/1f988.png" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="./manifest.json" />
+    
+    <!-- Tailwind CSS (CDN for Prototype) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              // Dynamic Colors mapped to CSS Variables
+              gold: 'var(--color-secondary)',
+              shark: 'var(--color-primary)',
+              background: 'var(--color-background)',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    
+    <!-- Polyfill for process -->
+    <script>
+      window.process = { env: { NODE_ENV: 'production' } };
+    </script>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <title>App de Empréstimos</title>
+    
+    <style>
+      :root {
+        /* Default Colors (Shark) - will be overridden by JS */
+        --color-primary: #FF0000;
+        --color-secondary: #D4AF37;
+        --color-background: #000000;
+      }
+
+      body {
+        background-color: var(--color-background);
+        color: #fff;
+        margin: 0;
+        padding: 0;
+        overscroll-behavior-y: none;
+      }
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #111;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--color-secondary);
+      }
+    </style>
+    
+    <!-- CRITICAL FIX: Clean Import Map - ONLY React 18 from esm.sh -->
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "react-router-dom": "https://esm.sh/react-router-dom@6.22.3?deps=react@18.2.0,react-dom@18.2.0",
+    "lucide-react": "https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0",
+    "recharts": "https://esm.sh/recharts@2.12.2?deps=react@18.2.0,react-dom@18.2.0",
+    "tesseract.js": "https://esm.sh/tesseract.js@5.0.5",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^18.2.1/",
+    "react/": "https://aistudiocdn.com/react@^18.2.1/",
+    "@prisma/client": "https://aistudiocdn.com/@prisma/client@^7.1.0"
+  }
+}
+</script>
+  <link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
