@@ -11,14 +11,15 @@ import { useToast } from '../../components/Toast';
 import { ImageViewer } from '../../components/ImageViewer';
 import { AdvancedKPIs } from '../../components/AdvancedKPIs';
 
-const data = [
-  { name: 'Jan', amt: 2400 },
-  { name: 'Fev', amt: 1398 },
-  { name: 'Mar', amt: 9800 },
-  { name: 'Abr', amt: 3908 },
-  { name: 'Mai', amt: 4800 },
-  { name: 'Jun', amt: 3800 },
-  { name: 'Jul', amt: 4300 },
+// Dados de gráfico serão carregados dinamicamente
+const emptyChartData = [
+  { name: 'Jan', amt: 0 },
+  { name: 'Fev', amt: 0 },
+  { name: 'Mar', amt: 0 },
+  { name: 'Abr', amt: 0 },
+  { name: 'Mai', amt: 0 },
+  { name: 'Jun', amt: 0 },
+  { name: 'Jul', amt: 0 },
 ];
 
 export const Dashboard: React.FC = () => {
@@ -127,12 +128,12 @@ export const Dashboard: React.FC = () => {
 
             {/* Main Content Area */}
             <div className="lg:col-span-3 space-y-8">
-              {/* KPI Cards */}
+              {/* KPI Cards - Dados zerados até haver dados reais */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                <KPICard title="Total Emprestado" value={1250000} prefix="R$" icon={DollarSign} trend="+12%" />
-                <KPICard title="Clientes Ativos" value={342} icon={Users} trend="+5%" />
-                <KPICard title="Inadimplência" value={2.4} suffix="%" icon={AlertTriangle} trend="-0.5%" isBad={false} />
-                <KPICard title="Receita Projetada" value={150000} prefix="R$" icon={TrendingUp} trend="+8%" />
+                <KPICard title="Total Emprestado" value={0} prefix="R$" icon={DollarSign} trend="0%" />
+                <KPICard title="Clientes Ativos" value={0} icon={Users} trend="0%" />
+                <KPICard title="Inadimplência" value={0} suffix="%" icon={AlertTriangle} trend="0%" isBad={false} />
+                <KPICard title="Receita Projetada" value={0} prefix="R$" icon={TrendingUp} trend="0%" />
               </div>
 
               {/* Pending Loans Table (Approval Interface) */}
@@ -186,7 +187,7 @@ export const Dashboard: React.FC = () => {
                   <h3 className="text-lg font-semibold mb-6">Volume de Empréstimos</h3>
                   <div className="h-[250px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={data}>
+                      <BarChart data={emptyChartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                         <XAxis dataKey="name" stroke="#666" axisLine={false} tickLine={false} />
                         <YAxis stroke="#666" axisLine={false} tickLine={false} />
@@ -201,7 +202,7 @@ export const Dashboard: React.FC = () => {
                   <h3 className="text-lg font-semibold mb-6">Novos Clientes</h3>
                   <div className="h-[250px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={data}>
+                      <LineChart data={emptyChartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                         <XAxis dataKey="name" stroke="#666" axisLine={false} tickLine={false} />
                         <YAxis stroke="#666" axisLine={false} tickLine={false} />
@@ -225,36 +226,11 @@ export const Dashboard: React.FC = () => {
                   {/* Timeline line */}
                   <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-zinc-800"></div>
 
-                  <ActivityItem
-                    title="Pagamento Recebido"
-                    desc="Ana Souza pagou R$ 450,00"
-                    time="2 min atrás"
-                    type="success"
-                  />
-                  <ActivityItem
-                    title="Nova Solicitação"
-                    desc="Pedro Santos solicitou R$ 2.000"
-                    time="15 min atrás"
-                    type="info"
-                  />
-                  <ActivityItem
-                    title="Alerta de Risco"
-                    desc="Carlos Pereira atrasou parcela"
-                    time="1h atrás"
-                    type="warning"
-                  />
-                  <ActivityItem
-                    title="Pagamento Recebido"
-                    desc="Marcos Vinícius pagou R$ 450,00"
-                    time="2h atrás"
-                    type="success"
-                  />
-                  <ActivityItem
-                    title="Cliente Cadastrado"
-                    desc="Julia Matos criou conta"
-                    time="3h atrás"
-                    type="info"
-                  />
+                  {/* Sem atividades - dados virão do banco */}
+                  <div className="text-center py-8 text-zinc-500">
+                    <Activity size={32} className="mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhuma atividade recente</p>
+                  </div>
                 </div>
               </div>
             </div>
