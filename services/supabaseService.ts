@@ -764,6 +764,12 @@ export const supabaseService = {
             preApprovedOffer: c.pre_approved_amount ? {
                 amount: c.pre_approved_amount,
                 createdAt: c.pre_approved_at
+            } : undefined,
+            customRates: c.custom_rates ? {
+                monthlyInterestRate: c.custom_rates.monthly_interest_rate,
+                lateFixedFee: c.custom_rates.late_fixed_fee,
+                lateInterestDaily: c.custom_rates.late_interest_daily,
+                lateInterestMonthly: c.custom_rates.late_interest_monthly
             } : undefined
         }));
     },
@@ -784,6 +790,27 @@ export const supabaseService = {
                 pre_approved_at: new Date().toISOString()
             })
             .eq('id', customerId);
+        return !error;
+    },
+
+    updateCustomerRates: async (customerId: string, rates?: {
+        monthlyInterestRate?: number;
+        lateFixedFee?: number;
+        lateInterestDaily?: number;
+        lateInterestMonthly?: number;
+    }) => {
+        const customRates = rates ? {
+            monthly_interest_rate: rates.monthlyInterestRate,
+            late_fixed_fee: rates.lateFixedFee,
+            late_interest_daily: rates.lateInterestDaily,
+            late_interest_monthly: rates.lateInterestMonthly
+        } : null;
+
+        const { error } = await supabase
+            .from('customers')
+            .update({ custom_rates: customRates })
+            .eq('id', customerId);
+
         return !error;
     },
 

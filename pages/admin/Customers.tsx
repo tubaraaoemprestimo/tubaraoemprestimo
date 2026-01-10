@@ -1,10 +1,10 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign } from 'lucide-react';
+import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings } from 'lucide-react';
 import { supabaseService } from '../../services/supabaseService';
 import { whatsappService } from '../../services/whatsappService';
-import { Customer } from '../../types';
+import { Customer, SystemSettings } from '../../types';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
 
@@ -13,19 +13,30 @@ export const Customers: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
-  
+
   // Message Modal State
   const [msgModalOpen, setMsgModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
 
-  // Pre-approval Modal State
   const [preApproveOpen, setPreApproveOpen] = useState(false);
   const [preApproveAmount, setPreApproveAmount] = useState(500);
 
+  // Rates Modal State
+  const [ratesModalOpen, setRatesModalOpen] = useState(false);
+  const [globalSettings, setGlobalSettings] = useState<SystemSettings | null>(null);
+  const [customRates, setCustomRates] = useState({
+    useCustomRates: false,
+    monthlyInterestRate: 0,
+    lateFixedFee: 0,
+    lateInterestDaily: 0,
+    lateInterestMonthly: 0
+  });
+
   useEffect(() => {
     loadCustomers();
+    loadGlobalSettings();
   }, []);
 
   const loadCustomers = async () => {
@@ -35,15 +46,20 @@ export const Customers: React.FC = () => {
     setLoading(false);
   };
 
+  const loadGlobalSettings = async () => {
+    const settings = await supabaseService.getSettings();
+    setGlobalSettings(settings);
+  };
+
   const handleToggleStatus = async (cust: Customer) => {
-      const newStatus = cust.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE';
-      const action = newStatus === 'ACTIVE' ? 'desbloquear' : 'bloquear';
-      
-      if(confirm(`Tem certeza que deseja ${action} o cliente ${cust.name}?`)) {
-          await supabaseService.toggleCustomerStatus(cust.id, newStatus);
-          addToast(`Cliente ${newStatus === 'ACTIVE' ? 'desbloqueado' : 'bloqueado'} com sucesso.`, 'info');
-          loadCustomers();
-      }
+    const newStatus = cust.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE';
+    const action = newStatus === 'ACTIVE' ? 'desbloquear' : 'bloquear';
+
+    if (confirm(`Tem certeza que deseja ${action} o cliente ${cust.name}?`)) {
+      await supabaseService.toggleCustomerStatus(cust.id, newStatus);
+      addToast(`Cliente ${newStatus === 'ACTIVE' ? 'desbloqueado' : 'bloqueado'} com sucesso.`, 'info');
+      loadCustomers();
+    }
   };
 
   const openMessageModal = (cust: Customer) => {
@@ -56,6 +72,38 @@ export const Customers: React.FC = () => {
     setSelectedCustomer(cust);
     setPreApproveAmount(cust.preApprovedOffer?.amount || 500);
     setPreApproveOpen(true);
+  };
+
+  const openRatesModal = (cust: Customer) => {
+    setSelectedCustomer(cust);
+    const rates = cust.customRates;
+    setCustomRates({
+      useCustomRates: !!rates,
+      monthlyInterestRate: rates?.monthlyInterestRate || globalSettings?.monthlyInterestRate || 0,
+      lateFixedFee: rates?.lateFixedFee || globalSettings?.lateFixedFee || 0,
+      lateInterestDaily: rates?.lateInterestDaily || globalSettings?.lateInterestDaily || 0,
+      lateInterestMonthly: rates?.lateInterestMonthly || globalSettings?.lateInterestMonthly || 0
+    });
+    setRatesModalOpen(true);
+  };
+
+  const handleSaveRates = async () => {
+    if (!selectedCustomer) return;
+    setSending(true);
+
+    const ratesToSave = customRates.useCustomRates ? {
+      monthlyInterestRate: customRates.monthlyInterestRate,
+      lateFixedFee: customRates.lateFixedFee,
+      lateInterestDaily: customRates.lateInterestDaily,
+      lateInterestMonthly: customRates.lateInterestMonthly
+    } : undefined;
+
+    await supabaseService.updateCustomerRates(selectedCustomer.id, ratesToSave);
+
+    setSending(false);
+    setRatesModalOpen(false);
+    addToast(`Taxas ${customRates.useCustomRates ? 'personalizadas salvas' : 'resetadas para padrão'}!`, 'success');
+    loadCustomers();
   };
 
   const handleSendPreApproval = async () => {
@@ -78,34 +126,34 @@ export const Customers: React.FC = () => {
   const handleSendMessage = async () => {
     if (!selectedCustomer || !messageText) return;
     setSending(true);
-    
+
     // Attempt to send
     const success = await whatsappService.sendMessage(selectedCustomer.phone, messageText);
-    
+
     setSending(false);
     if (success) {
-        addToast('Mensagem enviada com sucesso!', 'success');
-        setMsgModalOpen(false);
+      addToast('Mensagem enviada com sucesso!', 'success');
+      setMsgModalOpen(false);
     } else {
-        addToast('Falha ao enviar. Verifique a conexão na aba Configurações.', 'error');
+      addToast('Falha ao enviar. Verifique a conexão na aba Configurações.', 'error');
     }
   };
 
   const handleExportCSV = () => {
     const headers = ["Nome", "CPF", "Telefone", "Status", "Score", "Divida", "Data Entrada"];
     const rows = customers.map(c => [
-        c.name,
-        c.cpf,
-        c.phone,
-        c.status,
-        c.internalScore,
-        c.totalDebt,
-        new Date(c.joinedAt).toLocaleDateString()
+      c.name,
+      c.cpf,
+      c.phone,
+      c.status,
+      c.internalScore,
+      c.totalDebt,
+      new Date(c.joinedAt).toLocaleDateString()
     ]);
 
-    let csvContent = "data:text/csv;charset=utf-8," 
-        + headers.join(",") + "\n" 
-        + rows.map(e => e.join(",")).join("\n");
+    let csvContent = "data:text/csv;charset=utf-8,"
+      + headers.join(",") + "\n"
+      + rows.map(e => e.join(",")).join("\n");
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -116,8 +164,8 @@ export const Customers: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(filter.toLowerCase()) || 
+  const filteredCustomers = customers.filter(c =>
+    c.name.toLowerCase().includes(filter.toLowerCase()) ||
     c.cpf.includes(filter) ||
     c.email.toLowerCase().includes(filter.toLowerCase())
   );
@@ -127,19 +175,19 @@ export const Customers: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <h1 className="text-3xl font-bold text-[#D4AF37]">Gestão de Clientes</h1>
         <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-            <div className="relative w-full md:w-auto">
+          <div className="relative w-full md:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={20} />
-            <input 
-                type="text" 
-                placeholder="Buscar por nome ou CPF..." 
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                className="w-full md:w-80 bg-zinc-900 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-[#D4AF37] outline-none"
+            <input
+              type="text"
+              placeholder="Buscar por nome ou CPF..."
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="w-full md:w-80 bg-zinc-900 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-[#D4AF37] outline-none"
             />
-            </div>
-            <Button onClick={handleExportCSV} variant="secondary" className="w-full md:w-auto bg-zinc-900 border border-zinc-800 hover:border-[#D4AF37]">
-                <Download size={18} className="mr-2"/> Exportar CSV
-            </Button>
+          </div>
+          <Button onClick={handleExportCSV} variant="secondary" className="w-full md:w-auto bg-zinc-900 border border-zinc-800 hover:border-[#D4AF37]">
+            <Download size={18} className="mr-2" /> Exportar CSV
+          </Button>
         </div>
       </div>
 
@@ -172,27 +220,25 @@ export const Customers: React.FC = () => {
                     <td className="p-4">
                       <div className="font-bold text-white flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-[#D4AF37] text-xs">
-                          {cust.name.substring(0,2).toUpperCase()}
+                          {cust.name.substring(0, 2).toUpperCase()}
                         </div>
                         {cust.name}
                       </div>
                       <div className="text-xs text-zinc-500 pl-10">{cust.cpf} • {cust.phone}</div>
                     </td>
                     <td className="p-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold flex w-fit items-center gap-1 ${
-                        cust.status === 'ACTIVE' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
-                      }`}>
-                        {cust.status === 'ACTIVE' ? <UserCheck size={12}/> : <UserX size={12}/>}
+                      <span className={`px-2 py-1 rounded-full text-xs font-bold flex w-fit items-center gap-1 ${cust.status === 'ACTIVE' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
+                        }`}>
+                        {cust.status === 'ACTIVE' ? <UserCheck size={12} /> : <UserX size={12} />}
                         {cust.status === 'ACTIVE' ? 'Ativo' : 'Bloqueado'}
                       </span>
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 w-24 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full ${
-                              cust.internalScore > 700 ? 'bg-green-500' : cust.internalScore > 500 ? 'bg-yellow-500' : 'bg-red-500'
-                            }`} 
+                          <div
+                            className={`h-full rounded-full ${cust.internalScore > 700 ? 'bg-green-500' : cust.internalScore > 500 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`}
                             style={{ width: `${cust.internalScore / 10}%` }}
                           ></div>
                         </div>
@@ -203,41 +249,50 @@ export const Customers: React.FC = () => {
                       <div className="font-bold text-white">R$ {cust.totalDebt.toLocaleString()}</div>
                     </td>
                     <td className="p-4">
-                       {cust.preApprovedOffer ? (
-                          <div className="flex items-center gap-1 text-[#D4AF37] font-bold text-xs bg-[#D4AF37]/10 px-2 py-1 rounded-full w-fit">
-                             <Sparkles size={12} /> R$ {cust.preApprovedOffer.amount.toLocaleString()}
-                          </div>
-                       ) : (
-                          <span className="text-zinc-600 text-xs">-</span>
-                       )}
+                      {cust.preApprovedOffer ? (
+                        <div className="flex items-center gap-1 text-[#D4AF37] font-bold text-xs bg-[#D4AF37]/10 px-2 py-1 rounded-full w-fit">
+                          <Sparkles size={12} /> R$ {cust.preApprovedOffer.amount.toLocaleString()}
+                        </div>
+                      ) : (
+                        <span className="text-zinc-600 text-xs">-</span>
+                      )}
                     </td>
                     <td className="p-4 text-zinc-500 text-sm">
                       {new Date(cust.joinedAt).toLocaleDateString()}
                     </td>
                     <td className="p-4 text-right">
-                       <div className="flex justify-end gap-2">
-                           <Button 
-                              size="sm" 
-                              variant="secondary" 
-                              onClick={() => openPreApproveModal(cust)} 
-                              title="Enviar Pré-Aprovação"
-                              className="text-[#D4AF37] hover:text-[#B5942F]"
-                           >
-                              <DollarSign size={16} />
-                           </Button>
-                           <Button size="sm" variant="secondary" onClick={() => openMessageModal(cust)}>
-                              <MessageSquare size={16} />
-                           </Button>
-                           <Button 
-                                size="sm" 
-                                variant={cust.status === 'ACTIVE' ? 'danger' : 'secondary'} 
-                                onClick={() => handleToggleStatus(cust)}
-                                title={cust.status === 'ACTIVE' ? 'Bloquear Cliente' : 'Desbloquear Cliente'}
-                                className={cust.status === 'ACTIVE' ? 'bg-red-900/20 text-red-500 border border-red-900/50' : 'bg-green-900/20 text-green-500 border border-green-900/50'}
-                           >
-                               {cust.status === 'ACTIVE' ? <ShieldAlert size={16} /> : <ShieldCheck size={16} />}
-                           </Button>
-                       </div>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => openRatesModal(cust)}
+                          title="Configurar Taxas"
+                          className={cust.customRates ? 'text-purple-400 bg-purple-900/20 border border-purple-700/50' : ''}
+                        >
+                          <Percent size={16} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => openPreApproveModal(cust)}
+                          title="Enviar Pré-Aprovação"
+                          className="text-[#D4AF37] hover:text-[#B5942F]"
+                        >
+                          <DollarSign size={16} />
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => openMessageModal(cust)}>
+                          <MessageSquare size={16} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={cust.status === 'ACTIVE' ? 'danger' : 'secondary'}
+                          onClick={() => handleToggleStatus(cust)}
+                          title={cust.status === 'ACTIVE' ? 'Bloquear Cliente' : 'Desbloquear Cliente'}
+                          className={cust.status === 'ACTIVE' ? 'bg-red-900/20 text-red-500 border border-red-900/50' : 'bg-green-900/20 text-green-500 border border-green-900/50'}
+                        >
+                          {cust.status === 'ACTIVE' ? <ShieldAlert size={16} /> : <ShieldCheck size={16} />}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -250,65 +305,158 @@ export const Customers: React.FC = () => {
       {/* Message Modal */}
       {msgModalOpen && selectedCustomer && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
-                <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                        <MessageSquare className="text-green-500" /> WhatsApp
-                    </h3>
-                    <button onClick={() => setMsgModalOpen(false)} className="text-zinc-500 hover:text-white"><X /></button>
-                </div>
-                
-                <div className="space-y-4">
-                    <div className="text-sm text-zinc-400">
-                        Enviando para: <span className="text-white font-bold">{selectedCustomer.name}</span> ({selectedCustomer.phone})
-                    </div>
-                    
-                    <textarea 
-                        value={messageText}
-                        onChange={(e) => setMessageText(e.target.value)}
-                        className="w-full h-32 bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none resize-none"
-                        placeholder="Digite sua mensagem aqui..."
-                    />
-                    
-                    <Button onClick={handleSendMessage} isLoading={sending} className="w-full bg-green-600 hover:bg-green-700 text-white border-none shadow-lg shadow-green-900/20">
-                        <Send size={18} className="mr-2" /> Enviar Mensagem
-                    </Button>
-                </div>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <MessageSquare className="text-green-500" /> WhatsApp
+              </h3>
+              <button onClick={() => setMsgModalOpen(false)} className="text-zinc-500 hover:text-white"><X /></button>
             </div>
+
+            <div className="space-y-4">
+              <div className="text-sm text-zinc-400">
+                Enviando para: <span className="text-white font-bold">{selectedCustomer.name}</span> ({selectedCustomer.phone})
+              </div>
+
+              <textarea
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                className="w-full h-32 bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none resize-none"
+                placeholder="Digite sua mensagem aqui..."
+              />
+
+              <Button onClick={handleSendMessage} isLoading={sending} className="w-full bg-green-600 hover:bg-green-700 text-white border-none shadow-lg shadow-green-900/20">
+                <Send size={18} className="mr-2" /> Enviar Mensagem
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Pre-Approval Modal */}
       {preApproveOpen && selectedCustomer && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
-                <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
-                    <h3 className="text-xl font-bold text-[#D4AF37] flex items-center gap-2">
-                        <Sparkles size={20} /> Crédito Pré-Aprovado
-                    </h3>
-                    <button onClick={() => setPreApproveOpen(false)} className="text-zinc-500 hover:text-white"><X /></button>
-                </div>
-                
-                <p className="text-zinc-400 text-sm mb-6">
-                    Envie uma notificação para <strong>{selectedCustomer.name}</strong> informando que ele possui um limite pré-aprovado.
-                </p>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
+              <h3 className="text-xl font-bold text-[#D4AF37] flex items-center gap-2">
+                <Sparkles size={20} /> Crédito Pré-Aprovado
+              </h3>
+              <button onClick={() => setPreApproveOpen(false)} className="text-zinc-500 hover:text-white"><X /></button>
+            </div>
 
-                <div className="space-y-4">
-                     <div>
-                        <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Valor da Oferta (R$)</label>
-                        <input 
-                            type="number" 
-                            value={preApproveAmount} 
-                            onChange={(e) => setPreApproveAmount(Number(e.target.value))}
-                            className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-2xl font-bold text-white text-center focus:border-[#D4AF37] outline-none"
-                        />
-                     </div>
+            <p className="text-zinc-400 text-sm mb-6">
+              Envie uma notificação para <strong>{selectedCustomer.name}</strong> informando que ele possui um limite pré-aprovado.
+            </p>
 
-                     <Button onClick={handleSendPreApproval} isLoading={sending} className="w-full bg-[#D4AF37] text-black hover:bg-[#B5942F]">
-                         Enviar Oferta Agora
-                     </Button>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Valor da Oferta (R$)</label>
+                <input
+                  type="number"
+                  value={preApproveAmount}
+                  onChange={(e) => setPreApproveAmount(Number(e.target.value))}
+                  className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-2xl font-bold text-white text-center focus:border-[#D4AF37] outline-none"
+                />
+              </div>
+
+              <Button onClick={handleSendPreApproval} isLoading={sending} className="w-full bg-[#D4AF37] text-black hover:bg-[#B5942F]">
+                Enviar Oferta Agora
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rates Modal */}
+      {ratesModalOpen && selectedCustomer && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
+              <h3 className="text-xl font-bold text-purple-400 flex items-center gap-2">
+                <Percent size={20} /> Taxas Personalizadas
+              </h3>
+              <button onClick={() => setRatesModalOpen(false)} className="text-zinc-500 hover:text-white"><X /></button>
+            </div>
+
+            <p className="text-zinc-400 text-sm mb-4">
+              Configure taxas específicas para <strong>{selectedCustomer.name}</strong> que sobrescrevem as taxas globais.
+            </p>
+
+            <div className="space-y-4">
+              {/* Toggle */}
+              <div className="flex items-center justify-between bg-black p-4 rounded-xl border border-zinc-800">
+                <div>
+                  <p className="text-white font-bold">Usar taxas personalizadas</p>
+                  <p className="text-xs text-zinc-500">Se desativado, usa taxa global</p>
                 </div>
-             </div>
+                <button
+                  onClick={() => setCustomRates({ ...customRates, useCustomRates: !customRates.useCustomRates })}
+                  className={`w-12 h-6 rounded-full transition-colors ${customRates.useCustomRates ? 'bg-purple-500' : 'bg-zinc-700'}`}
+                >
+                  <div className={`w-5 h-5 rounded-full bg-white shadow-md transition-transform ${customRates.useCustomRates ? 'translate-x-6' : 'translate-x-1'}`}></div>
+                </button>
+              </div>
+
+              {customRates.useCustomRates && (
+                <div className="space-y-4 animate-in slide-in-from-top-2">
+                  <div>
+                    <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Taxa Mensal Empréstimo (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={customRates.monthlyInterestRate}
+                      onChange={(e) => setCustomRates({ ...customRates, monthlyInterestRate: Number(e.target.value) })}
+                      className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Multa Atraso (R$)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={customRates.lateFixedFee}
+                        onChange={(e) => setCustomRates({ ...customRates, lateFixedFee: Number(e.target.value) })}
+                        className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Juros/Dia (%)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={customRates.lateInterestDaily}
+                        onChange={(e) => setCustomRates({ ...customRates, lateInterestDaily: Number(e.target.value) })}
+                        className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Juros/Mês (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={customRates.lateInterestMonthly}
+                      onChange={(e) => setCustomRates({ ...customRates, lateInterestMonthly: Number(e.target.value) })}
+                      className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-purple-500 outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {!customRates.useCustomRates && (
+                <div className="bg-zinc-800/50 p-4 rounded-xl text-center">
+                  <p className="text-zinc-400 text-sm">Este cliente usará as taxas globais configuradas no sistema.</p>
+                </div>
+              )}
+
+              <Button onClick={handleSaveRates} isLoading={sending} className="w-full bg-purple-500 hover:bg-purple-600 text-white">
+                Salvar Taxas
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

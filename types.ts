@@ -141,6 +141,14 @@ export interface Customer {
     amount: number;
     createdAt: string;
   };
+
+  // Taxas personalizadas do cliente (sobrescrevem as globais se definidas)
+  customRates?: {
+    monthlyInterestRate?: number;     // Taxa mensal de juros do empréstimo
+    lateFixedFee?: number;            // Multa fixa por atraso
+    lateInterestDaily?: number;       // Juros diário por atraso
+    lateInterestMonthly?: number;     // Juros mensal por atraso
+  };
 }
 
 // ==================== PAYMENT RECEIPT TYPES ====================
