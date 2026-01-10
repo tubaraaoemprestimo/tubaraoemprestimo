@@ -250,12 +250,75 @@ export const Settings: React.FC = () => {
           </h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-zinc-400 mb-2">Juros Mensal (%)</label>
+              <label className="block text-sm text-zinc-400 mb-2">Juros Mensal do Empréstimo (%)</label>
               <input type="number" step="0.1" value={settings.monthlyInterestRate} onChange={(e) => setSettings({ ...settings, monthlyInterestRate: Number(e.target.value) })} className={inputStyle} />
+              <p className="text-xs text-zinc-600 mt-1">Taxa aplicada no cálculo das parcelas</p>
             </div>
+          </div>
+        </div>
+
+        {/* Juros de Atraso */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+            <AlertCircle size={20} className="text-red-500" /> Juros de Atraso
+          </h2>
+          <p className="text-zinc-500 text-xs mb-4">Aplicados quando o cliente atrasa o pagamento da parcela</p>
+          <div className="space-y-4">
             <div>
-              <label className="block text-sm text-zinc-400 mb-2">Multa Atraso (%)</label>
-              <input type="number" step="0.1" value={settings.lateFeeRate} onChange={(e) => setSettings({ ...settings, lateFeeRate: Number(e.target.value) })} className={inputStyle} />
+              <label className="block text-sm text-zinc-400 mb-2">Multa Fixa por Atraso (R$)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={settings.lateFixedFee || 0}
+                onChange={(e) => setSettings({ ...settings, lateFixedFee: Number(e.target.value) })}
+                className={inputStyle}
+                placeholder="0.00"
+              />
+              <p className="text-xs text-zinc-600 mt-1">Valor fixo aplicado uma única vez ao atrasar</p>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Juros/Dia (%)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={settings.lateInterestDaily || 0}
+                  onChange={(e) => setSettings({ ...settings, lateInterestDaily: Number(e.target.value) })}
+                  className={inputStyle}
+                  placeholder="0.033"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Juros/Mês (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={settings.lateInterestMonthly || 0}
+                  onChange={(e) => setSettings({ ...settings, lateInterestMonthly: Number(e.target.value) })}
+                  className={inputStyle}
+                  placeholder="1.0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Juros/Ano (%)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={settings.lateInterestYearly || 0}
+                  onChange={(e) => setSettings({ ...settings, lateInterestYearly: Number(e.target.value) })}
+                  className={inputStyle}
+                  placeholder="12.0"
+                />
+              </div>
+            </div>
+            <div className="bg-black/50 p-4 rounded-xl border border-zinc-800 mt-4">
+              <p className="text-xs text-zinc-500 mb-2">Exemplo de cálculo (parcela de R$ 500):</p>
+              <div className="text-sm text-zinc-300">
+                <p>• 10 dias de atraso com {settings.lateInterestDaily || 0}%/dia:</p>
+                <p className="text-[#D4AF37] font-bold pl-4">
+                  R$ {(500 + (settings.lateFixedFee || 0) + (500 * ((settings.lateInterestDaily || 0) / 100) * 10)).toFixed(2)}
+                </p>
+              </div>
             </div>
           </div>
         </div>

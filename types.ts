@@ -86,6 +86,12 @@ export interface DashboardStats {
 export interface SystemSettings {
   monthlyInterestRate: number;
   lateFeeRate: number;
+  // Juros de atraso
+  lateInterestDaily?: number;    // Juros ao dia (%)
+  lateInterestMonthly?: number;  // Juros ao mês (%)
+  lateInterestYearly?: number;   // Juros ao ano (%)
+  lateFixedFee?: number;         // Multa fixa (R$) aplicada ao atrasar
+  // PIX
   pixKey?: string;
   pixKeyType?: 'CPF' | 'CNPJ' | 'EMAIL' | 'TELEFONE' | 'ALEATORIA';
   pixReceiverName?: string;
