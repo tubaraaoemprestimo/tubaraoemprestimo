@@ -32,6 +32,7 @@ import { DocumentsPage } from './pages/admin/Documents';
 import { ScorePage } from './pages/admin/Score';
 import { GeolocationPage } from './pages/admin/Geolocation';
 import { OpenFinancePage } from './pages/admin/OpenFinance';
+import { PaymentReceipts } from './pages/admin/PaymentReceipts';
 
 // Pages - Public
 import { DemoSimulator } from './pages/public/DemoSimulator';
@@ -47,7 +48,7 @@ import {
   LayoutDashboard, FileText, Settings as SettingsIcon, LogOut, Users, Bot, Menu, X,
   UserCog, Home as HomeIcon, PieChart, User as UserIcon, Megaphone, BarChart3,
   Calendar, Ban, FileCheck, DollarSign, MessageSquare, Star, ChevronDown, ChevronRight,
-  MapPin, Landmark
+  MapPin, Landmark, Receipt
 } from 'lucide-react';
 import { Logo } from './components/Logo';
 import { supabaseService } from './services/supabaseService';
@@ -85,6 +86,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {/* Financeiro */}
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Financeiro</p>
         <Link to="/admin/finance" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/finance')}`}><DollarSign size={18} /> Fluxo de Caixa</Link>
+        <Link to="/admin/receipts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/receipts')}`}><Receipt size={18} /> Comprovantes</Link>
         <Link to="/admin/agenda" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/agenda')}`}><Calendar size={18} /> Agenda</Link>
         <Link to="/admin/score" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/score')}`}><Star size={18} /> Score & Renegociação</Link>
         <Link to="/admin/documents" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/documents')}`}><FileCheck size={18} /> Documentos</Link>
@@ -310,6 +312,7 @@ export default function App() {
             <Route path="/admin/score" element={<AdminLayout><ScorePage /></AdminLayout>} />
             <Route path="/admin/geolocation" element={<AdminLayout><GeolocationPage /></AdminLayout>} />
             <Route path="/admin/openfinance" element={<AdminLayout><OpenFinancePage /></AdminLayout>} />
+            <Route path="/admin/receipts" element={<AdminLayout><PaymentReceipts /></AdminLayout>} />
           </Routes>
         </Router>
       </ToastProvider>

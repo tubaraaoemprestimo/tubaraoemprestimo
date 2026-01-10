@@ -86,6 +86,9 @@ export interface DashboardStats {
 export interface SystemSettings {
   monthlyInterestRate: number;
   lateFeeRate: number;
+  pixKey?: string;
+  pixKeyType?: 'CPF' | 'CNPJ' | 'EMAIL' | 'TELEFONE' | 'ALEATORIA';
+  pixReceiverName?: string;
 }
 
 // --- BRANDING / WHITE LABEL ---
@@ -132,6 +135,24 @@ export interface Customer {
     amount: number;
     createdAt: string;
   };
+}
+
+// ==================== PAYMENT RECEIPT TYPES ====================
+
+export interface PaymentReceipt {
+  id: string;
+  installmentId: string;
+  loanId: string;
+  customerId: string;
+  customerName: string;
+  amount: number;
+  receiptUrl: string;
+  receiptType: 'IMAGE' | 'PDF';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  rejectionReason?: string;
 }
 
 // ==================== GEOLOCATION TYPES ====================

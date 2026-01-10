@@ -257,8 +257,52 @@ export const Settings: React.FC = () => {
               <label className="block text-sm text-zinc-400 mb-2">Multa Atraso (%)</label>
               <input type="number" step="0.1" value={settings.lateFeeRate} onChange={(e) => setSettings({ ...settings, lateFeeRate: Number(e.target.value) })} className={inputStyle} />
             </div>
+          </div>
+        </div>
+
+        {/* PIX Configuration */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+            <QrCode size={20} className="text-green-500" /> Chave PIX
+          </h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Tipo da Chave</label>
+              <select
+                value={settings.pixKeyType || 'ALEATORIA'}
+                onChange={(e) => setSettings({ ...settings, pixKeyType: e.target.value as any })}
+                className={inputStyle}
+              >
+                <option value="CPF">CPF</option>
+                <option value="CNPJ">CNPJ</option>
+                <option value="EMAIL">E-mail</option>
+                <option value="TELEFONE">Telefone</option>
+                <option value="ALEATORIA">Chave Aleatória</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Chave PIX</label>
+              <input
+                type="text"
+                value={settings.pixKey || ''}
+                onChange={(e) => setSettings({ ...settings, pixKey: e.target.value })}
+                className={inputStyle}
+                placeholder="Digite sua chave PIX"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Nome do Recebedor</label>
+              <input
+                type="text"
+                value={settings.pixReceiverName || ''}
+                onChange={(e) => setSettings({ ...settings, pixReceiverName: e.target.value })}
+                className={inputStyle}
+                placeholder="Nome que aparece no PIX"
+              />
+              <p className="text-xs text-zinc-600 mt-1">Este nome aparecerá no QR Code do cliente</p>
+            </div>
             <div className="pt-4">
-              <Button onClick={handleSaveSettings} isLoading={loadingFinancial} className="w-full"><Save size={18} /> Salvar Taxas</Button>
+              <Button onClick={handleSaveSettings} isLoading={loadingFinancial} className="w-full"><Save size={18} /> Salvar Configurações</Button>
             </div>
           </div>
         </div>
