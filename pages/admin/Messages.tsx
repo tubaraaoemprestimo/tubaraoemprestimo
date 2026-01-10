@@ -29,22 +29,23 @@ export const MessagesPage: React.FC = () => {
     }, []);
 
     const loadData = async () => {
-        setTemplates(templateService.getAll());
+        const templatesData = await templateService.getAll();
+        setTemplates(templatesData);
         setMassMessages(massMessageService.getAll());
         setCustomers(await supabaseService.getCustomers());
     };
 
-    const handleSaveTemplate = () => {
+    const handleSaveTemplate = async () => {
         if (!currentTemplate.name || !currentTemplate.content) {
             addToast('Preencha nome e conteúdo', 'warning');
             return;
         }
 
         if (currentTemplate.id) {
-            templateService.update(currentTemplate.id, currentTemplate);
+            await templateService.update(currentTemplate.id, currentTemplate);
             addToast('Template atualizado', 'success');
         } else {
-            templateService.save({
+            await templateService.save({
                 name: currentTemplate.name,
                 category: currentTemplate.category || 'CUSTOM',
                 content: currentTemplate.content,
@@ -57,9 +58,9 @@ export const MessagesPage: React.FC = () => {
         loadData();
     };
 
-    const handleDeleteTemplate = (id: string) => {
+    const handleDeleteTemplate = async (id: string) => {
         if (confirm('Excluir este template?')) {
-            templateService.delete(id);
+            await templateService.delete(id);
             addToast('Template excluído', 'info');
             loadData();
         }

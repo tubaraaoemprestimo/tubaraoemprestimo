@@ -56,16 +56,17 @@ export const AuditPage: React.FC = () => {
         loadLogs();
     }, [filterAction, filterEntity]);
 
-    const loadLogs = () => {
+    const loadLogs = async () => {
         const filters: any = { limit: 200 };
         if (filterAction !== 'ALL') filters.action = filterAction;
         if (filterEntity !== 'ALL') filters.entity = filterEntity;
-        setLogs(auditService.getAll(filters));
+        const data = await auditService.getAll(filters);
+        setLogs(data);
     };
 
-    const handleClearLogs = () => {
+    const handleClearLogs = async () => {
         if (confirm('Tem certeza que deseja limpar todos os logs? Esta ação não pode ser desfeita.')) {
-            auditService.clear();
+            await auditService.clear();
             addToast('Logs limpos com sucesso', 'info');
             loadLogs();
         }

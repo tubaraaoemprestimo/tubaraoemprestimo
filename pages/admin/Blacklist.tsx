@@ -17,24 +17,26 @@ export const BlacklistPage: React.FC = () => {
         loadBlacklist();
     }, []);
 
-    const loadBlacklist = () => {
-        setEntries(blacklistService.getAll());
+    const loadBlacklist = async () => {
+        const data = await blacklistService.getAll();
+        setEntries(data);
     };
 
-    const handleAdd = () => {
+    const handleAdd = async () => {
         if (!newEntry.cpf || !newEntry.name || !newEntry.reason) {
             addToast('Preencha todos os campos', 'warning');
             return;
         }
 
         // Check if already exists
-        if (blacklistService.check(newEntry.cpf)) {
+        const exists = await blacklistService.check(newEntry.cpf);
+        if (exists) {
             addToast('Este CPF já está na blacklist', 'warning');
             return;
         }
 
         const user = JSON.parse(localStorage.getItem('tubarao_user') || '{}');
-        blacklistService.add({
+        await blacklistService.add({
             cpf: newEntry.cpf,
             name: newEntry.name,
             reason: newEntry.reason,
@@ -47,16 +49,16 @@ export const BlacklistPage: React.FC = () => {
         loadBlacklist();
     };
 
-    const handleRemove = (id: string) => {
+    const handleRemove = async (id: string) => {
         if (confirm('Tem certeza que deseja remover este CPF da blacklist?')) {
-            blacklistService.remove(id);
+            await blacklistService.remove(id);
             addToast('CPF removido da blacklist', 'info');
             loadBlacklist();
         }
     };
 
-    const handleToggle = (id: string) => {
-        blacklistService.toggle(id);
+    const handleToggle = async (id: string) => {
+        await blacklistService.toggle(id);
         loadBlacklist();
     };
 
