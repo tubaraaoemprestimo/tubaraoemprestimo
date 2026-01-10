@@ -206,6 +206,27 @@ export const supabaseService = {
         }
     },
 
+    resetPassword: async (email: string): Promise<{ success: boolean; message: string }> => {
+        try {
+            // Se o email não tem @, adiciona o domínio padrão
+            const formattedEmail = email.includes('@') ? email : `${email}@tubarao.local`;
+
+            const { error } = await supabase.auth.resetPasswordForEmail(formattedEmail, {
+                redirectTo: `${window.location.origin}/#/reset-password`
+            });
+
+            if (error) {
+                console.error('Reset password error:', error);
+                return { success: false, message: 'Erro ao enviar email. Verifique o endereço.' };
+            }
+
+            return { success: true, message: 'Email de recuperação enviado! Verifique sua caixa de entrada.' };
+        } catch (err) {
+            console.error('Reset password error:', err);
+            return { success: false, message: 'Erro ao processar solicitação.' };
+        }
+    },
+
     updateUserAvatar: async (avatarUrl: string): Promise<boolean> => {
         const user = loadFromStorage<any>(STORAGE_KEYS.USER, null);
         if (user) {
@@ -245,13 +266,43 @@ export const supabaseService = {
 
     createUser: async (userData: any): Promise<boolean> => {
         try {
-            const { error } = await supabase.from('users').insert({
-                name: userData.name,
+            // 1. Criar usuário no Supabase Auth
+            const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: userData.email,
-                role: userData.role
+                password: userData.password,
+                options: {
+                    data: {
+                        name: userData.name,
+                        role: userData.role
+                    },
+                    // Desabilitar confirmação de email para uso imediato
+                    emailRedirectTo: undefined
+                }
             });
-            return !error;
-        } catch {
+
+            if (authError) {
+                console.error('Auth error creating user:', authError);
+                return false;
+            }
+
+            // 2. Criar perfil na tabela users
+            if (authData.user) {
+                const { error: profileError } = await supabase.from('users').insert({
+                    auth_id: authData.user.id,
+                    name: userData.name,
+                    email: userData.email,
+                    role: userData.role
+                });
+
+                if (profileError) {
+                    console.error('Profile error:', profileError);
+                    // Mesmo com erro no perfil, o auth foi criado
+                }
+            }
+
+            return true;
+        } catch (err) {
+            console.error('Create user error:', err);
             return false;
         }
     },
