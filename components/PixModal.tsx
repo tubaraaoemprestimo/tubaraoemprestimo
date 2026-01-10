@@ -1,114 +1,153 @@
+// 💳 PIX Payment Modal - Integrado com configurações do sistema
+// Modal de pagamento PIX com QR Code real e upload de comprovante
 
-import React, { useState } from 'react';
-import { X, Copy, CheckCircle2, Clock, Upload, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Clock } from 'lucide-react';
 import { Button } from './Button';
+import { PixQrCode } from './PixQrCode';
+import { PaymentReceiptUpload } from './PaymentReceiptUpload';
+import { supabaseService } from '../services/supabaseService';
 
 interface PixModalProps {
   amount: number;
-  pixCode: string;
+  installmentId: string;
+  loanId: string;
+  customerId?: string;
+  customerName?: string;
   onClose: () => void;
-  onUploadProof?: (file: string) => Promise<void>; // New prop
+  onPaymentSubmitted?: () => void;
 }
 
-export const PixModal: React.FC<PixModalProps> = ({ amount, pixCode, onClose, onUploadProof }) => {
-  const [copied, setCopied] = useState(false);
-  const [uploading, setUploading] = useState(false);
+export const PixModal: React.FC<PixModalProps> = ({
+  amount,
+  installmentId,
+  loanId,
+  customerId,
+  customerName,
+  onClose,
+  onPaymentSubmitted
+}) => {
+  const [pixConfig, setPixConfig] = useState<{
+    pixKey: string;
+    pixKeyType: 'CPF' | 'CNPJ' | 'EMAIL' | 'TELEFONE' | 'ALEATORIA';
+    pixReceiverName: string;
+  } | null>(null);
+  const [showUpload, setShowUpload] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(pixCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  useEffect(() => {
+    loadPixConfig();
+  }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && onUploadProof) {
-        setUploading(true);
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-            const result = reader.result as string;
-            await onUploadProof(result);
-            setUploading(false);
-            onClose();
-        };
-        reader.readAsDataURL(file);
+  const loadPixConfig = async () => {
+    setLoading(true);
+    try {
+      const settings = await supabaseService.getSettings();
+      setPixConfig({
+        pixKey: settings.pixKey || '',
+        pixKeyType: settings.pixKeyType || 'ALEATORIA',
+        pixReceiverName: settings.pixReceiverName || 'TUBARAO EMPRESTIMOS'
+      });
+    } catch (err) {
+      console.error('Erro ao carregar config PIX:', err);
     }
+    setLoading(false);
   };
+
+  const handleUploadSuccess = () => {
+    onPaymentSubmitted?.();
+    onClose();
+  };
+
+  // Get current user info
+  const user = JSON.parse(localStorage.getItem('tubarao_user') || '{}');
+  const finalCustomerId = customerId || user.customerId || user.id;
+  const finalCustomerName = customerName || user.name || 'Cliente';
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-zinc-500 hover:text-white p-2">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-zinc-500 hover:text-white p-2 z-10">
           <X size={24} />
         </button>
 
-        <div className="p-8 flex flex-col items-center text-center">
-          <div className="w-16 h-16 rounded-full bg-[#D4AF37]/10 flex items-center justify-center mb-4">
-             <img src="https://upload.wikimedia.org/wikipedia/commons/a/a2/Logo%E2%80%94pix_powered_by_Banco_Central_%28Brazil%2C_2020%29.svg" alt="Pix" className="w-10 opacity-80" />
-          </div>
-          
-          <h2 className="text-xl font-bold text-white mb-1">Pagamento via Pix</h2>
-          <p className="text-zinc-400 text-sm mb-6">Escaneie o QR Code ou copie o código abaixo.</p>
+        <div className="p-6">
+          {loading ? (
+            <div className="text-center py-12 text-zinc-500">
+              <div className="w-12 h-12 border-2 border-zinc-700 border-t-[#D4AF37] rounded-full animate-spin mx-auto mb-4"></div>
+              <p>Carregando dados de pagamento...</p>
+            </div>
+          ) : !showUpload ? (
+            <>
+              {/* PIX QR Code Section */}
+              {pixConfig && pixConfig.pixKey ? (
+                <PixQrCode
+                  pixKey={pixConfig.pixKey}
+                  pixKeyType={pixConfig.pixKeyType}
+                  receiverName={pixConfig.pixReceiverName}
+                  amount={amount}
+                  txId={`TUB${installmentId.slice(-8)}`}
+                />
+              ) : (
+                <div className="text-center py-8 bg-yellow-900/20 border border-yellow-700/30 rounded-xl mb-6">
+                  <p className="text-yellow-400 text-sm">
+                    Chave PIX não configurada pelo administrador.
+                  </p>
+                  <p className="text-zinc-500 text-xs mt-2">
+                    Entre em contato para obter os dados de pagamento.
+                  </p>
+                </div>
+              )}
 
-          <div className="bg-white p-4 rounded-xl mb-6">
-             {/* Using a placeholder QR code API for demo visualization */}
-             <img 
-               src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixCode)}`} 
-               alt="QR Code" 
-               className="w-48 h-48"
-             />
-          </div>
+              {/* Action Button */}
+              <div className="mt-6 space-y-3">
+                <Button
+                  onClick={() => setShowUpload(true)}
+                  className="w-full"
+                >
+                  Já Paguei - Anexar Comprovante
+                </Button>
 
-          <div className="mb-6">
-             <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Valor a Pagar</div>
-             <div className="text-3xl font-bold text-[#D4AF37]">R$ {amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-          </div>
+                <Button onClick={onClose} variant="secondary" className="w-full">
+                  Fechar
+                </Button>
+              </div>
 
-          <div className="w-full bg-black border border-zinc-800 rounded-xl p-4 mb-4 flex items-center justify-between gap-4 group cursor-pointer hover:border-[#D4AF37]/50 transition-colors" onClick={handleCopy}>
-             <div className="flex-1 overflow-hidden">
-                <p className="text-xs text-zinc-500 mb-1 text-left">Código Copia e Cola</p>
-                <p className="text-zinc-300 text-xs truncate font-mono text-left">{pixCode}</p>
-             </div>
-             <div className={`${copied ? 'text-green-500' : 'text-[#D4AF37]'}`}>
-                {copied ? <CheckCircle2 size={20} /> : <Copy size={20} />}
-             </div>
-          </div>
+              <div className="mt-4 flex items-center justify-center gap-2 text-xs text-zinc-500">
+                <Clock size={12} />
+                <span>O comprovante será analisado pelo administrador</span>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Upload Section */}
+              <div className="mb-4">
+                <button
+                  onClick={() => setShowUpload(false)}
+                  className="text-[#D4AF37] text-sm hover:underline"
+                >
+                  ← Voltar para QR Code
+                </button>
+              </div>
 
-          <div className="w-full space-y-2">
-             {/* Upload Button */}
-             {onUploadProof && (
-                 <div className="relative">
-                    <input 
-                        type="file" 
-                        id="proof-upload" 
-                        accept="image/*,application/pdf"
-                        className="hidden" 
-                        onChange={handleFileChange}
-                        disabled={uploading}
-                    />
-                    <label 
-                        htmlFor="proof-upload" 
-                        className={`flex items-center justify-center gap-2 w-full p-4 rounded-xl cursor-pointer transition-colors font-bold ${
-                            uploading ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-[#D4AF37] text-black hover:bg-[#B5942F]'
-                        }`}
-                    >
-                        {uploading ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
-                        {uploading ? "Enviando..." : "Anexar Comprovante"}
-                    </label>
-                 </div>
-             )}
-             
-             <Button onClick={onClose} variant="secondary" className="w-full" disabled={uploading}>
-                Fechar
-             </Button>
-          </div>
+              <PaymentReceiptUpload
+                installmentId={installmentId}
+                loanId={loanId}
+                customerId={finalCustomerId}
+                customerName={finalCustomerName}
+                amount={amount}
+                onUploadSuccess={handleUploadSuccess}
+              />
 
-          <div className="mt-4 flex items-center gap-2 text-xs text-zinc-500 bg-zinc-900/50 py-1 px-3 rounded-full">
-             <Clock size={12} />
-             <span>Este código expira em 30 minutos</span>
-          </div>
+              <Button onClick={onClose} variant="secondary" className="w-full mt-4">
+                Cancelar
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 };
+
+export default PixModal;
