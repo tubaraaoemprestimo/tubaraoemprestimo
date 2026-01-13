@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { autoNotificationService } from './autoNotificationService';
 import {
     LoanRequest,
     LoanStatus,
@@ -694,6 +695,11 @@ export const supabaseService = {
                 total_debt: totalAmount
             })
             .eq('id', request.customer_id);
+
+        // ✅ Enviar notificação automática de aprovação
+        if (request.email) {
+            await autoNotificationService.onLoanApproved(request.email, request.amount);
+        }
 
         return true;
     },

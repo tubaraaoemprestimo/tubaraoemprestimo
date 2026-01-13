@@ -7,6 +7,7 @@ import { Button } from '../../components/Button';
 import { supabase } from '../../services/supabaseClient';
 import { PaymentReceipt } from '../../types';
 import { useToast } from '../../components/Toast';
+import { autoNotificationService } from '../../services/autoNotificationService';
 
 export const PaymentReceipts: React.FC = () => {
     const { addToast } = useToast();
@@ -82,8 +83,28 @@ export const PaymentReceipts: React.FC = () => {
 
             if (error) throw error;
 
-            // TODO: Dar baixa na parcela aqui
-            // await supabaseService.markInstallmentAsPaid(receipt.installmentId);
+            // Marcar parcela como paga
+            await supabase
+                .from('installments')
+                .update({ status: 'PAID', paid_at: new Date().toISOString() })
+                .eq('id', receipt.installmentId);
+
+            // Buscar email do cliente para notificação
+            const { data: customer } = await supabase
+                .from('customers')
+                .select('email')
+                .eq('id', receipt.customerId)
+                .single();
+
+            // Enviar notificação e atualizar score
+            if (customer?.email) {
+                await autoNotificationService.onPaymentConfirmed(
+                    customer.email,
+                    receipt.amount,
+                    true, // wasOnTime - podemos calcular depois
+                    false // wasEarly
+                );
+            }
 
             addToast('Pagamento aprovado! Parcela baixada.', 'success');
             setSelectedReceipt(null);
@@ -235,8 +256,8 @@ export const PaymentReceipts: React.FC = () => {
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                     <div className="flex items-center gap-4">
                                         <div className={`p-3 rounded-lg ${receipt.receiptType === 'IMAGE'
-                                                ? 'bg-blue-500/20 text-blue-400'
-                                                : 'bg-red-500/20 text-red-400'
+                                            ? 'bg-blue-500/20 text-blue-400'
+                                            : 'bg-red-500/20 text-red-400'
                                             }`}>
                                             {receipt.receiptType === 'IMAGE' ? <Image size={24} /> : <FileText size={24} />}
                                         </div>
@@ -367,8 +388,8 @@ export const PaymentReceipts: React.FC = () => {
 
                             {selectedReceipt.status !== 'PENDING' && (
                                 <div className={`p-4 rounded-xl ${selectedReceipt.status === 'APPROVED'
-                                        ? 'bg-green-900/20 border border-green-700/30'
-                                        : 'bg-red-900/20 border border-red-700/30'
+                                    ? 'bg-green-900/20 border border-green-700/30'
+                                    : 'bg-red-900/20 border border-red-700/30'
                                     }`}>
                                     <p className={`font-bold ${selectedReceipt.status === 'APPROVED' ? 'text-green-400' : 'text-red-400'
                                         }`}>
