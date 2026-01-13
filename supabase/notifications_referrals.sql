@@ -1,13 +1,14 @@
 -- ==============================================================
--- Script para Notificações, Score Real e Sistema "Indique e Ganhe"
+-- Script CORRIGIDO para Notificações, Score Real e Indique e Ganhe
 -- Execute no Supabase SQL Editor
 -- ==============================================================
 
 -- 1. TABELA DE NOTIFICAÇÕES
--- Notificações reais do sistema para cada cliente
-CREATE TABLE IF NOT EXISTS notifications (
+DROP TABLE IF EXISTS notifications CASCADE;
+CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+    user_id UUID, -- ID do usuário (auth_id ou user.id)
+    customer_email TEXT, -- Email do cliente para identificação
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
     type VARCHAR(50) DEFAULT 'INFO', -- INFO, WARNING, ALERT, SUCCESS
@@ -17,55 +18,39 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 -- Índices para performance
-CREATE INDEX IF NOT EXISTS idx_notifications_customer ON notifications(customer_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(customer_id, read);
-CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC);
-
--- RLS para notificações
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Customers can view own notifications" ON notifications
-    FOR SELECT USING (
-        customer_id IN (
-            SELECT id FROM customers WHERE email = auth.jwt() ->> 'email'
-        )
-    );
-
-CREATE POLICY "Admin can manage all notifications" ON notifications
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM users 
-            WHERE auth_id = auth.uid() AND role = 'ADMIN'
-        )
-    );
+CREATE INDEX idx_notifications_user ON notifications(user_id);
+CREATE INDEX idx_notifications_email ON notifications(customer_email);
+CREATE INDEX idx_notifications_read ON notifications(read);
+CREATE INDEX idx_notifications_created ON notifications(created_at DESC);
 
 -- 2. TABELA DE HISTÓRICO DE SCORE
--- Histórico de alterações de score do cliente
-CREATE TABLE IF NOT EXISTS score_history (
+DROP TABLE IF EXISTS score_history CASCADE;
+CREATE TABLE score_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+    customer_email TEXT NOT NULL,
     score_before INTEGER NOT NULL,
     score_after INTEGER NOT NULL,
     reason VARCHAR(255) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_score_history_customer ON score_history(customer_id);
+CREATE INDEX idx_score_history_email ON score_history(customer_email);
 
 -- 3. TABELA DE INDICAÇÕES (Indique e Ganhe)
--- Sistema de códigos de indicação com validação do admin
-CREATE TABLE IF NOT EXISTS referrals (
+DROP TABLE IF EXISTS referrals CASCADE;
+CREATE TABLE referrals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     
     -- Quem indicou
-    referrer_customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
-    referrer_code VARCHAR(10) NOT NULL UNIQUE, -- Código único de 6 caracteres
+    referrer_email TEXT NOT NULL,
+    referrer_name TEXT,
+    referrer_code VARCHAR(10) NOT NULL, -- Código único de 6 caracteres
     
     -- Quem foi indicado
-    referred_customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
-    referred_name VARCHAR(255),
+    referred_name VARCHAR(255) NOT NULL,
     referred_cpf VARCHAR(14),
     referred_phone VARCHAR(20),
+    referred_email TEXT,
     
     -- Status da indicação
     status VARCHAR(50) DEFAULT 'PENDING', -- PENDING, APPROVED, REJECTED, BONUS_PAID
@@ -78,35 +63,17 @@ CREATE TABLE IF NOT EXISTS referrals (
     -- Datas
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     approved_at TIMESTAMP WITH TIME ZONE,
-    approved_by UUID REFERENCES users(id)
+    approved_by TEXT
 );
 
 -- Índices
-CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_customer_id);
-CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(referrer_code);
-CREATE INDEX IF NOT EXISTS idx_referrals_status ON referrals(status);
-
--- RLS para indicações
-ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Customers can view own referrals" ON referrals
-    FOR SELECT USING (
-        referrer_customer_id IN (
-            SELECT id FROM customers WHERE email = auth.jwt() ->> 'email'
-        )
-    );
-
-CREATE POLICY "Admin can manage all referrals" ON referrals
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM users 
-            WHERE auth_id = auth.uid() AND role = 'ADMIN'
-        )
-    );
+CREATE INDEX idx_referrals_referrer ON referrals(referrer_email);
+CREATE INDEX idx_referrals_code ON referrals(referrer_code);
+CREATE INDEX idx_referrals_status ON referrals(status);
 
 -- 4. ADICIONAR COLUNA DE CÓDIGO DE INDICAÇÃO NO CUSTOMER
 -- Cada cliente tem seu código único para indicar outros
-ALTER TABLE customers ADD COLUMN IF NOT EXISTS referral_code VARCHAR(10) UNIQUE;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS referral_code VARCHAR(10);
 
 -- 5. FUNÇÃO PARA GERAR CÓDIGO DE INDICAÇÃO
 CREATE OR REPLACE FUNCTION generate_referral_code()
@@ -152,26 +119,14 @@ UPDATE customers
 SET referral_code = generate_referral_code() 
 WHERE referral_code IS NULL;
 
--- 8. CONFIGURAÇÃO DE BÔNUS DE INDICAÇÃO (no system_settings)
+-- 8. Adicionar índice único para referral_code
+CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_referral_code ON customers(referral_code);
+
+-- 9. CONFIGURAÇÃO DE BÔNUS DE INDICAÇÃO (no system_settings se não existir)
 INSERT INTO system_settings (key, value) 
-VALUES ('referral_bonus', '{"amount": 50, "enabled": true}')
-ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+VALUES ('referral_bonus', '50')
+ON CONFLICT (key) DO NOTHING;
 
 -- ==============================================================
--- Comentários sobre o sistema:
--- 
--- NOTIFICAÇÕES:
--- - Criadas automaticamente por triggers ou manualmente pelo admin
--- - Tipos: INFO, WARNING, ALERT, SUCCESS
--- 
--- SCORE:
--- - Score real baseado no histórico do cliente
--- - Aumenta com pagamentos em dia
--- - Diminui com atrasos
--- 
--- INDIQUE E GANHE:
--- - Cada cliente tem um código único (6 caracteres)
--- - Quando alguém usa o código, a indicação fica PENDING
--- - Admin valida e aprova/rejeita
--- - Após aprovação, cliente indicado contrata, bônus é creditado
+-- SUCESSO! Execute o próximo bloco para inserir notificação de teste
 -- ==============================================================

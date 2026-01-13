@@ -33,6 +33,7 @@ import { ScorePage } from './pages/admin/Score';
 import { GeolocationPage } from './pages/admin/Geolocation';
 import { OpenFinancePage } from './pages/admin/OpenFinance';
 import { PaymentReceipts } from './pages/admin/PaymentReceipts';
+import { Referrals } from './pages/admin/Referrals';
 
 // Pages - Public
 import { DemoSimulator } from './pages/public/DemoSimulator';
@@ -48,7 +49,7 @@ import {
   LayoutDashboard, FileText, Settings as SettingsIcon, LogOut, Users, Bot, Menu, X,
   UserCog, Home as HomeIcon, PieChart, User as UserIcon, Megaphone, BarChart3,
   Calendar, Ban, FileCheck, DollarSign, MessageSquare, Star, ChevronDown, ChevronRight,
-  MapPin, Landmark, Receipt
+  MapPin, Landmark, Receipt, Gift
 } from 'lucide-react';
 import { Logo } from './components/Logo';
 import { supabaseService } from './services/supabaseService';
@@ -95,6 +96,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Comunicação</p>
         <Link to="/admin/messages" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/messages')}`}><MessageSquare size={18} /> Mensagens</Link>
         <Link to="/admin/marketing" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/marketing')}`}><Megaphone size={18} /> Marketing</Link>
+        <Link to="/admin/referrals" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/referrals')}`}><Gift size={18} /> Indique e Ganhe</Link>
 
         {/* Análises */}
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Análises</p>
@@ -313,6 +315,7 @@ export default function App() {
             <Route path="/admin/geolocation" element={<AdminLayout><GeolocationPage /></AdminLayout>} />
             <Route path="/admin/openfinance" element={<AdminLayout><OpenFinancePage /></AdminLayout>} />
             <Route path="/admin/receipts" element={<AdminLayout><PaymentReceipts /></AdminLayout>} />
+            <Route path="/admin/referrals" element={<AdminLayout><Referrals /></AdminLayout>} />
           </Routes>
         </Router>
       </ToastProvider>
