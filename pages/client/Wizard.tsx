@@ -57,6 +57,7 @@ export const Wizard: React.FC = () => {
     proofIncome: [] as string[],
     workCard: [] as string[],   // Carteira de trabalho digital
     billInName: [] as string[], // Boleto em nome do cliente
+    bankStatement: [] as string[], // Extrato bancário
 
     // Vehicle Data
     hasVehicle: false,
@@ -660,13 +661,34 @@ export const Wizard: React.FC = () => {
                   <h3 className="font-semibold text-sm flex items-center gap-2 text-[#D4AF37]">
                     <FileText size={18} /> Documentos Necessários
                   </h3>
+                  <p className="text-xs text-zinc-500 -mt-4">Envie fotos ou PDFs claros de todos os documentos</p>
 
-                  {renderUploadArea('idCardFront', 'Selfie com RG ou CNH', formData.idCardFront)}
-                  {renderUploadArea('idCardBack', 'RG/CNH (Verso)', formData.idCardBack)}
-                  {renderUploadArea('proofAddress', 'Comprovante de Endereço (Água/Luz)', formData.proofAddress)}
-                  {renderUploadArea('billInName', 'Boleto em seu Nome', formData.billInName)}
-                  {renderUploadArea('proofIncome', 'Holerite ou Extrato Recente', formData.proofIncome)}
-                  {renderUploadArea('workCard', 'Carteira de Trabalho Digital (Print/PDF)', formData.workCard)}
+                  {/* Documentos de Identidade */}
+                  <div className="bg-black/30 border border-zinc-800 rounded-xl p-4 space-y-4">
+                    <p className="text-xs text-zinc-400 font-bold uppercase">📄 Identificação</p>
+                    {renderUploadArea('idCardFront', 'Selfie segurando RG ou CNH', formData.idCardFront)}
+                    {renderUploadArea('idCardBack', 'RG/CNH (Verso)', formData.idCardBack)}
+                  </div>
+
+                  {/* Comprovantes de Endereço */}
+                  <div className="bg-black/30 border border-zinc-800 rounded-xl p-4 space-y-4">
+                    <p className="text-xs text-zinc-400 font-bold uppercase">🏠 Comprovante de Residência</p>
+                    {renderUploadArea('proofAddress', 'Conta de Água ou Luz (recente)', formData.proofAddress)}
+                    {renderUploadArea('billInName', 'Boleto em seu Nome', formData.billInName)}
+                  </div>
+
+                  {/* Comprovantes de Renda/Trabalho */}
+                  <div className="bg-black/30 border border-zinc-800 rounded-xl p-4 space-y-4">
+                    <p className="text-xs text-zinc-400 font-bold uppercase">💼 Comprovante de Renda</p>
+                    {renderUploadArea('proofIncome', 'Holerite ou Contracheque', formData.proofIncome)}
+                    {renderUploadArea('workCard', 'Carteira de Trabalho Digital (Vínculos)', formData.workCard)}
+                  </div>
+
+                  {/* Comprovante Bancário */}
+                  <div className="bg-black/30 border border-zinc-800 rounded-xl p-4 space-y-4">
+                    <p className="text-xs text-zinc-400 font-bold uppercase">🏦 Comprovante Bancário</p>
+                    {renderUploadArea('bankStatement', 'Extrato Bancário Recente', formData.bankStatement)}
+                  </div>
                 </div>
 
                 <div className="pt-4 border-t border-zinc-800">

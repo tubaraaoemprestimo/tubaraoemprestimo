@@ -256,7 +256,12 @@ export const ClientDashboard: React.FC = () => {
 
         {/* Loan Progress Timeline */}
         {pendingRequest && (
-          <LoanTimeline status={pendingRequest.status} date={pendingRequest.date} />
+          <LoanTimeline
+            status={pendingRequest.status}
+            date={pendingRequest.date}
+            amount={pendingRequest.amount}
+            installments={pendingRequest.installments}
+          />
         )}
 
         {/* Main Debt Card */}
