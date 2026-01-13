@@ -496,12 +496,21 @@ export const supabaseService = {
 
             const settings: any = {};
             data.forEach(item => {
-                settings[item.key] = typeof item.value === 'string' ? parseFloat(item.value) || item.value : item.value;
+                // Tentar parsear como número, senão manter como string
+                const numValue = parseFloat(item.value);
+                settings[item.key] = isNaN(numValue) ? item.value : numValue;
             });
 
             return {
                 monthlyInterestRate: settings.monthlyInterestRate || 5,
-                lateFeeRate: settings.lateFeeRate || 2
+                lateFeeRate: settings.lateFeeRate || 2,
+                lateInterestDaily: settings.lateInterestDaily || 0,
+                lateInterestMonthly: settings.lateInterestMonthly || 0,
+                lateInterestYearly: settings.lateInterestYearly || 0,
+                lateFixedFee: settings.lateFixedFee || 0,
+                pixKey: settings.pixKey || '',
+                pixKeyType: settings.pixKeyType || 'ALEATORIA',
+                pixReceiverName: settings.pixReceiverName || '',
             };
         } catch {
             return { monthlyInterestRate: 5, lateFeeRate: 2 };
@@ -509,10 +518,19 @@ export const supabaseService = {
     },
 
     updateSettings: async (s: SystemSettings) => {
-        await supabase.from('system_settings').upsert([
-            { key: 'monthlyInterestRate', value: s.monthlyInterestRate.toString() },
-            { key: 'lateFeeRate', value: s.lateFeeRate.toString() }
-        ], { onConflict: 'key' });
+        const updates = [
+            { key: 'monthlyInterestRate', value: s.monthlyInterestRate?.toString() || '0' },
+            { key: 'lateFeeRate', value: s.lateFeeRate?.toString() || '0' },
+            { key: 'lateInterestDaily', value: s.lateInterestDaily?.toString() || '0' },
+            { key: 'lateInterestMonthly', value: s.lateInterestMonthly?.toString() || '0' },
+            { key: 'lateInterestYearly', value: s.lateInterestYearly?.toString() || '0' },
+            { key: 'lateFixedFee', value: s.lateFixedFee?.toString() || '0' },
+            { key: 'pixKey', value: s.pixKey || '' },
+            { key: 'pixKeyType', value: s.pixKeyType || 'ALEATORIA' },
+            { key: 'pixReceiverName', value: s.pixReceiverName || '' },
+        ];
+
+        await supabase.from('system_settings').upsert(updates, { onConflict: 'key' });
         return true;
     },
 
