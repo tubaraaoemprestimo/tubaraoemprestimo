@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, ChevronRight, ChevronLeft, Upload, User, MapPin, Camera as CameraIcon, PenTool, AlertCircle, FileText, Image as ImageIcon, Car, ScanFace, X, Plus, Loader2, Sparkles, Scan, Phone, Users, Video } from 'lucide-react';
+import {
+  Check, ChevronRight, ChevronLeft, Upload, User, MapPin, Camera as CameraIcon, PenTool,
+  AlertCircle, FileText, Image as ImageIcon, Car, ScanFace, X, Plus, Loader2, Sparkles, Scan,
+  Phone, Users, Video, DollarSign, Shield, Clock, Landmark, CreditCard, CheckCircle2, FileCheck
+} from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Camera } from '../../components/Camera';
 import { SignaturePad } from '../../components/SignaturePad';
@@ -11,12 +15,26 @@ import { ocrService } from '../../services/ocrService';
 import { useToast } from '../../components/Toast';
 import { InstallPwaButton } from '../../components/InstallPwaButton';
 
+// Novo fluxo de steps
 const steps = [
-  { id: 1, title: 'Pessoal', icon: User },
-  { id: 2, title: 'Endereço', icon: MapPin },
-  { id: 3, title: 'Garantias', icon: CameraIcon },
-  { id: 4, title: 'Finalizar', icon: PenTool },
+  { id: 1, title: 'Valores', icon: DollarSign },
+  { id: 2, title: 'Termos', icon: Shield },
+  { id: 3, title: 'Dados', icon: User },
+  { id: 4, title: 'Documentos', icon: FileText },
+  { id: 5, title: 'Banco', icon: Landmark },
+  { id: 6, title: 'Confirmar', icon: CheckCircle2 },
 ];
+
+// Pacotes de empréstimo (configuráveis pelo admin)
+const loanPackages = [
+  { id: 1, amount: 500, label: 'R$ 500', popular: false },
+  { id: 2, amount: 1000, label: 'R$ 1.000', popular: true },
+  { id: 3, amount: 2000, label: 'R$ 2.000', popular: false },
+  { id: 4, amount: 3000, label: 'R$ 3.000', popular: false },
+  { id: 5, amount: 5000, label: 'R$ 5.000', popular: false },
+];
+
+const installmentOptions = [2, 3, 4, 5, 6, 8, 10, 12];
 
 export const Wizard: React.FC = () => {
   const navigate = useNavigate();
@@ -28,83 +46,77 @@ export const Wizard: React.FC = () => {
   const [scanningOCR, setScanningOCR] = useState(false);
   const [scannedImage, setScannedImage] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ cpf?: string; cep?: string; biometrics?: string; doc?: string }>({});
-  const [showTerms, setShowTerms] = useState(false);
 
-  // Approval Chance State
-  const [approvalChance, setApprovalChance] = useState(10);
+  // Termos aceitos
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
+  // Valores do empréstimo
+  const [selectedAmount, setSelectedAmount] = useState<number>(1000);
+  const [customAmount, setCustomAmount] = useState<string>('');
+  const [selectedInstallments, setSelectedInstallments] = useState<number>(4);
 
   const [formData, setFormData] = useState({
+    // Dados Pessoais
     name: '', cpf: '', email: '', phone: '', birthDate: '',
-    // References - Novos campos
-    whatsappPersonal: '',  // WhatsApp pessoal
-    contactTrust1: '',     // Contato de confiança 1
-    contactTrust1Name: '', // Nome do contato 1
-    contactTrust2: '',     // Contato de confiança 2
-    contactTrust2Name: '', // Nome do contato 2
-    instagram: '',         // Instagram do cliente
+
+    // Contatos
+    whatsappPersonal: '',
+    contactTrust1: '', contactTrust1Name: '',
+    contactTrust2: '', contactTrust2Name: '',
+    instagram: '',
 
     // Trabalho
-    occupation: '',        // Profissão
-    companyName: '',       // Nome da empresa
-    companyAddress: '',    // Endereço da empresa
-    workTime: '',          // Tempo de registro em carteira
+    occupation: '', companyName: '', companyAddress: '', workTime: '',
 
+    // Endereço
     cep: '', address: '', number: '', income: '',
+
+    // Documentos
     selfie: '',
     idCardFront: [] as string[],
     idCardBack: [] as string[],
     proofAddress: [] as string[],
     proofIncome: [] as string[],
-    workCard: [] as string[],   // Carteira de trabalho digital
-    billInName: [] as string[], // Boleto em nome do cliente
-    bankStatement: [] as string[], // Extrato bancário
+    workCard: [] as string[],
+    billInName: [] as string[],
+    bankStatement: [] as string[],
 
-    // Vehicle Data
+    // Veículo
     hasVehicle: false,
     vehicleCRLV: [] as string[],
     vehicleFront: [] as string[],
     vehicleBack: [] as string[],
     vehicleSide: [] as string[],
 
-    // Videos
-    videoSelfie: '',  // Vídeo dizendo que está ciente do empréstimo e juros 30%
+    // Vídeos
+    videoSelfie: '',
     videoHouse: '',
     videoVehicle: '',
 
+    // Dados Bancários (NOVO)
+    bankName: '',
+    pixKey: '',
+    pixKeyType: 'cpf', // cpf, phone, email, random
+    accountHolderName: '',
+    accountHolderCpf: '',
+
+    // Finalização
     signature: '',
-    termsAccepted: false
   });
 
-  // Effect to calculate probability
-  useEffect(() => {
-    let score = 10;
+  // Calcular parcela com juros de 30%
+  const calculateInstallment = () => {
+    const amount = customAmount ? parseFloat(customAmount) : selectedAmount;
+    const totalWithInterest = amount * 1.30; // 30% de juros
+    return totalWithInterest / selectedInstallments;
+  };
 
-    // Step 1: Personal
-    if (formData.name && formData.cpf && formData.email) score += 5;
-    if (formData.whatsappPersonal && formData.contactTrust1 && formData.contactTrust2) score += 15;
-    if (formData.instagram) score += 5;
+  const getTotalAmount = () => {
+    const amount = customAmount ? parseFloat(customAmount) : selectedAmount;
+    return amount * 1.30;
+  };
 
-    // Step 2: Address/Income
-    if (formData.address && formData.income) score += 10;
-
-    // Step 3: Docs
-    if (formData.selfie) score += 5;
-    if (formData.idCardFront.length > 0) score += 5;
-    if (formData.proofIncome.length > 0) score += 5;
-
-    // Videos (High Value)
-    if (formData.videoSelfie) score += 15;
-    if (formData.videoHouse) score += 15;
-    if (formData.hasVehicle && formData.videoVehicle) score += 10;
-    else if (!formData.hasVehicle) score += 5; // Bonus for not needing extra verification
-
-    // Step 4: Sig
-    if (formData.signature) score += 5;
-
-    setApprovalChance(Math.min(98, score));
-  }, [formData]);
-
-  // CPF Validation Helper
+  // CPF Validation
   const validateCPF = (cpf: string) => {
     const cleanCPF = cpf.replace(/\D/g, '');
     if (cleanCPF.length === 0) return undefined;
@@ -128,7 +140,6 @@ export const Wizard: React.FC = () => {
         }));
       }
     } catch (e) {
-      console.error("Erro CEP", e);
       setErrors(prev => ({ ...prev, cep: "Erro ao buscar CEP." }));
     }
   };
@@ -137,13 +148,15 @@ export const Wizard: React.FC = () => {
     const { name, value } = e.target;
     let newValue = value;
 
-    if (name === 'cpf') {
+    if (name === 'cpf' || name === 'accountHolderCpf') {
       const nums = value.replace(/\D/g, '').slice(0, 11);
       newValue = nums.replace(/(\d{3})(\d)/, '$1.$2')
         .replace(/(\d{3})(\d)/, '$1.$2')
         .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-      const error = validateCPF(newValue);
-      setErrors(prev => ({ ...prev, cpf: error }));
+      if (name === 'cpf') {
+        const error = validateCPF(newValue);
+        setErrors(prev => ({ ...prev, cpf: error }));
+      }
     }
 
     if (name === 'cep') {
@@ -152,10 +165,8 @@ export const Wizard: React.FC = () => {
       newValue = v;
       const cleanCep = v.replace(/\D/g, '');
       if (cleanCep.length === 8) fetchAddress(cleanCep);
-      else setErrors(prev => ({ ...prev, cep: undefined }));
     }
 
-    // Phone masking for references
     if (['phone', 'whatsappPersonal', 'contactTrust1', 'contactTrust2'].includes(name)) {
       let v = value.replace(/\D/g, '').slice(0, 11);
       v = v.replace(/^(\d{2})(\d)/g, '($1) $2');
@@ -164,49 +175,6 @@ export const Wizard: React.FC = () => {
     }
 
     setFormData({ ...formData, [name]: newValue });
-  };
-
-  // Magic Fill / OCR Handler
-  const handleMagicFill = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const imageSrc = reader.result as string;
-      setScannedImage(imageSrc);
-      setScanningOCR(true);
-
-      try {
-        const result = await ocrService.scanDocument(imageSrc);
-
-        if (result.success) {
-          setFormData(prev => ({
-            ...prev,
-            name: result.name || prev.name,
-            cpf: result.cpf || prev.cpf,
-            birthDate: result.birthDate ? result.birthDate.split('/').reverse().join('-') : prev.birthDate,
-            idCardFront: [imageSrc, ...prev.idCardFront]
-          }));
-
-          let msg = "Leitura concluída!";
-          if (result.name) msg += " Nome encontrado.";
-          if (result.cpf) msg += " CPF encontrado.";
-          addToast(msg, 'success');
-        } else {
-          addToast("Não foi possível ler os dados. Tente uma foto mais clara.", 'warning');
-        }
-      } catch (error) {
-        console.error(error);
-        addToast("Erro ao processar imagem.", 'error');
-      } finally {
-        setTimeout(() => {
-          setScanningOCR(false);
-          setScannedImage(null);
-        }, 2000);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
@@ -241,117 +209,57 @@ export const Wizard: React.FC = () => {
     });
   };
 
-  const validateDocuments = async (): Promise<boolean> => {
-    setAnalyzingDocs(true);
-    setErrors(prev => ({ ...prev, doc: undefined }));
-
-    if (formData.idCardFront.length > 0) {
-      try {
-        const result = await aiService.analyzeDocument(formData.idCardFront[0]);
-
-        if (!result.valid) {
-          console.warn("AI OCR failed to read document");
-          setAnalyzingDocs(false);
-          return true;
-        }
-
-        const cleanInputCPF = formData.cpf.replace(/\D/g, '');
-        const cleanDocCPF = result.cpf.replace(/\D/g, '');
-
-        const inputNameParts = formData.name.toUpperCase().split(' ');
-        const docName = result.name.toUpperCase();
-        const nameMatch = inputNameParts.some(part => docName.includes(part) && part.length > 2);
-
-        if (cleanDocCPF && cleanInputCPF !== cleanDocCPF) {
-          const msg = `CPF do documento (${result.cpf}) não confere com o digitado.`;
-          setErrors(prev => ({ ...prev, doc: msg }));
-          addToast(msg, 'error');
-          setAnalyzingDocs(false);
-          return false;
-        }
-
-        if (!nameMatch && result.name.length > 5) {
-          const msg = `Nome no documento (${result.name}) parece diferente do cadastro.`;
-          addToast(msg, 'warning');
-        }
-
-      } catch (e) {
-        console.error("Validation error", e);
+  const handleNext = async () => {
+    // Validações por step
+    if (currentStep === 1) {
+      const amount = customAmount ? parseFloat(customAmount) : selectedAmount;
+      if (!amount || amount < 300) {
+        addToast("Selecione um valor mínimo de R$ 300", 'warning');
+        return;
       }
     }
 
-    setAnalyzingDocs(false);
-    return true;
-  };
-
-  const validateBiometrics = async (): Promise<boolean> => {
-    setVerifyingBiometrics(true);
-    setErrors(prev => ({ ...prev, biometrics: undefined }));
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    const isMatch = formData.selfie.length > 100 && formData.idCardFront.length > 0;
-    setVerifyingBiometrics(false);
-
-    if (isMatch) return true;
-    else {
-      const msg = "A selfie não corresponde ao documento. Tente novamente.";
-      setErrors(prev => ({ ...prev, biometrics: msg }));
-      addToast(msg, 'error');
-      return false;
+    if (currentStep === 2) {
+      if (!termsAccepted) {
+        addToast("Você precisa aceitar os termos para continuar.", 'warning');
+        return;
+      }
     }
-  };
 
-  const handleNext = async () => {
-    if (currentStep === 1) {
-      if (errors.cpf || !formData.cpf || !formData.name || !formData.email) {
-        addToast("Preencha os dados pessoais obrigatórios.", 'warning');
+    if (currentStep === 3) {
+      if (!formData.name || !formData.cpf || !formData.email || !formData.phone) {
+        addToast("Preencha todos os dados pessoais.", 'warning');
         return;
       }
       if (!formData.whatsappPersonal || !formData.contactTrust1 || !formData.contactTrust2) {
-        addToast("Preencha seu WhatsApp e os 2 contatos de confiança.", 'warning');
+        addToast("Preencha os contatos de confiança.", 'warning');
         return;
       }
       if (!formData.occupation || !formData.companyName) {
-        addToast("Informe sua profissão e nome da empresa.", 'warning');
+        addToast("Informe seus dados profissionais.", 'warning');
         return;
       }
     }
-    if (currentStep === 2) {
-      if (errors.cep || !formData.cep || !formData.address || !formData.number || !formData.income || formData.proofIncome.length === 0) {
-        addToast("Endereço e Comprovante de Renda são obrigatórios.", 'warning');
+
+    if (currentStep === 4) {
+      if (!formData.selfie || formData.idCardFront.length === 0) {
+        addToast("Envie a selfie e documento de identificação.", 'warning');
+        return;
+      }
+      if (!formData.videoSelfie) {
+        addToast("Grave o vídeo de confirmação.", 'warning');
         return;
       }
     }
-    if (currentStep === 3) {
-      // New validations for videos
-      if (!formData.selfie || formData.idCardFront.length === 0 || formData.idCardBack.length === 0 || formData.proofAddress.length === 0) {
-        addToast("Documentos básicos (Selfie, RG, Endereço) são obrigatórios.", 'warning');
+
+    if (currentStep === 5) {
+      if (!formData.bankName || !formData.pixKey || !formData.accountHolderName) {
+        addToast("Preencha os dados bancários para depósito.", 'warning');
         return;
       }
-
-      if (!formData.videoSelfie || !formData.videoHouse) {
-        addToast("Vídeos da Selfie e da Casa são obrigatórios.", 'warning');
-        return;
-      }
-
-      if (formData.hasVehicle) {
-        if (formData.vehicleCRLV.length === 0 || formData.vehicleFront.length === 0) {
-          addToast("Fotos do veículo são obrigatórias.", 'warning');
-          return;
-        }
-        if (!formData.videoVehicle) {
-          addToast("Vídeo do veículo é obrigatório.", 'warning');
-          return;
-        }
-      }
-
-      const docsValid = await validateDocuments();
-      if (!docsValid) return;
-
-      const bioValid = await validateBiometrics();
-      if (!bioValid) return;
     }
-    if (currentStep < 4) setCurrentStep(c => c + 1);
+
+    if (currentStep < 6) setCurrentStep(c => c + 1);
   };
 
   const handleBack = () => {
@@ -359,17 +267,30 @@ export const Wizard: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (!formData.signature) {
+      addToast("Assine para confirmar a solicitação.", 'warning');
+      return;
+    }
+
     setLoading(true);
-    await supabaseService.submitRequest(formData);
+
+    const requestData = {
+      ...formData,
+      amount: customAmount ? parseFloat(customAmount) : selectedAmount,
+      installments: selectedInstallments,
+      totalAmount: getTotalAmount(),
+      installmentValue: calculateInstallment(),
+    };
+
+    await supabaseService.submitRequest(requestData);
     setLoading(false);
     addToast("Solicitação enviada com sucesso!", 'success');
-    navigate('/');
+    navigate('/client/dashboard');
   };
 
   const renderUploadArea = (name: string, label: string, files: string[]) => (
     <div className="space-y-3">
       <label className="text-sm text-zinc-400 font-medium block">{label}</label>
-
       <div className="grid grid-cols-3 gap-2">
         {files.map((file, idx) => (
           <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-zinc-700 bg-black group">
@@ -382,7 +303,6 @@ export const Wizard: React.FC = () => {
             </button>
           </div>
         ))}
-
         <div className="relative group">
           <input
             type="file"
@@ -404,347 +324,427 @@ export const Wizard: React.FC = () => {
     </div>
   );
 
-  const isFormComplete =
-    formData.termsAccepted &&
-    formData.signature &&
-    formData.selfie &&
-    formData.videoSelfie &&
-    formData.videoHouse &&
-    formData.idCardFront.length > 0;
-
   return (
     <div className="min-h-screen bg-black text-white font-sans pb-32">
-      {/* OCR Scanner Overlay */}
-      {scanningOCR && (
-        <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center animate-in fade-in">
-          <div className="relative w-full max-w-sm aspect-[3/4] border-2 border-[#D4AF37] rounded-xl overflow-hidden shadow-[0_0_50px_rgba(212,175,55,0.3)] bg-black">
-            {scannedImage && <img src={scannedImage} className="w-full h-full object-contain opacity-50" />}
-
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-green-500 to-transparent shadow-[0_0_20px_#22c55e] animate-[scan-vertical_2s_linear_infinite]"></div>
-
-            <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-green-500"></div>
-            <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-green-500"></div>
-            <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-green-500"></div>
-            <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-green-500"></div>
-
-            <div className="absolute bottom-10 left-0 w-full text-center">
-              <p className="text-green-500 font-mono text-sm animate-pulse">PROCESSANDO OCR...</p>
-            </div>
-          </div>
-          <style>{`
-                @keyframes scan-vertical {
-                    0% { top: 0%; }
-                    100% { top: 100%; }
-                }
-             `}</style>
-        </div>
-      )}
-
-      {/* Header Mobile */}
+      {/* Header */}
       <div className="sticky top-0 z-30 bg-black/80 backdrop-blur-md border-b border-zinc-900 p-4 flex items-center justify-between">
         <div className="flex items-center gap-2" onClick={() => navigate('/')}>
           <ChevronLeft className="text-zinc-400" />
-          <span className="font-bold">Solicitação</span>
+          <span className="font-bold">Solicitar Empréstimo</span>
         </div>
         <div className="flex items-center gap-3">
           <InstallPwaButton className="!py-1.5 !px-3" />
-          <div className="text-sm font-medium text-[#D4AF37]">Passo {currentStep}/4</div>
+          <div className="text-sm font-medium text-[#D4AF37]">Passo {currentStep}/6</div>
         </div>
       </div>
 
       <div className="max-w-xl mx-auto px-4 pt-6">
-
-        {/* Dynamic Approval Gauge (Gamification) */}
-        <div className="mb-6 bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center justify-between shadow-lg">
-          <div>
-            <p className="text-xs text-zinc-500 uppercase tracking-wide font-bold">Chance de Aprovação</p>
-            <p className={`text-2xl font-bold ${approvalChance > 70 ? 'text-green-500' : approvalChance > 40 ? 'text-yellow-500' : 'text-red-500'}`}>
-              {approvalChance}%
-            </p>
-          </div>
-          <div className="w-32 h-3 bg-zinc-800 rounded-full overflow-hidden border border-zinc-700">
-            <div
-              className={`h-full transition-all duration-1000 ease-out ${approvalChance > 70 ? 'bg-green-500' : approvalChance > 40 ? 'bg-yellow-500' : 'bg-red-500'}`}
-              style={{ width: `${approvalChance}%` }}
-            ></div>
-          </div>
-        </div>
-
         {/* Progress Steps */}
         <div className="flex justify-between mb-8 px-2 relative">
-          <div className="absolute top-1/2 left-0 w-full h-0.5 bg-zinc-800 -z-10 -translate-y-1/2 rounded-full"></div>
-
+          <div className="absolute top-1/2 left-0 w-full h-0.5 bg-zinc-800 -z-10 -translate-y-1/2"></div>
           {steps.map((step) => {
             const Icon = step.icon;
             const isActive = step.id === currentStep;
             const isCompleted = step.id < currentStep;
-
             return (
-              <div key={step.id} className="flex flex-col items-center gap-2 bg-black px-2 z-10">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.4)]' :
-                  isCompleted ? 'bg-zinc-800 text-[#D4AF37] border border-[#D4AF37]' :
-                    'bg-zinc-900 text-zinc-600 border border-zinc-800'
+              <div key={step.id} className="flex flex-col items-center gap-2 bg-black px-1 z-10">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.4)]' :
+                    isCompleted ? 'bg-zinc-800 text-[#D4AF37] border border-[#D4AF37]' :
+                      'bg-zinc-900 text-zinc-600 border border-zinc-800'
                   }`}>
-                  {isCompleted ? <Check size={18} /> : <Icon size={18} />}
+                  {isCompleted ? <Check size={16} /> : <Icon size={16} />}
                 </div>
               </div>
             );
           })}
         </div>
 
-        <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+        {/* Content Area */}
+        <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 shadow-2xl">
 
-          {(verifyingBiometrics || analyzingDocs) && (
-            <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center text-center p-6 animate-in fade-in">
-              <div className="w-16 h-16 border-4 border-zinc-800 border-t-[#D4AF37] rounded-full animate-spin mb-6"></div>
-              <h3 className="text-xl font-bold text-white mb-2">
-                {analyzingDocs ? 'Validando Documento...' : 'Analisando Biometria'}
-              </h3>
-              <p className="text-zinc-400 text-sm">
-                {analyzingDocs ? 'Verificando autenticidade.' : 'Aguarde enquanto validamos sua identidade.'}
-              </p>
-            </div>
-          )}
-
+          {/* STEP 1: Valores */}
           {currentStep === 1 && (
-            <div className="space-y-5 animate-in slide-in-from-right fade-in duration-300">
-              <div className="flex justify-between items-center mb-2">
-                <h2 className="text-xl font-bold text-white">Dados Pessoais</h2>
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold text-white">Quanto você precisa?</h2>
+                <p className="text-zinc-400 text-sm mt-2">Escolha o valor do seu empréstimo</p>
               </div>
 
-              {/* Magic Fill Button */}
-              <div className="relative mb-6">
-                <input
-                  type="file"
-                  id="ocr-upload"
-                  accept="image/*"
-                  onChange={handleMagicFill}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="ocr-upload"
-                  className="flex items-center justify-center gap-3 w-full p-4 bg-gradient-to-r from-[#D4AF37]/20 to-[#D4AF37]/5 border border-[#D4AF37] rounded-xl cursor-pointer hover:bg-[#D4AF37]/30 transition-all group"
-                >
-                  <div className="p-2 bg-[#D4AF37] rounded-full text-black shadow-[0_0_15px_rgba(212,175,55,0.5)] group-hover:scale-110 transition-transform">
-                    <Scan size={20} />
-                  </div>
-                  <div className="text-left">
-                    <span className="block font-bold text-[#D4AF37] flex items-center gap-2"><Sparkles size={14} /> Preenchimento Mágico</span>
-                    <span className="text-xs text-zinc-400">Envie foto da CNH para preencher tudo.</span>
-                  </div>
-                </label>
+              {/* Pacotes */}
+              <div className="grid grid-cols-3 gap-3">
+                {loanPackages.map(pkg => (
+                  <button
+                    key={pkg.id}
+                    onClick={() => { setSelectedAmount(pkg.amount); setCustomAmount(''); }}
+                    className={`relative p-4 rounded-xl border-2 transition-all ${selectedAmount === pkg.amount && !customAmount
+                        ? 'border-[#D4AF37] bg-[#D4AF37]/10'
+                        : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600'
+                      }`}
+                  >
+                    {pkg.popular && (
+                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#D4AF37] text-black text-[10px] px-2 py-0.5 rounded-full font-bold">
+                        POPULAR
+                      </span>
+                    )}
+                    <span className="text-lg font-bold text-white">{pkg.label}</span>
+                  </button>
+                ))}
               </div>
 
-              <div className="space-y-4">
-                <Input label="Nome Completo" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Seu nome" />
-
-                <div>
-                  <Input
-                    label="CPF"
-                    name="cpf"
-                    value={formData.cpf}
-                    onChange={handleChange}
-                    placeholder="000.000.000-00"
-                    error={errors.cpf}
+              {/* Valor personalizado */}
+              <div className="space-y-2">
+                <label className="text-sm text-zinc-400">Ou digite outro valor:</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">R$</span>
+                  <input
+                    type="number"
+                    value={customAmount}
+                    onChange={(e) => setCustomAmount(e.target.value)}
+                    placeholder="0,00"
+                    className="w-full bg-black border border-zinc-700 rounded-xl pl-12 pr-4 py-4 text-white text-xl font-bold focus:border-[#D4AF37] outline-none"
                   />
                 </div>
+              </div>
 
-                <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="nome@email.com" />
-                <Input label="Data de Nascimento" type="date" name="birthDate" value={formData.birthDate} onChange={handleChange} />
-                <Input label="Seu Celular (WhatsApp)" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
-
-                {/* WhatsApp e Contatos de Confiança */}
-                <div className="pt-4 border-t border-zinc-800 space-y-4">
-                  <h3 className="font-bold text-[#D4AF37] flex items-center gap-2 text-sm uppercase tracking-wide">
-                    <Phone size={16} /> Contatos (Obrigatório)
-                  </h3>
-                  <Input label="WhatsApp Pessoal" name="whatsappPersonal" value={formData.whatsappPersonal} onChange={handleChange} placeholder="(00) 00000-0000" />
-
-                  <div className="bg-black/50 border border-zinc-800 rounded-xl p-4 space-y-3">
-                    <p className="text-xs text-zinc-500">Informe 2 contatos de confiança para referência</p>
-                    <Input label="Nome do Contato 1" name="contactTrust1Name" value={formData.contactTrust1Name} onChange={handleChange} placeholder="Ex: João (Irmão)" />
-                    <Input label="Telefone Contato 1" name="contactTrust1" value={formData.contactTrust1} onChange={handleChange} placeholder="(00) 00000-0000" />
-                    <Input label="Nome do Contato 2" name="contactTrust2Name" value={formData.contactTrust2Name} onChange={handleChange} placeholder="Ex: Maria (Amiga)" />
-                    <Input label="Telefone Contato 2" name="contactTrust2" value={formData.contactTrust2} onChange={handleChange} placeholder="(00) 00000-0000" />
-                  </div>
-
-                  <Input label="Instagram (opcional)" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="@seuinstagram" />
+              {/* Parcelas */}
+              <div className="space-y-3">
+                <label className="text-sm text-zinc-400">Em quantas vezes?</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {installmentOptions.map(opt => (
+                    <button
+                      key={opt}
+                      onClick={() => setSelectedInstallments(opt)}
+                      className={`p-3 rounded-lg border-2 font-bold transition-all ${selectedInstallments === opt
+                          ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]'
+                          : 'border-zinc-800 text-zinc-400 hover:border-zinc-600'
+                        }`}
+                    >
+                      {opt}x
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                {/* Dados do Trabalho */}
-                <div className="pt-4 border-t border-zinc-800 space-y-4">
-                  <h3 className="font-bold text-[#D4AF37] flex items-center gap-2 text-sm uppercase tracking-wide">
-                    <Users size={16} /> Dados do Trabalho
-                  </h3>
-                  <Input label="Profissão" name="occupation" value={formData.occupation} onChange={handleChange} placeholder="Ex: Vendedor" />
-                  <Input label="Nome da Empresa" name="companyName" value={formData.companyName} onChange={handleChange} placeholder="Nome da empresa" />
-                  <Input label="Endereço da Empresa" name="companyAddress" value={formData.companyAddress} onChange={handleChange} placeholder="Endereço completo" />
-                  <Input label="Tempo de Carteira Assinada" name="workTime" value={formData.workTime} onChange={handleChange} placeholder="Ex: 6 meses, 2 anos" />
+              {/* Simulação */}
+              <div className="bg-black border border-[#D4AF37]/30 rounded-2xl p-5">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-zinc-400">Valor solicitado:</span>
+                  <span className="text-xl font-bold text-white">
+                    R$ {(customAmount ? parseFloat(customAmount) : selectedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-zinc-400">Total a pagar (30% juros):</span>
+                  <span className="text-lg font-bold text-zinc-300">
+                    R$ {getTotalAmount().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pt-4 border-t border-zinc-800">
+                  <span className="text-zinc-400">Parcela mensal:</span>
+                  <span className="text-2xl font-bold text-[#D4AF37]">
+                    {selectedInstallments}x de R$ {calculateInstallment().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
               </div>
             </div>
           )}
 
+          {/* STEP 2: Termos */}
           {currentStep === 2 && (
-            <div className="space-y-5 animate-in slide-in-from-right fade-in duration-300">
-              <h2 className="text-xl font-bold text-white mb-2">Localização & Renda</h2>
-
-              <div className="space-y-4">
-                <Input label="CEP" name="cep" value={formData.cep} onChange={handleChange} placeholder="00000-000" error={errors.cep} />
-                <Input label="Endereço" name="address" value={formData.address} onChange={() => { }} readOnly className="opacity-60 cursor-not-allowed" />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="Número" name="number" value={formData.number} onChange={handleChange} placeholder="123" />
-                  <Input label="Renda Mensal" name="income" type="number" value={formData.income} onChange={handleChange} placeholder="R$ 0,00" />
-                </div>
-
-                <div className="pt-2 border-t border-zinc-800 mt-4">
-                  {renderUploadArea('proofIncome', 'Comprovante de Renda (PDF/Foto)', formData.proofIncome)}
-                </div>
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center mb-4">
+                <Shield size={48} className="mx-auto text-[#D4AF37] mb-3" />
+                <h2 className="text-xl font-bold text-white">Termos de Contratação</h2>
+                <p className="text-zinc-400 text-sm mt-2">Para seguir com a contratação, você precisará:</p>
               </div>
-            </div>
-          )}
 
-          {currentStep === 3 && (
-            <div className="space-y-6 animate-in slide-in-from-right fade-in duration-300">
-              <h2 className="text-xl font-bold text-white">Garantias & Vídeos</h2>
+              {/* Lista de Documentos */}
+              <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-3">
+                <h3 className="font-bold text-[#D4AF37] text-sm uppercase flex items-center gap-2">
+                  <FileCheck size={16} /> Documentos Necessários
+                </h3>
 
-              {errors.biometrics && (
-                <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg flex items-center gap-3 text-red-200 text-sm">
-                  <AlertCircle size={18} className="text-red-500 shrink-0" />
-                  {errors.biometrics}
-                </div>
-              )}
-
-              {errors.doc && (
-                <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg flex items-center gap-3 text-red-200 text-sm">
-                  <AlertCircle size={18} className="text-red-500 shrink-0" />
-                  {errors.doc}
-                </div>
-              )}
-
-              <div className="space-y-6">
-
-                {/* Selfie Photo */}
-                <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><ScanFace className="text-[#D4AF37]" size={18} /> Selfie (Foto)</h3>
-                  <Camera
-                    label="Tirar Selfie"
-                    onCapture={(img) => setFormData({ ...formData, selfie: img })}
-                  />
-                </div>
-
-                {/* Videos Section */}
-                <div className="bg-black p-4 rounded-xl border border-zinc-800 space-y-4">
-                  <h3 className="font-semibold text-sm mb-1 flex items-center gap-2"><Video className="text-[#D4AF37]" size={18} /> Vídeos Obrigatórios</h3>
-                  <p className="text-xs text-zinc-500 mb-2">Grave vídeos curtos para validação.</p>
-
-                  <VideoUpload
-                    label="Vídeo de Confirmação"
-                    subtitle="Diga seu nome e que está ciente do empréstimo com juros de 30%."
-                    videoUrl={formData.videoSelfie}
-                    onUpload={(url) => setFormData({ ...formData, videoSelfie: url })}
-                    onRemove={() => setFormData({ ...formData, videoSelfie: '' })}
-                  />
-
-                  <VideoUpload
-                    label="Vídeo da Casa"
-                    subtitle="Mostre a frente ou interior da sua residência."
-                    videoUrl={formData.videoHouse}
-                    onUpload={(url) => setFormData({ ...formData, videoHouse: url })}
-                    onRemove={() => setFormData({ ...formData, videoHouse: '' })}
-                  />
-                </div>
-
-                {/* Documentos Necessários */}
-                <div className="space-y-6">
-                  <h3 className="font-semibold text-sm flex items-center gap-2 text-[#D4AF37]">
-                    <FileText size={18} /> Documentos Necessários
-                  </h3>
-                  <p className="text-xs text-zinc-500 -mt-4">Envie fotos ou PDFs claros de todos os documentos</p>
-
-                  {/* Documentos de Identidade */}
-                  <div className="bg-black/30 border border-zinc-800 rounded-xl p-4 space-y-4">
-                    <p className="text-xs text-zinc-400 font-bold uppercase">📄 Identificação</p>
-                    {renderUploadArea('idCardFront', 'Selfie segurando RG ou CNH', formData.idCardFront)}
-                    {renderUploadArea('idCardBack', 'RG/CNH (Verso)', formData.idCardBack)}
+                {[
+                  'Nome completo',
+                  'Tempo de registro em carteira (mínimo 3 meses)',
+                  'Profissão e nome da empresa',
+                  'Endereço da empresa',
+                  'Holerite ou extrato recente',
+                  'Selfie segurando RG ou CNH',
+                  'Localização em tempo real',
+                  'Comprovante de endereço (água/luz) + boleto em seu nome',
+                  'Carteira de Trabalho Digital (PDF ou print dos vínculos)',
+                  'Vídeo dizendo que está ciente do empréstimo e dos juros de 30%',
+                ].map((doc, idx) => (
+                  <div key={idx} className="flex items-start gap-3 py-2 border-b border-zinc-900 last:border-0">
+                    <CheckCircle2 size={16} className="text-green-500 mt-0.5 shrink-0" />
+                    <span className="text-sm text-zinc-300">{doc}</span>
                   </div>
-
-                  {/* Comprovantes de Endereço */}
-                  <div className="bg-black/30 border border-zinc-800 rounded-xl p-4 space-y-4">
-                    <p className="text-xs text-zinc-400 font-bold uppercase">🏠 Comprovante de Residência</p>
-                    {renderUploadArea('proofAddress', 'Conta de Água ou Luz (recente)', formData.proofAddress)}
-                    {renderUploadArea('billInName', 'Boleto em seu Nome', formData.billInName)}
-                  </div>
-
-                  {/* Comprovantes de Renda/Trabalho */}
-                  <div className="bg-black/30 border border-zinc-800 rounded-xl p-4 space-y-4">
-                    <p className="text-xs text-zinc-400 font-bold uppercase">💼 Comprovante de Renda</p>
-                    {renderUploadArea('proofIncome', 'Holerite ou Contracheque', formData.proofIncome)}
-                    {renderUploadArea('workCard', 'Carteira de Trabalho Digital (Vínculos)', formData.workCard)}
-                  </div>
-
-                  {/* Comprovante Bancário */}
-                  <div className="bg-black/30 border border-zinc-800 rounded-xl p-4 space-y-4">
-                    <p className="text-xs text-zinc-400 font-bold uppercase">🏦 Comprovante Bancário</p>
-                    {renderUploadArea('bankStatement', 'Extrato Bancário Recente', formData.bankStatement)}
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-zinc-800">
-                  <label className="flex items-center gap-3 p-4 bg-black border border-zinc-800 rounded-xl cursor-pointer hover:border-[#D4AF37] transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={formData.hasVehicle}
-                      onChange={(e) => setFormData(prev => ({ ...prev, hasVehicle: e.target.checked }))}
-                      className="accent-[#D4AF37] w-5 h-5"
-                    />
-                    <div className="flex-1">
-                      <span className="block text-sm font-bold text-white">Possui Veículo?</span>
-                      <span className="text-xs text-zinc-500">Aumente suas chances de aprovação.</span>
-                    </div>
-                    <Car size={24} className={formData.hasVehicle ? "text-[#D4AF37]" : "text-zinc-600"} />
-                  </label>
-
-                  {formData.hasVehicle && (
-                    <div className="mt-4 space-y-4 animate-in slide-in-from-top-2">
-                      <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                        <VideoUpload
-                          label="Vídeo do Carro"
-                          subtitle="Mostre o veículo e a placa."
-                          videoUrl={formData.videoVehicle}
-                          onUpload={(url) => setFormData({ ...formData, videoVehicle: url })}
-                          onRemove={() => setFormData({ ...formData, videoVehicle: '' })}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        {renderUploadArea('vehicleCRLV', 'Doc. (CRLV)', formData.vehicleCRLV)}
-                        {renderUploadArea('vehicleFront', 'Foto Frente', formData.vehicleFront)}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                ))}
               </div>
-            </div>
-          )}
 
-          {currentStep === 4 && (
-            <div className="space-y-6 animate-in slide-in-from-right fade-in duration-300">
-              <h2 className="text-xl font-bold text-white">Assinatura</h2>
+              {/* Aviso */}
+              <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-xl p-4">
+                <p className="text-sm text-yellow-400 flex items-start gap-2">
+                  <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Importante:</strong> Após enviar todos os documentos, analisaremos sua solicitação.
+                    Se aprovado, o dinheiro estará em sua conta em até <strong>72 horas</strong>.
+                  </span>
+                </p>
+              </div>
 
-              <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
-
-              <div className="flex items-start gap-3 p-4 bg-black border border-zinc-800 rounded-xl">
+              {/* Aceite */}
+              <label className="flex items-start gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer hover:border-[#D4AF37] transition-colors">
                 <input
                   type="checkbox"
-                  id="terms"
-                  checked={formData.termsAccepted}
-                  onChange={(e) => setFormData({ ...formData, termsAccepted: e.target.checked })}
-                  className="mt-1 accent-[#D4AF37] w-5 h-5 cursor-pointer shrink-0"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="mt-1 accent-[#D4AF37] w-6 h-6"
                 />
-                <label htmlFor="terms" className="text-sm text-zinc-400 select-none">
-                  Li e concordo com os <span onClick={(e) => { e.preventDefault(); setShowTerms(true); }} className="text-[#D4AF37] font-bold cursor-pointer hover:underline">Termos de Uso</span>. Declaro que as informações enviadas são verdadeiras.
-                </label>
+                <div>
+                  <span className="text-white font-bold">Li e concordo com os termos</span>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Declaro que fornecerei informações verdadeiras e estou ciente dos juros de 30%.
+                  </p>
+                </div>
+              </label>
+            </div>
+          )}
+
+          {/* STEP 3: Dados Pessoais */}
+          {currentStep === 3 && (
+            <div className="space-y-5 animate-in slide-in-from-right">
+              <h2 className="text-xl font-bold text-white">Seus Dados</h2>
+
+              <div className="space-y-4">
+                <Input label="Nome Completo" name="name" value={formData.name} onChange={handleChange} placeholder="Seu nome completo" />
+                <Input label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00" error={errors.cpf} />
+                <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="seu@email.com" />
+                <Input label="Data de Nascimento" type="date" name="birthDate" value={formData.birthDate} onChange={handleChange} />
+                <Input label="WhatsApp Pessoal" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
+              </div>
+
+              {/* Contatos de Confiança */}
+              <div className="pt-4 border-t border-zinc-800 space-y-4">
+                <h3 className="font-bold text-[#D4AF37] flex items-center gap-2 text-sm">
+                  <Phone size={16} /> Contatos de Confiança
+                </h3>
+                <Input label="WhatsApp (outro número)" name="whatsappPersonal" value={formData.whatsappPersonal} onChange={handleChange} placeholder="(00) 00000-0000" />
+
+                <div className="bg-black/50 border border-zinc-800 rounded-xl p-4 space-y-3">
+                  <p className="text-xs text-zinc-500">Informe 2 contatos de referência</p>
+                  <Input label="Nome do Contato 1" name="contactTrust1Name" value={formData.contactTrust1Name} onChange={handleChange} placeholder="Ex: João (Irmão)" />
+                  <Input label="Telefone Contato 1" name="contactTrust1" value={formData.contactTrust1} onChange={handleChange} placeholder="(00) 00000-0000" />
+                  <Input label="Nome do Contato 2" name="contactTrust2Name" value={formData.contactTrust2Name} onChange={handleChange} placeholder="Ex: Maria (Amiga)" />
+                  <Input label="Telefone Contato 2" name="contactTrust2" value={formData.contactTrust2} onChange={handleChange} placeholder="(00) 00000-0000" />
+                </div>
+
+                <Input label="Instagram (opcional)" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="@seuinstagram" />
+              </div>
+
+              {/* Dados Profissionais */}
+              <div className="pt-4 border-t border-zinc-800 space-y-4">
+                <h3 className="font-bold text-[#D4AF37] flex items-center gap-2 text-sm">
+                  <Users size={16} /> Dados Profissionais
+                </h3>
+                <Input label="Profissão" name="occupation" value={formData.occupation} onChange={handleChange} placeholder="Ex: Vendedor" />
+                <Input label="Nome da Empresa" name="companyName" value={formData.companyName} onChange={handleChange} placeholder="Nome da empresa" />
+                <Input label="Endereço da Empresa" name="companyAddress" value={formData.companyAddress} onChange={handleChange} placeholder="Endereço completo" />
+                <Input label="Tempo de Carteira Assinada" name="workTime" value={formData.workTime} onChange={handleChange} placeholder="Ex: 6 meses, 2 anos" />
+              </div>
+
+              {/* Endereço */}
+              <div className="pt-4 border-t border-zinc-800 space-y-4">
+                <h3 className="font-bold text-[#D4AF37] flex items-center gap-2 text-sm">
+                  <MapPin size={16} /> Seu Endereço
+                </h3>
+                <Input label="CEP" name="cep" value={formData.cep} onChange={handleChange} placeholder="00000-000" error={errors.cep} />
+                <Input label="Endereço" name="address" value={formData.address} readOnly className="opacity-60" />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="Número" name="number" value={formData.number} onChange={handleChange} placeholder="123" />
+                  <Input label="Renda Mensal" name="income" type="number" value={formData.income} onChange={handleChange} placeholder="0,00" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: Documentos */}
+          {currentStep === 4 && (
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <h2 className="text-xl font-bold text-white">Documentos e Vídeos</h2>
+
+              {/* Selfie */}
+              <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                  <ScanFace className="text-[#D4AF37]" size={18} /> Selfie com Documento
+                </h3>
+                <Camera
+                  label="Tire uma selfie segurando seu RG ou CNH"
+                  onCapture={(img) => setFormData({ ...formData, selfie: img })}
+                />
+              </div>
+
+              {/* Vídeo de Confirmação */}
+              <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                <h3 className="font-semibold text-sm mb-1 flex items-center gap-2">
+                  <Video className="text-[#D4AF37]" size={18} /> Vídeo Obrigatório
+                </h3>
+                <VideoUpload
+                  label="Vídeo de Confirmação"
+                  subtitle="Diga seu nome e que está ciente do empréstimo com juros de 30%"
+                  videoUrl={formData.videoSelfie}
+                  onUpload={(url) => setFormData({ ...formData, videoSelfie: url })}
+                  onRemove={() => setFormData({ ...formData, videoSelfie: '' })}
+                />
+              </div>
+
+              {/* Documentos */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-sm flex items-center gap-2 text-[#D4AF37]">
+                  <FileText size={18} /> Documentos
+                </h3>
+
+                <div className="bg-black/30 border border-zinc-800 rounded-xl p-4 space-y-4">
+                  <p className="text-xs text-zinc-400 font-bold uppercase">📄 Identificação</p>
+                  {renderUploadArea('idCardFront', 'RG ou CNH (Frente)', formData.idCardFront)}
+                  {renderUploadArea('idCardBack', 'RG ou CNH (Verso)', formData.idCardBack)}
+                </div>
+
+                <div className="bg-black/30 border border-zinc-800 rounded-xl p-4 space-y-4">
+                  <p className="text-xs text-zinc-400 font-bold uppercase">🏠 Comprovante de Residência</p>
+                  {renderUploadArea('proofAddress', 'Conta de Água ou Luz', formData.proofAddress)}
+                  {renderUploadArea('billInName', 'Boleto em seu Nome', formData.billInName)}
+                </div>
+
+                <div className="bg-black/30 border border-zinc-800 rounded-xl p-4 space-y-4">
+                  <p className="text-xs text-zinc-400 font-bold uppercase">💼 Comprovante de Renda</p>
+                  {renderUploadArea('proofIncome', 'Holerite ou Contracheque', formData.proofIncome)}
+                  {renderUploadArea('workCard', 'Carteira de Trabalho Digital', formData.workCard)}
+                </div>
+
+                <div className="bg-black/30 border border-zinc-800 rounded-xl p-4 space-y-4">
+                  <p className="text-xs text-zinc-400 font-bold uppercase">🏦 Comprovante Bancário</p>
+                  {renderUploadArea('bankStatement', 'Extrato Bancário Recente', formData.bankStatement)}
+                </div>
+              </div>
+
+              {/* Vídeo da Casa (Opcional) */}
+              <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                <VideoUpload
+                  label="Vídeo da Casa (Opcional)"
+                  subtitle="Mostre a frente ou interior da sua residência"
+                  videoUrl={formData.videoHouse}
+                  onUpload={(url) => setFormData({ ...formData, videoHouse: url })}
+                  onRemove={() => setFormData({ ...formData, videoHouse: '' })}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5: Dados Bancários */}
+          {currentStep === 5 && (
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center mb-4">
+                <Landmark size={48} className="mx-auto text-[#D4AF37] mb-3" />
+                <h2 className="text-xl font-bold text-white">Dados para Depósito</h2>
+                <p className="text-zinc-400 text-sm mt-2">Informe onde deseja receber o valor</p>
+              </div>
+
+              <div className="space-y-4">
+                <Input label="Nome do Banco" name="bankName" value={formData.bankName} onChange={handleChange} placeholder="Ex: Nubank, Itaú, Bradesco" />
+
+                <div className="space-y-2">
+                  <label className="block text-xs text-zinc-400 mb-1.5 ml-1">Tipo de Chave PIX</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { value: 'cpf', label: 'CPF' },
+                      { value: 'phone', label: 'Celular' },
+                      { value: 'email', label: 'Email' },
+                      { value: 'random', label: 'Aleatória' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, pixKeyType: opt.value })}
+                        className={`p-2 rounded-lg border text-sm font-medium transition-all ${formData.pixKeyType === opt.value
+                            ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]'
+                            : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                          }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <Input
+                  label="Chave PIX"
+                  name="pixKey"
+                  value={formData.pixKey}
+                  onChange={handleChange}
+                  placeholder={
+                    formData.pixKeyType === 'cpf' ? '000.000.000-00' :
+                      formData.pixKeyType === 'phone' ? '(00) 00000-0000' :
+                        formData.pixKeyType === 'email' ? 'seu@email.com' :
+                          'Chave aleatória'
+                  }
+                />
+
+                <Input label="Nome Completo do Titular" name="accountHolderName" value={formData.accountHolderName} onChange={handleChange} placeholder="Nome como está no banco" />
+                <Input label="CPF do Titular" name="accountHolderCpf" value={formData.accountHolderCpf} onChange={handleChange} placeholder="000.000.000-00" />
+              </div>
+
+              <div className="bg-green-900/20 border border-green-600/30 rounded-xl p-4">
+                <p className="text-sm text-green-400 flex items-start gap-2">
+                  <CheckCircle2 size={18} className="shrink-0 mt-0.5" />
+                  <span>O valor será depositado na conta informada em até <strong>72 horas</strong> após aprovação.</span>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6: Confirmação */}
+          {currentStep === 6 && (
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center mb-4">
+                <CheckCircle2 size={48} className="mx-auto text-green-500 mb-3" />
+                <h2 className="text-xl font-bold text-white">Confirme sua Solicitação</h2>
+              </div>
+
+              {/* Resumo */}
+              <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-3">
+                <h3 className="font-bold text-[#D4AF37] text-sm">RESUMO DO PEDIDO</h3>
+                <div className="flex justify-between py-2 border-b border-zinc-900">
+                  <span className="text-zinc-400">Valor solicitado:</span>
+                  <span className="text-white font-bold">R$ {(customAmount ? parseFloat(customAmount) : selectedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-zinc-900">
+                  <span className="text-zinc-400">Total a pagar:</span>
+                  <span className="text-white font-bold">R$ {getTotalAmount().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-zinc-900">
+                  <span className="text-zinc-400">Parcela:</span>
+                  <span className="text-[#D4AF37] font-bold">{selectedInstallments}x de R$ {calculateInstallment().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-zinc-400">Depósito via PIX:</span>
+                  <span className="text-green-400 font-bold">{formData.bankName}</span>
+                </div>
+              </div>
+
+              {/* Assinatura */}
+              <div>
+                <h3 className="font-bold text-white mb-3">Assinatura Digital</h3>
+                <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
+              </div>
+
+              {/* Aviso Final */}
+              <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl p-4">
+                <p className="text-sm text-[#D4AF37] text-center">
+                  <Clock size={16} className="inline mr-2" />
+                  Após aprovação, o valor será depositado em até <strong>72 horas</strong>.
+                </p>
               </div>
             </div>
           )}
@@ -753,54 +753,27 @@ export const Wizard: React.FC = () => {
         {/* Action Buttons */}
         <div className="fixed bottom-0 left-0 w-full p-4 bg-black/90 border-t border-zinc-900 flex gap-4 z-40 backdrop-blur-md">
           {currentStep > 1 && (
-            <Button onClick={handleBack} variant="secondary" className="flex-1" disabled={verifyingBiometrics || analyzingDocs}>
+            <Button onClick={handleBack} variant="secondary" className="flex-1">
               Voltar
             </Button>
           )}
 
-          {currentStep < 4 ? (
-            <Button onClick={handleNext} className="flex-1" isLoading={verifyingBiometrics || analyzingDocs}>
-              {verifyingBiometrics || analyzingDocs ? 'Validando...' : 'Continuar'}
+          {currentStep < 6 ? (
+            <Button onClick={handleNext} className="flex-1">
+              Continuar
             </Button>
           ) : (
-            <Button onClick={handleSubmit} className="flex-1" isLoading={loading} disabled={!isFormComplete}>
-              Finalizar Pedido
+            <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700" isLoading={loading}>
+              Enviar Solicitação
             </Button>
           )}
         </div>
-
       </div>
-
-      {/* Terms Modal */}
-      {showTerms && (
-        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
-            <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-white">Termos de Uso</h3>
-              <button onClick={() => setShowTerms(false)}><X className="text-zinc-500 hover:text-white" /></button>
-            </div>
-            <div className="p-6 overflow-y-auto text-sm text-zinc-300 space-y-4">
-              <p><strong>1. ACEITAÇÃO</strong><br />Ao utilizar a plataforma Tubarão Empréstimos, você concorda com a coleta e processamento de seus dados para fins de análise de crédito.</p>
-              <p><strong>2. VERACIDADE</strong><br />Você declara que todas as informações, documentos e biometria fornecidos são verdadeiros e autênticos, sob pena de responsabilidade civil e criminal.</p>
-              <p><strong>3. VÍDEOS E REFERÊNCIAS</strong><br />Autorizo o uso dos vídeos enviados (casa, veículo, rosto) para validação cadastral e contato com os contatos de confiança fornecidos em caso de necessidade.</p>
-              <p><strong>4. CONSULTA</strong><br />Autorizo a consulta de meu CPF em órgãos de proteção ao crédito (SPC/Serasa) e no Sistema de Informações de Crédito (SCR) do Banco Central.</p>
-              <p><strong>5. BIOMETRIA</strong><br />Consinto com a coleta da minha imagem facial (selfie) para fins de prevenção à fraude e validação de identidade (Liveness Check).</p>
-              <p><strong>6. JUROS E MULTAS</strong><br />Estou ciente das taxas de juros de <strong>30% ao mês</strong> aplicadas e que o atraso no pagamento acarretará multas e juros moratórios conforme contrato.</p>
-              <p><strong>7. CONFIRMAÇÃO VIA VÍDEO</strong><br />Confirmo que gravei vídeo declarando estar ciente do empréstimo e dos juros de 30%, conforme solicitado.</p>
-            </div>
-            <div className="p-6 border-t border-zinc-800 bg-black/50 rounded-b-2xl">
-              <Button onClick={() => { setFormData({ ...formData, termsAccepted: true }); setShowTerms(false); }} className="w-full">
-                Li e Concordo
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
 
-// Reusable Input Component for Wizard
+// Input Component
 const Input = ({ label, error, className = "", ...props }: any) => (
   <div>
     <label className="block text-xs text-zinc-400 mb-1.5 ml-1">{label}</label>
@@ -808,6 +781,6 @@ const Input = ({ label, error, className = "", ...props }: any) => (
       className={`w-full bg-black border rounded-lg p-3 text-white text-sm focus:border-[#D4AF37] outline-none transition-colors ${error ? 'border-red-900 focus:border-red-500' : 'border-zinc-700'} ${className}`}
       {...props}
     />
-    {error && <p className="text-xs text-red-500 mt-1 ml-1 font-medium">{error}</p>}
+    {error && <p className="text-xs text-red-500 mt-1 ml-1">{error}</p>}
   </div>
 );
