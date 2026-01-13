@@ -12,6 +12,7 @@ import { SignaturePad } from '../../components/SignaturePad';
 import { VideoUpload } from '../../components/VideoUpload';
 import { supabaseService } from '../../services/supabaseService';
 import { loanSettingsService, LoanSettings } from '../../services/loanSettingsService';
+import { antifraudService } from '../../services/antifraudService';
 import { useToast } from '../../components/Toast';
 import { InstallPwaButton } from '../../components/InstallPwaButton';
 
@@ -93,10 +94,15 @@ export const Wizard: React.FC = () => {
     signature: '',
   });
 
-  // Carregar configurações REAIS do banco
+  // Carregar configurações REAIS do banco e registrar visita (antifraude)
   useEffect(() => {
     const loadSettings = async () => {
       setLoadingSettings(true);
+
+      // Registrar início do wizard (antifraude - silencioso)
+      antifraudService.initSession();
+      antifraudService.logRiskEvent('wizard_start').catch(() => { });
+
       const data = await loanSettingsService.getSettings();
       setSettings(data);
       setLoadingSettings(false);
@@ -282,23 +288,54 @@ export const Wizard: React.FC = () => {
 
     setLoading(true);
 
-    await supabaseService.submitRequest({
-      ...formData,
-      amount: getAmount(),
-      installments: settings.defaultInstallments,
-      totalAmount: calculateTotal(),
-      installmentValue: calculateInstallment(),
-      interestRate: settings.interestRateMonthly,
-      lateFeeDaily: settings.lateFeeDaily,
-      lateFeeMonthly: settings.lateFeeMonthly,
-      lateFeeFixed: settings.lateFeeFixed,
-      hasGuarantee: needsGuarantee,
-      guarantee: needsGuarantee ? guarantee : null,
-    });
+    try {
+      // Registrar evento de submissão (antifraude)
+      const riskData = await antifraudService.logRiskEvent('form_submit', undefined, {
+        amount: getAmount(),
+        hasGuarantee: needsGuarantee,
+      });
 
-    setLoading(false);
-    addToast("Solicitação enviada!", 'success');
-    navigate('/client/dashboard');
+      // Verificar se é alto risco
+      if (riskData && antifraudService.isHighRisk(riskData.riskScore)) {
+        addToast("Sua solicitação será analisada manualmente.", 'info');
+      }
+
+      // Submeter o pedido
+      const success = await supabaseService.submitRequest({
+        ...formData,
+        amount: getAmount(),
+        installments: settings.defaultInstallments,
+        totalAmount: calculateTotal(),
+        installmentValue: calculateInstallment(),
+        interestRate: settings.interestRateMonthly,
+        lateFeeDaily: settings.lateFeeDaily,
+        lateFeeMonthly: settings.lateFeeMonthly,
+        lateFeeFixed: settings.lateFeeFixed,
+        hasGuarantee: needsGuarantee,
+        guarantee: needsGuarantee ? guarantee : null,
+        // Dados antifraude
+        sessionId: antifraudService.getSessionId(),
+        riskScore: riskData?.riskScore || 0,
+        riskFactors: riskData?.riskFactors || [],
+      });
+
+      if (!success) {
+        throw new Error('Falha ao submeter');
+      }
+
+      // Registrar assinatura (antifraude - silencioso)
+      antifraudService.logRiskEvent('contract_signed', undefined, {
+        signature: true,
+        termsAccepted: true,
+      }).catch(() => { });
+
+      setLoading(false);
+      addToast("Solicitação enviada!", 'success');
+      navigate('/client/dashboard');
+    } catch (error) {
+      setLoading(false);
+      addToast("Erro ao enviar. Tente novamente.", 'error');
+    }
   };
 
   const renderUploadArea = (name: string, label: string, files: string[], isGuarantee = false) => (
