@@ -13,6 +13,7 @@ import { VideoUpload } from '../../components/VideoUpload';
 import { supabaseService } from '../../services/supabaseService';
 import { loanSettingsService, LoanSettings } from '../../services/loanSettingsService';
 import { antifraudService } from '../../services/antifraudService';
+import { emailService } from '../../services/emailService';
 import { useToast } from '../../components/Toast';
 import { InstallPwaButton } from '../../components/InstallPwaButton';
 
@@ -328,6 +329,15 @@ export const Wizard: React.FC = () => {
         signature: true,
         termsAccepted: true,
       }).catch(() => { });
+
+      // Enviar emails de notificação (silencioso)
+      emailService.notifyNewRequest({
+        clientName: formData.name,
+        clientEmail: formData.email,
+        amount: getAmount(),
+        installments: settings.defaultInstallments,
+        status: 'PENDING',
+      }, 'admin@tubaraoemprestimo.com').catch(() => { });
 
       setLoading(false);
       addToast("Solicitação enviada!", 'success');
