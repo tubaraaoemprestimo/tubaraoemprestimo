@@ -266,7 +266,41 @@ export const supabaseService = {
 
     createUser: async (userData: any): Promise<boolean> => {
         try {
-            // 1. Criar usuário no Supabase Auth
+            // Método 1: Tentar usar Edge Function (requer deploy no Supabase)
+            const session = await supabase.auth.getSession();
+            const token = session.data.session?.access_token;
+            const supabaseUrl = 'https://cwhiujeragsethxjekkb.supabase.co';
+
+            if (token) {
+                try {
+                    const response = await fetch(
+                        `${supabaseUrl}/functions/v1/create-user`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({
+                                email: userData.email,
+                                password: userData.password,
+                                name: userData.name,
+                                role: userData.role
+                            })
+                        }
+                    );
+
+                    const result = await response.json();
+                    if (result.success) {
+                        console.log('User created via Edge Function');
+                        return true;
+                    }
+                } catch (edgeFnError) {
+                    console.log('Edge Function not available, using fallback...');
+                }
+            }
+
+            // Método 2: Fallback - usar signUp (requer confirmação de email desabilitada no Supabase)
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: userData.email,
                 password: userData.password,
@@ -274,9 +308,7 @@ export const supabaseService = {
                     data: {
                         name: userData.name,
                         role: userData.role
-                    },
-                    // Desabilitar confirmação de email para uso imediato
-                    emailRedirectTo: undefined
+                    }
                 }
             });
 
@@ -285,19 +317,22 @@ export const supabaseService = {
                 return false;
             }
 
-            // 2. Criar perfil na tabela users
-            if (authData.user) {
-                const { error: profileError } = await supabase.from('users').insert({
-                    auth_id: authData.user.id,
-                    name: userData.name,
-                    email: userData.email,
-                    role: userData.role
-                });
+            // Verificar se o usuário foi criado (não apenas "awaiting confirmation")
+            if (!authData.user) {
+                console.error('User not created - check email confirmation settings');
+                return false;
+            }
 
-                if (profileError) {
-                    console.error('Profile error:', profileError);
-                    // Mesmo com erro no perfil, o auth foi criado
-                }
+            // Criar perfil na tabela users
+            const { error: profileError } = await supabase.from('users').insert({
+                auth_id: authData.user.id,
+                name: userData.name,
+                email: userData.email,
+                role: userData.role
+            });
+
+            if (profileError) {
+                console.error('Profile error:', profileError);
             }
 
             return true;
