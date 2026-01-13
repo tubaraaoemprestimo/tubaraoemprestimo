@@ -198,35 +198,12 @@ export const Login: React.FC = () => {
               <ScanFace size={24} />
             </button>
           </div>
-
-          <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-zinc-800"></div>
-            <span className="flex-shrink-0 mx-4 text-zinc-600 text-xs uppercase tracking-widest">Ou</span>
-            <div className="flex-grow border-t border-zinc-800"></div>
-          </div>
-
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full py-4 text-sm font-semibold tracking-wide bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 border-zinc-800"
-            onClick={handleAdminLogin}
-            disabled={loading}
-          >
-            <ShieldCheck size={18} /> ACESSAR COMO ADMIN
-          </Button>
         </form>
 
-        <div className="mt-8 text-center flex flex-col gap-4">
+        <div className="mt-8 text-center">
           <p className="text-zinc-500 text-sm">
             Não tem uma conta? <button onClick={() => navigate('/wizard')} className="text-gold hover:text-white transition-colors font-semibold">Cadastre-se</button>
           </p>
-
-          <button
-            onClick={() => navigate('/demo')}
-            className="text-xs text-zinc-600 hover:text-[#D4AF37] transition-colors flex items-center justify-center gap-2"
-          >
-            <Smartphone size={14} /> Modo Apresentação (Demo)
-          </button>
         </div>
       </div>
 

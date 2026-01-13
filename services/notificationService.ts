@@ -40,17 +40,56 @@ const getCurrentUserId = (): string | null => {
     }
 };
 
+// Cache local para notificações (evita chamadas excessivas)
+let notificationsCache: Notification[] = [];
+let lastFetch: number = 0;
+const CACHE_DURATION = 30000; // 30 segundos
+
 const loadNotifications = (): Notification[] => {
+    // Retornar cache se ainda válido
+    return notificationsCache;
+};
+
+// Carregar do Supabase (assíncrono)
+const fetchNotificationsFromDB = async (): Promise<Notification[]> => {
+    const now = Date.now();
+    if (now - lastFetch < CACHE_DURATION && notificationsCache.length > 0) {
+        return notificationsCache;
+    }
+
     try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        return stored ? JSON.parse(stored) : [];
+        const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(MAX_NOTIFICATIONS);
+
+        if (error || !data) {
+            console.error('Error fetching notifications:', error);
+            return notificationsCache;
+        }
+
+        notificationsCache = data.map((n: any) => ({
+            id: n.id,
+            type: n.type?.toLowerCase() || 'info',
+            title: n.title,
+            message: n.message,
+            timestamp: n.created_at,
+            read: n.read,
+            actionUrl: n.link,
+            actionLabel: n.link ? 'Ver' : undefined
+        }));
+        lastFetch = now;
+        return notificationsCache;
     } catch {
-        return [];
+        return notificationsCache;
     }
 };
 
 const saveNotifications = (notifications: Notification[]): void => {
+    // Salvar também no localStorage para cache offline
     localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications.slice(0, MAX_NOTIFICATIONS)));
+    notificationsCache = notifications;
 };
 
 const loadPreferences = (): NotificationPreferences => {

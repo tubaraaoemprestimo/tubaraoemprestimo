@@ -271,6 +271,8 @@ export const supabaseService = {
             const token = session.data.session?.access_token;
             const supabaseUrl = 'https://cwhiujeragsethxjekkb.supabase.co';
 
+            let authUserId: string | null = null;
+
             if (token) {
                 try {
                     const response = await fetch(
@@ -291,9 +293,9 @@ export const supabaseService = {
                     );
 
                     const result = await response.json();
-                    if (result.success) {
+                    if (result.success && result.user?.id) {
                         console.log('User created via Edge Function');
-                        return true;
+                        authUserId = result.user.id;
                     }
                 } catch (edgeFnError) {
                     console.log('Edge Function not available, using fallback...');
@@ -301,38 +303,68 @@ export const supabaseService = {
             }
 
             // Método 2: Fallback - usar signUp (requer confirmação de email desabilitada no Supabase)
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                email: userData.email,
-                password: userData.password,
-                options: {
-                    data: {
-                        name: userData.name,
-                        role: userData.role
+            if (!authUserId) {
+                const { data: authData, error: authError } = await supabase.auth.signUp({
+                    email: userData.email,
+                    password: userData.password,
+                    options: {
+                        data: {
+                            name: userData.name,
+                            role: userData.role
+                        }
                     }
+                });
+
+                if (authError) {
+                    console.error('Auth error creating user:', authError);
+                    return false;
                 }
-            });
 
-            if (authError) {
-                console.error('Auth error creating user:', authError);
-                return false;
+                // Verificar se o usuário foi criado (não apenas "awaiting confirmation")
+                if (!authData.user) {
+                    console.error('User not created - check email confirmation settings');
+                    return false;
+                }
+
+                authUserId = authData.user.id;
+
+                // Criar perfil na tabela users
+                const { error: profileError } = await supabase.from('users').insert({
+                    auth_id: authUserId,
+                    name: userData.name,
+                    email: userData.email,
+                    role: userData.role
+                });
+
+                if (profileError) {
+                    console.error('Profile error:', profileError);
+                }
             }
 
-            // Verificar se o usuário foi criado (não apenas "awaiting confirmation")
-            if (!authData.user) {
-                console.error('User not created - check email confirmation settings');
-                return false;
-            }
+            // Se for Cliente, criar registro na tabela customers também
+            if (userData.role === 'CLIENT' && authUserId) {
+                const { error: customerError } = await supabase.from('customers').insert({
+                    user_id: authUserId,
+                    name: userData.name,
+                    cpf: userData.cpf || '',
+                    email: userData.email,
+                    phone: userData.phone || '',
+                    status: 'ACTIVE',
+                    internal_score: 500, // Score inicial
+                    total_debt: 0,
+                    active_loans_count: 0,
+                    address: userData.address || null,
+                    neighborhood: userData.neighborhood || null,
+                    city: userData.city || null,
+                    state: userData.state || null,
+                    zip_code: userData.zipCode || null,
+                    monthly_income: userData.monthlyIncome || null
+                });
 
-            // Criar perfil na tabela users
-            const { error: profileError } = await supabase.from('users').insert({
-                auth_id: authData.user.id,
-                name: userData.name,
-                email: userData.email,
-                role: userData.role
-            });
-
-            if (profileError) {
-                console.error('Profile error:', profileError);
+                if (customerError) {
+                    console.error('Customer creation error:', customerError);
+                    // Não falhar se o customer não foi criado, usuário já existe
+                }
             }
 
             return true;

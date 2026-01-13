@@ -149,6 +149,42 @@ export interface Customer {
     lateInterestDaily?: number;       // Juros diário por atraso
     lateInterestMonthly?: number;     // Juros mensal por atraso
   };
+
+  // Código de indicação único do cliente
+  referralCode?: string;
+}
+
+// ==================== NOTIFICATION TYPES ====================
+
+export interface Notification {
+  id: string;
+  customerId: string;
+  title: string;
+  message: string;
+  type: 'INFO' | 'WARNING' | 'ALERT' | 'SUCCESS';
+  read: boolean;
+  link?: string;
+  createdAt: string;
+}
+
+// ==================== REFERRAL (INDIQUE E GANHE) TYPES ====================
+
+export interface Referral {
+  id: string;
+  referrerCustomerId: string;
+  referrerCode: string;
+  referrerName?: string;
+  referredCustomerId?: string;
+  referredName: string;
+  referredCpf: string;
+  referredPhone: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'BONUS_PAID';
+  rejectionReason?: string;
+  bonusAmount: number;
+  bonusPaidAt?: string;
+  createdAt: string;
+  approvedAt?: string;
+  approvedBy?: string;
 }
 
 // ==================== PAYMENT RECEIPT TYPES ====================
