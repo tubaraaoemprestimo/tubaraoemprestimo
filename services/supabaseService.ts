@@ -134,17 +134,26 @@ export const supabaseService = {
                 }
 
                 // Get user profile from database
-                const { data: userData } = await supabase
+                const { data: userData, error: userError } = await supabase
                     .from('users')
                     .select('*')
                     .eq('auth_id', authData.user.id)
                     .single();
 
+                // DEBUG: Log para verificar dados
+                console.log('[Auth] Auth user ID:', authData.user.id);
+                console.log('[Auth] User data from DB:', userData);
+                console.log('[Auth] User error:', userError);
+
+                // Normalizar role para uppercase
+                const userRole = (userData?.role || 'CLIENT').toString().toUpperCase();
+                console.log('[Auth] Final role:', userRole);
+
                 const user = {
                     id: userData?.id || authData.user.id,
                     name: userData?.name || authData.user.email?.split('@')[0] || 'Usuário',
                     email: authData.user.email || '',
-                    role: userData?.role || 'CLIENT',
+                    role: userRole,
                     token: authData.session?.access_token || '',
                     avatarUrl: userData?.avatar_url || null
                 };
