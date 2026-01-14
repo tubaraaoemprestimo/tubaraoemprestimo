@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Megaphone, Plus, Trash2, Edit2, Calendar, Link as LinkIcon, Image as ImageIcon, CheckCircle, XCircle, Search, Users, Gift, AlertTriangle, ShieldCheck, Ban } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Edit2, Calendar, Link as LinkIcon, Image as ImageIcon, CheckCircle, XCircle, Search, Users, Gift, AlertTriangle, ShieldCheck, Ban, Send, Loader2 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { supabaseService } from '../../services/supabaseService';
 import { referralService } from '../../services/referralService';
+import { firebasePushService } from '../../services/firebasePushService';
+import { emailService } from '../../services/emailService';
 import { Campaign, ReferralUsage, Customer } from '../../types';
 import { useToast } from '../../components/Toast';
 
@@ -42,7 +44,7 @@ export const Marketing: React.FC = () => {
         setCustomers(customersData);
 
         // Fetch referral usages
-        const rawReferrals = referralService.getAllUsages();
+        const rawReferrals = await referralService.getAllUsages();
 
         // Run fraud check on pending referrals
         const checkedReferrals = rawReferrals.map(r => {
@@ -58,10 +60,12 @@ export const Marketing: React.FC = () => {
         setReferrals(checkedReferrals);
     };
 
-    const handleValidation = (id: string, action: 'VALIDATE' | 'REJECT' | 'FRAUD') => {
+
+    const handleValidation = async (id: string, action: 'VALIDATE' | 'REJECT' | 'FRAUD') => {
         referralService.validateUsage(id, action, action === 'FRAUD' ? 'Atividade suspeita detectada manualmente pelo admin' : undefined);
-        addToast(`Indicação ${action === 'VALIDATE' ? 'validada' : action === 'FRAUD' ? 'marcada como fraude' : 'jeitada'} com sucesso!`, action === 'VALIDATE' ? 'success' : 'warning');
-        setReferrals(referralService.getAllUsages());
+        addToast(`Indicação ${action === 'VALIDATE' ? 'validada' : action === 'FRAUD' ? 'marcada como fraude' : 'rejeitada'} com sucesso!`, action === 'VALIDATE' ? 'success' : 'warning');
+        const updatedReferrals = await referralService.getAllUsages();
+        setReferrals(updatedReferrals);
     };
 
     const handleSave = async () => {
@@ -121,6 +125,65 @@ export const Marketing: React.FC = () => {
                 setFormData({ ...formData, imageUrl: reader.result as string });
             };
             reader.readAsDataURL(file);
+        }
+    };
+
+    // 🚀 DISPARAR CAMPANHA - Enviar Push + Email para todos os clientes
+    const [sendingCampaign, setSendingCampaign] = useState<string | null>(null);
+
+    const handleSendCampaign = async (campaign: Campaign) => {
+        if (!confirm(`Disparar campanha "${campaign.title}" para ${customers.length} clientes?\n\nIsso enviará:\n• Push notification para todos\n• Email para todos`)) {
+            return;
+        }
+
+        setSendingCampaign(campaign.id);
+
+        try {
+            let pushSent = 0;
+            let emailSent = 0;
+            let failed = 0;
+
+            // Enviar Push para todos
+            const pushResult = await firebasePushService.sendPush({
+                to: 'all',
+                title: `📢 ${campaign.title}`,
+                body: campaign.description,
+                link: campaign.link || '/client/dashboard'
+            });
+            pushSent = pushResult.sent || 0;
+
+            // Enviar Email para cada cliente com email válido
+            const clientsWithEmail = customers.filter(c => c.email && c.email.includes('@'));
+
+            for (const customer of clientsWithEmail) {
+                try {
+                    await emailService.sendMarketingCampaign({
+                        clientName: customer.name,
+                        clientEmail: customer.email,
+                        amount: 0,
+                        campaignTitle: campaign.title,
+                        campaignDescription: campaign.description,
+                        campaignLink: campaign.link || undefined
+                    });
+                    emailSent++;
+                } catch (err) {
+                    console.error(`Email failed for ${customer.email}:`, err);
+                    failed++;
+                }
+
+                // Pequena pausa entre emails (evitar rate limit)
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+
+            addToast(
+                `Campanha disparada!\n📱 ${pushSent} push enviados\n📧 ${emailSent} emails enviados${failed > 0 ? `\n❌ ${failed} falhas` : ''}`,
+                'success'
+            );
+        } catch (error) {
+            console.error('Campaign send error:', error);
+            addToast('Erro ao disparar campanha. Verifique o console.', 'error');
+        } finally {
+            setSendingCampaign(null);
         }
     };
 
@@ -309,6 +372,23 @@ export const Marketing: React.FC = () => {
                                     <div className="flex items-center gap-4 text-xs text-zinc-500 mb-4 font-mono">
                                         <div className="flex items-center gap-1"><Calendar size={12} /> {new Date(camp.startDate).toLocaleDateString()} - {new Date(camp.endDate).toLocaleDateString()}</div>
                                     </div>
+
+                                    {/* Botão Disparar Campanha */}
+                                    {camp.active && (
+                                        <Button
+                                            size="sm"
+                                            onClick={() => handleSendCampaign(camp)}
+                                            className="w-full mb-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500"
+                                            isLoading={sendingCampaign === camp.id}
+                                            disabled={sendingCampaign !== null}
+                                        >
+                                            {sendingCampaign === camp.id ? (
+                                                <><Loader2 size={16} className="mr-2 animate-spin" /> Enviando...</>
+                                            ) : (
+                                                <><Send size={16} className="mr-2" /> Disparar Campanha</>
+                                            )}
+                                        </Button>
+                                    )}
 
                                     <div className="flex items-center gap-2 border-t border-zinc-800 pt-4">
                                         <Button size="sm" variant="secondary" onClick={() => handleEdit(camp)} className="flex-1">

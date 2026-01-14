@@ -331,13 +331,13 @@ export const Wizard: React.FC = () => {
       }).catch(() => { });
 
       // Enviar emails de notificação (silencioso)
+      // Envia para admin E para o cliente automaticamente
       emailService.notifyNewRequest({
         clientName: formData.name,
         clientEmail: formData.email,
         amount: getAmount(),
         installments: settings.defaultInstallments,
-        status: 'PENDING',
-      }, 'admin@tubaraoemprestimo.com').catch(() => { });
+      }).catch(() => { });
 
       setLoading(false);
       addToast("Solicitação enviada!", 'success');

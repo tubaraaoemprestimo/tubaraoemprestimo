@@ -38,12 +38,11 @@ export const Requests: React.FC = () => {
         await supabaseService.approveLoan(id);
 
         // Enviar email de aprovação
-        emailService.notifyStatusChange({
+        emailService.notifyApproved({
             clientName: selectedRequest.clientName,
             clientEmail: selectedRequest.email,
             amount: selectedRequest.amount,
             installments: selectedRequest.installments,
-            status: 'APPROVED',
         }).catch(() => { });
 
         setProcessing(null);
@@ -58,12 +57,11 @@ export const Requests: React.FC = () => {
         await supabaseService.rejectLoan(id);
 
         // Enviar email de reprovação
-        emailService.notifyStatusChange({
+        emailService.notifyRejected({
             clientName: selectedRequest.clientName,
             clientEmail: selectedRequest.email,
             amount: selectedRequest.amount,
             installments: selectedRequest.installments,
-            status: 'REJECTED',
         }).catch(() => { });
 
         setProcessing(null);
@@ -79,12 +77,11 @@ export const Requests: React.FC = () => {
         await supabaseService.requestSupplementalDoc(selectedRequest.id, docRequestDesc);
 
         // Enviar email solicitando documentos
-        emailService.notifyStatusChange({
+        emailService.notifyWaitingDocs({
             clientName: selectedRequest.clientName,
             clientEmail: selectedRequest.email,
             amount: selectedRequest.amount,
             installments: selectedRequest.installments,
-            status: 'WAITING_DOCS',
             message: docRequestDesc,
         }).catch(() => { });
 

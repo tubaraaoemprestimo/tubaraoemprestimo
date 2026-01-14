@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
 
 // Pages - Client
@@ -38,6 +38,7 @@ import { Referrals } from './pages/admin/Referrals';
 // Pages - Public
 import { DemoSimulator } from './pages/public/DemoSimulator';
 
+
 // Components
 import { Chatbot } from './components/Chatbot';
 import { BottomNav } from './components/BottomNav';
@@ -45,6 +46,8 @@ import { SplashScreen } from './components/SplashScreen';
 import { InstallPrompt } from './components/InstallPrompt';
 import { ToastProvider } from './components/Toast';
 import { NotificationCenter } from './components/NotificationCenter';
+import { PushPermissionBanner } from './components/PushPermissionBanner';
+import { OfflineStatus } from './components/OfflineStatus';
 import {
   LayoutDashboard, FileText, Settings as SettingsIcon, LogOut, Users, Bot, Menu, X,
   UserCog, Home as HomeIcon, PieChart, User as UserIcon, Megaphone, BarChart3,
@@ -54,6 +57,7 @@ import {
 import { Logo } from './components/Logo';
 import { supabaseService } from './services/supabaseService';
 import { BrandProvider, useBrand } from './contexts/BrandContext';
+import { firebasePushService } from './services/firebasePushService';
 
 // --- Layouts ---
 
@@ -263,6 +267,27 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
 
+  // Initialize Firebase Push on app load
+  useEffect(() => {
+    if (!showSplash) {
+      firebasePushService.init().then(() => {
+        console.log('[App] Firebase Push initialized');
+
+        // Listen for foreground messages
+        firebasePushService.onForegroundMessage((payload) => {
+          console.log('[App] Foreground push received:', payload);
+          // Show local notification or toast
+          if (payload.notification) {
+            new Notification(payload.notification.title || 'Tubarão Empréstimos', {
+              body: payload.notification.body,
+              icon: '/Logo.png'
+            });
+          }
+        });
+      });
+    }
+  }, [showSplash]);
+
   if (showSplash) {
     return (
       <BrandProvider>
@@ -275,7 +300,9 @@ export default function App() {
     <BrandProvider>
       <ToastProvider>
         <Router>
+          <OfflineStatus />
           <InstallPrompt />
+          <PushPermissionBanner />
           <Routes>
             {/* Redirect Root to Login */}
             <Route path="/" element={<Navigate to="/login" replace />} />

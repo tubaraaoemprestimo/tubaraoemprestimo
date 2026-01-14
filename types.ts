@@ -86,11 +86,20 @@ export interface DashboardStats {
 export interface SystemSettings {
   monthlyInterestRate: number;
   lateFeeRate: number;
-  // Juros de atraso
-  lateInterestDaily?: number;    // Juros ao dia (%)
-  lateInterestMonthly?: number;  // Juros ao mês (%)
-  lateInterestYearly?: number;   // Juros ao ano (%)
-  lateFixedFee?: number;         // Multa fixa (R$) aplicada ao atrasar
+
+  // Juros de atraso - com tipo (% ou R$)
+  lateInterestDaily?: number;       // Valor
+  lateInterestDailyType?: 'PERCENT' | 'FIXED';  // Tipo: % ou R$
+
+  lateInterestMonthly?: number;     // Valor
+  lateInterestMonthlyType?: 'PERCENT' | 'FIXED'; // Tipo: % ou R$
+
+  lateInterestYearly?: number;      // Valor
+  lateInterestYearlyType?: 'PERCENT' | 'FIXED';  // Tipo: % ou R$
+
+  lateFixedFee?: number;            // Multa fixa - Valor
+  lateFixedFeeType?: 'PERCENT' | 'FIXED'; // Tipo: % ou R$ (antes era só R$)
+
   // PIX
   pixKey?: string;
   pixKeyType?: 'CPF' | 'CNPJ' | 'EMAIL' | 'TELEFONE' | 'ALEATORIA';

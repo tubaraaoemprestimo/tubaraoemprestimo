@@ -12,6 +12,7 @@
     "@prisma/client": "^7.1.0",
     "@supabase/supabase-js": "^2.90.1",
     "@types/uuid": "^10.0.0",
+    "firebase": "^12.7.0",
     "lucide-react": "0.344.0",
     "react": "^18.2.1",
     "react-dom": "^18.2.1",

@@ -1,23 +1,64 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦈</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#000000" />
-    <meta name="description" content="Plataforma de Crédito" />
+    <link rel="icon" href="/Logo.png" type="image/png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
     
-    <!-- PWA iOS Support -->
+    <!-- SEO & PWA Meta Tags -->
+    <meta name="theme-color" content="#D4AF37" />
+    <meta name="description" content="Tubarão Empréstimos - Plataforma de Crédito Premium. Simule seu empréstimo agora!" />
+    <meta name="keywords" content="empréstimo, crédito, financiamento, dinheiro rápido, empréstimo pessoal" />
+    <meta name="author" content="Tubarão Empréstimos" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://tubaraoemprestimo.vercel.app/" />
+    <meta property="og:title" content="Tubarão Empréstimos - Crédito Rápido e Seguro" />
+    <meta property="og:description" content="Simule seu empréstimo em segundos. Aprovação rápida e taxas baixas!" />
+    <meta property="og:image" content="https://tubaraoemprestimo.vercel.app/Logo.png" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://tubaraoemprestimo.vercel.app/" />
+    <meta property="twitter:title" content="Tubarão Empréstimos" />
+    <meta property="twitter:description" content="Simule seu empréstimo em segundos!" />
+    <meta property="twitter:image" content="https://tubaraoemprestimo.vercel.app/Logo.png" />
+    
+    <!-- PWA iOS Support (Apple) -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Tubarão" />
-    <link rel="apple-touch-icon" href="https://cdn.jsdelivr.net/npm/twemoji@11.3.0/2/72x72/1f988.png" />
+    <link rel="apple-touch-icon" href="/Logo.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/Logo.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/Logo.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/Logo.png" />
+    
+    <!-- iOS Splash Screens -->
+    <link rel="apple-touch-startup-image" href="/Logo.png" />
+    
+    <!-- Microsoft Tiles -->
+    <meta name="msapplication-TileColor" content="#000000" />
+    <meta name="msapplication-TileImage" content="/Logo.png" />
+    <meta name="msapplication-config" content="none" />
+    
+    <!-- Disable telephone detection on iOS -->
+    <meta name="format-detection" content="telephone=no" />
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="./manifest.json" />
     
-    <!-- Tailwind CSS (CDN for Prototype) -->
+    <!-- Preconnect to critical domains -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cwhiujeragsethxjekkb.supabase.co" />
+    <link rel="dns-prefetch" href="https://www.gstatic.com" />
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    
+    <!-- Tailwind CSS (CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -25,13 +66,17 @@
         theme: {
           extend: {
             colors: {
-              // Dynamic Colors mapped to CSS Variables
               gold: 'var(--color-secondary)',
               shark: 'var(--color-primary)',
               background: 'var(--color-background)',
             },
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.3s ease-out',
+              'slide-up': 'slideUp 0.3s ease-out',
+              'pulse-slow': 'pulse 3s infinite',
             }
           }
         }
@@ -43,44 +88,126 @@
       window.process = { env: { NODE_ENV: 'production' } };
     </script>
     
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
-    
-    <title>App de Empréstimos</title>
+    <title>Tubarão Empréstimos - Crédito Rápido e Seguro</title>
     
     <style>
       :root {
-        /* Default Colors (Shark) - will be overridden by JS */
         --color-primary: #FF0000;
         --color-secondary: #D4AF37;
         --color-background: #000000;
+        --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+      }
+
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+        overscroll-behavior: none;
       }
 
       body {
         background-color: var(--color-background);
         color: #fff;
-        margin: 0;
-        padding: 0;
-        overscroll-behavior-y: none;
+        font-family: 'Inter', system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       }
+
+      /* Safe area padding for notched devices */
+      .pb-safe {
+        padding-bottom: max(1rem, var(--safe-area-inset-bottom));
+      }
+
+      /* Custom scrollbar */
       ::-webkit-scrollbar {
-        width: 8px;
+        width: 6px;
+        height: 6px;
       }
       ::-webkit-scrollbar-track {
         background: #111;
       }
       ::-webkit-scrollbar-thumb {
         background: #333;
-        border-radius: 4px;
+        border-radius: 3px;
       }
       ::-webkit-scrollbar-thumb:hover {
         background: var(--color-secondary);
       }
+
+      /* Loading skeleton animation */
+      @keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+      }
+      .skeleton {
+        background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+      }
+
+      /* Initial loading screen */
+      #loading-screen {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.3s ease;
+      }
+      #loading-screen.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .loader {
+        width: 60px;
+        height: 60px;
+        border: 3px solid #333;
+        border-top-color: #D4AF37;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* PWA install banner animation */
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(100%);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* Fadeout animation */
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      /* Disable pull-to-refresh on mobile */
+      body {
+        overscroll-behavior-y: contain;
+      }
+
+      /* Selection style */
+      ::selection {
+        background-color: var(--color-secondary);
+        color: #000;
+      }
     </style>
     
-    <!-- CRITICAL FIX: Clean Import Map - ONLY React 18 from esm.sh -->
+    <!-- Import Map for React -->
     <script type="importmap">
 {
   "imports": {
@@ -95,12 +222,86 @@
     "@prisma/client": "https://aistudiocdn.com/@prisma/client@^7.1.0"
   }
 }
-</script>
-  <link rel="stylesheet" href="/index.css">
-</head>
+    </script>
+    <link rel="stylesheet" href="/index.css" />
+  </head>
   <body>
+    <!-- Initial Loading Screen -->
+    <div id="loading-screen">
+      <div class="text-center">
+        <img src="/Logo.png" alt="Tubarão" class="w-20 h-20 mx-auto mb-4" onerror="this.style.display='none'" />
+        <div class="loader mx-auto"></div>
+        <p class="text-zinc-500 text-sm mt-4">Carregando...</p>
+      </div>
+    </div>
+
+    <!-- App Root -->
     <div id="root"></div>
+    
+    <!-- App Script -->
     <script type="module" src="./index.tsx"></script>
-  <script type="module" src="/index.tsx"></script>
-</body>
+    <script type="module" src="/index.tsx"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+      // Register Service Worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', async () => {
+          try {
+            // Register main SW
+            const swReg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+            console.log('[PWA] Service Worker registered:', swReg.scope);
+
+            // Check for updates periodically
+            setInterval(() => {
+              swReg.update();
+            }, 60 * 60 * 1000); // Every hour
+
+            // Handle SW updates
+            swReg.onupdatefound = () => {
+              const installingWorker = swReg.installing;
+              if (installingWorker) {
+                installingWorker.onstatechange = () => {
+                  if (installingWorker.state === 'installed') {
+                    if (navigator.serviceWorker.controller) {
+                      console.log('[PWA] New content available! Refresh to update.');
+                    }
+                  }
+                };
+              }
+            };
+
+            // Also register Firebase SW if needed
+            if (window.firebase) {
+              await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+              console.log('[PWA] Firebase SW registered');
+            }
+          } catch (error) {
+            console.error('[PWA] SW registration failed:', error);
+          }
+        });
+      }
+
+      // Hide loading screen when app is ready
+      window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          const loadingScreen = document.getElementById('loading-screen');
+          if (loadingScreen) {
+            loadingScreen.classList.add('hidden');
+            setTimeout(() => loadingScreen.remove(), 300);
+          }
+        }, 500);
+      });
+
+      // Prevent zoom on double-tap (iOS)
+      let lastTouchEnd = 0;
+      document.addEventListener('touchend', (e) => {
+        const now = Date.now();
+        if (now - lastTouchEnd <= 300) {
+          e.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, { passive: false });
+    </script>
+  </body>
 </html>

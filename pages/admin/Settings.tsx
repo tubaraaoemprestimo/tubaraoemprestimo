@@ -262,66 +262,127 @@ export const Settings: React.FC = () => {
           <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
             <AlertCircle size={20} className="text-red-500" /> Juros de Atraso
           </h2>
-          <p className="text-zinc-500 text-xs mb-4">Aplicados quando o cliente atrasa o pagamento da parcela</p>
+          <p className="text-zinc-500 text-xs mb-4">Aplicados quando o cliente atrasa o pagamento da parcela. Escolha se cada valor é em <strong className="text-[#D4AF37]">%</strong> ou <strong className="text-green-400">R$</strong>.</p>
           <div className="space-y-4">
+
+            {/* Multa Fixa */}
             <div>
-              <label className="block text-sm text-zinc-400 mb-2">Multa Fixa por Atraso (R$)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={settings.lateFixedFee || 0}
-                onChange={(e) => setSettings({ ...settings, lateFixedFee: Number(e.target.value) })}
-                className={inputStyle}
-                placeholder="0.00"
-              />
-              <p className="text-xs text-zinc-600 mt-1">Valor fixo aplicado uma única vez ao atrasar</p>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-sm text-zinc-400 mb-2">Juros/Dia (%)</label>
+              <label className="block text-sm text-zinc-400 mb-2">Multa por Atraso</label>
+              <div className="flex gap-2">
+                <select
+                  value={settings.lateFixedFeeType || 'FIXED'}
+                  onChange={(e) => setSettings({ ...settings, lateFixedFeeType: e.target.value as any })}
+                  className={`${inputStyle} w-24 text-center`}
+                >
+                  <option value="FIXED">R$</option>
+                  <option value="PERCENT">%</option>
+                </select>
                 <input
                   type="number"
                   step="0.01"
-                  value={settings.lateInterestDaily || 0}
-                  onChange={(e) => setSettings({ ...settings, lateInterestDaily: Number(e.target.value) })}
+                  value={settings.lateFixedFee || 0}
+                  onChange={(e) => setSettings({ ...settings, lateFixedFee: Number(e.target.value) })}
                   className={inputStyle}
-                  placeholder="0.033"
+                  placeholder="0.00"
                 />
               </div>
+              <p className="text-xs text-zinc-600 mt-1">
+                {settings.lateFixedFeeType === 'PERCENT'
+                  ? '% do valor da parcela'
+                  : 'Valor fixo aplicado uma vez ao atrasar'}
+              </p>
+            </div>
+
+            {/* Juros Diário/Mensal/Anual */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Juros/Dia */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Juros/Mês (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={settings.lateInterestMonthly || 0}
-                  onChange={(e) => setSettings({ ...settings, lateInterestMonthly: Number(e.target.value) })}
-                  className={inputStyle}
-                  placeholder="1.0"
-                />
+                <label className="block text-sm text-zinc-400 mb-2">Juros/Dia</label>
+                <div className="flex gap-2">
+                  <select
+                    value={settings.lateInterestDailyType || 'PERCENT'}
+                    onChange={(e) => setSettings({ ...settings, lateInterestDailyType: e.target.value as any })}
+                    className={`${inputStyle} w-20 text-center text-xs`}
+                  >
+                    <option value="PERCENT">%</option>
+                    <option value="FIXED">R$</option>
+                  </select>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={settings.lateInterestDaily || 0}
+                    onChange={(e) => setSettings({ ...settings, lateInterestDaily: Number(e.target.value) })}
+                    className={inputStyle}
+                    placeholder="0.033"
+                  />
+                </div>
               </div>
+
+              {/* Juros/Mês */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Juros/Ano (%)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={settings.lateInterestYearly || 0}
-                  onChange={(e) => setSettings({ ...settings, lateInterestYearly: Number(e.target.value) })}
-                  className={inputStyle}
-                  placeholder="12.0"
-                />
+                <label className="block text-sm text-zinc-400 mb-2">Juros/Mês</label>
+                <div className="flex gap-2">
+                  <select
+                    value={settings.lateInterestMonthlyType || 'PERCENT'}
+                    onChange={(e) => setSettings({ ...settings, lateInterestMonthlyType: e.target.value as any })}
+                    className={`${inputStyle} w-20 text-center text-xs`}
+                  >
+                    <option value="PERCENT">%</option>
+                    <option value="FIXED">R$</option>
+                  </select>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={settings.lateInterestMonthly || 0}
+                    onChange={(e) => setSettings({ ...settings, lateInterestMonthly: Number(e.target.value) })}
+                    className={inputStyle}
+                    placeholder="1.0"
+                  />
+                </div>
+              </div>
+
+              {/* Juros/Ano */}
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Juros/Ano</label>
+                <div className="flex gap-2">
+                  <select
+                    value={settings.lateInterestYearlyType || 'PERCENT'}
+                    onChange={(e) => setSettings({ ...settings, lateInterestYearlyType: e.target.value as any })}
+                    className={`${inputStyle} w-20 text-center text-xs`}
+                  >
+                    <option value="PERCENT">%</option>
+                    <option value="FIXED">R$</option>
+                  </select>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={settings.lateInterestYearly || 0}
+                    onChange={(e) => setSettings({ ...settings, lateInterestYearly: Number(e.target.value) })}
+                    className={inputStyle}
+                    placeholder="12.0"
+                  />
+                </div>
               </div>
             </div>
+
+            {/* Exemplo de cálculo */}
             <div className="bg-black/50 p-4 rounded-xl border border-zinc-800 mt-4">
-              <p className="text-xs text-zinc-500 mb-2">Exemplo de cálculo (parcela de R$ 500):</p>
-              <div className="text-sm text-zinc-300">
-                <p>• 10 dias de atraso com {settings.lateInterestDaily || 0}%/dia:</p>
-                <p className="text-[#D4AF37] font-bold pl-4">
-                  R$ {(500 + (settings.lateFixedFee || 0) + (500 * ((settings.lateInterestDaily || 0) / 100) * 10)).toFixed(2)}
+              <p className="text-xs text-zinc-500 mb-2">Exemplo de cálculo (parcela de R$ 500, 10 dias de atraso):</p>
+              <div className="text-sm text-zinc-300 space-y-1">
+                <p>• Multa: {settings.lateFixedFeeType === 'PERCENT' ? `${settings.lateFixedFee || 0}% = R$ ${((500 * (settings.lateFixedFee || 0)) / 100).toFixed(2)}` : `R$ ${(settings.lateFixedFee || 0).toFixed(2)}`}</p>
+                <p>• Juros 10 dias: {settings.lateInterestDailyType === 'FIXED' ? `R$ ${((settings.lateInterestDaily || 0) * 10).toFixed(2)}` : `${settings.lateInterestDaily || 0}% x 10 = R$ ${(500 * ((settings.lateInterestDaily || 0) / 100) * 10).toFixed(2)}`}</p>
+                <p className="text-[#D4AF37] font-bold pt-2 border-t border-zinc-800">
+                  Total: R$ {(
+                    500 +
+                    (settings.lateFixedFeeType === 'PERCENT' ? (500 * (settings.lateFixedFee || 0) / 100) : (settings.lateFixedFee || 0)) +
+                    (settings.lateInterestDailyType === 'FIXED' ? ((settings.lateInterestDaily || 0) * 10) : (500 * ((settings.lateInterestDaily || 0) / 100) * 10))
+                  ).toFixed(2)}
                 </p>
               </div>
             </div>
           </div>
         </div>
+
 
         {/* PIX Configuration */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">

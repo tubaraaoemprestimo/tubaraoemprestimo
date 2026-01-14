@@ -1,8 +1,10 @@
 // 🔔 Auto Notification Service - Notificações Automáticas
 // Triggers automáticos para enviar notificações ao cliente
+// Agora integrado com Firebase Push Notifications
 
 import { supabase } from './supabaseClient';
 import { scoreService } from './scoreService';
+import { firebasePushService } from './firebasePushService';
 
 export const autoNotificationService = {
     // ============================================
@@ -43,7 +45,8 @@ export const autoNotificationService = {
     // ============================================
 
     // Solicitação recebida
-    onLoanRequested: async (customerEmail: string, amount: number): Promise<void> => {
+    onLoanRequested: async (customerEmail: string, amount: number, clientName?: string): Promise<void> => {
+        // Notificação no banco
         await autoNotificationService.createNotification(
             customerEmail,
             'Solicitação Recebida ✓',
@@ -51,6 +54,22 @@ export const autoNotificationService = {
             'INFO',
             '/client/contracts'
         );
+
+        // Push para o cliente
+        firebasePushService.sendPush({
+            to: customerEmail,
+            title: '📝 Solicitação Recebida',
+            body: `Recebemos sua solicitação de R$ ${amount.toLocaleString('pt-BR')}`,
+            link: '/client/contracts'
+        }).catch(() => { });
+
+        // Push para admin
+        firebasePushService.sendPush({
+            to: 'admin',
+            title: '📝 Nova Solicitação',
+            body: `${clientName || 'Cliente'} solicitou R$ ${amount.toLocaleString('pt-BR')}`,
+            link: '/admin/requests'
+        }).catch(() => { });
     },
 
     // Empréstimo aprovado
@@ -62,6 +81,14 @@ export const autoNotificationService = {
             'SUCCESS',
             '/client/contracts'
         );
+
+        // Push para o cliente
+        firebasePushService.sendPush({
+            to: customerEmail,
+            title: '✅ Empréstimo Aprovado!',
+            body: `Parabéns! Seu empréstimo de R$ ${amount.toLocaleString('pt-BR')} foi aprovado!`,
+            link: '/client/contracts'
+        }).catch(() => { });
     },
 
     // Empréstimo rejeitado
@@ -73,6 +100,14 @@ export const autoNotificationService = {
             'ALERT',
             '/client/dashboard'
         );
+
+        // Push para o cliente
+        firebasePushService.sendPush({
+            to: customerEmail,
+            title: '❌ Solicitação Não Aprovada',
+            body: reason || 'Sua solicitação não foi aprovada neste momento.',
+            link: '/client/dashboard'
+        }).catch(() => { });
     },
 
     // ============================================
