@@ -523,26 +523,17 @@ export const Wizard: React.FC = () => {
                 </div>
               )}
 
-              {/* Simulação */}
-              <div className="bg-black border border-[#D4AF37]/30 rounded-2xl p-5">
-                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-zinc-800">
-                  <Percent size={18} className="text-[#D4AF37]" />
-                  <span className="text-sm font-bold text-[#D4AF37]">TAXA: {settings.interestRateMonthly}% a.m.</span>
-                </div>
-
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-zinc-400">Valor:</span>
-                  <span className="text-xl font-bold">R$ {getAmount().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-zinc-400">Total a pagar:</span>
-                  <span className="text-lg font-bold text-zinc-300">R$ {calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between items-center pt-4 border-t border-zinc-800">
-                  <span className="text-zinc-400">Parcela:</span>
-                  <span className="text-2xl font-bold text-[#D4AF37]">
-                    {settings.defaultInstallments}x de R$ {calculateInstallment().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
+              {/* Informação sobre próximos passos */}
+              <div className="bg-black border border-zinc-700 rounded-2xl p-5">
+                <div className="text-center space-y-3">
+                  <Clock size={32} className="mx-auto text-[#D4AF37]" />
+                  <h3 className="font-bold text-white">Valor Solicitado</h3>
+                  <p className="text-3xl font-bold text-[#D4AF37]">
+                    R$ {getAmount().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-sm text-zinc-400">
+                    Após a análise, apresentaremos as condições de pagamento.
+                  </p>
                 </div>
               </div>
             </div>

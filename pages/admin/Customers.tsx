@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings } from 'lucide-react';
+import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings, Calendar, RotateCcw, Calculator } from 'lucide-react';
 import { supabaseService } from '../../services/supabaseService';
 import { whatsappService } from '../../services/whatsappService';
 import { Customer, SystemSettings } from '../../types';
@@ -32,6 +32,16 @@ export const Customers: React.FC = () => {
     lateFixedFee: 0,
     lateInterestDaily: 0,
     lateInterestMonthly: 0
+  });
+
+  // Installment Offer Modal State
+  const [installmentOfferOpen, setInstallmentOfferOpen] = useState(false);
+  const [installmentOffer, setInstallmentOffer] = useState({
+    amount: 1000,
+    installments: 4,
+    interestRate: 15,
+    installmentValue: 0,
+    totalAmount: 0
   });
 
   useEffect(() => {
@@ -104,6 +114,77 @@ export const Customers: React.FC = () => {
     setRatesModalOpen(false);
     addToast(`Taxas ${customRates.useCustomRates ? 'personalizadas salvas' : 'resetadas para padrão'}!`, 'success');
     loadCustomers();
+  };
+
+  // Funções para Oferta de Parcelamento
+  const openInstallmentOfferModal = (cust: Customer) => {
+    setSelectedCustomer(cust);
+    // Usar taxa personalizada do cliente ou taxa global
+    const rate = cust.customRates?.monthlyInterestRate || globalSettings?.monthlyInterestRate || 15;
+    setInstallmentOffer({
+      amount: 1000,
+      installments: 4,
+      interestRate: rate,
+      installmentValue: 0,
+      totalAmount: 0
+    });
+    setInstallmentOfferOpen(true);
+  };
+
+  const calculateInstallmentOffer = (amount: number, installments: number, rate: number) => {
+    // Cálculo com juros compostos simples: Total = Principal * (1 + taxa/100)
+    const totalAmount = amount * (1 + rate / 100);
+    const installmentValue = totalAmount / installments;
+    return { totalAmount, installmentValue };
+  };
+
+  // Atualiza cálculos quando valores mudam
+  useEffect(() => {
+    const { totalAmount, installmentValue } = calculateInstallmentOffer(
+      installmentOffer.amount,
+      installmentOffer.installments,
+      installmentOffer.interestRate
+    );
+    setInstallmentOffer(prev => ({
+      ...prev,
+      totalAmount,
+      installmentValue
+    }));
+  }, [installmentOffer.amount, installmentOffer.installments, installmentOffer.interestRate]);
+
+  const handleSendInstallmentOffer = async () => {
+    if (!selectedCustomer) return;
+    setSending(true);
+
+    try {
+      // Salvar oferta no banco
+      await supabaseService.sendInstallmentOffer(selectedCustomer.id, {
+        amount: installmentOffer.amount,
+        installments: installmentOffer.installments,
+        interestRate: installmentOffer.interestRate,
+        installmentValue: installmentOffer.installmentValue,
+        totalAmount: installmentOffer.totalAmount
+      });
+
+      // Enviar WhatsApp
+      const msg = `Olá ${selectedCustomer.name.split(' ')[0]}! 🦈\n\n` +
+        `Temos uma oferta especial para você:\n\n` +
+        `💰 *Valor:* R$ ${installmentOffer.amount.toLocaleString('pt-BR')}\n` +
+        `📅 *Parcelas:* ${installmentOffer.installments}x de R$ ${installmentOffer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+        `📊 *Taxa:* ${installmentOffer.interestRate}% a.m.\n` +
+        `💵 *Total:* R$ ${installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
+        `Acesse o app para conferir!`;
+
+      whatsappService.sendMessage(selectedCustomer.phone, msg);
+
+      setSending(false);
+      setInstallmentOfferOpen(false);
+      addToast(`Oferta de ${installmentOffer.installments}x R$ ${installmentOffer.installmentValue.toFixed(2)} enviada para ${selectedCustomer.name}!`, 'success');
+      loadCustomers();
+    } catch (error) {
+      setSending(false);
+      addToast('Erro ao enviar oferta.', 'error');
+    }
   };
 
   const handleSendPreApproval = async () => {
@@ -280,6 +361,15 @@ export const Customers: React.FC = () => {
                         >
                           <DollarSign size={16} />
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => openInstallmentOfferModal(cust)}
+                          title="Enviar Oferta de Parcelamento"
+                          className="text-emerald-400 hover:text-emerald-300 bg-emerald-900/20 border border-emerald-700/50"
+                        >
+                          <Calculator size={16} />
+                        </Button>
                         <Button size="sm" variant="secondary" onClick={() => openMessageModal(cust)}>
                           <MessageSquare size={16} />
                         </Button>
@@ -454,6 +544,99 @@ export const Customers: React.FC = () => {
 
               <Button onClick={handleSaveRates} isLoading={sending} className="w-full bg-purple-500 hover:bg-purple-600 text-white">
                 Salvar Taxas
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Installment Offer Modal */}
+      {installmentOfferOpen && selectedCustomer && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
+              <h3 className="text-xl font-bold text-emerald-400 flex items-center gap-2">
+                <Calculator size={20} /> Oferta de Parcelamento
+              </h3>
+              <button onClick={() => setInstallmentOfferOpen(false)} className="text-zinc-500 hover:text-white"><X /></button>
+            </div>
+
+            <p className="text-zinc-400 text-sm mb-6">
+              Configure uma oferta de parcelamento personalizada para <strong>{selectedCustomer.name}</strong>.
+            </p>
+
+            <div className="space-y-4">
+              {/* Valor */}
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Valor do Empréstimo (R$)</label>
+                <input
+                  type="number"
+                  value={installmentOffer.amount}
+                  onChange={(e) => setInstallmentOffer(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                  className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-xl font-bold text-white text-center focus:border-emerald-500 outline-none"
+                />
+              </div>
+
+              {/* Parcelas */}
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Número de Parcelas</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[2, 3, 4, 6, 8, 10, 12, 24].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => setInstallmentOffer(prev => ({ ...prev, installments: num }))}
+                      className={`p-3 rounded-lg border text-sm font-bold transition-all ${installmentOffer.installments === num
+                          ? 'border-emerald-500 bg-emerald-900/30 text-emerald-400'
+                          : 'border-zinc-700 bg-black text-zinc-400 hover:border-zinc-500'
+                        }`}
+                    >
+                      {num}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Taxa de Juros */}
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Taxa de Juros Mensal (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={installmentOffer.interestRate}
+                  onChange={(e) => setInstallmentOffer(prev => ({ ...prev, interestRate: Number(e.target.value) }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                />
+              </div>
+
+              {/* Resumo do Cálculo */}
+              <div className="bg-emerald-900/20 border border-emerald-700/50 rounded-xl p-4 space-y-3">
+                <h4 className="text-emerald-400 font-bold text-sm uppercase flex items-center gap-2">
+                  <Calculator size={16} /> Resumo da Oferta
+                </h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-zinc-500">Valor Solicitado</p>
+                    <p className="text-white font-bold text-lg">R$ {installmentOffer.amount.toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500">Taxa</p>
+                    <p className="text-white font-bold text-lg">{installmentOffer.interestRate}% a.m.</p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500">Total a Pagar</p>
+                    <p className="text-white font-bold text-lg">R$ {installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-500">Parcela</p>
+                    <p className="text-emerald-400 font-bold text-lg">
+                      {installmentOffer.installments}x R$ {installmentOffer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Button onClick={handleSendInstallmentOffer} isLoading={sending} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white">
+                <Send size={18} className="mr-2" /> Enviar Oferta de Parcelamento
               </Button>
             </div>
           </div>

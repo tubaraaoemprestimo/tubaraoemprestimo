@@ -1047,6 +1047,30 @@ export const supabaseService = {
         return !error;
     },
 
+    sendInstallmentOffer: async (customerId: string, offer: {
+        amount: number;
+        installments: number;
+        interestRate: number;
+        installmentValue: number;
+        totalAmount: number;
+    }) => {
+        const { error } = await supabase
+            .from('customers')
+            .update({
+                installment_offer: {
+                    amount: offer.amount,
+                    installments: offer.installments,
+                    interest_rate: offer.interestRate,
+                    installment_value: offer.installmentValue,
+                    total_amount: offer.totalAmount,
+                    created_at: new Date().toISOString()
+                }
+            })
+            .eq('id', customerId);
+
+        return !error;
+    },
+
     getPreApproval: async (): Promise<number | null> => {
         const user = loadFromStorage<any>(STORAGE_KEYS.USER, null);
         if (!user) return null;
