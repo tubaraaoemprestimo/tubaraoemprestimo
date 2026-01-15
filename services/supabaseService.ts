@@ -1129,9 +1129,52 @@ export const supabaseService = {
         }));
     },
 
-    // ============================================
-    // COLLECTION RULES
-    // ============================================
+    // Admin Coupon Management
+    getCoupons: async () => {
+        const { data } = await supabase
+            .from('coupons')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (!data) return [];
+
+        return data.map((c: any) => ({
+            id: c.id,
+            code: c.code,
+            discount: c.discount,
+            description: c.description || '',
+            customerEmail: c.customer_email,
+            active: c.active,
+            expiresAt: c.expires_at,
+            createdAt: c.created_at
+        }));
+    },
+
+    saveCoupon: async (coupon: {
+        id?: string;
+        code: string;
+        discount: number;
+        description: string;
+        customerEmail: string | null;
+        expiresAt: string;
+        active: boolean;
+    }) => {
+        const { error } = await supabase.from('coupons').upsert({
+            id: coupon.id || undefined,
+            code: coupon.code,
+            discount: coupon.discount,
+            description: coupon.description,
+            customer_email: coupon.customerEmail,
+            expires_at: coupon.expiresAt,
+            active: coupon.active
+        });
+        return !error;
+    },
+
+    deleteCoupon: async (id: string) => {
+        const { error } = await supabase.from('coupons').delete().eq('id', id);
+        return !error;
+    },
     getCollectionRules: async (): Promise<CollectionRule[]> => {
         const { data } = await supabase
             .from('collection_rules')

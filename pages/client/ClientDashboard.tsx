@@ -355,7 +355,10 @@ export const ClientDashboard: React.FC = () => {
               Proposta enviada em {new Date(installmentOffer.createdAt).toLocaleDateString('pt-BR')}
             </p>
 
-            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-none">
+            <Button
+              onClick={() => navigate(`/wizard?amount=${installmentOffer.amount}&installments=${installmentOffer.installments}&rate=${installmentOffer.interestRate}`)}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+            >
               <CheckCircle size={16} className="mr-2" /> Aceitar Proposta
             </Button>
           </div>

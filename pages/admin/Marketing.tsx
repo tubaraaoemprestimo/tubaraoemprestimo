@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Megaphone, Plus, Trash2, Edit2, Calendar, Link as LinkIcon, Image as ImageIcon, CheckCircle, XCircle, Search, Users, Gift, AlertTriangle, ShieldCheck, Ban, Send, Loader2 } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Edit2, Calendar, Link as LinkIcon, Image as ImageIcon, CheckCircle, XCircle, Search, Users, Gift, AlertTriangle, ShieldCheck, Ban, Send, Loader2, Ticket } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { supabaseService } from '../../services/supabaseService';
 import { referralService } from '../../services/referralService';
@@ -12,13 +12,26 @@ const inputStyle = "w-full bg-black border border-zinc-700 rounded-lg p-3 text-w
 
 export const Marketing: React.FC = () => {
     const { addToast } = useToast();
-    const [activeTab, setActiveTab] = useState<'campaigns' | 'referrals'>('referrals');
+    const [activeTab, setActiveTab] = useState<'campaigns' | 'referrals' | 'coupons'>('referrals');
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [referrals, setReferrals] = useState<ReferralUsage[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Coupons State
+    const [coupons, setCoupons] = useState<{ id: string; code: string; discount: number; description: string; customerEmail: string | null; active: boolean; expiresAt: string; createdAt: string }[]>([]);
+    const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
+    const [couponForm, setCouponForm] = useState({
+        id: '',
+        code: '',
+        discount: 10,
+        description: '',
+        customerEmail: '',
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        active: true
+    });
 
     // Form State
     const [formData, setFormData] = useState<Partial<Campaign>>({
@@ -58,6 +71,10 @@ export const Marketing: React.FC = () => {
         });
 
         setReferrals(checkedReferrals);
+
+        // Fetch coupons
+        const couponsData = await supabaseService.getCoupons();
+        setCoupons(couponsData);
     };
 
 
@@ -66,6 +83,61 @@ export const Marketing: React.FC = () => {
         addToast(`Indicação ${action === 'VALIDATE' ? 'validada' : action === 'FRAUD' ? 'marcada como fraude' : 'rejeitada'} com sucesso!`, action === 'VALIDATE' ? 'success' : 'warning');
         const updatedReferrals = await referralService.getAllUsages();
         setReferrals(updatedReferrals);
+    };
+
+    // Coupon Management Functions
+    const handleSaveCoupon = async () => {
+        if (!couponForm.code || couponForm.discount <= 0) {
+            addToast("Código e desconto são obrigatórios.", 'warning');
+            return;
+        }
+
+        setLoading(true);
+        const success = await supabaseService.saveCoupon({
+            id: couponForm.id || undefined,
+            code: couponForm.code.toUpperCase(),
+            discount: couponForm.discount,
+            description: couponForm.description,
+            customerEmail: couponForm.customerEmail || null,
+            expiresAt: couponForm.expiresAt,
+            active: couponForm.active
+        });
+
+        if (success) {
+            addToast(couponForm.id ? "Cupom atualizado!" : "Cupom criado!", 'success');
+            setIsCouponModalOpen(false);
+            setCouponForm({ id: '', code: '', discount: 10, description: '', customerEmail: '', expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], active: true });
+            loadData();
+        } else {
+            addToast("Erro ao salvar cupom.", 'error');
+        }
+        setLoading(false);
+    };
+
+    const handleDeleteCoupon = async (id: string) => {
+        if (confirm("Tem certeza que deseja excluir este cupom?")) {
+            await supabaseService.deleteCoupon(id);
+            addToast("Cupom excluído!", 'info');
+            loadData();
+        }
+    };
+
+    const handleEditCoupon = (coupon: typeof coupons[0]) => {
+        setCouponForm({
+            id: coupon.id,
+            code: coupon.code,
+            discount: coupon.discount,
+            description: coupon.description,
+            customerEmail: coupon.customerEmail || '',
+            expiresAt: coupon.expiresAt.split('T')[0],
+            active: coupon.active
+        });
+        setIsCouponModalOpen(true);
+    };
+
+    const handleCreateCoupon = () => {
+        setCouponForm({ id: '', code: '', discount: 10, description: '', customerEmail: '', expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], active: true });
+        setIsCouponModalOpen(true);
     };
 
     const handleSave = async () => {
@@ -208,20 +280,31 @@ export const Marketing: React.FC = () => {
                         <Plus size={18} className="mr-2" /> Nova Campanha
                     </Button>
                 )}
+                {activeTab === 'coupons' && (
+                    <Button onClick={handleCreateCoupon}>
+                        <Plus size={18} className="mr-2" /> Novo Cupom
+                    </Button>
+                )}
             </div>
 
-            <div className="flex gap-4 mb-8 border-b border-zinc-800">
+            <div className="flex gap-4 mb-8 border-b border-zinc-800 overflow-x-auto">
                 <button
                     onClick={() => setActiveTab('referrals')}
-                    className={`pb-4 px-2 font-bold transition-colors ${activeTab === 'referrals' ? 'text-[#D4AF37] border-b-2 border-[#D4AF37]' : 'text-zinc-500 hover:text-white'}`}
+                    className={`pb-4 px-2 font-bold transition-colors whitespace-nowrap ${activeTab === 'referrals' ? 'text-[#D4AF37] border-b-2 border-[#D4AF37]' : 'text-zinc-500 hover:text-white'}`}
                 >
-                    Indicações (Anti-Fraude)
+                    Indicações
                 </button>
                 <button
                     onClick={() => setActiveTab('campaigns')}
-                    className={`pb-4 px-2 font-bold transition-colors ${activeTab === 'campaigns' ? 'text-[#D4AF37] border-b-2 border-[#D4AF37]' : 'text-zinc-500 hover:text-white'}`}
+                    className={`pb-4 px-2 font-bold transition-colors whitespace-nowrap ${activeTab === 'campaigns' ? 'text-[#D4AF37] border-b-2 border-[#D4AF37]' : 'text-zinc-500 hover:text-white'}`}
                 >
-                    Campanhas & Banners
+                    Campanhas
+                </button>
+                <button
+                    onClick={() => setActiveTab('coupons')}
+                    className={`pb-4 px-2 font-bold transition-colors whitespace-nowrap ${activeTab === 'coupons' ? 'text-[#D4AF37] border-b-2 border-[#D4AF37]' : 'text-zinc-500 hover:text-white'}`}
+                >
+                    <Ticket size={16} className="inline mr-1" /> Cupons
                 </button>
             </div>
 
@@ -522,6 +605,174 @@ export const Marketing: React.FC = () => {
                             <div className="pt-4 flex gap-3">
                                 <Button variant="secondary" onClick={() => setIsModalOpen(false)} className="flex-1">Cancelar</Button>
                                 <Button onClick={handleSave} isLoading={loading} className="flex-1">Salvar Campanha</Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Coupons Tab */}
+            {activeTab === 'coupons' && (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                            <p className="text-zinc-400 text-sm mb-1">Total de Cupons</p>
+                            <p className="text-2xl font-bold text-white">{coupons.length}</p>
+                        </div>
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                            <p className="text-zinc-400 text-sm mb-1">Cupons Ativos</p>
+                            <p className="text-2xl font-bold text-green-400">{coupons.filter(c => c.active).length}</p>
+                        </div>
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                            <p className="text-zinc-400 text-sm mb-1">Cupons Expirados</p>
+                            <p className="text-2xl font-bold text-red-400">{coupons.filter(c => new Date(c.expiresAt) < new Date()).length}</p>
+                        </div>
+                    </div>
+
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+                        <div className="p-4 border-b border-zinc-800">
+                            <h3 className="font-bold text-white flex items-center gap-2">
+                                <Ticket size={18} className="text-purple-400" /> Lista de Cupons
+                            </h3>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-black/50 text-zinc-400">
+                                    <tr>
+                                        <th className="p-3 text-left">Código</th>
+                                        <th className="p-3 text-left">Desconto</th>
+                                        <th className="p-3 text-left">Descrição</th>
+                                        <th className="p-3 text-left">Cliente</th>
+                                        <th className="p-3 text-left">Validade</th>
+                                        <th className="p-3 text-left">Status</th>
+                                        <th className="p-3 text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {coupons.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} className="p-8 text-center text-zinc-500">
+                                                Nenhum cupom cadastrado. Clique em "Novo Cupom" para criar.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        coupons.map(coupon => (
+                                            <tr key={coupon.id} className="border-t border-zinc-800 hover:bg-zinc-900/50">
+                                                <td className="p-3">
+                                                    <span className="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded">{coupon.code}</span>
+                                                </td>
+                                                <td className="p-3 font-bold text-purple-400">{coupon.discount}%</td>
+                                                <td className="p-3 text-zinc-300">{coupon.description || '-'}</td>
+                                                <td className="p-3 text-zinc-400">{coupon.customerEmail || 'Todos'}</td>
+                                                <td className="p-3 text-zinc-400">{new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}</td>
+                                                <td className="p-3">
+                                                    {coupon.active && new Date(coupon.expiresAt) >= new Date() ? (
+                                                        <span className="bg-green-900/30 text-green-400 text-xs px-2 py-1 rounded">Ativo</span>
+                                                    ) : (
+                                                        <span className="bg-red-900/30 text-red-400 text-xs px-2 py-1 rounded">Inativo</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-3 text-right">
+                                                    <button onClick={() => handleEditCoupon(coupon)} className="p-2 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white mr-1">
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteCoupon(coupon.id)} className="p-2 hover:bg-red-900/30 rounded text-zinc-400 hover:text-red-400">
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Coupon Modal */}
+            {isCouponModalOpen && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in duration-200">
+                        <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
+                            <h3 className="text-xl font-bold text-purple-400 flex items-center gap-2">
+                                <Ticket size={20} /> {couponForm.id ? 'Editar Cupom' : 'Novo Cupom'}
+                            </h3>
+                            <button onClick={() => setIsCouponModalOpen(false)}><XCircle className="text-zinc-500 hover:text-white" /></button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm text-zinc-400 mb-1">Código do Cupom</label>
+                                <input
+                                    type="text"
+                                    value={couponForm.code}
+                                    onChange={e => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
+                                    placeholder="BEMVINDO10"
+                                    className={inputStyle}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm text-zinc-400 mb-1">Desconto (%)</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="100"
+                                    value={couponForm.discount}
+                                    onChange={e => setCouponForm({ ...couponForm, discount: Number(e.target.value) })}
+                                    className={inputStyle}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm text-zinc-400 mb-1">Descrição</label>
+                                <input
+                                    type="text"
+                                    value={couponForm.description}
+                                    onChange={e => setCouponForm({ ...couponForm, description: e.target.value })}
+                                    placeholder="Desconto de boas-vindas"
+                                    className={inputStyle}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm text-zinc-400 mb-1">Email do Cliente (opcional)</label>
+                                <input
+                                    type="email"
+                                    value={couponForm.customerEmail}
+                                    onChange={e => setCouponForm({ ...couponForm, customerEmail: e.target.value })}
+                                    placeholder="cliente@email.com (vazio = todos)"
+                                    className={inputStyle}
+                                />
+                                <p className="text-xs text-zinc-600 mt-1">Deixe vazio para cupom disponível a todos os clientes</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm text-zinc-400 mb-1">Validade</label>
+                                <input
+                                    type="date"
+                                    value={couponForm.expiresAt}
+                                    onChange={e => setCouponForm({ ...couponForm, expiresAt: e.target.value })}
+                                    className={inputStyle}
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-black rounded-lg border border-zinc-800">
+                                <input
+                                    type="checkbox"
+                                    id="couponActive"
+                                    checked={couponForm.active}
+                                    onChange={e => setCouponForm({ ...couponForm, active: e.target.checked })}
+                                    className="accent-purple-500 w-5 h-5"
+                                />
+                                <label htmlFor="couponActive" className="text-white text-sm cursor-pointer select-none">Cupom Ativo?</label>
+                            </div>
+
+                            <div className="pt-4 flex gap-3">
+                                <Button variant="secondary" onClick={() => setIsCouponModalOpen(false)} className="flex-1">Cancelar</Button>
+                                <Button onClick={handleSaveCoupon} isLoading={loading} className="flex-1 bg-purple-600 hover:bg-purple-700">Salvar Cupom</Button>
                             </div>
                         </div>
                     </div>
