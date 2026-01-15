@@ -399,9 +399,70 @@ export const supabaseService = {
 
     deleteUser: async (id: string): Promise<boolean> => {
         try {
-            const { error } = await supabase.from('users').delete().eq('id', id);
-            return !error;
-        } catch {
+            // 1. Buscar dados do usuário antes de deletar
+            const { data: userData } = await supabase
+                .from('users')
+                .select('auth_id, email')
+                .eq('id', id)
+                .single();
+
+            if (!userData) {
+                console.error('User not found');
+                return false;
+            }
+
+            // 2. Tentar usar Edge Function para deleção completa (inclui Auth)
+            const session = await supabase.auth.getSession();
+            const token = session.data.session?.access_token;
+            const supabaseUrl = 'https://cwhiujeragsethxjekkb.supabase.co';
+
+            if (token) {
+                try {
+                    const response = await fetch(
+                        `${supabaseUrl}/functions/v1/delete-user`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({
+                                userId: id,
+                                authId: userData.auth_id,
+                                email: userData.email
+                            })
+                        }
+                    );
+
+                    const result = await response.json();
+                    if (result.success) {
+                        console.log('User deleted via Edge Function (including Auth)');
+                        return true;
+                    }
+                } catch (edgeFnError) {
+                    console.log('Edge Function not available, using fallback...');
+                }
+            }
+
+            // 3. Fallback: Deletar localmente (sem Auth)
+            // Deletar customer associado (se existir)
+            await supabase.from('customers').delete().eq('email', userData.email);
+
+            // Deletar da tabela users
+            const { error: userError } = await supabase
+                .from('users')
+                .delete()
+                .eq('id', id);
+
+            if (userError) {
+                console.error('Error deleting user:', userError);
+                return false;
+            }
+
+            console.log('User deleted from users and customers tables (Auth remains)');
+            return true;
+        } catch (err) {
+            console.error('Delete user error:', err);
             return false;
         }
     },
