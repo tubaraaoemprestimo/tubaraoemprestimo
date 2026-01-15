@@ -1111,20 +1111,29 @@ export const supabaseService = {
         const user = loadFromStorage<any>(STORAGE_KEYS.USER, null);
         if (!user) return [];
 
-        // Buscar cupons do cliente ou cupons gerais ativos
-        const { data } = await supabase
+        // Buscar todos os cupons ativos e não expirados
+        // Cupons com customer_email NULL são para todos
+        // Cupons com customer_email específico são apenas para aquele cliente
+        const { data, error } = await supabase
             .from('coupons')
             .select('*')
-            .or(`customer_email.eq.${user.email},customer_email.is.null`)
             .eq('active', true)
             .gte('expires_at', new Date().toISOString());
 
-        if (!data) return [];
+        if (error || !data) {
+            console.log('Erro ao buscar cupons:', error);
+            return [];
+        }
 
-        return data.map((c: any) => ({
+        // Filtrar: cupons gerais (sem email) + cupons específicos para este cliente
+        const filteredCoupons = data.filter((c: any) =>
+            c.customer_email === null || c.customer_email === '' || c.customer_email === user.email
+        );
+
+        return filteredCoupons.map((c: any) => ({
             code: c.code,
             discount: c.discount,
-            description: c.description,
+            description: c.description || '',
             expiresAt: c.expires_at
         }));
     },
