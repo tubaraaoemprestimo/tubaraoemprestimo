@@ -353,10 +353,19 @@ export const supabaseService = {
 
             // Se for Cliente, criar registro na tabela customers também
             if (userData.role === 'CLIENT' && authUserId) {
+                // Primeiro, buscar o ID do usuário na tabela users
+                const { data: userRecord } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('auth_id', authUserId)
+                    .single();
+
+                const userId = userRecord?.id || null;
+
                 const { error: customerError } = await supabase.from('customers').insert({
-                    user_id: authUserId,
+                    user_id: userId,
                     name: userData.name,
-                    cpf: userData.cpf || '',
+                    cpf: userData.cpf || '000.000.000-00',
                     email: userData.email,
                     phone: userData.phone || '',
                     status: 'ACTIVE',
@@ -374,6 +383,8 @@ export const supabaseService = {
                 if (customerError) {
                     console.error('Customer creation error:', customerError);
                     // Não falhar se o customer não foi criado, usuário já existe
+                } else {
+                    console.log('Customer created successfully');
                 }
             }
 
