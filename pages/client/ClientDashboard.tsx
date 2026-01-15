@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronRight, Wallet, Plus, Calendar, FileText, TrendingUp, X, Percent, Eye, EyeOff, Gift, Tag, Sparkles, AlertTriangle, Upload, CheckCircle, Calculator, Ticket } from 'lucide-react';
+import { Bell, ChevronRight, Wallet, Plus, Calendar, FileText, TrendingUp, X, Percent, Eye, EyeOff, Gift, Tag, Sparkles, AlertTriangle, Upload, CheckCircle, Calculator, Ticket, Megaphone } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Skeleton } from '../../components/Skeleton';
 import { supabaseService } from '../../services/supabaseService';
@@ -34,6 +34,11 @@ export const ClientDashboard: React.FC = () => {
     createdAt: string;
   } | null>(null);
   const [coupons, setCoupons] = useState<{ code: string; discount: number; description: string; expiresAt: string }[]>([]);
+
+  // Modais separados para Campanhas, Cupons e Ofertas
+  const [isCampaignsModalOpen, setIsCampaignsModalOpen] = useState(false);
+  const [isCouponsModalOpen, setIsCouponsModalOpen] = useState(false);
+  const [isOffersModalOpen, setIsOffersModalOpen] = useState(false);
 
   // Upload Modal for Waiting Docs
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -324,101 +329,44 @@ export const ClientDashboard: React.FC = () => {
           <ActionButton icon={Percent} label="Renegociar" onClick={() => setIsRenegotiateOpen(true)} disabled={userData.balance === 0} />
         </div>
 
-        {/* Proposta de Parcelamento */}
-        {installmentOffer && (
-          <div className="bg-gradient-to-br from-emerald-900/30 to-emerald-900/10 border border-emerald-600/50 rounded-2xl p-5 shadow-lg">
-            <div className="flex items-center gap-2 mb-4">
-              <Calculator size={20} className="text-emerald-400" />
-              <h3 className="text-lg font-bold text-emerald-400">Proposta de Parcelamento</h3>
-            </div>
+        {/* Cards de Acesso: Ofertas, Cupons, Campanhas */}
+        <div className="grid grid-cols-3 gap-3">
+          {/* Ofertas/Propostas */}
+          <button
+            onClick={() => setIsOffersModalOpen(true)}
+            className="relative flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-emerald-900/30 to-emerald-900/10 border border-emerald-600/50 hover:border-emerald-400 transition-all"
+          >
+            <Calculator size={24} className="text-emerald-400" />
+            <span className="text-xs font-bold text-white">Ofertas</span>
+            {installmentOffer && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-black text-xs font-bold rounded-full flex items-center justify-center">1</span>
+            )}
+          </button>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="bg-black/30 p-3 rounded-xl">
-                <p className="text-xs text-zinc-500">Valor</p>
-                <p className="text-lg font-bold text-white">R$ {installmentOffer.amount.toLocaleString('pt-BR')}</p>
-              </div>
-              <div className="bg-black/30 p-3 rounded-xl">
-                <p className="text-xs text-zinc-500">Taxa</p>
-                <p className="text-lg font-bold text-white">{installmentOffer.interestRate}% a.m.</p>
-              </div>
-              <div className="bg-black/30 p-3 rounded-xl">
-                <p className="text-xs text-zinc-500">Total</p>
-                <p className="text-lg font-bold text-white">R$ {installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-              </div>
-              <div className="bg-black/30 p-3 rounded-xl">
-                <p className="text-xs text-zinc-500">Parcela</p>
-                <p className="text-lg font-bold text-emerald-400">{installmentOffer.installments}x R$ {installmentOffer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-              </div>
-            </div>
+          {/* Cupons */}
+          <button
+            onClick={() => setIsCouponsModalOpen(true)}
+            className="relative flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-purple-900/30 to-purple-900/10 border border-purple-600/50 hover:border-purple-400 transition-all"
+          >
+            <Ticket size={24} className="text-purple-400" />
+            <span className="text-xs font-bold text-white">Cupons</span>
+            {coupons.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 text-white text-xs font-bold rounded-full flex items-center justify-center">{coupons.length}</span>
+            )}
+          </button>
 
-            <p className="text-xs text-zinc-500 mb-4">
-              Proposta enviada em {new Date(installmentOffer.createdAt).toLocaleDateString('pt-BR')}
-            </p>
-
-            <Button
-              onClick={() => navigate(`/wizard?amount=${installmentOffer.amount}&installments=${installmentOffer.installments}&rate=${installmentOffer.interestRate}`)}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-none"
-            >
-              <CheckCircle size={16} className="mr-2" /> Aceitar Proposta
-            </Button>
-          </div>
-        )}
-
-        {/* Cupons Disponíveis */}
-        {coupons.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="text-white font-bold flex items-center gap-2">
-              <Ticket size={18} className="text-purple-400" /> Seus Cupons
-            </h3>
-            <div className="space-y-3">
-              {coupons.map((coupon, idx) => (
-                <div
-                  key={idx}
-                  className="bg-gradient-to-r from-purple-900/30 to-purple-900/10 border border-purple-600/50 rounded-xl p-4 flex items-center justify-between"
-                >
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded">{coupon.code}</span>
-                      <span className="text-purple-400 font-bold">{coupon.discount}% OFF</span>
-                    </div>
-                    <p className="text-xs text-zinc-400">{coupon.description}</p>
-                    <p className="text-[10px] text-zinc-600">Válido até {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}</p>
-                  </div>
-                  <Button size="sm" variant="secondary" className="bg-purple-900/50 border-purple-700 text-purple-300">
-                    Usar
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Active Promotions Feed */}
-        {activeCampaigns.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="text-white font-bold flex items-center gap-2">
-              <Tag size={18} className="text-[#D4AF37]" /> Parceiros & Ofertas
-            </h3>
-            <div className="flex gap-4 overflow-x-auto pb-4 snap-x">
-              {activeCampaigns.map(camp => (
-                <div
-                  key={camp.id}
-                  onClick={() => camp.link && window.open(camp.link, '_blank')}
-                  className="min-w-[260px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden cursor-pointer hover:border-[#D4AF37] transition-all snap-center shadow-lg"
-                >
-                  <div className="h-28 bg-black relative">
-                    {camp.imageUrl && <img src={camp.imageUrl} className="w-full h-full object-cover" alt={camp.title} />}
-                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 to-transparent"></div>
-                  </div>
-                  <div className="p-4">
-                    <h4 className="font-bold text-white mb-1">{camp.title}</h4>
-                    <p className="text-xs text-zinc-400 line-clamp-2">{camp.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          {/* Campanhas */}
+          <button
+            onClick={() => setIsCampaignsModalOpen(true)}
+            className="relative flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-amber-900/30 to-amber-900/10 border border-amber-600/50 hover:border-amber-400 transition-all"
+          >
+            <Megaphone size={24} className="text-amber-400" />
+            <span className="text-xs font-bold text-white">Campanhas</span>
+            {activeCampaigns.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-black text-xs font-bold rounded-full flex items-center justify-center">{activeCampaigns.length}</span>
+            )}
+          </button>
+        </div>
 
         {/* Refer a Friend Banner */}
         <div onClick={handleShare} className="bg-gradient-to-r from-zinc-900 to-black border border-zinc-800 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-[#D4AF37]/30 transition-colors active:scale-95">
@@ -524,6 +472,144 @@ export const ClientDashboard: React.FC = () => {
             </div>
 
             <Button className="w-full" onClick={handleRenegotiateSubmit}>Confirmar Renegociação</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Ofertas/Propostas */}
+      {isOffersModalOpen && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-5 shadow-2xl animate-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 border-b border-zinc-800 pb-3">
+              <h3 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
+                <Calculator size={20} /> Ofertas de Parcelamento
+              </h3>
+              <button onClick={() => setIsOffersModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
+            </div>
+
+            {installmentOffer ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-black/30 p-3 rounded-xl">
+                    <p className="text-xs text-zinc-500">Valor</p>
+                    <p className="text-lg font-bold text-white">R$ {installmentOffer.amount.toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div className="bg-black/30 p-3 rounded-xl">
+                    <p className="text-xs text-zinc-500">Taxa</p>
+                    <p className="text-lg font-bold text-white">{installmentOffer.interestRate}% a.m.</p>
+                  </div>
+                  <div className="bg-black/30 p-3 rounded-xl">
+                    <p className="text-xs text-zinc-500">Total</p>
+                    <p className="text-lg font-bold text-white">R$ {installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="bg-black/30 p-3 rounded-xl">
+                    <p className="text-xs text-zinc-500">Parcela</p>
+                    <p className="text-lg font-bold text-emerald-400">{installmentOffer.installments}x R$ {installmentOffer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500 text-center">
+                  Proposta enviada em {new Date(installmentOffer.createdAt).toLocaleDateString('pt-BR')}
+                </p>
+                <Button
+                  onClick={() => {
+                    setIsOffersModalOpen(false);
+                    navigate(`/wizard?amount=${installmentOffer.amount}&installments=${installmentOffer.installments}&rate=${installmentOffer.interestRate}`);
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+                >
+                  <CheckCircle size={16} className="mr-2" /> Aceitar Proposta
+                </Button>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-zinc-500">
+                <Calculator size={48} className="mx-auto mb-4 opacity-30" />
+                <p>Nenhuma oferta disponível no momento.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cupons */}
+      {isCouponsModalOpen && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-5 shadow-2xl animate-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 border-b border-zinc-800 pb-3">
+              <h3 className="text-lg font-bold text-purple-400 flex items-center gap-2">
+                <Ticket size={20} /> Seus Cupons
+              </h3>
+              <button onClick={() => setIsCouponsModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
+            </div>
+
+            {coupons.length > 0 ? (
+              <div className="space-y-3">
+                {coupons.map((coupon, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-gradient-to-r from-purple-900/30 to-purple-900/10 border border-purple-600/50 rounded-xl p-4"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded">{coupon.code}</span>
+                        <span className="text-purple-400 font-bold">{coupon.discount}% OFF</span>
+                      </div>
+                      <Button size="sm" variant="secondary" className="bg-purple-900/50 border-purple-700 text-purple-300">
+                        Usar
+                      </Button>
+                    </div>
+                    <p className="text-xs text-zinc-400">{coupon.description}</p>
+                    <p className="text-[10px] text-zinc-600">Válido até {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-zinc-500">
+                <Ticket size={48} className="mx-auto mb-4 opacity-30" />
+                <p>Nenhum cupom disponível no momento.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Campanhas */}
+      {isCampaignsModalOpen && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-5 shadow-2xl animate-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 border-b border-zinc-800 pb-3">
+              <h3 className="text-lg font-bold text-amber-400 flex items-center gap-2">
+                <Megaphone size={20} /> Campanhas & Parceiros
+              </h3>
+              <button onClick={() => setIsCampaignsModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
+            </div>
+
+            {activeCampaigns.length > 0 ? (
+              <div className="space-y-4">
+                {activeCampaigns.map(camp => (
+                  <div
+                    key={camp.id}
+                    onClick={() => camp.link && window.open(camp.link, '_blank')}
+                    className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden cursor-pointer hover:border-amber-500 transition-all"
+                  >
+                    {camp.imageUrl && (
+                      <div className="h-32 bg-black relative">
+                        <img src={camp.imageUrl} className="w-full h-full object-cover" alt={camp.title} />
+                        <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 to-transparent"></div>
+                      </div>
+                    )}
+                    <div className="p-4">
+                      <h4 className="font-bold text-white mb-1">{camp.title}</h4>
+                      <p className="text-xs text-zinc-400">{camp.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-zinc-500">
+                <Megaphone size={48} className="mx-auto mb-4 opacity-30" />
+                <p>Nenhuma campanha disponível no momento.</p>
+              </div>
+            )}
           </div>
         </div>
       )}

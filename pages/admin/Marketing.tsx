@@ -693,11 +693,11 @@ export const Marketing: React.FC = () => {
 
             {/* Coupon Modal */}
             {isCouponModalOpen && (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in duration-200">
-                        <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
-                            <h3 className="text-xl font-bold text-purple-400 flex items-center gap-2">
-                                <Ticket size={20} /> {couponForm.id ? 'Editar Cupom' : 'Novo Cupom'}
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl animate-in zoom-in duration-200 my-4 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4 border-b border-zinc-800 pb-3">
+                            <h3 className="text-lg font-bold text-purple-400 flex items-center gap-2">
+                                <Ticket size={18} /> {couponForm.id ? 'Editar Cupom' : 'Novo Cupom'}
                             </h3>
                             <button onClick={() => setIsCouponModalOpen(false)}><XCircle className="text-zinc-500 hover:text-white" /></button>
                         </div>
