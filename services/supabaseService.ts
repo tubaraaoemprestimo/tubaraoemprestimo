@@ -1003,7 +1003,8 @@ export const supabaseService = {
                 lateFixedFee: c.custom_rates.late_fixed_fee,
                 lateInterestDaily: c.custom_rates.late_interest_daily,
                 lateInterestMonthly: c.custom_rates.late_interest_monthly
-            } : undefined
+            } : undefined,
+            installmentOffer: c.installment_offer || undefined
         }));
     },
 
@@ -1053,6 +1054,7 @@ export const supabaseService = {
         interestRate: number;
         installmentValue: number;
         totalAmount: number;
+        expiresAt?: string;
     }) => {
         const { error } = await supabase
             .from('customers')
@@ -1063,9 +1065,19 @@ export const supabaseService = {
                     interest_rate: offer.interestRate,
                     installment_value: offer.installmentValue,
                     total_amount: offer.totalAmount,
+                    expires_at: offer.expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
                     created_at: new Date().toISOString()
                 }
             })
+            .eq('id', customerId);
+
+        return !error;
+    },
+
+    deleteInstallmentOffer: async (customerId: string) => {
+        const { error } = await supabase
+            .from('customers')
+            .update({ installment_offer: null })
             .eq('id', customerId);
 
         return !error;

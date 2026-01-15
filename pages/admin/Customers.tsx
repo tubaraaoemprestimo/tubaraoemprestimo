@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings, Calendar, RotateCcw, Calculator } from 'lucide-react';
+import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings, Calendar, RotateCcw, Calculator, Edit2, Trash2, Gift } from 'lucide-react';
 import { supabaseService } from '../../services/supabaseService';
 import { whatsappService } from '../../services/whatsappService';
 import { Customer, SystemSettings } from '../../types';
@@ -41,8 +41,10 @@ export const Customers: React.FC = () => {
     installments: 4,
     interestRate: 15,
     installmentValue: 0,
-    totalAmount: 0
+    totalAmount: 0,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 7 dias
   });
+  const [isEditingOffer, setIsEditingOffer] = useState(false);
 
   useEffect(() => {
     loadCustomers();
@@ -117,18 +119,41 @@ export const Customers: React.FC = () => {
   };
 
   // Funções para Oferta de Parcelamento
-  const openInstallmentOfferModal = (cust: Customer) => {
+  const openInstallmentOfferModal = (cust: Customer, editMode = false) => {
     setSelectedCustomer(cust);
-    // Usar taxa personalizada do cliente ou taxa global
-    const rate = cust.customRates?.monthlyInterestRate || globalSettings?.monthlyInterestRate || 15;
-    setInstallmentOffer({
-      amount: 1000,
-      installments: 4,
-      interestRate: rate,
-      installmentValue: 0,
-      totalAmount: 0
-    });
+    setIsEditingOffer(editMode);
+
+    // Se cliente tem oferta existente, carregar dados
+    if (cust.installmentOffer && editMode) {
+      setInstallmentOffer({
+        amount: cust.installmentOffer.amount,
+        installments: cust.installmentOffer.installments,
+        interestRate: cust.installmentOffer.interest_rate || cust.installmentOffer.interestRate,
+        installmentValue: cust.installmentOffer.installment_value || cust.installmentOffer.installmentValue,
+        totalAmount: cust.installmentOffer.total_amount || cust.installmentOffer.totalAmount,
+        expiresAt: cust.installmentOffer.expires_at?.split('T')[0] || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      });
+    } else {
+      // Nova oferta
+      const rate = cust.customRates?.monthlyInterestRate || globalSettings?.monthlyInterestRate || 15;
+      setInstallmentOffer({
+        amount: 1000,
+        installments: 4,
+        interestRate: rate,
+        installmentValue: 0,
+        totalAmount: 0,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      });
+    }
     setInstallmentOfferOpen(true);
+  };
+
+  const handleDeleteOffer = async (cust: Customer) => {
+    if (!confirm(`Remover oferta de parcelamento de ${cust.name}?`)) return;
+
+    await supabaseService.deleteInstallmentOffer(cust.id);
+    addToast('Oferta removida!', 'info');
+    loadCustomers();
   };
 
   const calculateInstallmentOffer = (amount: number, installments: number, rate: number) => {
@@ -163,23 +188,28 @@ export const Customers: React.FC = () => {
         installments: installmentOffer.installments,
         interestRate: installmentOffer.interestRate,
         installmentValue: installmentOffer.installmentValue,
-        totalAmount: installmentOffer.totalAmount
+        totalAmount: installmentOffer.totalAmount,
+        expiresAt: installmentOffer.expiresAt
       });
 
-      // Enviar WhatsApp
-      const msg = `Olá ${selectedCustomer.name.split(' ')[0]}! 🦈\n\n` +
-        `Temos uma oferta especial para você:\n\n` +
-        `💰 *Valor:* R$ ${installmentOffer.amount.toLocaleString('pt-BR')}\n` +
-        `📅 *Parcelas:* ${installmentOffer.installments}x de R$ ${installmentOffer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
-        `📊 *Taxa:* ${installmentOffer.interestRate}% a.m.\n` +
-        `💵 *Total:* R$ ${installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n` +
-        `Acesse o app para conferir!`;
+      // Enviar WhatsApp (apenas se não for edição)
+      if (!isEditingOffer) {
+        const expiresDate = new Date(installmentOffer.expiresAt).toLocaleDateString('pt-BR');
+        const msg = `Olá ${selectedCustomer.name.split(' ')[0]}! 🦈\n\n` +
+          `Temos uma oferta especial para você:\n\n` +
+          `💰 *Valor:* R$ ${installmentOffer.amount.toLocaleString('pt-BR')}\n` +
+          `📅 *Parcelas:* ${installmentOffer.installments}x de R$ ${installmentOffer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+          `📊 *Taxa:* ${installmentOffer.interestRate}% a.m.\n` +
+          `💵 *Total:* R$ ${installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+          `⏰ *Válido até:* ${expiresDate}\n\n` +
+          `Acesse o app para conferir!`;
 
-      whatsappService.sendMessage(selectedCustomer.phone, msg);
+        whatsappService.sendMessage(selectedCustomer.phone, msg);
+      }
 
       setSending(false);
       setInstallmentOfferOpen(false);
-      addToast(`Oferta de ${installmentOffer.installments}x R$ ${installmentOffer.installmentValue.toFixed(2)} enviada para ${selectedCustomer.name}!`, 'success');
+      addToast(isEditingOffer ? 'Oferta atualizada!' : `Oferta de ${installmentOffer.installments}x R$ ${installmentOffer.installmentValue.toFixed(2)} enviada para ${selectedCustomer.name}!`, 'success');
       loadCustomers();
     } catch (error) {
       setSending(false);
@@ -370,6 +400,29 @@ export const Customers: React.FC = () => {
                         >
                           <Calculator size={16} />
                         </Button>
+                        {/* Botões de Editar/Excluir oferta se existir */}
+                        {cust.installmentOffer && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => openInstallmentOfferModal(cust, true)}
+                              title="Editar Oferta"
+                              className="text-blue-400 hover:text-blue-300 bg-blue-900/20 border border-blue-700/50"
+                            >
+                              <Edit2 size={14} />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleDeleteOffer(cust)}
+                              title="Remover Oferta"
+                              className="text-red-400 hover:text-red-300 bg-red-900/20 border border-red-700/50"
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          </>
+                        )}
                         <Button size="sm" variant="secondary" onClick={() => openMessageModal(cust)}>
                           <MessageSquare size={16} />
                         </Button>
@@ -556,13 +609,13 @@ export const Customers: React.FC = () => {
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-5 shadow-2xl animate-in fade-in zoom-in duration-200 my-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4 border-b border-zinc-800 pb-3">
               <h3 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
-                <Calculator size={18} /> Oferta de Parcelamento
+                <Calculator size={18} /> {isEditingOffer ? 'Editar Oferta' : 'Nova Oferta'}
               </h3>
               <button onClick={() => setInstallmentOfferOpen(false)} className="text-zinc-500 hover:text-white"><X /></button>
             </div>
 
             <p className="text-zinc-400 text-sm mb-4">
-              Configure uma oferta para <strong>{selectedCustomer.name}</strong>.
+              {isEditingOffer ? 'Editando oferta de' : 'Configure uma oferta para'} <strong>{selectedCustomer.name}</strong>.
             </p>
 
             <div className="space-y-3">
@@ -608,6 +661,17 @@ export const Customers: React.FC = () => {
                 />
               </div>
 
+              {/* Validade */}
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Válido até</label>
+                <input
+                  type="date"
+                  value={installmentOffer.expiresAt}
+                  onChange={(e) => setInstallmentOffer(prev => ({ ...prev, expiresAt: e.target.value }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-emerald-500 outline-none"
+                />
+              </div>
+
               {/* Resumo do Cálculo */}
               <div className="bg-emerald-900/20 border border-emerald-700/50 rounded-xl p-3">
                 <h4 className="text-emerald-400 font-bold text-xs uppercase flex items-center gap-2 mb-2">
@@ -636,7 +700,7 @@ export const Customers: React.FC = () => {
               </div>
 
               <Button onClick={handleSendInstallmentOffer} isLoading={sending} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white">
-                <Send size={16} className="mr-2" /> Enviar Oferta
+                <Send size={16} className="mr-2" /> {isEditingOffer ? 'Atualizar Oferta' : 'Enviar Oferta'}
               </Button>
             </div>
           </div>

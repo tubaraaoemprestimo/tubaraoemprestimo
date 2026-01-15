@@ -161,6 +161,20 @@ export interface Customer {
 
   // Código de indicação único do cliente
   referralCode?: string;
+
+  // Oferta de parcelamento enviada pelo admin
+  installmentOffer?: {
+    amount: number;
+    installments: number;
+    interest_rate?: number;
+    interestRate?: number;
+    installment_value?: number;
+    installmentValue?: number;
+    total_amount?: number;
+    totalAmount?: number;
+    expires_at?: string;
+    created_at?: string;
+  };
 }
 
 // ==================== NOTIFICATION TYPES ====================
