@@ -552,42 +552,42 @@ export const Customers: React.FC = () => {
 
       {/* Installment Offer Modal */}
       {installmentOfferOpen && selectedCustomer && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
-              <h3 className="text-xl font-bold text-emerald-400 flex items-center gap-2">
-                <Calculator size={20} /> Oferta de Parcelamento
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-5 shadow-2xl animate-in fade-in zoom-in duration-200 my-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 border-b border-zinc-800 pb-3">
+              <h3 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
+                <Calculator size={18} /> Oferta de Parcelamento
               </h3>
               <button onClick={() => setInstallmentOfferOpen(false)} className="text-zinc-500 hover:text-white"><X /></button>
             </div>
 
-            <p className="text-zinc-400 text-sm mb-6">
-              Configure uma oferta de parcelamento personalizada para <strong>{selectedCustomer.name}</strong>.
+            <p className="text-zinc-400 text-sm mb-4">
+              Configure uma oferta para <strong>{selectedCustomer.name}</strong>.
             </p>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Valor */}
               <div>
-                <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Valor do Empréstimo (R$)</label>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Valor (R$)</label>
                 <input
                   type="number"
                   value={installmentOffer.amount}
                   onChange={(e) => setInstallmentOffer(prev => ({ ...prev, amount: Number(e.target.value) }))}
-                  className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-xl font-bold text-white text-center focus:border-emerald-500 outline-none"
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-lg font-bold text-white text-center focus:border-emerald-500 outline-none"
                 />
               </div>
 
               {/* Parcelas */}
               <div>
-                <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Número de Parcelas</label>
-                <div className="grid grid-cols-4 gap-2">
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Parcelas</label>
+                <div className="grid grid-cols-4 gap-1.5">
                   {[2, 3, 4, 6, 8, 10, 12, 24].map((num) => (
                     <button
                       key={num}
                       onClick={() => setInstallmentOffer(prev => ({ ...prev, installments: num }))}
-                      className={`p-3 rounded-lg border text-sm font-bold transition-all ${installmentOffer.installments === num
-                          ? 'border-emerald-500 bg-emerald-900/30 text-emerald-400'
-                          : 'border-zinc-700 bg-black text-zinc-400 hover:border-zinc-500'
+                      className={`p-2 rounded-lg border text-sm font-bold transition-all ${installmentOffer.installments === num
+                        ? 'border-emerald-500 bg-emerald-900/30 text-emerald-400'
+                        : 'border-zinc-700 bg-black text-zinc-400 hover:border-zinc-500'
                         }`}
                     >
                       {num}x
@@ -598,37 +598,37 @@ export const Customers: React.FC = () => {
 
               {/* Taxa de Juros */}
               <div>
-                <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Taxa de Juros Mensal (%)</label>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Taxa Mensal (%)</label>
                 <input
                   type="number"
                   step="0.1"
                   value={installmentOffer.interestRate}
                   onChange={(e) => setInstallmentOffer(prev => ({ ...prev, interestRate: Number(e.target.value) }))}
-                  className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-emerald-500 outline-none"
                 />
               </div>
 
               {/* Resumo do Cálculo */}
-              <div className="bg-emerald-900/20 border border-emerald-700/50 rounded-xl p-4 space-y-3">
-                <h4 className="text-emerald-400 font-bold text-sm uppercase flex items-center gap-2">
-                  <Calculator size={16} /> Resumo da Oferta
+              <div className="bg-emerald-900/20 border border-emerald-700/50 rounded-xl p-3">
+                <h4 className="text-emerald-400 font-bold text-xs uppercase flex items-center gap-2 mb-2">
+                  <Calculator size={14} /> Resumo
                 </h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
-                    <p className="text-zinc-500">Valor Solicitado</p>
-                    <p className="text-white font-bold text-lg">R$ {installmentOffer.amount.toLocaleString('pt-BR')}</p>
+                    <p className="text-zinc-500 text-xs">Valor</p>
+                    <p className="text-white font-bold">R$ {installmentOffer.amount.toLocaleString('pt-BR')}</p>
                   </div>
                   <div>
-                    <p className="text-zinc-500">Taxa</p>
-                    <p className="text-white font-bold text-lg">{installmentOffer.interestRate}% a.m.</p>
+                    <p className="text-zinc-500 text-xs">Taxa</p>
+                    <p className="text-white font-bold">{installmentOffer.interestRate}% a.m.</p>
                   </div>
                   <div>
-                    <p className="text-zinc-500">Total a Pagar</p>
-                    <p className="text-white font-bold text-lg">R$ {installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-zinc-500 text-xs">Total</p>
+                    <p className="text-white font-bold">R$ {installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                   </div>
                   <div>
-                    <p className="text-zinc-500">Parcela</p>
-                    <p className="text-emerald-400 font-bold text-lg">
+                    <p className="text-zinc-500 text-xs">Parcela</p>
+                    <p className="text-emerald-400 font-bold">
                       {installmentOffer.installments}x R$ {installmentOffer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
@@ -636,7 +636,7 @@ export const Customers: React.FC = () => {
               </div>
 
               <Button onClick={handleSendInstallmentOffer} isLoading={sending} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white">
-                <Send size={18} className="mr-2" /> Enviar Oferta de Parcelamento
+                <Send size={16} className="mr-2" /> Enviar Oferta
               </Button>
             </div>
           </div>

@@ -294,7 +294,7 @@ export const Settings: React.FC = () => {
             </div>
 
             {/* Juros Diário/Mensal/Anual */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Juros/Dia */}
               <div>
                 <label className="block text-sm text-zinc-400 mb-2">Juros/Dia</label>
@@ -302,7 +302,7 @@ export const Settings: React.FC = () => {
                   <select
                     value={settings.lateInterestDailyType || 'PERCENT'}
                     onChange={(e) => setSettings({ ...settings, lateInterestDailyType: e.target.value as any })}
-                    className={`${inputStyle} w-20 text-center text-xs`}
+                    className={`${inputStyle} w-24 text-center`}
                   >
                     <option value="PERCENT">%</option>
                     <option value="FIXED">R$</option>
@@ -312,7 +312,7 @@ export const Settings: React.FC = () => {
                     step="0.01"
                     value={settings.lateInterestDaily || 0}
                     onChange={(e) => setSettings({ ...settings, lateInterestDaily: Number(e.target.value) })}
-                    className={inputStyle}
+                    className={`${inputStyle} flex-1`}
                     placeholder="0.033"
                   />
                 </div>
@@ -325,7 +325,7 @@ export const Settings: React.FC = () => {
                   <select
                     value={settings.lateInterestMonthlyType || 'PERCENT'}
                     onChange={(e) => setSettings({ ...settings, lateInterestMonthlyType: e.target.value as any })}
-                    className={`${inputStyle} w-20 text-center text-xs`}
+                    className={`${inputStyle} w-24 text-center`}
                   >
                     <option value="PERCENT">%</option>
                     <option value="FIXED">R$</option>
@@ -335,7 +335,7 @@ export const Settings: React.FC = () => {
                     step="0.1"
                     value={settings.lateInterestMonthly || 0}
                     onChange={(e) => setSettings({ ...settings, lateInterestMonthly: Number(e.target.value) })}
-                    className={inputStyle}
+                    className={`${inputStyle} flex-1`}
                     placeholder="1.0"
                   />
                 </div>
@@ -348,7 +348,7 @@ export const Settings: React.FC = () => {
                   <select
                     value={settings.lateInterestYearlyType || 'PERCENT'}
                     onChange={(e) => setSettings({ ...settings, lateInterestYearlyType: e.target.value as any })}
-                    className={`${inputStyle} w-20 text-center text-xs`}
+                    className={`${inputStyle} w-24 text-center`}
                   >
                     <option value="PERCENT">%</option>
                     <option value="FIXED">R$</option>
@@ -358,7 +358,7 @@ export const Settings: React.FC = () => {
                     step="0.5"
                     value={settings.lateInterestYearly || 0}
                     onChange={(e) => setSettings({ ...settings, lateInterestYearly: Number(e.target.value) })}
-                    className={inputStyle}
+                    className={`${inputStyle} flex-1`}
                     placeholder="12.0"
                   />
                 </div>
