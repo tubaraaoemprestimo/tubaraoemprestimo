@@ -4,6 +4,7 @@ import { Button } from '../../components/Button';
 import { supabaseService } from '../../services/supabaseService';
 import { whatsappService } from '../../services/whatsappService';
 import { useBrand } from '../../contexts/BrandContext';
+import { themeService, ThemeColors } from '../../services/themeService';
 import { LoanPackage, SystemSettings, CollectionRule, CollectionRuleType, WhatsappConfig, GoalsSettings } from '../../types';
 import { useToast } from '../../components/Toast';
 
@@ -13,7 +14,7 @@ export const Settings: React.FC = () => {
   const { addToast } = useToast();
   const { settings: brandSettings, updateSettings: updateBrand, resetSettings: resetBrand } = useBrand();
 
-  const [activeTab, setActiveTab] = useState<'FINANCIAL' | 'AUTOMATION' | 'INTEGRATION' | 'BRANDING' | 'GOALS'>('FINANCIAL');
+  const [activeTab, setActiveTab] = useState<'FINANCIAL' | 'AUTOMATION' | 'INTEGRATION' | 'BRANDING' | 'GOALS' | 'TEMA'>('FINANCIAL');
 
   // Financial State
   const [settings, setSettings] = useState<SystemSettings>({ monthlyInterestRate: 0, lateFeeRate: 0 });
@@ -42,8 +43,13 @@ export const Settings: React.FC = () => {
   const [goals, setGoals] = useState<GoalsSettings | null>(null);
   const [loadingGoals, setLoadingGoals] = useState(false);
 
+  // Theme State
+  const [themeColors, setThemeColors] = useState<ThemeColors>(themeService.getDefaultTheme());
+  const [loadingTheme, setLoadingTheme] = useState(false);
+
   useEffect(() => {
     loadData();
+    loadTheme();
   }, []);
 
   // Sync local brand state when context changes
@@ -69,6 +75,29 @@ export const Settings: React.FC = () => {
     if (waData.apiUrl && waData.apiKey) {
       checkWaStatus();
     }
+  };
+
+  const loadTheme = async () => {
+    const theme = await themeService.getTheme();
+    setThemeColors(theme);
+  };
+
+  const handleSaveTheme = async () => {
+    setLoadingTheme(true);
+    const success = await themeService.saveTheme(themeColors);
+    setLoadingTheme(false);
+    if (success) {
+      addToast('Cores salvas com sucesso! Aplicadas em tempo real.', 'success');
+    } else {
+      addToast('Erro ao salvar cores.', 'error');
+    }
+  };
+
+  const handleResetTheme = async () => {
+    const defaultTheme = themeService.getDefaultTheme();
+    setThemeColors(defaultTheme);
+    await themeService.saveTheme(defaultTheme);
+    addToast('Cores restauradas para o padrão.', 'info');
   };
 
   const checkWaStatus = async () => {
@@ -923,6 +952,104 @@ export const Settings: React.FC = () => {
     );
   };
 
+  // Render Theme Tab (Cores em Tempo Real)
+  const renderThemeTab = () => {
+    const colorFields = [
+      { key: 'primaryColor', label: 'Cor Primária (Dourado)', description: 'Cor principal do sistema' },
+      { key: 'secondaryColor', label: 'Cor Secundária', description: 'Cor de fundo secundária' },
+      { key: 'accentColor', label: 'Cor de Destaque (Verde)', description: 'Botões de ação, sucesso' },
+      { key: 'dangerColor', label: 'Cor de Perigo (Vermelho)', description: 'Alertas, erros, exclusão' },
+      { key: 'warningColor', label: 'Cor de Aviso (Amarelo)', description: 'Avisos, pendências' },
+      { key: 'successColor', label: 'Cor de Sucesso', description: 'Confirmações, aprovações' },
+      { key: 'backgroundColor', label: 'Cor de Fundo', description: 'Background geral' },
+      { key: 'cardColor', label: 'Cor dos Cards', description: 'Fundo de painéis e cards' },
+      { key: 'textColor', label: 'Cor do Texto', description: 'Texto principal' }
+    ];
+
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 border border-purple-700/30 rounded-2xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Palette className="text-purple-400" size={28} />
+            <div>
+              <h2 className="text-2xl font-bold text-white">Paleta de Cores</h2>
+              <p className="text-zinc-400 text-sm">Personalize as cores do sistema em tempo real</p>
+            </div>
+          </div>
+          <p className="text-zinc-300 text-sm">
+            As alterações são aplicadas <strong className="text-purple-400">instantaneamente</strong> em todo o sistema,
+            tanto para administradores quanto para clientes.
+          </p>
+        </div>
+
+        {/* Color Pickers Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {colorFields.map((field) => (
+            <div key={field.key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+              <label className="block text-sm font-bold text-white mb-1">{field.label}</label>
+              <p className="text-xs text-zinc-500 mb-3">{field.description}</p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={(themeColors as any)[field.key]}
+                  onChange={(e) => setThemeColors(prev => ({ ...prev, [field.key]: e.target.value }))}
+                  className="w-12 h-12 rounded-lg border-2 border-zinc-700 cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={(themeColors as any)[field.key]}
+                  onChange={(e) => setThemeColors(prev => ({ ...prev, [field.key]: e.target.value }))}
+                  className="flex-1 bg-black border border-zinc-700 rounded-lg p-2 text-white text-sm font-mono uppercase"
+                  placeholder="#FFFFFF"
+                />
+                <div
+                  className="w-10 h-10 rounded-lg border border-zinc-600"
+                  style={{ backgroundColor: (themeColors as any)[field.key] }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Preview */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            👁️ Preview em Tempo Real
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 rounded-xl" style={{ backgroundColor: themeColors.cardColor }}>
+              <div className="w-full h-3 rounded" style={{ backgroundColor: themeColors.primaryColor }} />
+              <p className="text-xs mt-2" style={{ color: themeColors.textColor }}>Primária</p>
+            </div>
+            <div className="p-4 rounded-xl" style={{ backgroundColor: themeColors.cardColor }}>
+              <div className="w-full h-3 rounded" style={{ backgroundColor: themeColors.accentColor }} />
+              <p className="text-xs mt-2" style={{ color: themeColors.textColor }}>Destaque</p>
+            </div>
+            <div className="p-4 rounded-xl" style={{ backgroundColor: themeColors.cardColor }}>
+              <div className="w-full h-3 rounded" style={{ backgroundColor: themeColors.dangerColor }} />
+              <p className="text-xs mt-2" style={{ color: themeColors.textColor }}>Perigo</p>
+            </div>
+            <div className="p-4 rounded-xl" style={{ backgroundColor: themeColors.cardColor }}>
+              <div className="w-full h-3 rounded" style={{ backgroundColor: themeColors.successColor }} />
+              <p className="text-xs mt-2" style={{ color: themeColors.textColor }}>Sucesso</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-4 justify-end">
+          <Button variant="secondary" onClick={handleResetTheme}>
+            <RotateCcw size={18} className="mr-2" /> Restaurar Padrão
+          </Button>
+          <Button onClick={handleSaveTheme} isLoading={loadingTheme} className="bg-purple-500 hover:bg-purple-600">
+            <Save size={18} className="mr-2" /> Salvar Cores
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-4 md:p-8 bg-black min-h-screen text-white pb-32">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -932,7 +1059,7 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-8 bg-zinc-900/50 p-1 rounded-xl w-fit border border-zinc-800">
-        {['FINANCIAL', 'GOALS', 'AUTOMATION', 'INTEGRATION', 'BRANDING'].map((tab) => (
+        {['FINANCIAL', 'GOALS', 'AUTOMATION', 'INTEGRATION', 'BRANDING', 'TEMA'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab as any)}
@@ -944,7 +1071,8 @@ export const Settings: React.FC = () => {
             {tab === 'FINANCIAL' ? 'Financeiro' :
               tab === 'GOALS' ? 'Metas' :
                 tab === 'AUTOMATION' ? 'Automação' :
-                  tab === 'INTEGRATION' ? 'Integrações' : 'Identidade Visual'}
+                  tab === 'INTEGRATION' ? 'Integrações' :
+                    tab === 'BRANDING' ? 'Identidade Visual' : '🎨 Cores'}
           </button>
         ))}
       </div>
@@ -954,6 +1082,7 @@ export const Settings: React.FC = () => {
       {activeTab === 'AUTOMATION' && renderAutomationTab()}
       {activeTab === 'INTEGRATION' && renderIntegrationTab()}
       {activeTab === 'BRANDING' && renderBrandingTab()}
+      {activeTab === 'TEMA' && renderThemeTab()}
 
       {/* Modals */}
       {isPkgModalOpen && (

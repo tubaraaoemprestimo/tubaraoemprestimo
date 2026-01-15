@@ -58,6 +58,7 @@ import { Logo } from './components/Logo';
 import { supabaseService } from './services/supabaseService';
 import { BrandProvider, useBrand } from './contexts/BrandContext';
 import { firebasePushService } from './services/firebasePushService';
+import { themeService } from './services/themeService';
 
 // --- Layouts ---
 
@@ -267,9 +268,14 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
 
-  // Initialize Firebase Push on app load
+  // Initialize Firebase Push and Theme on app load
   useEffect(() => {
     if (!showSplash) {
+      // Inicializar tema imediatamente
+      themeService.init().then(() => {
+        console.log('[App] Theme initialized');
+      });
+
       firebasePushService.init().then(() => {
         console.log('[App] Firebase Push initialized');
 
