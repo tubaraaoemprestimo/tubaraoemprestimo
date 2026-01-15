@@ -1084,6 +1084,51 @@ export const supabaseService = {
         return data?.pre_approved_amount || null;
     },
 
+    getClientInstallmentOffer: async () => {
+        const user = loadFromStorage<any>(STORAGE_KEYS.USER, null);
+        if (!user) return null;
+
+        const { data } = await supabase
+            .from('customers')
+            .select('installment_offer')
+            .eq('email', user.email)
+            .single();
+
+        if (!data?.installment_offer) return null;
+
+        const offer = data.installment_offer;
+        return {
+            amount: offer.amount,
+            installments: offer.installments,
+            interestRate: offer.interest_rate,
+            installmentValue: offer.installment_value,
+            totalAmount: offer.total_amount,
+            createdAt: offer.created_at
+        };
+    },
+
+    getClientCoupons: async () => {
+        const user = loadFromStorage<any>(STORAGE_KEYS.USER, null);
+        if (!user) return [];
+
+        // Buscar cupons do cliente ou cupons gerais ativos
+        const { data } = await supabase
+            .from('coupons')
+            .select('*')
+            .or(`customer_email.eq.${user.email},customer_email.is.null`)
+            .eq('active', true)
+            .gte('expires_at', new Date().toISOString());
+
+        if (!data) return [];
+
+        return data.map((c: any) => ({
+            code: c.code,
+            discount: c.discount,
+            description: c.description,
+            expiresAt: c.expires_at
+        }));
+    },
+
     // ============================================
     // COLLECTION RULES
     // ============================================

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronRight, Wallet, Plus, Calendar, FileText, TrendingUp, X, Percent, Eye, EyeOff, Gift, Tag, Sparkles, AlertTriangle, Upload, CheckCircle } from 'lucide-react';
+import { Bell, ChevronRight, Wallet, Plus, Calendar, FileText, TrendingUp, X, Percent, Eye, EyeOff, Gift, Tag, Sparkles, AlertTriangle, Upload, CheckCircle, Calculator, Ticket } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Skeleton } from '../../components/Skeleton';
 import { supabaseService } from '../../services/supabaseService';
@@ -23,6 +23,17 @@ export const ClientDashboard: React.FC = () => {
   const [activeCampaigns, setActiveCampaigns] = useState<Campaign[]>([]);
   const [preApprovedAmount, setPreApprovedAmount] = useState<number | null>(null);
   const [referralCode, setReferralCode] = useState<string>('');
+
+  // Propostas e Cupons
+  const [installmentOffer, setInstallmentOffer] = useState<{
+    amount: number;
+    installments: number;
+    interestRate: number;
+    installmentValue: number;
+    totalAmount: number;
+    createdAt: string;
+  } | null>(null);
+  const [coupons, setCoupons] = useState<{ code: string; discount: number; description: string; expiresAt: string }[]>([]);
 
   // Upload Modal for Waiting Docs
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -66,6 +77,10 @@ export const ClientDashboard: React.FC = () => {
     const campaigns = await supabaseService.getActiveCampaigns();
     const preApproved = await supabaseService.getPreApproval();
 
+    // Buscar oferta de parcelamento e cupons
+    const offer = await supabaseService.getClientInstallmentOffer();
+    const clientCoupons = await supabaseService.getClientCoupons();
+
     let totalDebt = 0;
     let nextInstDate = '--/--';
     let nextInstVal = 0;
@@ -94,9 +109,11 @@ export const ClientDashboard: React.FC = () => {
     setPendingRequest(pendingReq);
     setActiveCampaigns(campaigns);
     setPreApprovedAmount(preApproved);
+    setInstallmentOffer(offer);
+    setCoupons(clientCoupons);
 
     if (user) {
-      const code = referralService.getOrCreateCode(user.id, user.name);
+      const code = await referralService.getOrCreateCode(user.id, user.name);
       setReferralCode(code.code);
     }
 
@@ -306,6 +323,72 @@ export const ClientDashboard: React.FC = () => {
           <ActionButton icon={TrendingUp} label="Extrato" onClick={() => navigate('/client/statement')} />
           <ActionButton icon={Percent} label="Renegociar" onClick={() => setIsRenegotiateOpen(true)} disabled={userData.balance === 0} />
         </div>
+
+        {/* Proposta de Parcelamento */}
+        {installmentOffer && (
+          <div className="bg-gradient-to-br from-emerald-900/30 to-emerald-900/10 border border-emerald-600/50 rounded-2xl p-5 shadow-lg">
+            <div className="flex items-center gap-2 mb-4">
+              <Calculator size={20} className="text-emerald-400" />
+              <h3 className="text-lg font-bold text-emerald-400">Proposta de Parcelamento</h3>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="bg-black/30 p-3 rounded-xl">
+                <p className="text-xs text-zinc-500">Valor</p>
+                <p className="text-lg font-bold text-white">R$ {installmentOffer.amount.toLocaleString('pt-BR')}</p>
+              </div>
+              <div className="bg-black/30 p-3 rounded-xl">
+                <p className="text-xs text-zinc-500">Taxa</p>
+                <p className="text-lg font-bold text-white">{installmentOffer.interestRate}% a.m.</p>
+              </div>
+              <div className="bg-black/30 p-3 rounded-xl">
+                <p className="text-xs text-zinc-500">Total</p>
+                <p className="text-lg font-bold text-white">R$ {installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              </div>
+              <div className="bg-black/30 p-3 rounded-xl">
+                <p className="text-xs text-zinc-500">Parcela</p>
+                <p className="text-lg font-bold text-emerald-400">{installmentOffer.installments}x R$ {installmentOffer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-500 mb-4">
+              Proposta enviada em {new Date(installmentOffer.createdAt).toLocaleDateString('pt-BR')}
+            </p>
+
+            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-none">
+              <CheckCircle size={16} className="mr-2" /> Aceitar Proposta
+            </Button>
+          </div>
+        )}
+
+        {/* Cupons Disponíveis */}
+        {coupons.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-white font-bold flex items-center gap-2">
+              <Ticket size={18} className="text-purple-400" /> Seus Cupons
+            </h3>
+            <div className="space-y-3">
+              {coupons.map((coupon, idx) => (
+                <div
+                  key={idx}
+                  className="bg-gradient-to-r from-purple-900/30 to-purple-900/10 border border-purple-600/50 rounded-xl p-4 flex items-center justify-between"
+                >
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded">{coupon.code}</span>
+                      <span className="text-purple-400 font-bold">{coupon.discount}% OFF</span>
+                    </div>
+                    <p className="text-xs text-zinc-400">{coupon.description}</p>
+                    <p className="text-[10px] text-zinc-600">Válido até {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                  <Button size="sm" variant="secondary" className="bg-purple-900/50 border-purple-700 text-purple-300">
+                    Usar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Active Promotions Feed */}
         {activeCampaigns.length > 0 && (
