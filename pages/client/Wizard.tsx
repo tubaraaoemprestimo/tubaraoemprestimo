@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Check, ChevronLeft, User, MapPin,
   AlertCircle, FileText, ScanFace, X, Plus, Loader2,
@@ -39,11 +39,15 @@ const steps = [
 
 export const Wizard: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { addToast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [errors, setErrors] = useState<{ cpf?: string; cep?: string }>({});
+
+  // Flag para quando vem de uma oferta aceita
+  const [isFromOffer, setIsFromOffer] = useState(false);
 
   // Configurações do banco
   const [settings, setSettings] = useState<LoanSettings | null>(null);
@@ -107,9 +111,27 @@ export const Wizard: React.FC = () => {
       const data = await loanSettingsService.getSettings();
       setSettings(data);
       setLoadingSettings(false);
+
+      // Verificar se veio de uma oferta aceita (via URL params)
+      const amountParam = searchParams.get('amount');
+      const installmentsParam = searchParams.get('installments');
+      const rateParam = searchParams.get('rate');
+
+      if (amountParam) {
+        const amount = parseFloat(amountParam);
+        setSelectedAmount(amount);
+        setCustomAmount(amount.toString());
+        setIsFromOffer(true);
+        setTermsAccepted(true); // Marcar termos como aceitos (já veio da proposta)
+
+        // Pular diretamente para o step 3 (Dados)
+        setCurrentStep(3);
+
+        addToast('Proposta aceita! Complete seus dados para finalizar.', 'success');
+      }
     };
     loadSettings();
-  }, []);
+  }, [searchParams]);
 
   // Verificar se precisa de garantia
   useEffect(() => {
