@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
         }
 
         // Get request body
-        const { email, password, name, role = 'CLIENT' } = await req.json()
+        const { email, password, name, role = 'CLIENT', cpf, phone } = await req.json()
 
         if (!email || !password || !name) {
             throw new Error('Missing required fields: email, password, name')
@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
         }
 
         // Create user profile in users table
-        const { error: profileError } = await supabaseAdmin
+        const { data: userProfile, error: profileError } = await supabaseAdmin
             .from('users')
             .insert({
                 auth_id: authData.user.id,
@@ -87,10 +87,38 @@ Deno.serve(async (req) => {
                 email,
                 role
             })
+            .select('id')
+            .single()
 
         if (profileError) {
             console.error('Profile error:', profileError)
             // User was created in Auth, but profile failed - still return success
+        }
+
+        // Se for CLIENT, criar registro na tabela customers também
+        if (role === 'CLIENT' && userProfile) {
+            // Gerar CPF único se não fornecido
+            const customerCpf = cpf || `TEMP-${Date.now()}`
+
+            const { error: customerError } = await supabaseAdmin
+                .from('customers')
+                .insert({
+                    user_id: userProfile.id,
+                    name,
+                    cpf: customerCpf,
+                    email,
+                    phone: phone || '',
+                    status: 'ACTIVE',
+                    internal_score: 500,
+                    total_debt: 0,
+                    active_loans_count: 0
+                })
+
+            if (customerError) {
+                console.error('Customer creation error:', customerError)
+            } else {
+                console.log('Customer created successfully for:', email)
+            }
         }
 
         return new Response(

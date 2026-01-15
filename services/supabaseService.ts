@@ -297,7 +297,9 @@ export const supabaseService = {
                                 email: userData.email,
                                 password: userData.password,
                                 name: userData.name,
-                                role: userData.role
+                                role: userData.role,
+                                cpf: userData.cpf,
+                                phone: userData.phone
                             })
                         }
                     );
