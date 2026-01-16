@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Trash2, Search, Shield, User, Users as UsersIcon, Phone, MapPin, FileText } from 'lucide-react';
+import { UserPlus, Trash2, Search, Shield, User, Users as UsersIcon, Phone, MapPin, FileText, Edit2, Key, X, Save } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { supabaseService } from '../../services/supabaseService';
 import { UserAccess, UserRole } from '../../types';
@@ -72,6 +72,73 @@ export const Users: React.FC = () => {
       await supabaseService.deleteUser(id);
       addToast("Usuário removido.", 'info');
       loadUsers();
+    }
+  };
+
+  // Estado para edição
+  const [editingUser, setEditingUser] = useState<UserAccess | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    role: UserRole.CLIENT,
+    phone: '',
+    address: '',
+    city: '',
+    neighborhood: ''
+  });
+  const [newPassword, setNewPassword] = useState('');
+  const [updatingUser, setUpdatingUser] = useState(false);
+
+  // Abrir modal de edição
+  const handleEditUser = (user: UserAccess) => {
+    setEditingUser(user);
+    setEditFormData({
+      name: user.name,
+      role: user.role,
+      phone: (user as any).phone || '',
+      address: (user as any).address || '',
+      city: (user as any).city || '',
+      neighborhood: (user as any).neighborhood || ''
+    });
+    setNewPassword('');
+  };
+
+  // Atualizar usuário
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+
+    setUpdatingUser(true);
+    const success = await supabaseService.updateUser(editingUser.id, editFormData);
+    setUpdatingUser(false);
+
+    if (success) {
+      addToast("Usuário atualizado com sucesso!", 'success');
+      setEditingUser(null);
+      loadUsers();
+    } else {
+      addToast("Erro ao atualizar usuário.", 'error');
+    }
+  };
+
+  // Resetar senha
+  const handleResetPassword = async () => {
+    if (!editingUser || !newPassword) {
+      addToast("Digite a nova senha.", 'warning');
+      return;
+    }
+    if (newPassword.length < 6) {
+      addToast("A senha deve ter pelo menos 6 caracteres.", 'warning');
+      return;
+    }
+
+    setUpdatingUser(true);
+    const success = await supabaseService.resetUserPassword(editingUser.id, newPassword);
+    setUpdatingUser(false);
+
+    if (success) {
+      addToast("Senha alterada com sucesso!", 'success');
+      setNewPassword('');
+    } else {
+      addToast("Erro ao alterar senha.", 'error');
     }
   };
 
@@ -148,14 +215,25 @@ export const Users: React.FC = () => {
                       <span className="text-green-500 text-xs font-bold bg-green-900/20 px-2 py-1 rounded-full">ATIVO</span>
                     </td>
                     <td className="p-4 text-right">
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => handleDeleteUser(user.id)}
-                        disabled={user.email === 'admin@tubarao.com'} // Prevent deleting main admin
-                      >
-                        <Trash2 size={16} />
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditUser(user)}
+                          title="Editar usuário"
+                        >
+                          <Edit2 size={16} />
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleDeleteUser(user.id)}
+                          disabled={user.email === 'admin@tubarao.com'}
+                          title="Remover usuário"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -292,6 +370,107 @@ export const Users: React.FC = () => {
                 <Button variant="secondary" onClick={() => setIsModalOpen(false)} className="flex-1">Cancelar</Button>
                 <Button onClick={handleCreateUser} isLoading={creatingUser} className="flex-1">
                   Criar Usuário
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl animate-in zoom-in duration-200 my-4">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <Edit2 size={20} className="text-[#D4AF37]" /> Editar Usuário
+              </h2>
+              <button onClick={() => setEditingUser(null)} className="p-2 hover:bg-zinc-800 rounded-lg">
+                <X size={20} className="text-zinc-400" />
+              </button>
+            </div>
+
+            {/* Info do usuário */}
+            <div className="bg-zinc-800 rounded-lg p-4 mb-6">
+              <p className="text-zinc-400 text-sm">Email (não editável)</p>
+              <p className="text-white font-medium">{editingUser.email}</p>
+            </div>
+
+            {/* Campos editáveis */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-zinc-400 mb-1">Nome</label>
+                <input
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-zinc-400 mb-1">Função</label>
+                <select
+                  value={editFormData.role}
+                  onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value as UserRole })}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                >
+                  <option value={UserRole.CLIENT}>Cliente</option>
+                  <option value={UserRole.ADMIN}>Administrador</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-zinc-400 mb-1">Telefone</label>
+                <input
+                  value={editFormData.phone}
+                  onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                  placeholder="(81) 99999-9999"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1">Cidade</label>
+                  <input
+                    value={editFormData.city}
+                    onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
+                    className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1">Bairro</label>
+                  <input
+                    value={editFormData.neighborhood}
+                    onChange={(e) => setEditFormData({ ...editFormData, neighborhood: e.target.value })}
+                    className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Salvar alterações */}
+            <div className="pt-4 mt-4 border-t border-zinc-800">
+              <Button onClick={handleUpdateUser} isLoading={updatingUser} className="w-full">
+                <Save size={18} className="mr-2" /> Salvar Alterações
+              </Button>
+            </div>
+
+            {/* Seção de Reset de Senha */}
+            <div className="mt-6 pt-4 border-t border-zinc-800">
+              <h3 className="text-sm font-bold text-[#D4AF37] flex items-center gap-2 mb-4">
+                <Key size={16} /> Alterar Senha
+              </h3>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                  placeholder="Nova senha (mín. 6 caracteres)"
+                />
+                <Button onClick={handleResetPassword} isLoading={updatingUser} variant="outline">
+                  Alterar
                 </Button>
               </div>
             </div>

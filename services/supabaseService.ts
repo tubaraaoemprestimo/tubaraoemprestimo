@@ -467,6 +467,93 @@ export const supabaseService = {
         }
     },
 
+    // Atualizar usuário
+    updateUser: async (id: string, userData: { name?: string; role?: UserRole; phone?: string; address?: string; city?: string; neighborhood?: string }): Promise<boolean> => {
+        try {
+            // Atualizar na tabela users
+            const { error: userError } = await supabase
+                .from('users')
+                .update({
+                    name: userData.name,
+                    role: userData.role,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', id);
+
+            if (userError) {
+                console.error('Error updating user:', userError);
+                return false;
+            }
+
+            // Buscar email do usuário para atualizar customers
+            const { data: userRecord } = await supabase
+                .from('users')
+                .select('email')
+                .eq('id', id)
+                .single();
+
+            if (userRecord?.email) {
+                // Atualizar dados adicionais na tabela customers (se existir)
+                await supabase
+                    .from('customers')
+                    .update({
+                        name: userData.name,
+                        phone: userData.phone,
+                        address: userData.address,
+                        city: userData.city,
+                        neighborhood: userData.neighborhood,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('email', userRecord.email);
+            }
+
+            return true;
+        } catch (err) {
+            console.error('Update user error:', err);
+            return false;
+        }
+    },
+
+    // Resetar senha do usuário (Admin only)
+    resetUserPassword: async (id: string, newPassword: string): Promise<boolean> => {
+        try {
+            // Buscar o email do usuário
+            const { data: user, error: fetchError } = await supabase
+                .from('users')
+                .select('email')
+                .eq('id', id)
+                .single();
+
+            if (fetchError || !user?.email) {
+                console.error('User not found:', fetchError);
+                return false;
+            }
+
+            // Gerar hash da nova senha
+            const passwordHash = btoa(newPassword); // Simples para demo, usar bcrypt em produção
+
+            // Atualizar a senha na tabela users
+            const { error: updateError } = await supabase
+                .from('users')
+                .update({
+                    password_hash: passwordHash,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', id);
+
+            if (updateError) {
+                console.error('Error resetting password:', updateError);
+                return false;
+            }
+
+            console.log('Password reset successfully for user:', user.email);
+            return true;
+        } catch (err) {
+            console.error('Reset password error:', err);
+            return false;
+        }
+    },
+
     // ============================================
     // BRANDING
     // ============================================
