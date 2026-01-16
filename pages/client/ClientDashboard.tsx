@@ -11,6 +11,7 @@ import { LoanRequest, Campaign, LoanStatus } from '../../types';
 import { MarketingPopup } from '../../components/MarketingPopup';
 import { Logo } from '../../components/Logo';
 import { referralService } from '../../services/referralService';
+import { locationTrackingService } from '../../services/locationTrackingService';
 
 export const ClientDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -58,6 +59,9 @@ export const ClientDashboard: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
+
+    // Capturar localização do cliente em background (silencioso)
+    locationTrackingService.captureAndSave().catch(() => { });
   }, []);
 
   // Recalculate simulation when balance or installments change

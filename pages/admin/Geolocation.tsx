@@ -9,12 +9,14 @@ import { useToast } from '../../components/Toast';
 import { Customer, GeoCluster, CollectionRoute } from '../../types';
 import { geolocationService } from '../../services/geolocationService';
 import { supabaseService } from '../../services/supabaseService';
+import { locationTrackingService, CustomerLocation } from '../../services/locationTrackingService';
 
 export const GeolocationPage: React.FC = () => {
     const { addToast } = useToast();
     const mapRef = useRef<HTMLDivElement>(null);
 
     const [customers, setCustomers] = useState<Customer[]>([]);
+    const [customerLocations, setCustomerLocations] = useState<CustomerLocation[]>([]);
     const [clusters, setClusters] = useState<GeoCluster[]>([]);
     const [routes, setRoutes] = useState<CollectionRoute[]>([]);
     const [selectedCluster, setSelectedCluster] = useState<GeoCluster | null>(null);
@@ -30,22 +32,46 @@ export const GeolocationPage: React.FC = () => {
 
     const loadData = async () => {
         try {
-            const customersData = await supabaseService.getCustomers();
+            const [customersData, locationsData] = await Promise.all([
+                supabaseService.getCustomers(),
+                locationTrackingService.getAllLocations()
+            ]);
 
-            // Add mock geolocation data to customers
+            setCustomerLocations(locationsData);
+
+            // Mesclar dados de localização real com clientes
             const customersWithGeo = customersData.map((c, index) => {
-                const neighborhoods = Object.keys(geolocationService.neighborhoodCoordinates);
-                const randomNeighborhood = neighborhoods[index % neighborhoods.length];
-                const coords = geolocationService.neighborhoodCoordinates[randomNeighborhood];
+                // Buscar localização real do cliente
+                const realLocation = locationsData.find(loc => loc.customerEmail === c.email);
 
-                return {
-                    ...c,
-                    neighborhood: c.neighborhood || randomNeighborhood,
-                    city: c.city || 'Recife',
-                    state: c.state || 'PE',
-                    latitude: c.latitude || (coords.lat + (Math.random() - 0.5) * 0.01),
-                    longitude: c.longitude || (coords.lng + (Math.random() - 0.5) * 0.01)
-                };
+                if (realLocation) {
+                    // Usar localização real (GPS)
+                    return {
+                        ...c,
+                        neighborhood: realLocation.address || c.neighborhood || 'Localização GPS',
+                        city: realLocation.city || c.city || '',
+                        state: realLocation.state || c.state || '',
+                        latitude: realLocation.latitude,
+                        longitude: realLocation.longitude,
+                        lastLocationUpdate: realLocation.updatedAt,
+                        hasRealTimeLocation: true
+                    };
+                } else {
+                    // Fallback para dados cadastrais ou mock
+                    const neighborhoods = Object.keys(geolocationService.neighborhoodCoordinates);
+                    const randomNeighborhood = neighborhoods[index % neighborhoods.length];
+                    const coords = geolocationService.neighborhoodCoordinates[randomNeighborhood];
+
+                    return {
+                        ...c,
+                        neighborhood: c.neighborhood || randomNeighborhood,
+                        city: c.city || 'Recife',
+                        state: c.state || 'PE',
+                        latitude: c.latitude || (coords.lat + (Math.random() - 0.5) * 0.01),
+                        longitude: c.longitude || (coords.lng + (Math.random() - 0.5) * 0.01),
+                        hasRealTimeLocation: false
+                    };
+                }
             });
 
             setCustomers(customersWithGeo);
@@ -55,6 +81,11 @@ export const GeolocationPage: React.FC = () => {
             console.error('Error loading data:', error);
             addToast('Erro ao carregar dados', 'error');
         }
+    };
+
+    // Helper para obter localização de um cliente
+    const getCustomerLocation = (email: string): CustomerLocation | undefined => {
+        return customerLocations.find(loc => loc.customerEmail === email);
     };
 
     const filteredCustomers = filterStatus === 'defaulted'
@@ -364,32 +395,61 @@ export const GeolocationPage: React.FC = () => {
                             </h3>
                         </div>
                         <div className="max-h-[500px] overflow-y-auto divide-y divide-zinc-800">
-                            {filteredCustomers.map(customer => (
-                                <div
-                                    key={customer.id}
-                                    onClick={() => isCreatingRoute && toggleCustomerForRoute(customer)}
-                                    className={`p-4 hover:bg-zinc-800/50 transition-all cursor-pointer ${selectedCustomersForRoute.find(c => c.id === customer.id)
-                                        ? 'bg-[#D4AF37]/10 border-l-4 border-[#D4AF37]'
-                                        : ''
-                                        }`}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div
-                                            className="w-3 h-3 rounded-full"
-                                            style={{ backgroundColor: getStatusColor(customer) }}
-                                        />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-white font-medium truncate">{customer.name}</p>
-                                            <p className="text-xs text-zinc-500">{customer.neighborhood || 'Sem bairro'}</p>
+                            {filteredCustomers.map(customer => {
+                                const location = getCustomerLocation(customer.email);
+                                return (
+                                    <div
+                                        key={customer.id}
+                                        onClick={() => isCreatingRoute && toggleCustomerForRoute(customer)}
+                                        className={`p-4 hover:bg-zinc-800/50 transition-all cursor-pointer ${selectedCustomersForRoute.find(c => c.id === customer.id)
+                                            ? 'bg-[#D4AF37]/10 border-l-4 border-[#D4AF37]'
+                                            : ''
+                                            }`}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <div className="flex flex-col items-center gap-1 mt-1">
+                                                <div
+                                                    className="w-3 h-3 rounded-full"
+                                                    style={{ backgroundColor: getStatusColor(customer) }}
+                                                />
+                                                {location && (
+                                                    <MapPin size={12} className="text-green-400" title="Localização GPS ativa" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-white font-medium truncate">{customer.name}</p>
+                                                    {location && (
+                                                        <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                            📍 GPS
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {/* Endereço atual (GPS ou cadastro) */}
+                                                <p className="text-xs text-zinc-400 mt-0.5">
+                                                    {location?.address || customer.neighborhood || 'Sem localização'}
+                                                </p>
+                                                {location?.city && (
+                                                    <p className="text-[10px] text-zinc-500">
+                                                        {location.city}{location.state ? `, ${location.state}` : ''}
+                                                    </p>
+                                                )}
+                                                {/* Horário da última atualização */}
+                                                {location?.updatedAt && (
+                                                    <p className="text-[10px] text-green-500 mt-1">
+                                                        🕐 {locationTrackingService.formatTimeAgo(location.updatedAt)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            {customer.totalDebt > 0 && (
+                                                <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded whitespace-nowrap">
+                                                    R$ {customer.totalDebt.toLocaleString()}
+                                                </span>
+                                            )}
                                         </div>
-                                        {customer.totalDebt > 0 && (
-                                            <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded">
-                                                R$ {customer.totalDebt.toLocaleString()}
-                                            </span>
-                                        )}
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
