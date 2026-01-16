@@ -15,9 +15,14 @@ export const NotificationCenter: React.FC = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Load initial
-        setNotifications(notificationService.getAll());
-        setUnreadCount(notificationService.getUnreadCount());
+        // Load initial (async)
+        const loadNotifications = async () => {
+            const data = await notificationService.getAll();
+            setNotifications(data);
+            const count = await notificationService.getUnreadCount();
+            setUnreadCount(count);
+        };
+        loadNotifications();
 
         // Subscribe to updates
         const unsubscribe = notificationService.subscribe((updated) => {
@@ -192,7 +197,9 @@ export const NotificationBadge: React.FC<{ onClick?: () => void }> = ({ onClick 
     const [unreadCount, setUnreadCount] = useState(0);
 
     useEffect(() => {
-        setUnreadCount(notificationService.getUnreadCount());
+        // Load initial (async)
+        notificationService.getUnreadCount().then(setUnreadCount);
+
         const unsubscribe = notificationService.subscribe((updated) => {
             setUnreadCount(updated.filter(n => !n.read).length);
         });

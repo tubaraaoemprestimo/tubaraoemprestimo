@@ -276,8 +276,6 @@ export const notificationService = {
 
     // 📡 Escutar mudanças em tempo real
     subscribeToChanges: (callback: (notifications: Notification[]) => void): (() => void) => {
-        const user = getCurrentUser();
-
         const channel = supabase
             .channel('notifications-changes')
             .on(
@@ -293,5 +291,14 @@ export const notificationService = {
         return () => {
             supabase.removeChannel(channel);
         };
+    },
+
+    // Alias para compatibilidade com código legado
+    subscribe: (callback: (notifications: Notification[]) => void): (() => void) => {
+        // Chamar callback imediatamente com dados atuais
+        notificationService.getAll().then(callback);
+
+        // Retornar função de unsubscribe (noop por enquanto, usar subscribeToChanges para real-time)
+        return () => { };
     }
 };
