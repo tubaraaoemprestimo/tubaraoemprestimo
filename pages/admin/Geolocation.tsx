@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     MapPin, Navigation, Route, Users, AlertTriangle,
     Clock, Target, Play, CheckCircle, Trash2, Plus,
-    Filter, RefreshCw, Download, Eye, ChevronRight
+    Filter, RefreshCw, Download, Eye, ChevronRight, ExternalLink, Navigation2, X
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
@@ -86,6 +86,25 @@ export const GeolocationPage: React.FC = () => {
     // Helper para obter localização de um cliente
     const getCustomerLocation = (email: string): CustomerLocation | undefined => {
         return customerLocations.find(loc => loc.customerEmail === email);
+    };
+
+    // Estado para cliente selecionado (modal de detalhes)
+    const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+
+    // Funções de navegação
+    const openInGoogleMaps = (lat: number, lng: number, name?: string) => {
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+        window.open(url, '_blank');
+    };
+
+    const openInWaze = (lat: number, lng: number) => {
+        const url = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+        window.open(url, '_blank');
+    };
+
+    const openInAppleMaps = (lat: number, lng: number, name?: string) => {
+        const url = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+        window.open(url, '_blank');
     };
 
     const filteredCustomers = filterStatus === 'defaulted'
@@ -441,11 +460,25 @@ export const GeolocationPage: React.FC = () => {
                                                     </p>
                                                 )}
                                             </div>
-                                            {customer.totalDebt > 0 && (
-                                                <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded whitespace-nowrap">
-                                                    R$ {customer.totalDebt.toLocaleString()}
-                                                </span>
-                                            )}
+                                            <div className="flex flex-col items-end gap-2">
+                                                {customer.totalDebt > 0 && (
+                                                    <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded whitespace-nowrap">
+                                                        R$ {customer.totalDebt.toLocaleString()}
+                                                    </span>
+                                                )}
+                                                {/* Botão para abrir detalhes/mapa */}
+                                                {location && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedCustomer(customer);
+                                                        }}
+                                                        className="flex items-center gap-1 text-[10px] bg-blue-500/20 text-blue-400 px-2 py-1 rounded hover:bg-blue-500/30 transition-colors"
+                                                    >
+                                                        <Navigation2 size={10} /> Ir até
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -643,6 +676,101 @@ export const GeolocationPage: React.FC = () => {
                     )}
                 </div>
             )}
+
+            {/* Modal de Localização do Cliente */}
+            {selectedCustomer && (() => {
+                const loc = getCustomerLocation(selectedCustomer.email);
+                if (!loc) return null;
+
+                return (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-2xl max-h-[90vh] overflow-hidden">
+                            {/* Header */}
+                            <div className="bg-zinc-800 p-4 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-green-500/20 rounded-lg">
+                                        <MapPin size={20} className="text-green-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-bold">{selectedCustomer.name}</h3>
+                                        <p className="text-xs text-zinc-400">{loc.address}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedCustomer(null)}
+                                    className="p-2 hover:bg-zinc-700 rounded-lg transition-colors"
+                                >
+                                    <X size={20} className="text-zinc-400" />
+                                </button>
+                            </div>
+
+                            {/* Mapa Embed (OpenStreetMap) */}
+                            <div className="h-[300px] bg-zinc-800">
+                                <iframe
+                                    width="100%"
+                                    height="100%"
+                                    frameBorder="0"
+                                    scrolling="no"
+                                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${loc.longitude - 0.005},${loc.latitude - 0.005},${loc.longitude + 0.005},${loc.latitude + 0.005}&layer=mapnik&marker=${loc.latitude},${loc.longitude}`}
+                                    style={{ border: 0 }}
+                                />
+                            </div>
+
+                            {/* Informações */}
+                            <div className="p-4 space-y-4">
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div className="bg-zinc-800 rounded-lg p-3">
+                                        <p className="text-zinc-500 text-xs">Endereço Atual</p>
+                                        <p className="text-white font-medium">{loc.address || 'Não disponível'}</p>
+                                    </div>
+                                    <div className="bg-zinc-800 rounded-lg p-3">
+                                        <p className="text-zinc-500 text-xs">Cidade/Estado</p>
+                                        <p className="text-white font-medium">{loc.city}{loc.state ? `, ${loc.state}` : ''}</p>
+                                    </div>
+                                    <div className="bg-zinc-800 rounded-lg p-3">
+                                        <p className="text-zinc-500 text-xs">Coordenadas GPS</p>
+                                        <p className="text-white font-mono text-xs">{loc.latitude.toFixed(6)}, {loc.longitude.toFixed(6)}</p>
+                                    </div>
+                                    <div className="bg-zinc-800 rounded-lg p-3">
+                                        <p className="text-zinc-500 text-xs">Última Atualização</p>
+                                        <p className="text-green-400 font-medium">{loc.updatedAt ? locationTrackingService.formatTimeAgo(loc.updatedAt) : '-'}</p>
+                                    </div>
+                                </div>
+
+                                {/* Botões de Navegação */}
+                                <div className="border-t border-zinc-800 pt-4">
+                                    <p className="text-zinc-400 text-sm mb-3 flex items-center gap-2">
+                                        <Navigation2 size={14} /> Ir até o cliente:
+                                    </p>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <button
+                                            onClick={() => openInGoogleMaps(loc.latitude, loc.longitude, selectedCustomer.name)}
+                                            className="flex flex-col items-center gap-2 p-4 bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
+                                        >
+                                            <img src="https://www.gstatic.com/images/branding/product/2x/maps_48dp.png" alt="Google Maps" className="w-8 h-8" />
+                                            <span className="text-white text-sm font-medium">Google Maps</span>
+                                        </button>
+                                        <button
+                                            onClick={() => openInWaze(loc.latitude, loc.longitude)}
+                                            className="flex flex-col items-center gap-2 p-4 bg-cyan-600 hover:bg-cyan-700 rounded-xl transition-colors"
+                                        >
+                                            <span className="text-2xl">🚗</span>
+                                            <span className="text-white text-sm font-medium">Waze</span>
+                                        </button>
+                                        <button
+                                            onClick={() => openInAppleMaps(loc.latitude, loc.longitude, selectedCustomer.name)}
+                                            className="flex flex-col items-center gap-2 p-4 bg-zinc-700 hover:bg-zinc-600 rounded-xl transition-colors"
+                                        >
+                                            <span className="text-2xl">🗺️</span>
+                                            <span className="text-white text-sm font-medium">Apple Maps</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 };
