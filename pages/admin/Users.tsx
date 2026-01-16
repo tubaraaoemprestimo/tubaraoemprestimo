@@ -379,99 +379,101 @@ export const Users: React.FC = () => {
 
       {/* Edit User Modal */}
       {editingUser && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl animate-in zoom-in duration-200 my-4">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <Edit2 size={20} className="text-[#D4AF37]" /> Editar Usuário
-              </h2>
-              <button onClick={() => setEditingUser(null)} className="p-2 hover:bg-zinc-800 rounded-lg">
-                <X size={20} className="text-zinc-400" />
-              </button>
-            </div>
-
-            {/* Info do usuário */}
-            <div className="bg-zinc-800 rounded-lg p-4 mb-6">
-              <p className="text-zinc-400 text-sm">Email (não editável)</p>
-              <p className="text-white font-medium">{editingUser.email}</p>
-            </div>
-
-            {/* Campos editáveis */}
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-zinc-400 mb-1">Nome</label>
-                <input
-                  value={editFormData.name}
-                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                  className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
-                />
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in duration-200 my-8 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Edit2 size={20} className="text-[#D4AF37]" /> Editar Usuário
+                </h2>
+                <button onClick={() => setEditingUser(null)} className="p-2 hover:bg-zinc-800 rounded-lg">
+                  <X size={20} className="text-zinc-400" />
+                </button>
               </div>
 
-              <div>
-                <label className="block text-sm text-zinc-400 mb-1">Função</label>
-                <select
-                  value={editFormData.role}
-                  onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value as UserRole })}
-                  className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
-                >
-                  <option value={UserRole.CLIENT}>Cliente</option>
-                  <option value={UserRole.ADMIN}>Administrador</option>
-                </select>
+              {/* Info do usuário */}
+              <div className="bg-zinc-800 rounded-lg p-4 mb-6">
+                <p className="text-zinc-400 text-sm">Email (não editável)</p>
+                <p className="text-white font-medium">{editingUser.email}</p>
               </div>
 
-              <div>
-                <label className="block text-sm text-zinc-400 mb-1">Telefone</label>
-                <input
-                  value={editFormData.phone}
-                  onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
-                  className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
-                  placeholder="(81) 99999-9999"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              {/* Campos editáveis */}
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Cidade</label>
+                  <label className="block text-sm text-zinc-400 mb-1">Nome</label>
                   <input
-                    value={editFormData.city}
-                    onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
                     className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Bairro</label>
-                  <input
-                    value={editFormData.neighborhood}
-                    onChange={(e) => setEditFormData({ ...editFormData, neighborhood: e.target.value })}
+                  <label className="block text-sm text-zinc-400 mb-1">Função</label>
+                  <select
+                    value={editFormData.role}
+                    onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value as UserRole })}
                     className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                  >
+                    <option value={UserRole.CLIENT}>Cliente</option>
+                    <option value={UserRole.ADMIN}>Administrador</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1">Telefone</label>
+                  <input
+                    value={editFormData.phone}
+                    onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                    className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                    placeholder="(81) 99999-9999"
                   />
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-zinc-400 mb-1">Cidade</label>
+                    <input
+                      value={editFormData.city}
+                      onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
+                      className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-zinc-400 mb-1">Bairro</label>
+                    <input
+                      value={editFormData.neighborhood}
+                      onChange={(e) => setEditFormData({ ...editFormData, neighborhood: e.target.value })}
+                      className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
 
-            {/* Salvar alterações */}
-            <div className="pt-4 mt-4 border-t border-zinc-800">
-              <Button onClick={handleUpdateUser} isLoading={updatingUser} className="w-full">
-                <Save size={18} className="mr-2" /> Salvar Alterações
-              </Button>
-            </div>
-
-            {/* Seção de Reset de Senha */}
-            <div className="mt-6 pt-4 border-t border-zinc-800">
-              <h3 className="text-sm font-bold text-[#D4AF37] flex items-center gap-2 mb-4">
-                <Key size={16} /> Alterar Senha
-              </h3>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
-                  placeholder="Nova senha (mín. 6 caracteres)"
-                />
-                <Button onClick={handleResetPassword} isLoading={updatingUser} variant="outline">
-                  Alterar
+              {/* Salvar alterações */}
+              <div className="pt-4 mt-4 border-t border-zinc-800">
+                <Button onClick={handleUpdateUser} isLoading={updatingUser} className="w-full">
+                  <Save size={18} className="mr-2" /> Salvar Alterações
                 </Button>
+              </div>
+
+              {/* Seção de Reset de Senha */}
+              <div className="mt-6 pt-4 border-t border-zinc-800">
+                <h3 className="text-sm font-bold text-[#D4AF37] flex items-center gap-2 mb-4">
+                  <Key size={16} /> Alterar Senha
+                </h3>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                    placeholder="Nova senha (mín. 6 caracteres)"
+                  />
+                  <Button onClick={handleResetPassword} isLoading={updatingUser} variant="outline">
+                    Alterar
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
