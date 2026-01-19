@@ -247,7 +247,7 @@ export const aiChatbotService = {
             } else if (apiKey.trim().startsWith('sk-')) {
                 // OpenAI
                 url = 'https://api.openai.com/v1/chat/completions';
-                model = 'gpt-4o-mini';
+                model = 'gpt-3.5-turbo';
             }
 
             const response = await fetch(url, {
