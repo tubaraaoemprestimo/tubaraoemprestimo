@@ -236,14 +236,28 @@ export const aiChatbotService = {
                 }))
             ];
 
-            const response = await fetch('https://api.perplexity.ai/chat/completions', {
+            let url = 'https://api.perplexity.ai/chat/completions';
+            let model = 'llama-3.1-sonar-large-128k-online';
+
+            // Smart Router based on API Key prefix
+            if (apiKey.trim().startsWith('gsk_')) {
+                // Groq
+                url = 'https://api.groq.com/openai/v1/chat/completions';
+                model = 'llama3-8b-8192';
+            } else if (apiKey.trim().startsWith('sk-')) {
+                // OpenAI
+                url = 'https://api.openai.com/v1/chat/completions';
+                model = 'gpt-4o-mini';
+            }
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${apiKey}`,
+                    'Authorization': `Bearer ${apiKey.trim()}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'llama-3.1-sonar-large-128k-online',
+                    model: model,
                     messages: formattedMessages,
                     max_tokens: 500,
                     temperature: 0.7
@@ -251,14 +265,14 @@ export const aiChatbotService = {
             });
 
             if (!response.ok) {
-                console.error('[AI Chatbot] Perplexity API error:', await response.text());
+                console.error('[AI Chatbot] API error:', await response.text());
                 return '';
             }
 
             const data = await response.json();
             return data.choices?.[0]?.message?.content || '';
         } catch (err) {
-            console.error('[AI Chatbot] Perplexity exception:', err);
+            console.error('[AI Chatbot] Exception:', err);
             return '';
         }
     },

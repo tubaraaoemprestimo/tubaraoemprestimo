@@ -250,14 +250,29 @@ async function generatePerplexityResponse(
             }))
         ]
 
-        const response = await fetch('https://api.perplexity.ai/chat/completions', {
+        let url = 'https://api.perplexity.ai/chat/completions'
+        let model = 'llama-3.1-sonar-large-128k-online'
+
+        // Smart Router based on API Key prefix
+        const cleanKey = apiKey.trim()
+        if (cleanKey.startsWith('gsk_')) {
+            // Groq
+            url = 'https://api.groq.com/openai/v1/chat/completions'
+            model = 'llama3-8b-8192'
+        } else if (cleanKey.startsWith('sk-')) {
+            // OpenAI
+            url = 'https://api.openai.com/v1/chat/completions'
+            model = 'gpt-4o-mini'
+        }
+
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': `Bearer ${cleanKey}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama-3.1-sonar-large-128k-online',
+                model: model,
                 messages: formattedMessages,
                 max_tokens: 500,
                 temperature: 0.7
