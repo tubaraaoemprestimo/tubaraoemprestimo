@@ -258,7 +258,7 @@ async function generatePerplexityResponse(
         if (cleanKey.startsWith('gsk_')) {
             // Groq
             url = 'https://api.groq.com/openai/v1/chat/completions'
-            model = 'llama3-8b-8192'
+            model = 'llama-3.1-8b-instant'
         } else if (cleanKey.startsWith('sk-')) {
             // OpenAI
             url = 'https://api.openai.com/v1/chat/completions'
