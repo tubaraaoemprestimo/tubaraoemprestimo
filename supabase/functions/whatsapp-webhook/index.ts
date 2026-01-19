@@ -257,7 +257,7 @@ async function generatePerplexityResponse(
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama-3.1-sonar-small-128k-online',
+                model: 'llama-3.1-sonar-large-128k-online',
                 messages: formattedMessages,
                 max_tokens: 500,
                 temperature: 0.7
