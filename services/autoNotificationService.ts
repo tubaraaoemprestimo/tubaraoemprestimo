@@ -1,10 +1,32 @@
 // 🔔 Auto Notification Service - Notificações Automáticas
 // Triggers automáticos para enviar notificações ao cliente
-// Agora integrado com Firebase Push Notifications
+// Integrado com Firebase Push Notifications e WhatsApp
 
 import { supabase } from './supabaseClient';
 import { scoreService } from './scoreService';
 import { firebasePushService } from './firebasePushService';
+import { whatsappService } from './whatsappService';
+
+const APP_LINK = 'https://tubaraoemprestimo.vercel.app/';
+
+// Helper para buscar telefone do cliente pelo email
+async function getCustomerPhone(email: string): Promise<string | null> {
+    const { data } = await supabase
+        .from('customers')
+        .select('phone, name')
+        .eq('email', email)
+        .single();
+    return data?.phone || null;
+}
+
+async function getCustomerData(email: string): Promise<{ phone: string | null; name: string }> {
+    const { data } = await supabase
+        .from('customers')
+        .select('phone, name')
+        .eq('email', email)
+        .single();
+    return { phone: data?.phone || null, name: data?.name || 'Cliente' };
+}
 
 export const autoNotificationService = {
     // ============================================
