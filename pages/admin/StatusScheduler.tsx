@@ -233,6 +233,9 @@ export const StatusScheduler: React.FC = () => {
         }
     };
 
+    // Estado do filtro
+    const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'POSTED' | 'FAILED'>('ALL');
+
     // Estatísticas
     const stats = {
         total: scheduledStatus.length,
@@ -240,6 +243,11 @@ export const StatusScheduler: React.FC = () => {
         posted: scheduledStatus.filter(s => s.status === 'POSTED').length,
         failed: scheduledStatus.filter(s => s.status === 'FAILED').length
     };
+
+    // Filtrar status
+    const filteredStatus = filter === 'ALL'
+        ? scheduledStatus
+        : scheduledStatus.filter(s => s.status === filter);
 
     return (
         <div className="space-y-6">
@@ -291,11 +299,38 @@ export const StatusScheduler: React.FC = () => {
 
             {/* Lista de Status Agendados */}
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-                <div className="p-4 border-b border-zinc-800">
+                <div className="p-4 border-b border-zinc-800 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <h3 className="text-white font-semibold flex items-center gap-2">
                         <Calendar size={18} className="text-green-500" />
-                        Agendamentos
+                        Histórico de Status
                     </h3>
+                    {/* Filtros */}
+                    <div className="flex gap-2 flex-wrap">
+                        <button
+                            onClick={() => setFilter('ALL')}
+                            className={`px-3 py-1 text-xs rounded-full transition-colors ${filter === 'ALL' ? 'bg-zinc-700 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}
+                        >
+                            Todos ({stats.total})
+                        </button>
+                        <button
+                            onClick={() => setFilter('PENDING')}
+                            className={`px-3 py-1 text-xs rounded-full transition-colors ${filter === 'PENDING' ? 'bg-yellow-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-yellow-400'}`}
+                        >
+                            Pendentes ({stats.pending})
+                        </button>
+                        <button
+                            onClick={() => setFilter('POSTED')}
+                            className={`px-3 py-1 text-xs rounded-full transition-colors ${filter === 'POSTED' ? 'bg-green-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-green-400'}`}
+                        >
+                            Postados ({stats.posted})
+                        </button>
+                        <button
+                            onClick={() => setFilter('FAILED')}
+                            className={`px-3 py-1 text-xs rounded-full transition-colors ${filter === 'FAILED' ? 'bg-red-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-red-400'}`}
+                        >
+                            Falhas ({stats.failed})
+                        </button>
+                    </div>
                 </div>
 
                 {loading ? (
@@ -303,15 +338,15 @@ export const StatusScheduler: React.FC = () => {
                         <Loader2 className="animate-spin mx-auto mb-2" />
                         Carregando...
                     </div>
-                ) : scheduledStatus.length === 0 ? (
+                ) : filteredStatus.length === 0 ? (
                     <div className="p-8 text-center text-zinc-500">
                         <Camera size={48} className="mx-auto mb-3 opacity-30" />
-                        <p>Nenhum status agendado.</p>
+                        <p>{filter === 'ALL' ? 'Nenhum status agendado.' : `Nenhum status ${filter === 'PENDING' ? 'pendente' : filter === 'POSTED' ? 'postado' : 'com falha'}.`}</p>
                         <p className="text-sm">Clique em "Agendar Status" para começar.</p>
                     </div>
                 ) : (
                     <div className="divide-y divide-zinc-800">
-                        {scheduledStatus.map((item) => (
+                        {filteredStatus.map((item) => (
                             <div key={item.id} className="p-4 flex items-center gap-4 hover:bg-zinc-800/50 transition-colors">
                                 {/* Thumbnail */}
                                 <div className="w-16 h-16 rounded-lg overflow-hidden bg-zinc-800 flex-shrink-0">
@@ -332,8 +367,14 @@ export const StatusScheduler: React.FC = () => {
                                     </p>
                                     <p className="text-zinc-400 text-sm flex items-center gap-1">
                                         <Clock size={12} />
-                                        {new Date(item.scheduled_at).toLocaleString('pt-BR')}
+                                        Agendado: {new Date(item.scheduled_at).toLocaleString('pt-BR')}
                                     </p>
+                                    {item.posted_at && (
+                                        <p className="text-green-400 text-xs mt-1 flex items-center gap-1">
+                                            <CheckCircle size={12} />
+                                            Postado em: {new Date(item.posted_at).toLocaleString('pt-BR')}
+                                        </p>
+                                    )}
                                     {item.error_message && (
                                         <p className="text-red-400 text-xs mt-1 flex items-center gap-1">
                                             <AlertCircle size={12} />

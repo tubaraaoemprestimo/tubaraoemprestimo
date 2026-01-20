@@ -44,8 +44,7 @@ async function postWhatsAppStatus(
                 type: 'image',
                 content: imageUrl,
                 caption: caption || '',
-                allContacts: true,
-                statusJidList: [] // Vazio = todos os contatos
+                allContacts: true
             })
         });
 
