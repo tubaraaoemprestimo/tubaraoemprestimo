@@ -467,20 +467,16 @@ export const autoNotificationService = {
      */
     sendWhatsAppCampaign: async (campaignId: string): Promise<{ success: boolean; sent?: number; error?: string }> => {
         try {
-            const response = await fetch(`https://cwhiujeragsethxjekkb.supabase.co/functions/v1/send-campaign`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: 'campaign', id: campaignId })
+            const { data, error } = await supabase.functions.invoke('send-campaign', {
+                body: { type: 'campaign', id: campaignId }
             });
 
-            const data = await response.json();
-            if (!response.ok) {
-                return { success: false, error: data.error };
-            }
+            if (error) throw error;
+
             return { success: true, sent: data.sent };
-        } catch (error) {
+        } catch (error: any) {
             console.error('[WhatsApp] Campaign error:', error);
-            return { success: false, error: 'Erro de conexão' };
+            return { success: false, error: error.message || 'Erro ao enviar campanha' };
         }
     },
 
@@ -489,20 +485,16 @@ export const autoNotificationService = {
      */
     sendWhatsAppCoupon: async (couponId: string): Promise<{ success: boolean; sent?: number; error?: string }> => {
         try {
-            const response = await fetch(`https://cwhiujeragsethxjekkb.supabase.co/functions/v1/send-campaign`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: 'coupon', id: couponId })
+            const { data, error } = await supabase.functions.invoke('send-campaign', {
+                body: { type: 'coupon', id: couponId }
             });
 
-            const data = await response.json();
-            if (!response.ok) {
-                return { success: false, error: data.error };
-            }
+            if (error) throw error;
+
             return { success: true, sent: data.sent };
-        } catch (error) {
+        } catch (error: any) {
             console.error('[WhatsApp] Coupon error:', error);
-            return { success: false, error: 'Erro de conexão' };
+            return { success: false, error: error.message || 'Erro de conexão' };
         }
     },
 

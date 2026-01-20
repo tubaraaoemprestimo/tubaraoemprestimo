@@ -2,34 +2,36 @@
 -- SETUP CRON: Automação de Notificações WhatsApp
 -- ============================================
 
--- 1. Habilitar a extensão pg_cron e pg_net (se ainda não estiverem)
+-- 1. Habilitar a extensão pg_cron e pg_net
 create extension if not exists pg_cron with schema extensions;
 create extension if not exists pg_net with schema extensions;
 
--- 2. Remover agendamento anterior (para não duplicar)
-select cron.unschedule('whatsapp-auto-notifications-job');
+-- 2. Remover agendamento anterior de forma segura
+DO $$
+DECLARE
+    row record;
+BEGIN
+    FOR row IN SELECT jobid FROM cron.job WHERE jobname = 'whatsapp-auto-notifications-job' LOOP
+        PERFORM cron.unschedule(row.jobid);
+    END LOOP;
+END $$;
 
--- 3. Criar o agendamento
--- Este job irá rodar a cada hora (minuto 0) para verificar envios pendentes
--- Ajuste o cronograma conforme necessidade: '0 9 * * *' para todo dia às 9h
+-- 3. Criar o agendamento (Atualizado com sua chave)
+-- Agendado para rodar a cada hora (minuto 0)
 SELECT cron.schedule(
     'whatsapp-auto-notifications-job',
-    '0 * * * *', -- Roda a cada hora cheia (ex: 10:00, 11:00...)
+    '0 * * * *', 
     $$
     SELECT
         net.http_post(
             url:='https://cwhiujeragsethxjekkb.supabase.co/functions/v1/auto-notifications',
-            headers:='{"Content-Type": "application/json", "Authorization": "Bearer SUA_SERVICE_ROLE_KEY_AQUI"}'::jsonb,
+            headers:='{"Content-Type": "application/json", "Authorization": "Bearer sb_secret_T2i1wRT0CkjMs0Ow6jh7IQ_4U7Hj5hx"}'::jsonb,
             body:='{}'::jsonb
         ) as request_id;
     $$
 );
 
 -- ============================================
--- IMPORTANTE:
--- Substitua 'SUA_SERVICE_ROLE_KEY_AQUI' pela sua chave 'service_role' (secret) do Supabase.
--- Você pode encontrá-la no Dashboard > Project Settings > API.
+-- VERIFICAÇÃO
 -- ============================================
-
--- 4. Verificar jobs agendados
 select * from cron.job;
