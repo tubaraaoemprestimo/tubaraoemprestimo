@@ -63,6 +63,49 @@ export const autoNotificationService = {
     },
 
     // ============================================
+    // NOTIFICAÇÕES DE BOAS-VINDAS
+    // ============================================
+
+    // Boas-vindas ao cliente (após cadastro)
+    onWelcome: async (customerEmail: string, customerName: string, customerPhone?: string): Promise<void> => {
+        const firstName = customerName.split(' ')[0];
+
+        // Notificação no banco
+        await autoNotificationService.createNotification(
+            customerEmail,
+            'Bem-vindo(a) ao Tubarão Empréstimos! 🦈',
+            `Olá ${firstName}! Seu cadastro foi realizado com sucesso. Agora você pode solicitar seu empréstimo de forma rápida e segura!`,
+            'SUCCESS',
+            '/client/dashboard'
+        );
+
+        // 📱 Enviar WhatsApp
+        if (customerPhone) {
+            whatsappService.sendMessage(
+                customerPhone,
+                `👋 *BEM-VINDO(A) AO TUBARÃO EMPRÉSTIMOS!*\n\n` +
+                `Olá ${firstName}!\n\n` +
+                `Seu cadastro foi realizado com sucesso! 🎉\n\n` +
+                `Agora você pode solicitar seu empréstimo de forma rápida e segura.\n\n` +
+                `✅ *Vantagens:*\n` +
+                `• Processo 100% digital\n` +
+                `• Aprovação em até 24h\n` +
+                `• Taxas competitivas\n\n` +
+                `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
+
+        // Push para o cliente
+        firebasePushService.sendPush({
+            to: customerEmail,
+            title: '👋 Bem-vindo ao Tubarão Empréstimos!',
+            body: 'Seu cadastro foi realizado com sucesso!',
+            link: '/client/dashboard'
+        }).catch(() => { });
+    },
+
+    // ============================================
     // NOTIFICAÇÕES DE EMPRÉSTIMO
     // ============================================
 
