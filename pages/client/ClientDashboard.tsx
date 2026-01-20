@@ -273,7 +273,10 @@ export const ClientDashboard: React.FC = () => {
               </div>
               <h3 className="text-lg font-bold leading-tight mb-2">Crédito Pré-Aprovado</h3>
               <div className="text-3xl font-extrabold mb-3">R$ {preApprovedAmount.toLocaleString()}</div>
-              <Button className="w-full bg-black text-[#D4AF37] hover:bg-zinc-800 border-none">
+              <Button
+                onClick={() => navigate(`/wizard?amount=${preApprovedAmount}`)}
+                className="w-full bg-black text-[#D4AF37] hover:bg-zinc-800 border-none"
+              >
                 Contratar Agora
               </Button>
             </div>
