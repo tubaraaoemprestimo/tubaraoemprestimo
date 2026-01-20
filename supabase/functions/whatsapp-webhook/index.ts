@@ -46,6 +46,16 @@ serve(async (req: Request) => {
             })
         }
 
+        // 🚫 Ignore group messages - only respond to individual chats
+        // Groups end with @g.us, individual chats end with @s.whatsapp.net
+        const remoteJid = payload.data?.key?.remoteJid || ''
+        if (remoteJid.endsWith('@g.us')) {
+            console.log('[Webhook] Ignoring group message from:', remoteJid)
+            return new Response(JSON.stringify({ status: 'ignored_group' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+        }
+
         // Extract message text
         const messageText = payload.data?.message?.conversation
             || payload.data?.message?.extendedTextMessage?.text

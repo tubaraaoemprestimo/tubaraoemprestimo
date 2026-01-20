@@ -281,6 +281,95 @@ export const autoNotificationService = {
                 }
             }
         }
+    },
+
+    // ============================================
+    // 📱 WHATSAPP - CAMPANHAS E CUPONS
+    // ============================================
+
+    /**
+     * Envia uma campanha para todos os clientes via WhatsApp
+     */
+    sendWhatsAppCampaign: async (campaignId: string): Promise<{ success: boolean; sent?: number; error?: string }> => {
+        try {
+            const response = await fetch(`https://cwhiujeragsethxjekkb.supabase.co/functions/v1/send-campaign`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'campaign', id: campaignId })
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                return { success: false, error: data.error };
+            }
+            return { success: true, sent: data.sent };
+        } catch (error) {
+            console.error('[WhatsApp] Campaign error:', error);
+            return { success: false, error: 'Erro de conexão' };
+        }
+    },
+
+    /**
+     * Envia um cupom para todos os clientes via WhatsApp
+     */
+    sendWhatsAppCoupon: async (couponId: string): Promise<{ success: boolean; sent?: number; error?: string }> => {
+        try {
+            const response = await fetch(`https://cwhiujeragsethxjekkb.supabase.co/functions/v1/send-campaign`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'coupon', id: couponId })
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                return { success: false, error: data.error };
+            }
+            return { success: true, sent: data.sent };
+        } catch (error) {
+            console.error('[WhatsApp] Coupon error:', error);
+            return { success: false, error: 'Erro de conexão' };
+        }
+    },
+
+    /**
+     * Executa cobranças automáticas via WhatsApp baseado nas regras
+     */
+    runWhatsAppCollections: async (): Promise<{ success: boolean; sent?: number; error?: string }> => {
+        try {
+            const response = await fetch(`https://cwhiujeragsethxjekkb.supabase.co/functions/v1/auto-notifications`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'collections' })
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                return { success: false, error: data.error };
+            }
+            return { success: true, sent: data.results?.collections?.sent || 0 };
+        } catch (error) {
+            console.error('[WhatsApp] Collections error:', error);
+            return { success: false, error: 'Erro de conexão' };
+        }
+    },
+
+    /**
+     * Busca histórico de notificações WhatsApp enviadas
+     */
+    getWhatsAppHistory: async (limit: number = 50) => {
+        try {
+            const { data, error } = await supabase
+                .from('notification_logs')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(limit);
+
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('[WhatsApp] History error:', error);
+            return [];
+        }
     }
 };
 
