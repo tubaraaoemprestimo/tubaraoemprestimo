@@ -157,7 +157,23 @@ serve(async (req: Request) => {
 
             // If coupon is for specific customer email
             if (coupon.customer_email) {
-                targetCustomers = customers.filter(c => c.email === coupon.customer_email);
+                // Tentar encontrar na lista já carregada (case insensitive)
+                targetCustomers = customers.filter(c => c.email.toLowerCase() === coupon.customer_email.toLowerCase());
+
+                // Se não encontrou na lista (pode não ser ACTIVE ou não ter phone na query inicial), tentar buscar específico
+                if (targetCustomers.length === 0) {
+                    const { data: specificCustomer } = await supabase
+                        .from('customers')
+                        .select('id, name, phone, email, status')
+                        .ilike('email', coupon.customer_email)
+                        .single();
+
+                    if (specificCustomer && specificCustomer.phone) {
+                        targetCustomers = [specificCustomer];
+                    } else {
+                        console.log(`[SendCampaign] Cliente alvo não encontrado ou sem telefone: ${coupon.customer_email}`);
+                    }
+                }
             }
         }
 
