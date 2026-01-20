@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Megaphone, Plus, Trash2, Edit2, Calendar, Link as LinkIcon, Image as ImageIcon, CheckCircle, XCircle, Search, Users, Gift, AlertTriangle, ShieldCheck, Ban, Send, Loader2, Ticket } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Edit2, Calendar, Link as LinkIcon, Image as ImageIcon, CheckCircle, XCircle, Search, Users, Gift, AlertTriangle, ShieldCheck, Ban, Send, Loader2, Ticket, MessageCircle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { supabaseService } from '../../services/supabaseService';
 import { referralService } from '../../services/referralService';
 import { firebasePushService } from '../../services/firebasePushService';
 import { emailService } from '../../services/emailService';
+import { autoNotificationService } from '../../services/autoNotificationService';
 import { Campaign, ReferralUsage, Customer } from '../../types';
 import { useToast } from '../../components/Toast';
 
@@ -204,7 +205,7 @@ export const Marketing: React.FC = () => {
     const [sendingCampaign, setSendingCampaign] = useState<string | null>(null);
 
     const handleSendCampaign = async (campaign: Campaign) => {
-        if (!confirm(`Disparar campanha "${campaign.title}" para ${customers.length} clientes?\n\nIsso enviará:\n• Push notification para todos\n• Email para todos`)) {
+        if (!confirm(`Disparar campanha "${campaign.title}" para ${customers.length} clientes?\n\nIsso enviará:\n• Push notification para todos\n• Email para todos\n• WhatsApp para todos`)) {
             return;
         }
 
@@ -213,9 +214,16 @@ export const Marketing: React.FC = () => {
         try {
             let pushSent = 0;
             let emailSent = 0;
+            let whatsappSent = 0;
             let failed = 0;
 
-            // Enviar Push para todos
+            // 📱 Enviar via WhatsApp (Edge Function)
+            const whatsappResult = await autoNotificationService.sendWhatsAppCampaign(campaign.id);
+            if (whatsappResult.success) {
+                whatsappSent = whatsappResult.sent || 0;
+            }
+
+            // 🔔 Enviar Push para todos
             const pushResult = await firebasePushService.sendPush({
                 to: 'all',
                 title: `📢 ${campaign.title}`,
@@ -224,7 +232,7 @@ export const Marketing: React.FC = () => {
             });
             pushSent = pushResult.sent || 0;
 
-            // Enviar Email para cada cliente com email válido
+            // 📧 Enviar Email para cada cliente com email válido
             const clientsWithEmail = customers.filter(c => c.email && c.email.includes('@'));
 
             for (const customer of clientsWithEmail) {
@@ -248,7 +256,7 @@ export const Marketing: React.FC = () => {
             }
 
             addToast(
-                `Campanha disparada!\n📱 ${pushSent} push enviados\n📧 ${emailSent} emails enviados${failed > 0 ? `\n❌ ${failed} falhas` : ''}`,
+                `Campanha disparada!\n📱 ${whatsappSent} WhatsApp\n🔔 ${pushSent} Push\n📧 ${emailSent} Emails${failed > 0 ? `\n❌ ${failed} falhas` : ''}`,
                 'success'
             );
         } catch (error) {
@@ -256,6 +264,31 @@ export const Marketing: React.FC = () => {
             addToast('Erro ao disparar campanha. Verifique o console.', 'error');
         } finally {
             setSendingCampaign(null);
+        }
+    };
+
+    // 🎟️ DISPARAR CUPOM VIA WHATSAPP
+    const [sendingCoupon, setSendingCoupon] = useState<string | null>(null);
+
+    const handleSendCouponWhatsApp = async (couponId: string, couponCode: string) => {
+        if (!confirm(`Enviar cupom "${couponCode}" via WhatsApp para todos os clientes?`)) {
+            return;
+        }
+
+        setSendingCoupon(couponId);
+
+        try {
+            const result = await autoNotificationService.sendWhatsAppCoupon(couponId);
+            if (result.success) {
+                addToast(`Cupom enviado para ${result.sent} clientes via WhatsApp!`, 'success');
+            } else {
+                addToast(`Erro: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Coupon send error:', error);
+            addToast('Erro ao enviar cupom.', 'error');
+        } finally {
+            setSendingCoupon(null);
         }
     };
 
@@ -673,8 +706,22 @@ export const Marketing: React.FC = () => {
                                                         <span className="bg-red-900/30 text-red-400 text-xs px-2 py-1 rounded">Inativo</span>
                                                     )}
                                                 </td>
-                                                <td className="p-3 text-right">
-                                                    <button onClick={() => handleEditCoupon(coupon)} className="p-2 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white mr-1">
+                                                <td className="p-3 text-right flex items-center justify-end gap-1">
+                                                    {coupon.active && (
+                                                        <button
+                                                            onClick={() => handleSendCouponWhatsApp(coupon.id, coupon.code)}
+                                                            className="p-2 hover:bg-green-900/30 rounded text-green-500 hover:text-green-400"
+                                                            title="Enviar via WhatsApp"
+                                                            disabled={sendingCoupon !== null}
+                                                        >
+                                                            {sendingCoupon === coupon.id ? (
+                                                                <Loader2 size={16} className="animate-spin" />
+                                                            ) : (
+                                                                <MessageCircle size={16} />
+                                                            )}
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => handleEditCoupon(coupon)} className="p-2 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white">
                                                         <Edit2 size={16} />
                                                     </button>
                                                     <button onClick={() => handleDeleteCoupon(coupon.id)} className="p-2 hover:bg-red-900/30 rounded text-zinc-400 hover:text-red-400">
