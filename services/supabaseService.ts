@@ -1341,6 +1341,23 @@ export const supabaseService = {
         }));
     },
 
+    // Criar notificação para um cliente
+    createNotification: async (
+        customerEmail: string,
+        title: string,
+        message: string,
+        type: 'INFO' | 'WARNING' | 'ALERT' | 'SUCCESS' = 'INFO'
+    ): Promise<boolean> => {
+        const { error } = await supabase.from('notifications').insert({
+            customer_email: customerEmail,
+            title,
+            message,
+            type,
+            read: false
+        });
+        return !error;
+    },
+
     getClientCoupons: async () => {
         const user = loadFromStorage<any>(STORAGE_KEYS.USER, null);
         if (!user) return [];
