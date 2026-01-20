@@ -123,6 +123,7 @@ serve(async (req: Request) => {
             message = `🎯 *${campaign.title}*\n\n` +
                 `${campaign.description || ''}\n\n` +
                 `${campaign.link ? `👉 Acesse: ${campaign.link}` : ''}\n\n` +
+                `📱 *Baixe o App:*\nhttps://tubaraoemprestimo.vercel.app/\n\n` +
                 `_Tubarão Empréstimos 🦈_`;
         }
 
@@ -151,6 +152,7 @@ serve(async (req: Request) => {
                 `Use o código *${coupon.code}* e ganhe *${coupon.discount}% de desconto*!\n` +
                 `${coupon.description || ''}\n` +
                 `${expiresText}\n\n` +
+                `📱 *Acesse o App:*\nhttps://tubaraoemprestimo.vercel.app/\n\n` +
                 `_Tubarão Empréstimos 🦈_`;
 
             // If coupon is for specific customer email
