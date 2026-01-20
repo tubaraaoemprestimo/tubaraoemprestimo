@@ -795,6 +795,9 @@ export const supabaseService = {
                 return false;
             }
             customerId = newCustomer.id;
+
+            // 🎉 Novo cliente! Enviar boas-vindas
+            autoNotificationService.onWelcome(data.email, data.name, data.phone).catch(console.error);
         }
 
         // Create loan request
