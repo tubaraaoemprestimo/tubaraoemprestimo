@@ -35,3 +35,31 @@ SELECT cron.schedule(
 -- VERIFICAÇÃO
 -- ============================================
 select * from cron.job;
+
+-- ============================================
+-- CRON: Status WhatsApp (a cada 5 minutos)
+-- ============================================
+DO $$
+DECLARE
+    row record;
+BEGIN
+    FOR row IN SELECT jobid FROM cron.job WHERE jobname = 'whatsapp-post-status-job' LOOP
+        PERFORM cron.unschedule(row.jobid);
+    END LOOP;
+END $$;
+
+SELECT cron.schedule(
+    'whatsapp-post-status-job',
+    '*/5 * * * *', -- A cada 5 minutos
+    $$
+    SELECT
+        net.http_post(
+            url:='https://cwhiujeragsethxjekkb.supabase.co/functions/v1/post-status',
+            headers:='{"Content-Type": "application/json", "Authorization": "Bearer sb_secret_T2i1wRT0CkjMs0Ow6jh7IQ_4U7Hj5hx"}'::jsonb,
+            body:='{}'::jsonb
+        ) as request_id;
+    $$
+);
+
+-- Verificar todos os jobs
+SELECT jobid, jobname, schedule FROM cron.job;
