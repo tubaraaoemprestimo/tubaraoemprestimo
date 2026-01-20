@@ -1150,10 +1150,16 @@ export const supabaseService = {
                         <p>Aproveite essa oportunidade exclusiva. Acesse seu app para contratar.</p>
                         <p>Tubarão Empréstimos 🦈</p>`
                 }).catch(console.error);
-            }
 
-            // 🔔 Notificação no app
-            autoNotificationService.onPreApprovedOffer(customer.email, amount).catch(console.error);
+                // 🔔 Notificação no app (UMA VEZ apenas)
+                autoNotificationService.createNotification(
+                    customer.email,
+                    '🎉 Crédito Pré-Aprovado',
+                    `Você tem R$ ${formattedAmount} pré-aprovados para empréstimo! Aproveite!`,
+                    'SUCCESS',
+                    '/client/dashboard'
+                ).catch(console.error);
+            }
         }
 
         return true;
@@ -1252,16 +1258,16 @@ export const supabaseService = {
                         <p>Acesse seu app para aceitar essa oferta exclusiva!</p>
                         <p>Tubarão Empréstimos 🦈</p>`
                 }).catch(console.error);
-            }
 
-            // 🔔 Notificação no app
-            autoNotificationService.createNotification(
-                customer.email,
-                '💰 Oferta Especial de Parcelamento!',
-                `R$ ${formattedAmount} em ${offer.installments}x de R$ ${formattedInstallment}. Válido até ${expiresDate}.`,
-                'SUCCESS',
-                '/client/dashboard'
-            ).catch(console.error);
+                // 🔔 Notificação no app (UMA VEZ apenas)
+                autoNotificationService.createNotification(
+                    customer.email,
+                    '💰 Oferta Especial de Parcelamento!',
+                    `R$ ${formattedAmount} em ${offer.installments}x de R$ ${formattedInstallment}. Válido até ${expiresDate}.`,
+                    'SUCCESS',
+                    '/client/dashboard'
+                ).catch(console.error);
+            }
         }
 
         return true;
@@ -1396,7 +1402,9 @@ export const supabaseService = {
         expiresAt: string;
         active: boolean;
     }) => {
-        const { error } = await supabase.from('coupons').upsert({
+        const isNew = !coupon.id;
+
+        const { data: savedCoupon, error } = await supabase.from('coupons').upsert({
             id: coupon.id || undefined,
             code: coupon.code,
             discount: coupon.discount,
@@ -1404,8 +1412,47 @@ export const supabaseService = {
             customer_email: coupon.customerEmail,
             expires_at: coupon.expiresAt,
             active: coupon.active
-        });
-        return !error;
+        }).select().single();
+
+        if (error) return false;
+
+        // 📢 Se for um NOVO cupom ativo, enviar notificação
+        if (isNew && coupon.active && savedCoupon) {
+            const expiresDate = new Date(coupon.expiresAt).toLocaleDateString('pt-BR');
+
+            if (coupon.customerEmail) {
+                // Cupom para cliente específico
+                await autoNotificationService.createNotification(
+                    coupon.customerEmail,
+                    '🎟️ Cupom Exclusivo!',
+                    `Use o código ${coupon.code} e ganhe ${coupon.discount}% de desconto! Válido até ${expiresDate}.`,
+                    'SUCCESS',
+                    '/client/dashboard'
+                );
+
+                // Buscar telefone do cliente
+                const { data: customer } = await supabase
+                    .from('customers')
+                    .select('phone, name')
+                    .eq('email', coupon.customerEmail)
+                    .single();
+
+                if (customer?.phone) {
+                    whatsappService.sendMessage(
+                        customer.phone,
+                        `🎟️ *CUPOM EXCLUSIVO!*\n\n` +
+                        `Olá ${customer.name?.split(' ')[0] || 'Cliente'}!\n\n` +
+                        `Use o código *${coupon.code}* e ganhe *${coupon.discount}% de desconto*!\n\n` +
+                        `📋 ${coupon.description || 'Aproveite essa oferta!'}\n` +
+                        `⏰ Válido até: ${expiresDate}\n\n` +
+                        `_Tubarão Empréstimos 🦈_`
+                    ).catch(console.error);
+                }
+            }
+            // Nota: Cupons para todos os clientes são enviados via Edge Function send-campaign
+        }
+
+        return true;
     },
 
     deleteCoupon: async (id: string) => {
@@ -1531,7 +1578,9 @@ export const supabaseService = {
     },
 
     saveCampaign: async (cmp: Campaign) => {
-        const { error } = await supabase.from('campaigns').upsert({
+        const isNew = !cmp.id;
+
+        const { data: savedCampaign, error } = await supabase.from('campaigns').upsert({
             id: cmp.id || undefined,
             title: cmp.title,
             description: cmp.description,
@@ -1542,8 +1591,36 @@ export const supabaseService = {
             frequency: cmp.frequency,
             active: cmp.active,
             priority: cmp.priority
-        });
-        return !error;
+        }).select().single();
+
+        if (error) return false;
+
+        // 📢 Se for uma NOVA campanha ativa, enviar notificação para todos os clientes
+        if (isNew && cmp.active && savedCampaign) {
+            // Buscar todos os clientes com email
+            const { data: customers } = await supabase
+                .from('customers')
+                .select('email')
+                .not('email', 'is', null);
+
+            if (customers) {
+                // Criar notificação para cada cliente
+                for (const customer of customers) {
+                    if (customer.email) {
+                        autoNotificationService.createNotification(
+                            customer.email,
+                            `📢 ${cmp.title}`,
+                            cmp.description,
+                            'INFO',
+                            cmp.link || '/client/dashboard'
+                        ).catch(console.error);
+                    }
+                }
+            }
+            // Nota: O WhatsApp para campanhas é enviado via Edge Function send-campaign na página Marketing
+        }
+
+        return true;
     },
 
     deleteCampaign: async (id: string) => {
