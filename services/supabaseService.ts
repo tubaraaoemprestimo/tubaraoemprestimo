@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient';
 import { autoNotificationService } from './autoNotificationService';
+import { whatsappService } from './whatsappService';
+import { emailService } from './emailService';
 import {
     LoanRequest,
     LoanStatus,
@@ -1104,6 +1106,14 @@ export const supabaseService = {
     },
 
     sendPreApproval: async (customerId: string, amount: number) => {
+        // Buscar dados do cliente
+        const { data: customer } = await supabase
+            .from('customers')
+            .select('name, email, phone')
+            .eq('id', customerId)
+            .single();
+
+        // Atualizar no banco
         const { error } = await supabase
             .from('customers')
             .update({
@@ -1111,7 +1121,42 @@ export const supabaseService = {
                 pre_approved_at: new Date().toISOString()
             })
             .eq('id', customerId);
-        return !error;
+
+        if (error) return false;
+
+        // Enviar notificações se cliente encontrado
+        if (customer) {
+            const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+            // 📱 Enviar WhatsApp
+            if (customer.phone) {
+                const whatsappMsg = `🎉 *OFERTA PRÉ-APROVADA!*\n\n` +
+                    `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                    `Você tem *R$ ${formattedAmount}* pré-aprovados para empréstimo!\n\n` +
+                    `✅ Aproveite essa oportunidade exclusiva!\n` +
+                    `📱 Acesse seu app para contratar.\n\n` +
+                    `_Tubarão Empréstimos 🦈_`;
+
+                whatsappService.sendMessage(customer.phone, whatsappMsg).catch(console.error);
+            }
+
+            // 📧 Enviar Email
+            if (customer.email) {
+                emailService.sendEmail({
+                    to: customer.email,
+                    subject: `🎉 Você tem R$ ${formattedAmount} pré-aprovados!`,
+                    html: `<h1>Parabéns ${customer.name}!</h1>
+                        <p>Você tem <strong>R$ ${formattedAmount}</strong> pré-aprovados para empréstimo!</p>
+                        <p>Aproveite essa oportunidade exclusiva. Acesse seu app para contratar.</p>
+                        <p>Tubarão Empréstimos 🦈</p>`
+                }).catch(console.error);
+            }
+
+            // 🔔 Notificação no app
+            autoNotificationService.onPreApprovedOffer(customer.email, amount).catch(console.error);
+        }
+
+        return true;
     },
 
     updateCustomerRates: async (customerId: string, rates?: {
@@ -1143,6 +1188,16 @@ export const supabaseService = {
         totalAmount: number;
         expiresAt?: string;
     }) => {
+        // Buscar dados do cliente
+        const { data: customer } = await supabase
+            .from('customers')
+            .select('name, email, phone')
+            .eq('id', customerId)
+            .single();
+
+        const expiresAt = offer.expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        // Salvar no banco
         const { error } = await supabase
             .from('customers')
             .update({
@@ -1152,13 +1207,64 @@ export const supabaseService = {
                     interest_rate: offer.interestRate,
                     installment_value: offer.installmentValue,
                     total_amount: offer.totalAmount,
-                    expires_at: offer.expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    expires_at: expiresAt,
                     created_at: new Date().toISOString()
                 }
             })
             .eq('id', customerId);
 
-        return !error;
+        if (error) return false;
+
+        // Enviar notificações se cliente encontrado
+        if (customer) {
+            const formattedAmount = offer.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+            const formattedInstallment = offer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+            const expiresDate = new Date(expiresAt).toLocaleDateString('pt-BR');
+
+            // 📱 Enviar WhatsApp
+            if (customer.phone) {
+                const whatsappMsg = `💰 *OFERTA ESPECIAL DE PARCELAMENTO!*\n\n` +
+                    `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                    `Preparamos uma oferta exclusiva para você:\n\n` +
+                    `💵 Valor: *R$ ${formattedAmount}*\n` +
+                    `📅 Parcelas: *${offer.installments}x de R$ ${formattedInstallment}*\n` +
+                    `📊 Taxa: *${offer.interestRate}% a.m.*\n\n` +
+                    `⏰ Válido até: ${expiresDate}\n\n` +
+                    `📱 Acesse seu app para aceitar!\n\n` +
+                    `_Tubarão Empréstimos 🦈_`;
+
+                whatsappService.sendMessage(customer.phone, whatsappMsg).catch(console.error);
+            }
+
+            // 📧 Enviar Email
+            if (customer.email) {
+                emailService.sendEmail({
+                    to: customer.email,
+                    subject: `💰 Oferta Especial: R$ ${formattedAmount} em ${offer.installments}x!`,
+                    html: `<h1>Olá ${customer.name}!</h1>
+                        <p>Preparamos uma oferta especial de parcelamento para você:</p>
+                        <ul>
+                            <li><strong>Valor:</strong> R$ ${formattedAmount}</li>
+                            <li><strong>Parcelas:</strong> ${offer.installments}x de R$ ${formattedInstallment}</li>
+                            <li><strong>Taxa:</strong> ${offer.interestRate}% a.m.</li>
+                        </ul>
+                        <p>⏰ <strong>Válido até:</strong> ${expiresDate}</p>
+                        <p>Acesse seu app para aceitar essa oferta exclusiva!</p>
+                        <p>Tubarão Empréstimos 🦈</p>`
+                }).catch(console.error);
+            }
+
+            // 🔔 Notificação no app
+            autoNotificationService.createNotification(
+                customer.email,
+                '💰 Oferta Especial de Parcelamento!',
+                `R$ ${formattedAmount} em ${offer.installments}x de R$ ${formattedInstallment}. Válido até ${expiresDate}.`,
+                'SUCCESS',
+                '/client/dashboard'
+            ).catch(console.error);
+        }
+
+        return true;
     },
 
     deleteInstallmentOffer: async (customerId: string) => {
