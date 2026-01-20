@@ -222,6 +222,40 @@ export const autoNotificationService = {
         }).catch(() => { });
     },
 
+    // Contrato assinado
+    onContractSigned: async (customerEmail: string, clientName?: string): Promise<void> => {
+        const title = "Contrato Assinado!";
+        const message = "Seu contrato foi assinado com sucesso. Aguarde a liberação do valor.";
+
+        await autoNotificationService.createNotification(customerEmail, title, message, 'SUCCESS');
+
+        // 📱 Enviar WhatsApp
+        try {
+            const { phone, name } = await getCustomerData(customerEmail);
+            if (phone) {
+                let content = `Olá ${name?.split(' ')[0] || clientName?.split(' ')[0]}! Seu contrato foi assinado com sucesso. O valor será liberado em breve.`;
+
+                // Tenta buscar template
+                const { data: template } = await supabase
+                    .from('message_templates')
+                    .select('content')
+                    .eq('trigger_event', 'CONTRACT_SIGNED')
+                    .eq('is_active', true)
+                    .single();
+
+                if (template) {
+                    content = template.content.replace('{nome}', name?.split(' ')[0] || clientName?.split(' ')[0] || 'Cliente');
+                } else {
+                    content += `\n\n📱 *Acesse:* ${APP_LINK}`;
+                }
+
+                await whatsappService.sendMessage(phone, content);
+            }
+        } catch (err) {
+            console.error('Erro ao enviar WhatsApp de contrato assinado:', err);
+        }
+    },
+
     // ============================================
     // NOTIFICAÇÕES DE PAGAMENTO
     // ============================================
