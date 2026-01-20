@@ -68,20 +68,36 @@ export const autoNotificationService = {
 
     // Solicitação recebida
     onLoanRequested: async (customerEmail: string, amount: number, clientName?: string): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
+        const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
         // Notificação no banco
         await autoNotificationService.createNotification(
             customerEmail,
             'Solicitação Recebida ✓',
-            `Recebemos sua solicitação de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}. Estamos analisando seus dados.`,
+            `Recebemos sua solicitação de R$ ${formattedAmount}. Estamos analisando seus dados.`,
             'INFO',
             '/client/contracts'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `📝 *SOLICITAÇÃO RECEBIDA!*\n\n` +
+                `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                `Recebemos sua solicitação de empréstimo no valor de *R$ ${formattedAmount}*.\n\n` +
+                `⏳ Nossa equipe está analisando e em breve você receberá uma resposta.\n\n` +
+                `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
 
         // Push para o cliente
         firebasePushService.sendPush({
             to: customerEmail,
             title: '📝 Solicitação Recebida',
-            body: `Recebemos sua solicitação de R$ ${amount.toLocaleString('pt-BR')}`,
+            body: `Recebemos sua solicitação de R$ ${formattedAmount}`,
             link: '/client/contracts'
         }).catch(() => { });
 
@@ -89,45 +105,76 @@ export const autoNotificationService = {
         firebasePushService.sendPush({
             to: 'admin',
             title: '📝 Nova Solicitação',
-            body: `${clientName || 'Cliente'} solicitou R$ ${amount.toLocaleString('pt-BR')}`,
+            body: `${clientName || customer.name} solicitou R$ ${formattedAmount}`,
             link: '/admin/requests'
         }).catch(() => { });
     },
 
     // Empréstimo aprovado
     onLoanApproved: async (customerEmail: string, amount: number): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
+        const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
         await autoNotificationService.createNotification(
             customerEmail,
             'Empréstimo Aprovado! 🎉',
-            `Parabéns! Seu empréstimo de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} foi aprovado! O valor será liberado em breve.`,
+            `Parabéns! Seu empréstimo de R$ ${formattedAmount} foi aprovado! O valor será liberado em breve.`,
             'SUCCESS',
             '/client/contracts'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `🎉 *EMPRÉSTIMO APROVADO!*\n\n` +
+                `Parabéns ${customer.name.split(' ')[0]}!\n\n` +
+                `Seu empréstimo de *R$ ${formattedAmount}* foi *APROVADO*!\n\n` +
+                `O valor será liberado em até 24 horas após assinatura do contrato.\n\n` +
+                `📱 *Acesse o App para assinar:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
 
         // Push para o cliente
         firebasePushService.sendPush({
             to: customerEmail,
             title: '✅ Empréstimo Aprovado!',
-            body: `Parabéns! Seu empréstimo de R$ ${amount.toLocaleString('pt-BR')} foi aprovado!`,
+            body: `Parabéns! Seu empréstimo de R$ ${formattedAmount} foi aprovado!`,
             link: '/client/contracts'
         }).catch(() => { });
     },
 
     // Empréstimo rejeitado
     onLoanRejected: async (customerEmail: string, reason?: string): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
+        const message = reason || 'Infelizmente sua solicitação não foi aprovada neste momento. Tente novamente em 30 dias.';
+
         await autoNotificationService.createNotification(
             customerEmail,
             'Solicitação Não Aprovada',
-            reason || 'Infelizmente sua solicitação não foi aprovada neste momento. Tente novamente em 30 dias.',
+            message,
             'ALERT',
             '/client/dashboard'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `Olá ${customer.name.split(' ')[0]},\n\n` +
+                `${message}\n\n` +
+                `Você pode fazer uma nova solicitação em 30 dias.\n\n` +
+                `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
 
         // Push para o cliente
         firebasePushService.sendPush({
             to: customerEmail,
             title: '❌ Solicitação Não Aprovada',
-            body: reason || 'Sua solicitação não foi aprovada neste momento.',
+            body: message,
             link: '/client/dashboard'
         }).catch(() => { });
     },
@@ -138,36 +185,84 @@ export const autoNotificationService = {
 
     // Parcela vencendo (3 dias antes)
     onInstallmentDueSoon: async (customerEmail: string, amount: number, dueDate: string): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
         const date = new Date(dueDate).toLocaleDateString('pt-BR');
+        const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
         await autoNotificationService.createNotification(
             customerEmail,
             'Parcela Vencendo',
-            `Sua parcela de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} vence em ${date}. Evite juros!`,
+            `Sua parcela de R$ ${formattedAmount} vence em ${date}. Evite juros!`,
             'WARNING',
             '/client/contracts'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `📅 *LEMBRETE DE VENCIMENTO*\n\n` +
+                `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                `Sua parcela de *R$ ${formattedAmount}* vence em *${date}*.\n\n` +
+                `💡 Pague em dia e evite juros!\n\n` +
+                `📱 *Acesse o App para pagar:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
     },
 
     // Parcela vencendo hoje
     onInstallmentDueToday: async (customerEmail: string, amount: number): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
+        const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
         await autoNotificationService.createNotification(
             customerEmail,
             '⚠️ Parcela Vence Hoje!',
-            `Sua parcela de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} vence HOJE. Pague agora para evitar multa.`,
+            `Sua parcela de R$ ${formattedAmount} vence HOJE. Pague agora para evitar multa.`,
             'ALERT',
             '/client/contracts'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `🔔 *VENCIMENTO HOJE!*\n\n` +
+                `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                `Sua parcela de *R$ ${formattedAmount}* vence *HOJE*.\n\n` +
+                `⚡ Pague agora e evite cobranças adicionais!\n\n` +
+                `📱 *Acesse o App para pagar:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
     },
 
     // Parcela atrasada
     onInstallmentOverdue: async (customerEmail: string, amount: number, daysLate: number): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
+        const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
         await autoNotificationService.createNotification(
             customerEmail,
             '🚨 Parcela em Atraso',
-            `Você possui uma parcela de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em atraso há ${daysLate} dia(s). Regularize para evitar juros adicionais.`,
+            `Você possui uma parcela de R$ ${formattedAmount} em atraso há ${daysLate} dia(s). Regularize para evitar juros adicionais.`,
             'ALERT',
             '/client/contracts'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `⚠️ *PARCELA EM ATRASO*\n\n` +
+                `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                `Sua parcela de *R$ ${formattedAmount}* está em atraso há *${daysLate} dia(s)*.\n\n` +
+                `💡 Regularize o quanto antes para evitar juros adicionais.\n\n` +
+                `📱 *Acesse o App para pagar:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
 
         // Atualizar score por atraso
         await scoreService.onPaymentLate(customerEmail, daysLate);
@@ -175,16 +270,18 @@ export const autoNotificationService = {
 
     // Pagamento confirmado
     onPaymentConfirmed: async (customerEmail: string, amount: number, wasOnTime: boolean, wasEarly: boolean): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
+        const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
         let message: string;
 
         if (wasEarly) {
-            message = `Pagamento antecipado de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmado! Seu score aumentou. 🌟`;
+            message = `Pagamento antecipado de R$ ${formattedAmount} confirmado! Seu score aumentou. 🌟`;
             await scoreService.onPaymentEarly(customerEmail);
         } else if (wasOnTime) {
-            message = `Pagamento de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmado! Obrigado por pagar em dia.`;
+            message = `Pagamento de R$ ${formattedAmount} confirmado! Obrigado por pagar em dia.`;
             await scoreService.onPaymentOnTime(customerEmail);
         } else {
-            message = `Pagamento de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmado!`;
+            message = `Pagamento de R$ ${formattedAmount} confirmado!`;
         }
 
         await autoNotificationService.createNotification(
@@ -194,6 +291,19 @@ export const autoNotificationService = {
             'SUCCESS',
             '/client/contracts'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `✅ *PAGAMENTO CONFIRMADO!*\n\n` +
+                `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                `Recebemos seu pagamento de *R$ ${formattedAmount}*.\n\n` +
+                `${wasEarly ? '🌟 Pagamento antecipado! Seu score aumentou!' : wasOnTime ? '👏 Obrigado por pagar em dia!' : ''}\n\n` +
+                `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
     },
 
     // ============================================
