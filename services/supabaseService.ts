@@ -1312,6 +1312,29 @@ export const supabaseService = {
         };
     },
 
+    getClientNotifications: async () => {
+        const user = loadFromStorage<any>(STORAGE_KEYS.USER, null);
+        if (!user) return [];
+
+        const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('customer_email', user.email)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (error || !data) return [];
+
+        return data.map((n: any) => ({
+            id: n.id,
+            title: n.title,
+            message: n.message,
+            type: n.type,
+            created_at: n.created_at,
+            read: n.read || false
+        }));
+    },
+
     getClientCoupons: async () => {
         const user = loadFromStorage<any>(STORAGE_KEYS.USER, null);
         if (!user) return [];
