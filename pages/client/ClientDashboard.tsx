@@ -227,12 +227,12 @@ export const ClientDashboard: React.FC = () => {
             </button>
 
             {isNotifOpen && (
-              <div className="absolute right-0 top-full mt-3 w-80 bg-zinc-950 border border-[#D4AF37]/50 rounded-2xl shadow-2xl overflow-hidden z-50">
-                <div className="flex items-center justify-between p-4 border-b border-zinc-900 bg-zinc-900/50">
+              <div className="fixed md:absolute right-4 md:right-0 top-16 md:top-full md:mt-3 w-[calc(100vw-2rem)] md:w-80 max-h-[70vh] bg-zinc-950 border border-[#D4AF37]/50 rounded-2xl shadow-2xl overflow-hidden z-50">
+                <div className="flex items-center justify-between p-4 border-b border-zinc-900 bg-zinc-900/50 sticky top-0">
                   <span className="font-bold text-[#D4AF37] text-sm">Notificações</span>
                   <button onClick={() => setIsNotifOpen(false)}><X size={16} /></button>
                 </div>
-                <div>
+                <div className="overflow-y-auto max-h-[calc(70vh-60px)]">
                   {notifications.map((notif) => (
                     <div key={notif.id} className="p-4 border-b border-zinc-900 hover:bg-zinc-900/40">
                       <h4 className={`text-sm font-bold ${notif.type === 'success' ? 'text-green-500' : notif.type === 'warning' ? 'text-yellow-500' : 'text-white'}`}>{notif.title}</h4>
