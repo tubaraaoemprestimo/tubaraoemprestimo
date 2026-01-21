@@ -64,7 +64,9 @@ export const whatsappService = {
 
         try {
             const baseUrl = cleanUrl(config.apiUrl);
-            const response = await fetch(`${baseUrl}/instance/connectionState/${config.instanceName}`, {
+
+            // Use fetchInstances endpoint that returns accurate connectionStatus
+            const response = await fetch(`${baseUrl}/instance/fetchInstances?instanceName=${config.instanceName}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -73,12 +75,25 @@ export const whatsappService = {
                 }
             });
 
-            if (response.status === 404) return 'close'; // Instance doesn't exist yet
+            if (response.status === 404) return 'close';
             if (!response.ok) return 'unknown';
 
             const data = await response.json();
-            // Evolution v2 structure: { instance: { state: 'open', ... } }
-            return data?.instance?.state || 'close';
+
+            // Evolution v2 fetchInstances returns array or object with instances
+            // Structure: [...] or { value: [...] } depending on version
+            const instances = Array.isArray(data) ? data : (data?.value || data || []);
+
+            if (instances.length === 0) return 'close';
+
+            // Find our instance
+            const instance = instances.find((i: any) => i.name === config.instanceName || i.instanceName === config.instanceName);
+
+            if (!instance) return 'close';
+
+            // Return connectionStatus (open, close, connecting)
+            const status = instance.connectionStatus || instance.state || 'close';
+            return status as 'open' | 'close' | 'connecting' | 'unknown';
         } catch (error) {
             console.error("[WhatsApp] Error checking state:", error);
             return 'unknown';
