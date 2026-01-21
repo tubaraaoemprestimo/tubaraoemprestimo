@@ -5,7 +5,7 @@
 
 UPDATE whatsapp_config
 SET 
-    api_url = 'https://travelling-gulf-amino-thomas.trycloudflare.com',
+    api_url = 'https://api.tubaraoemprestimo.com.br',
     api_key = 'B8959800-F546-407C-99E8-C40306E747F5',
     instance_name = 'tubarao',
     is_connected = false,
