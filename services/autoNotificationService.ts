@@ -519,12 +519,24 @@ export const autoNotificationService = {
      */
     sendWhatsAppCoupon: async (couponId: string): Promise<{ success: boolean; sent?: number; error?: string }> => {
         try {
-            const { data, error } = await supabase.functions.invoke('send-campaign', {
-                body: { type: 'coupon', id: couponId }
+            // Use fetch directly with anon key to avoid auth issues
+            const response = await fetch('https://cwhiujeragsethxjekkb.supabase.co/functions/v1/send-campaign', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ',
+                    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ'
+                },
+                body: JSON.stringify({ type: 'coupon', id: couponId })
             });
 
-            if (error) throw error;
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[WhatsApp] Coupon API error:', errorText);
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
 
+            const data = await response.json();
             return { success: true, sent: data.sent };
         } catch (error: any) {
             console.error('[WhatsApp] Coupon error:', error);
