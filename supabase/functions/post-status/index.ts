@@ -42,18 +42,16 @@ async function postWhatsAppStatus(
         console.log(`[PostStatus] Sending to: ${endpoint}`);
         console.log(`[PostStatus] Image URL: ${imageUrl}`);
 
+        // Evolution API v2 requer statusJidList ou allContacts
+        // Usando allContacts: true para enviar para todos os contatos
         const payload = {
             type: 'image',
             content: imageUrl,
             caption: caption || '',
-            statusJidList: [] // Empty list combined with allContacts logic? Evolution docs say: options?
+            allContacts: true
         };
 
-        // Na Evolution V2, para enviar para todos os contatos no Status:
-        // Endpoint: /message/send-status/:instance
-        // Body: { type: 'image', content: '...', caption: '...' }
-        // Se precisar especificar contatos, seria no corpo. Se não especificar, alguns endpoints enviam para todos.
-        // Vamos tentar o payload padrão que funcionava, mas ajustado.
+        console.log('[PostStatus] Payload:', JSON.stringify(payload));
 
         const response = await fetch(endpoint, {
             method: 'POST',
@@ -61,12 +59,7 @@ async function postWhatsAppStatus(
                 'Content-Type': 'application/json',
                 'apikey': waConfig.api_key,
             },
-            body: JSON.stringify({
-                type: 'image',
-                content: imageUrl,
-                caption: caption || '',
-                // options: { allContacts: true } // Algumas versões requerem isso dentro de options
-            })
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
