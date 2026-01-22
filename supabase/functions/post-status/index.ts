@@ -78,7 +78,7 @@ async function postWhatsAppStatus(
         const result = await response.json();
         console.log('[PostStatus] Success:', JSON.stringify(result));
         return { success: true };
-    } catch (err) {
+    } catch (err: any) {
         console.error('[PostStatus] Exception:', err);
         return { success: false, error: err.message };
     }
@@ -105,7 +105,20 @@ serve(async (req: Request) => {
 
         if (waError || !waConfig?.api_url || !waConfig?.api_key) {
             console.error('[PostStatus] WhatsApp not configured');
-            return new Response(JSON.stringify({ error: 'WhatsApp não configurado' }), {
+            if (waError) console.error('[PostStatus] DB Error:', JSON.stringify(waError));
+            if (!waConfig) console.error('[PostStatus] Config object is null/empty');
+            if (waConfig && (!waConfig.api_url || !waConfig.api_key)) {
+                console.error('[PostStatus] Missing fields:', {
+                    hasUrl: !!waConfig?.api_url,
+                    hasKey: !!waConfig?.api_key,
+                    instance: waConfig?.instance_name
+                });
+            }
+
+            return new Response(JSON.stringify({
+                error: 'WhatsApp não configurado',
+                details: waError || 'Missing URL/Key'
+            }), {
                 status: 400,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
@@ -189,7 +202,7 @@ serve(async (req: Request) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('[PostStatus] Error:', error);
         return new Response(JSON.stringify({ error: error.message }), {
             status: 500,
