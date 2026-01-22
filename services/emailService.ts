@@ -89,7 +89,7 @@ const emailTemplates = {
               <div class="value">${data.installments}x</div>
             </div>
             <div style="text-align: center;">
-              <a href="https://tubaraoemprestimo.vercel.app/#/admin/requests" class="button">Ver Solicitação</a>
+              <a href="https://tubaraoemprestimo.com.br/#/admin/requests" class="button">Ver Solicitação</a>
             </div>
           </div>
           <div class="footer">
@@ -241,7 +241,7 @@ const emailTemplates = {
             <p>Você pode fazer uma nova solicitação após 30 dias.</p>
             
             <div style="text-align: center;">
-              <a href="https://tubaraoemprestimo.vercel.app" class="button">Tentar Novamente</a>
+              <a href="https://tubaraoemprestimo.com.br" class="button">Tentar Novamente</a>
             </div>
           </div>
           <div class="footer">
@@ -285,7 +285,7 @@ const emailTemplates = {
             ` : ''}
             
             <div style="text-align: center;">
-              <a href="https://tubaraoemprestimo.vercel.app/#/client/dashboard" class="button">Enviar Documentos</a>
+              <a href="https://tubaraoemprestimo.com.br/#/client/dashboard" class="button">Enviar Documentos</a>
             </div>
             
             <p style="text-align: center; margin-top: 20px; color: #856404;">
@@ -341,7 +341,7 @@ const emailTemplates = {
             </div>
             
             <div style="text-align: center;">
-              <a href="https://tubaraoemprestimo.vercel.app/#/client/contracts" class="button">Ver Parcelas</a>
+              <a href="https://tubaraoemprestimo.com.br/#/client/contracts" class="button">Ver Parcelas</a>
             </div>
           </div>
           <div class="footer">
@@ -397,7 +397,7 @@ const emailTemplates = {
             </div>
             
             <div style="text-align: center;">
-              <a href="https://tubaraoemprestimo.vercel.app/#/client/contracts" class="button" style="background: linear-gradient(135deg, #DC3545 0%, #C82333 100%); color: #fff;">Pagar Agora</a>
+              <a href="https://tubaraoemprestimo.com.br/#/client/contracts" class="button" style="background: linear-gradient(135deg, #DC3545 0%, #C82333 100%); color: #fff;">Pagar Agora</a>
             </div>
           </div>
           <div class="footer">
@@ -493,7 +493,7 @@ const emailTemplates = {
             </div>
             
             <div style="text-align: center;">
-              <a href="https://tubaraoemprestimo.vercel.app" class="button">Fazer Novo Empréstimo</a>
+              <a href="https://tubaraoemprestimo.com.br" class="button">Fazer Novo Empréstimo</a>
             </div>
           </div>
           <div class="footer">
@@ -527,7 +527,7 @@ const emailTemplates = {
             <p style="text-align: center; font-size: 16px;">${data.campaignDescription}</p>
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${data.campaignLink || 'https://tubaraoemprestimo.vercel.app'}" class="button" style="font-size: 18px; padding: 20px 50px;">
+              <a href="${data.campaignLink || 'https://tubaraoemprestimo.com.br'}" class="button" style="font-size: 18px; padding: 20px 50px;">
                 Aproveitar Oferta
               </a>
             </div>
@@ -583,7 +583,7 @@ const emailTemplates = {
             </div>
             
             <div style="text-align: center;">
-              <a href="https://tubaraoemprestimo.vercel.app/#/admin/dashboard" class="button">Ver Dashboard</a>
+              <a href="https://tubaraoemprestimo.com.br/#/admin/dashboard" class="button">Ver Dashboard</a>
             </div>
           </div>
           <div class="footer">
@@ -637,7 +637,7 @@ const emailTemplates = {
             </div>
             
             <div style="text-align: center;">
-              <a href="https://tubaraoemprestimo.vercel.app/#/admin/customers" class="button" style="background: linear-gradient(135deg, #DC3545 0%, #C82333 100%); color: #fff;">Ver Cliente</a>
+              <a href="https://tubaraoemprestimo.com.br/#/admin/customers" class="button" style="background: linear-gradient(135deg, #DC3545 0%, #C82333 100%); color: #fff;">Ver Cliente</a>
             </div>
           </div>
           <div class="footer">
