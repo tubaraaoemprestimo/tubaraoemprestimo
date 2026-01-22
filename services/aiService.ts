@@ -181,6 +181,76 @@ export const aiService = {
   },
 
   /**
+   * Generates a creative caption for a WhatsApp Status image using Gemini Vision.
+   */
+  generateImageCaption: async (imageBase64: string): Promise<string> => {
+    try {
+      const apiKey = await getApiKey();
+
+      if (!apiKey) {
+        console.warn('[aiService] No API key for caption generation');
+        return "Tubarão Empréstimos - Crédito Rápido e Fácil 🦈💰";
+      }
+
+      console.log("[aiService] Generating caption with Gemini Vision...");
+
+      const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
+
+      const prompt = `
+        Atue como um Criador de Conteúdo para Redes Sociais.
+        
+        Sua tarefa: Analisar a imagem anexada e criar uma legenda PERFEITA para postar no Status do WhatsApp/Stories.
+
+        1. Identifique o que acontece na imagem (Cenário, Texto, Pessoas, Emoção).
+        2. Crie uma frase curta, impactante e criativa sobre ESSE CONTEÚDO.
+        
+        Regras:
+        - SEJA NATURAL. Não pareça um robô.
+        - Use Emojis que combinem com a foto.
+        - Se a imagem tiver texto, complemente a mensagem do texto.
+        - Se for meme/engraçado, entre na brincadeira.
+        - Se for sério/informativo, seja direto e profissional.
+        - MÁXIMO 2 linhas.
+
+        Retorne APENAS o texto da legenda.
+      `;
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: "image/jpeg", data: base64Data } }
+            ]
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[aiService] Gemini API Error ${response.status}:`, errText);
+        throw new Error(`API Error: ${response.status} - ${errText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts) {
+        const rawText = data.candidates[0].content.parts[0].text;
+        return rawText.trim();
+      }
+
+      throw new Error("Invalid response from Gemini");
+
+    } catch (error) {
+      console.error("[aiService] Caption Generation Failed:", error);
+      // Fallback message
+      return "Dinheiro rápido no Pix é com a Tubarão Empréstimos! 🦈💸 Chama no direct!";
+    }
+  },
+
+  /**
    * Mocks the Asaas API to generate a Pix code
    */
   generatePixCode: async (amount: number): Promise<string> => {

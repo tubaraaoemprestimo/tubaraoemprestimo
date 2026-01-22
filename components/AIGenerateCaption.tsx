@@ -22,7 +22,27 @@ export const AIGenerateCaption: React.FC<Props> = ({ imageBase64, onCaptionGener
 
         setIsLoading(true);
         try {
-            const caption = await aiService.generateImageCaption(imageBase64);
+            let finalBase64 = imageBase64;
+
+            // Se for URL, converter para Base64
+            if (imageBase64.startsWith('http')) {
+                try {
+                    const response = await fetch(imageBase64);
+                    const blob = await response.blob();
+                    finalBase64 = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result as string);
+                        reader.readAsDataURL(blob);
+                    });
+                } catch (e) {
+                    console.error("Erro ao converter imagem:", e);
+                    addToast("Erro ao processar imagem. Tente fazer upload novamente.", 'error');
+                    setIsLoading(false);
+                    return;
+                }
+            }
+
+            const caption = await aiService.generateImageCaption(finalBase64);
             if (caption) {
                 onCaptionGenerated(caption);
                 addToast("Legenda gerada com sucesso! ✨", 'success');
