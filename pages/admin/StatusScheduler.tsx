@@ -3,7 +3,7 @@ import { AIGenerateCaption } from '../../components/AIGenerateCaption';
 import {
     Camera, Plus, Trash2, Clock, CheckCircle, XCircle,
     AlertCircle, Calendar, Image as ImageIcon, Send, Loader2,
-    RefreshCw, Play
+    RefreshCw, Play, Edit, Repeat, CalendarDays
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { supabase } from '../../services/supabaseClient';
@@ -20,15 +20,40 @@ interface ScheduledStatus {
     created_at: string;
 }
 
+type RecurrenceType = 'single' | 'daily' | 'weekly' | 'monthly';
+
 const inputStyle = "w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none transition-colors";
+
+const WEEK_DAYS = [
+    { key: 'sun', label: 'Dom', value: 0 },
+    { key: 'mon', label: 'Seg', value: 1 },
+    { key: 'tue', label: 'Ter', value: 2 },
+    { key: 'wed', label: 'Qua', value: 3 },
+    { key: 'thu', label: 'Qui', value: 4 },
+    { key: 'fri', label: 'Sex', value: 5 },
+    { key: 'sat', label: 'Sáb', value: 6 }
+];
+
+const COMMON_TIMES = ['09:00', '12:00', '14:00', '18:00', '20:00'];
 
 export const StatusScheduler: React.FC = () => {
     const { addToast } = useToast();
     const [scheduledStatus, setScheduledStatus] = useState<ScheduledStatus[]>([]);
     const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const editFileInputRef = useRef<HTMLInputElement>(null);
+
+    // Estado do status sendo editado
+    const [editingStatus, setEditingStatus] = useState<ScheduledStatus | null>(null);
+    const [editFormData, setEditFormData] = useState({
+        image_url: '',
+        caption: '',
+        scheduled_date: '',
+        scheduled_time: ''
+    });
 
     // Form state
     const [formData, setFormData] = useState({
@@ -38,8 +63,19 @@ export const StatusScheduler: React.FC = () => {
         scheduled_time: '09:00'
     });
 
+    // Recurrence state
+    const [recurrence, setRecurrence] = useState<RecurrenceType>('single');
+    const [selectedDays, setSelectedDays] = useState<number[]>([1, 3, 5]); // Seg, Qua, Sex
+    const [selectedTimes, setSelectedTimes] = useState<string[]>(['09:00', '18:00']);
+    const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+    const [customTime, setCustomTime] = useState('');
+
     useEffect(() => {
         loadScheduledStatus();
+        // Definir data final padrão (1 mês à frente)
+        const endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + 1);
+        setRecurrenceEndDate(endDate.toISOString().split('T')[0]);
     }, []);
 
     const loadScheduledStatus = async () => {
@@ -56,17 +92,15 @@ export const StatusScheduler: React.FC = () => {
         setLoading(false);
     };
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isEdit = false) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Validar tamanho (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
             addToast('Imagem muito grande. Máximo 5MB.', 'error');
             return;
         }
 
-        // Validar tipo
         if (!file.type.startsWith('image/')) {
             addToast('Arquivo inválido. Apenas imagens são permitidas.', 'error');
             return;
@@ -75,16 +109,13 @@ export const StatusScheduler: React.FC = () => {
         setUploading(true);
 
         try {
-            // Gerar nome único
             const fileName = `status_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${file.name.split('.').pop()}`;
 
-            // Upload para Supabase Storage
             const { data, error } = await supabase.storage
                 .from('status-images')
                 .upload(fileName, file, { cacheControl: '3600', upsert: false });
 
             if (error) {
-                // Se o bucket não existe, criar
                 if (error.message.includes('not found')) {
                     addToast('Bucket de imagens não configurado. Configure o Storage.', 'error');
                 } else {
@@ -94,12 +125,15 @@ export const StatusScheduler: React.FC = () => {
                 return;
             }
 
-            // Obter URL pública
             const { data: { publicUrl } } = supabase.storage
                 .from('status-images')
                 .getPublicUrl(fileName);
 
-            setFormData({ ...formData, image_url: publicUrl });
+            if (isEdit) {
+                setEditFormData({ ...editFormData, image_url: publicUrl });
+            } else {
+                setFormData({ ...formData, image_url: publicUrl });
+            }
             addToast('Imagem enviada!', 'success');
         } catch (err: any) {
             console.error('Upload error:', err);
@@ -107,6 +141,60 @@ export const StatusScheduler: React.FC = () => {
         }
 
         setUploading(false);
+    };
+
+    const generateRecurringDates = (): Date[] => {
+        const dates: Date[] = [];
+        const startDate = new Date(`${formData.scheduled_date}T${formData.scheduled_time}:00`);
+        const endDate = new Date(recurrenceEndDate);
+        endDate.setHours(23, 59, 59);
+
+        if (recurrence === 'single') {
+            return [startDate];
+        }
+
+        let currentDate = new Date(startDate);
+
+        while (currentDate <= endDate) {
+            if (recurrence === 'daily') {
+                // Para cada horário selecionado
+                selectedTimes.forEach(time => {
+                    const [hours, minutes] = time.split(':').map(Number);
+                    const scheduleDate = new Date(currentDate);
+                    scheduleDate.setHours(hours, minutes, 0, 0);
+                    if (scheduleDate >= new Date() && scheduleDate <= endDate) {
+                        dates.push(new Date(scheduleDate));
+                    }
+                });
+                currentDate.setDate(currentDate.getDate() + 1);
+            } else if (recurrence === 'weekly') {
+                // Verificar se é um dos dias selecionados
+                if (selectedDays.includes(currentDate.getDay())) {
+                    selectedTimes.forEach(time => {
+                        const [hours, minutes] = time.split(':').map(Number);
+                        const scheduleDate = new Date(currentDate);
+                        scheduleDate.setHours(hours, minutes, 0, 0);
+                        if (scheduleDate >= new Date() && scheduleDate <= endDate) {
+                            dates.push(new Date(scheduleDate));
+                        }
+                    });
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+            } else if (recurrence === 'monthly') {
+                // Mesmo dia todo mês
+                selectedTimes.forEach(time => {
+                    const [hours, minutes] = time.split(':').map(Number);
+                    const scheduleDate = new Date(currentDate);
+                    scheduleDate.setHours(hours, minutes, 0, 0);
+                    if (scheduleDate >= new Date() && scheduleDate <= endDate) {
+                        dates.push(new Date(scheduleDate));
+                    }
+                });
+                currentDate.setMonth(currentDate.getMonth() + 1);
+            }
+        }
+
+        return dates.sort((a, b) => a.getTime() - b.getTime());
     };
 
     const handleSchedule = async () => {
@@ -120,31 +208,48 @@ export const StatusScheduler: React.FC = () => {
             return;
         }
 
+        if (recurrence !== 'single' && selectedTimes.length === 0) {
+            addToast('Selecione pelo menos um horário.', 'warning');
+            return;
+        }
+
+        if (recurrence === 'weekly' && selectedDays.length === 0) {
+            addToast('Selecione pelo menos um dia da semana.', 'warning');
+            return;
+        }
+
         setLoading(true);
 
         try {
-            // Combinar data e hora
-            const scheduledAt = new Date(`${formData.scheduled_date}T${formData.scheduled_time}:00`);
+            const dates = generateRecurringDates();
 
-            // Verificar se é no futuro
-            if (scheduledAt <= new Date()) {
-                addToast('A data/hora deve ser no futuro.', 'warning');
+            if (dates.length === 0) {
+                addToast('Nenhuma data válida para agendar.', 'warning');
                 setLoading(false);
                 return;
             }
 
+            if (dates.length > 100) {
+                addToast(`Muitas datas (${dates.length}). Reduza o período.`, 'warning');
+                setLoading(false);
+                return;
+            }
+
+            // Criar registros para todas as datas
+            const records = dates.map(date => ({
+                image_url: formData.image_url,
+                caption: formData.caption || null,
+                scheduled_at: date.toISOString(),
+                status: 'PENDING'
+            }));
+
             const { error } = await supabase
                 .from('scheduled_status')
-                .insert({
-                    image_url: formData.image_url,
-                    caption: formData.caption || null,
-                    scheduled_at: scheduledAt.toISOString(),
-                    status: 'PENDING'
-                });
+                .insert(records);
 
             if (error) throw error;
 
-            addToast('Status agendado com sucesso!', 'success');
+            addToast(`${records.length} status agendado(s) com sucesso!`, 'success');
             setIsModalOpen(false);
             setFormData({
                 image_url: '',
@@ -152,9 +257,58 @@ export const StatusScheduler: React.FC = () => {
                 scheduled_date: new Date().toISOString().split('T')[0],
                 scheduled_time: '09:00'
             });
+            setRecurrence('single');
             loadScheduledStatus();
         } catch (err: any) {
             console.error('Schedule error:', err);
+            addToast(`Erro: ${err.message}`, 'error');
+        }
+
+        setLoading(false);
+    };
+
+    const handleEdit = (item: ScheduledStatus) => {
+        setEditingStatus(item);
+        const date = new Date(item.scheduled_at);
+        setEditFormData({
+            image_url: item.image_url,
+            caption: item.caption || '',
+            scheduled_date: date.toISOString().split('T')[0],
+            scheduled_time: date.toTimeString().slice(0, 5)
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingStatus) return;
+
+        if (!editFormData.image_url) {
+            addToast('Selecione uma imagem.', 'warning');
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            const scheduledAt = new Date(`${editFormData.scheduled_date}T${editFormData.scheduled_time}:00`);
+
+            const { error } = await supabase
+                .from('scheduled_status')
+                .update({
+                    image_url: editFormData.image_url,
+                    caption: editFormData.caption || null,
+                    scheduled_at: scheduledAt.toISOString()
+                })
+                .eq('id', editingStatus.id);
+
+            if (error) throw error;
+
+            addToast('Status atualizado com sucesso!', 'success');
+            setIsEditModalOpen(false);
+            setEditingStatus(null);
+            loadScheduledStatus();
+        } catch (err: any) {
+            console.error('Update error:', err);
             addToast(`Erro: ${err.message}`, 'error');
         }
 
@@ -180,7 +334,6 @@ export const StatusScheduler: React.FC = () => {
     const handlePostNow = async (id: string) => {
         if (!confirm('Postar este status agora?')) return;
 
-        // Atualizar scheduled_at para agora
         const { error } = await supabase
             .from('scheduled_status')
             .update({ scheduled_at: new Date().toISOString() })
@@ -189,14 +342,12 @@ export const StatusScheduler: React.FC = () => {
         if (!error) {
             addToast('Status será postado em instantes!', 'success');
 
-            // Trigger a função manualmente
             try {
                 const response = await fetch('https://cwhiujeragsethxjekkb.supabase.co/functions/v1/post-status', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ',
-                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ'
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ'
                     }
                 });
                 const data = await response.json();
@@ -229,8 +380,7 @@ export const StatusScheduler: React.FC = () => {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ',
-                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ'
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ'
                     }
                 });
             } catch (e) {
@@ -252,6 +402,25 @@ export const StatusScheduler: React.FC = () => {
         }
     };
 
+    const toggleDay = (day: number) => {
+        setSelectedDays(prev =>
+            prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+        );
+    };
+
+    const toggleTime = (time: string) => {
+        setSelectedTimes(prev =>
+            prev.includes(time) ? prev.filter(t => t !== time) : [...prev, time]
+        );
+    };
+
+    const addCustomTime = () => {
+        if (customTime && !selectedTimes.includes(customTime)) {
+            setSelectedTimes([...selectedTimes, customTime].sort());
+            setCustomTime('');
+        }
+    };
+
     // Estado do filtro
     const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'POSTED' | 'FAILED'>('ALL');
 
@@ -267,6 +436,8 @@ export const StatusScheduler: React.FC = () => {
     const filteredStatus = filter === 'ALL'
         ? scheduledStatus
         : scheduledStatus.filter(s => s.status === filter);
+
+    const previewDatesCount = recurrence !== 'single' ? generateRecurringDates().length : 1;
 
     return (
         <div className="space-y-6">
@@ -410,13 +581,22 @@ export const StatusScheduler: React.FC = () => {
                                 {/* Actions */}
                                 <div className="flex items-center gap-1 flex-shrink-0">
                                     {item.status === 'PENDING' && (
-                                        <button
-                                            onClick={() => handlePostNow(item.id)}
-                                            className="p-2 hover:bg-green-900/30 rounded text-green-500 hover:text-green-400"
-                                            title="Postar agora"
-                                        >
-                                            <Play size={16} />
-                                        </button>
+                                        <>
+                                            <button
+                                                onClick={() => handleEdit(item)}
+                                                className="p-2 hover:bg-blue-900/30 rounded text-blue-500 hover:text-blue-400"
+                                                title="Editar"
+                                            >
+                                                <Edit size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handlePostNow(item.id)}
+                                                className="p-2 hover:bg-green-900/30 rounded text-green-500 hover:text-green-400"
+                                                title="Postar agora"
+                                            >
+                                                <Play size={16} />
+                                            </button>
+                                        </>
                                     )}
                                     {item.status === 'FAILED' && (
                                         <button
@@ -444,7 +624,7 @@ export const StatusScheduler: React.FC = () => {
             {/* Modal de Agendamento */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl animate-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
                             <h3 className="text-xl font-bold text-green-400 flex items-center gap-2">
                                 <Camera size={20} />
@@ -495,7 +675,7 @@ export const StatusScheduler: React.FC = () => {
                                     ref={fileInputRef}
                                     type="file"
                                     accept="image/*"
-                                    onChange={handleImageUpload}
+                                    onChange={(e) => handleImageUpload(e)}
                                     className="hidden"
                                 />
                             </div>
@@ -522,10 +702,38 @@ export const StatusScheduler: React.FC = () => {
                                 <p className="text-xs text-zinc-600 mt-1 text-right">{formData.caption.length}/500</p>
                             </div>
 
-                            {/* Data e Hora */}
+                            {/* Tipo de Recorrência */}
+                            <div>
+                                <label className="block text-sm text-zinc-400 mb-2 flex items-center gap-2">
+                                    <Repeat size={14} /> Repetição
+                                </label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {[
+                                        { value: 'single', label: 'Único' },
+                                        { value: 'daily', label: 'Diário' },
+                                        { value: 'weekly', label: 'Semanal' },
+                                        { value: 'monthly', label: 'Mensal' }
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => setRecurrence(opt.value as RecurrenceType)}
+                                            className={`p-2 text-xs rounded-lg border transition-colors ${recurrence === opt.value
+                                                ? 'bg-green-600 border-green-500 text-white'
+                                                : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-green-500'
+                                                }`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Data inicial */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-sm text-zinc-400 mb-1">Data *</label>
+                                    <label className="block text-sm text-zinc-400 mb-1">
+                                        {recurrence === 'single' ? 'Data *' : 'Data Início *'}
+                                    </label>
                                     <input
                                         type="date"
                                         value={formData.scheduled_date}
@@ -534,16 +742,112 @@ export const StatusScheduler: React.FC = () => {
                                         className={inputStyle}
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm text-zinc-400 mb-1">Hora *</label>
-                                    <input
-                                        type="time"
-                                        value={formData.scheduled_time}
-                                        onChange={(e) => setFormData({ ...formData, scheduled_time: e.target.value })}
-                                        className={inputStyle}
-                                    />
-                                </div>
+                                {recurrence === 'single' && (
+                                    <div>
+                                        <label className="block text-sm text-zinc-400 mb-1">Hora *</label>
+                                        <input
+                                            type="time"
+                                            value={formData.scheduled_time}
+                                            onChange={(e) => setFormData({ ...formData, scheduled_time: e.target.value })}
+                                            className={inputStyle}
+                                        />
+                                    </div>
+                                )}
+                                {recurrence !== 'single' && (
+                                    <div>
+                                        <label className="block text-sm text-zinc-400 mb-1">Data Fim *</label>
+                                        <input
+                                            type="date"
+                                            value={recurrenceEndDate}
+                                            onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                                            min={formData.scheduled_date}
+                                            className={inputStyle}
+                                        />
+                                    </div>
+                                )}
                             </div>
+
+                            {/* Dias da Semana (para semanal) */}
+                            {recurrence === 'weekly' && (
+                                <div>
+                                    <label className="block text-sm text-zinc-400 mb-2 flex items-center gap-2">
+                                        <CalendarDays size={14} /> Dias da Semana
+                                    </label>
+                                    <div className="flex gap-2 flex-wrap">
+                                        {WEEK_DAYS.map(day => (
+                                            <button
+                                                key={day.key}
+                                                onClick={() => toggleDay(day.value)}
+                                                className={`w-10 h-10 rounded-lg text-xs font-medium transition-colors ${selectedDays.includes(day.value)
+                                                    ? 'bg-green-600 text-white'
+                                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                                    }`}
+                                            >
+                                                {day.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Horários (para recorrência) */}
+                            {recurrence !== 'single' && (
+                                <div>
+                                    <label className="block text-sm text-zinc-400 mb-2 flex items-center gap-2">
+                                        <Clock size={14} /> Horários
+                                    </label>
+                                    <div className="flex gap-2 flex-wrap mb-2">
+                                        {COMMON_TIMES.map(time => (
+                                            <button
+                                                key={time}
+                                                onClick={() => toggleTime(time)}
+                                                className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${selectedTimes.includes(time)
+                                                    ? 'bg-green-600 text-white'
+                                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                                    }`}
+                                            >
+                                                {time}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="time"
+                                            value={customTime}
+                                            onChange={(e) => setCustomTime(e.target.value)}
+                                            className={inputStyle + " flex-1"}
+                                            placeholder="Horário personalizado"
+                                        />
+                                        <Button onClick={addCustomTime} variant="secondary" className="px-4">
+                                            <Plus size={16} />
+                                        </Button>
+                                    </div>
+                                    {selectedTimes.length > 0 && (
+                                        <div className="mt-2 flex flex-wrap gap-1">
+                                            {selectedTimes.map(time => (
+                                                <span
+                                                    key={time}
+                                                    className="bg-green-900/30 text-green-400 text-xs px-2 py-1 rounded flex items-center gap-1"
+                                                >
+                                                    {time}
+                                                    <button onClick={() => toggleTime(time)} className="hover:text-red-400">
+                                                        <XCircle size={12} />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Preview de quantidade */}
+                            {recurrence !== 'single' && (
+                                <div className="bg-zinc-800 rounded-lg p-3 text-center">
+                                    <p className="text-zinc-400 text-sm">
+                                        Serão criados <span className="text-green-400 font-bold">{previewDatesCount}</span> agendamentos
+                                    </p>
+                                </div>
+                            )}
 
                             {/* Botões */}
                             <div className="pt-4 flex gap-3">
@@ -560,7 +864,105 @@ export const StatusScheduler: React.FC = () => {
                                     className="flex-1 bg-green-600 hover:bg-green-700"
                                 >
                                     <Send size={16} className="mr-2" />
-                                    Agendar
+                                    Agendar {recurrence !== 'single' && `(${previewDatesCount})`}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Edição */}
+            {isEditModalOpen && editingStatus && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
+                            <h3 className="text-xl font-bold text-blue-400 flex items-center gap-2">
+                                <Edit size={20} />
+                                Editar Status
+                            </h3>
+                            <button onClick={() => setIsEditModalOpen(false)}>
+                                <XCircle className="text-zinc-500 hover:text-white" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {/* Upload de Imagem */}
+                            <div>
+                                <label className="block text-sm text-zinc-400 mb-2">Imagem *</label>
+                                <div className="relative">
+                                    <img
+                                        src={editFormData.image_url}
+                                        alt="Preview"
+                                        className="w-full h-48 object-cover rounded-lg"
+                                    />
+                                    <button
+                                        onClick={() => editFileInputRef.current?.click()}
+                                        className="absolute bottom-2 right-2 bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600"
+                                    >
+                                        <Camera size={16} />
+                                    </button>
+                                </div>
+                                <input
+                                    ref={editFileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => handleImageUpload(e, true)}
+                                    className="hidden"
+                                />
+                            </div>
+
+                            {/* Legenda */}
+                            <div>
+                                <label className="block text-sm text-zinc-400 mb-1">Legenda</label>
+                                <textarea
+                                    value={editFormData.caption}
+                                    onChange={(e) => setEditFormData({ ...editFormData, caption: e.target.value })}
+                                    placeholder="Escreva uma legenda..."
+                                    rows={3}
+                                    maxLength={500}
+                                    className={inputStyle + " resize-none"}
+                                />
+                            </div>
+
+                            {/* Data e Hora */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm text-zinc-400 mb-1">Data *</label>
+                                    <input
+                                        type="date"
+                                        value={editFormData.scheduled_date}
+                                        onChange={(e) => setEditFormData({ ...editFormData, scheduled_date: e.target.value })}
+                                        className={inputStyle}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-zinc-400 mb-1">Hora *</label>
+                                    <input
+                                        type="time"
+                                        value={editFormData.scheduled_time}
+                                        onChange={(e) => setEditFormData({ ...editFormData, scheduled_time: e.target.value })}
+                                        className={inputStyle}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Botões */}
+                            <div className="pt-4 flex gap-3">
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setIsEditModalOpen(false)}
+                                    className="flex-1"
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    onClick={handleSaveEdit}
+                                    isLoading={loading}
+                                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                                >
+                                    <CheckCircle size={16} className="mr-2" />
+                                    Salvar
                                 </Button>
                             </div>
                         </div>
