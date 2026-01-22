@@ -31,10 +31,31 @@ async function postWhatsAppStatus(
     caption?: string
 ): Promise<{ success: boolean; error?: string }> {
     try {
-        const apiUrl = waConfig.api_url.replace(/\/$/, '');
+        let apiUrl = waConfig.api_url.replace(/\/$/, '');
+        // Garantir que não duplique /message/message ?? Não, a config geralmente é a base.
+        // Se a config terminar em /message, remover.
+        apiUrl = apiUrl.replace(/\/message$/, '');
 
-        // Evolution API endpoint para status
-        const response = await fetch(`${apiUrl}/message/sendStatus/${waConfig.instance_name}`, {
+        // Construir endpoint
+        const endpoint = `${apiUrl}/message/sendStatus/${waConfig.instance_name}`;
+
+        console.log(`[PostStatus] Sending to: ${endpoint}`);
+        console.log(`[PostStatus] Image URL: ${imageUrl}`);
+
+        const payload = {
+            type: 'image',
+            content: imageUrl,
+            caption: caption || '',
+            statusJidList: [] // Empty list combined with allContacts logic? Evolution docs say: options?
+        };
+
+        // Na Evolution V2, para enviar para todos os contatos no Status:
+        // Endpoint: /message/send-status/:instance
+        // Body: { type: 'image', content: '...', caption: '...' }
+        // Se precisar especificar contatos, seria no corpo. Se não especificar, alguns endpoints enviam para todos.
+        // Vamos tentar o payload padrão que funcionava, mas ajustado.
+
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -44,18 +65,18 @@ async function postWhatsAppStatus(
                 type: 'image',
                 content: imageUrl,
                 caption: caption || '',
-                allContacts: true
+                // options: { allContacts: true } // Algumas versões requerem isso dentro de options
             })
         });
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('[PostStatus] API Error:', errorText);
-            return { success: false, error: errorText };
+            console.error(`[PostStatus] API Error (${response.status}):`, errorText);
+            return { success: false, error: `${response.status} - ${errorText}` };
         }
 
         const result = await response.json();
-        console.log('[PostStatus] Success:', result);
+        console.log('[PostStatus] Success:', JSON.stringify(result));
         return { success: true };
     } catch (err) {
         console.error('[PostStatus] Exception:', err);

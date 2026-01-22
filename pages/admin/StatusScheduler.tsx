@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { AIGenerateCaption } from '../../components/AIGenerateCaption';
 import {
     Camera, Plus, Trash2, Clock, CheckCircle, XCircle,
     AlertCircle, Calendar, Image as ImageIcon, Send, Loader2,
@@ -478,6 +479,14 @@ export const StatusScheduler: React.FC = () => {
                                     accept="image/*"
                                     onChange={handleImageUpload}
                                     className="hidden"
+                                />
+                            </div>
+
+                            {/* AIGenerateCaption Button */}
+                            <div className="flex justify-end mb-1">
+                                <AIGenerateCaption
+                                    imageBase64={formData.image_url}
+                                    onCaptionGenerated={(caption) => setFormData({ ...formData, caption })}
                                 />
                             </div>
 
