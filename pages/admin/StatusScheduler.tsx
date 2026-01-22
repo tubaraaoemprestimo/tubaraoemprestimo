@@ -191,9 +191,12 @@ export const StatusScheduler: React.FC = () => {
 
             // Trigger a função manualmente
             try {
-                await supabase.functions.invoke('post-status');
+                const { data, error: funcError } = await supabase.functions.invoke('post-status');
+                if (funcError) throw funcError;
+                console.log('Post Status Result:', data);
             } catch (e) {
-                console.log('Function triggered');
+                console.error('Error invoking post-status:', e);
+                addToast('Erro ao invocar função de postagem (ver console)', 'error');
             }
 
             setTimeout(() => loadScheduledStatus(), 3000);
