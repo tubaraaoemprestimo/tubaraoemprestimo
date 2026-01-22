@@ -1,13 +1,14 @@
 -- ==============================================
 -- CONFIGURAR EVOLUTION API - TUBARÃO EMPRÉSTIMOS
 -- Execute este script no Supabase SQL Editor
+-- Última atualização: 22/01/2026
 -- ==============================================
 
 UPDATE whatsapp_config
 SET 
-    api_url = 'https://frozenbarracuda-evolution.cloudfy.live',
-    api_key = '423xvTJtFzdL2i2bDN6hUHhTsaOXuL2S',
-    instance_name = 'tubarao-emprestimos',
+    api_url = 'https://api.tubaraoemprestimo.com.br',
+    api_key = 'B8959800-F546-407C-99E8-C40306E747F5',
+    instance_name = 'tubarao',
     is_connected = false,
     updated_at = NOW()
 WHERE id IS NOT NULL;

@@ -37,10 +37,12 @@ export const whatsappService = {
                     'ngrok-skip-browser-warning': 'true'
                 },
                 body: JSON.stringify({
-                    url: webhookUrl,
-                    webhookByEvents: false,
-                    events: ["MESSAGES_UPSERT"],
-                    enabled: true
+                    webhook: {
+                        url: webhookUrl,
+                        webhookByEvents: false,
+                        events: ["MESSAGES_UPSERT"],
+                        enabled: true
+                    }
                 })
             });
 
