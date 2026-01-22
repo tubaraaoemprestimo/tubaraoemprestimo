@@ -160,10 +160,15 @@ async function staleWhileRevalidate(request, cacheName = CACHE_IMAGES) {
   const cachedResponse = await caches.match(request);
 
   const fetchPromise = fetch(request)
-    .then((networkResponse) => {
+    .then(async (networkResponse) => {
       if (networkResponse.ok) {
-        const cache = caches.open(cacheName);
-        cache.then((c) => c.put(request, networkResponse.clone()));
+        try {
+          const responseClone = networkResponse.clone();
+          const cache = await caches.open(cacheName);
+          await cache.put(request, responseClone);
+        } catch (e) {
+          // Ignore cache errors
+        }
       }
       return networkResponse;
     })
