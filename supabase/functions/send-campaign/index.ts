@@ -72,19 +72,37 @@ serve(async (req: Request) => {
         const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         const supabase = createClient(supabaseUrl, supabaseKey);
 
-        // Get WhatsApp config
-        const { data: waConfig } = await supabase
+        console.log('[SendCampaign] Fetching WhatsApp config...');
+
+        // Get WhatsApp config - usando limit(1) sem single() para evitar erro
+        const { data: waConfigArray, error: waError } = await supabase
             .from('whatsapp_config')
             .select('*')
-            .limit(1)
-            .single();
+            .limit(1);
 
-        if (!waConfig?.api_url || !waConfig?.api_key) {
+        console.log('[SendCampaign] WhatsApp config result:', {
+            found: waConfigArray?.length || 0,
+            error: waError?.message || null
+        });
+
+        const waConfig = waConfigArray?.[0];
+
+        if (waError || !waConfig?.api_url || !waConfig?.api_key) {
+            console.error('[SendCampaign] WhatsApp not configured:', {
+                error: waError,
+                hasUrl: !!waConfig?.api_url,
+                hasKey: !!waConfig?.api_key
+            });
             return new Response(JSON.stringify({ error: 'WhatsApp not configured' }), {
                 status: 400,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
+
+        console.log('[SendCampaign] WhatsApp configured:', {
+            url: waConfig.api_url,
+            instance: waConfig.instance_name
+        });
 
         // Get customers
         const { data: customers } = await supabase

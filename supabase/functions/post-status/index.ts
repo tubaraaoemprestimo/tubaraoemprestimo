@@ -97,15 +97,19 @@ serve(async (req: Request) => {
         const supabase = createClient(supabaseUrl, supabaseKey);
 
         // Buscar configuração do WhatsApp
-        // Buscar configuração do WhatsApp (Pegar a mais recente válida)
-        const { data: waConfig, error: waError } = await supabase
+        console.log('[PostStatus] Fetching WhatsApp config...');
+
+        const { data: waConfigArray, error: waError } = await supabase
             .from('whatsapp_config')
             .select('*')
-            .neq('api_url', '')
-            .neq('api_key', '')
-            .order('updated_at', { ascending: false })
-            .limit(1)
-            .single();
+            .limit(1);
+
+        console.log('[PostStatus] Config query result:', {
+            found: waConfigArray?.length || 0,
+            error: waError?.message || null
+        });
+
+        const waConfig = waConfigArray?.[0];
 
         if (waError || !waConfig?.api_url || !waConfig?.api_key) {
             console.error('[PostStatus] WhatsApp not configured');
@@ -127,6 +131,11 @@ serve(async (req: Request) => {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
+
+        console.log('[PostStatus] WhatsApp configured:', {
+            url: waConfig.api_url,
+            instance: waConfig.instance_name
+        });
 
         // Buscar status pendentes que já passaram do horário agendado
         const now = new Date().toISOString();
