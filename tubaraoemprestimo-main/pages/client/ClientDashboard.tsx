@@ -35,6 +35,7 @@ export const ClientDashboard: React.FC = () => {
     createdAt: string;
   } | null>(null);
   const [coupons, setCoupons] = useState<{ code: string; discount: number; description: string; expiresAt: string }[]>([]);
+  const [realNotifications, setRealNotifications] = useState<{ id: string; title: string; message: string; type: string; created_at: string; read: boolean }[]>([]);
 
   // Modais separados para Campanhas, Cupons e Ofertas
   const [isCampaignsModalOpen, setIsCampaignsModalOpen] = useState(false);
@@ -89,6 +90,10 @@ export const ClientDashboard: React.FC = () => {
     // Buscar oferta de parcelamento e cupons
     const offer = await supabaseService.getClientInstallmentOffer();
     const clientCoupons = await supabaseService.getClientCoupons();
+
+    // Buscar notificações reais do banco
+    const notifs = await supabaseService.getClientNotifications();
+    setRealNotifications(notifs);
 
     let totalDebt = 0;
     let nextInstDate = '--/--';
@@ -173,10 +178,21 @@ export const ClientDashboard: React.FC = () => {
     }
   };
 
+  // Notificações dinâmicas (reais do banco + contextuais)
   const notifications = [
-    ...(preApprovedAmount ? [{ id: 99, title: 'Crédito Pré-Aprovado', msg: `Você tem R$ ${preApprovedAmount} disponíveis!`, type: 'success', time: 'Agora' }] : []),
-    ...(pendingRequest?.status === LoanStatus.WAITING_DOCS ? [{ id: 98, title: 'Ação Necessária', msg: 'Envie o documento solicitado.', type: 'warning', time: 'Agora' }] : []),
-    { id: 1, title: 'Parcela Vencendo', msg: 'Sua fatura vence em 3 dias. Evite juros.', type: 'warning', time: '2h' },
+    // Ofertas pendentes
+    ...(preApprovedAmount ? [{ id: 'pre-approved', title: '🎉 Crédito Pré-Aprovado', msg: `Você tem R$ ${preApprovedAmount.toLocaleString('pt-BR')} disponíveis!`, type: 'success', time: 'Agora' }] : []),
+    ...(installmentOffer ? [{ id: 'installment-offer', title: '💰 Oferta de Parcelamento', msg: `R$ ${installmentOffer.amount.toLocaleString('pt-BR')} em ${installmentOffer.installments}x`, type: 'success', time: 'Agora' }] : []),
+    // Documentos pendentes
+    ...(pendingRequest?.status === LoanStatus.WAITING_DOCS ? [{ id: 'waiting-docs', title: '⚠️ Ação Necessária', msg: 'Envie o documento solicitado.', type: 'warning', time: 'Agora' }] : []),
+    // Notificações reais do banco
+    ...realNotifications.filter(n => !n.read).map(n => ({
+      id: n.id,
+      title: n.title,
+      msg: n.message,
+      type: n.type?.toLowerCase() || 'info',
+      time: new Date(n.created_at).toLocaleDateString('pt-BR')
+    }))
   ];
 
   const formatCurrency = (val: number) => {
@@ -211,12 +227,12 @@ export const ClientDashboard: React.FC = () => {
             </button>
 
             {isNotifOpen && (
-              <div className="absolute right-0 top-full mt-3 w-80 bg-zinc-950 border border-[#D4AF37]/50 rounded-2xl shadow-2xl overflow-hidden z-50">
-                <div className="flex items-center justify-between p-4 border-b border-zinc-900 bg-zinc-900/50">
+              <div className="fixed md:absolute right-4 md:right-0 top-16 md:top-full md:mt-3 w-[calc(100vw-2rem)] md:w-80 max-h-[70vh] bg-zinc-950 border border-[#D4AF37]/50 rounded-2xl shadow-2xl overflow-hidden z-50">
+                <div className="flex items-center justify-between p-4 border-b border-zinc-900 bg-zinc-900/50 sticky top-0">
                   <span className="font-bold text-[#D4AF37] text-sm">Notificações</span>
                   <button onClick={() => setIsNotifOpen(false)}><X size={16} /></button>
                 </div>
-                <div>
+                <div className="overflow-y-auto max-h-[calc(70vh-60px)]">
                   {notifications.map((notif) => (
                     <div key={notif.id} className="p-4 border-b border-zinc-900 hover:bg-zinc-900/40">
                       <h4 className={`text-sm font-bold ${notif.type === 'success' ? 'text-green-500' : notif.type === 'warning' ? 'text-yellow-500' : 'text-white'}`}>{notif.title}</h4>
@@ -257,7 +273,10 @@ export const ClientDashboard: React.FC = () => {
               </div>
               <h3 className="text-lg font-bold leading-tight mb-2">Crédito Pré-Aprovado</h3>
               <div className="text-3xl font-extrabold mb-3">R$ {preApprovedAmount.toLocaleString()}</div>
-              <Button className="w-full bg-black text-[#D4AF37] hover:bg-zinc-800 border-none">
+              <Button
+                onClick={() => navigate(`/wizard?amount=${preApprovedAmount}`)}
+                className="w-full bg-black text-[#D4AF37] hover:bg-zinc-800 border-none"
+              >
                 Contratar Agora
               </Button>
             </div>
@@ -342,8 +361,10 @@ export const ClientDashboard: React.FC = () => {
           >
             <Calculator size={24} className="text-emerald-400" />
             <span className="text-xs font-bold text-white">Ofertas</span>
-            {installmentOffer && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-black text-xs font-bold rounded-full flex items-center justify-center">1</span>
+            {(preApprovedAmount || installmentOffer) && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-black text-xs font-bold rounded-full flex items-center justify-center">
+                {(preApprovedAmount ? 1 : 0) + (installmentOffer ? 1 : 0)}
+              </span>
             )}
           </button>
 
@@ -486,50 +507,85 @@ export const ClientDashboard: React.FC = () => {
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-5 shadow-2xl animate-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4 border-b border-zinc-800 pb-3">
               <h3 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
-                <Calculator size={20} /> Ofertas de Parcelamento
+                <Calculator size={20} /> Suas Ofertas
               </h3>
               <button onClick={() => setIsOffersModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
             </div>
 
-            {installmentOffer ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-black/30 p-3 rounded-xl">
-                    <p className="text-xs text-zinc-500">Valor</p>
-                    <p className="text-lg font-bold text-white">R$ {installmentOffer.amount.toLocaleString('pt-BR')}</p>
+            <div className="space-y-4">
+              {/* Oferta Pré-Aprovada */}
+              {preApprovedAmount && (
+                <div className="bg-gradient-to-r from-[#D4AF37]/20 to-[#FDB931]/10 border border-[#D4AF37]/50 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles size={16} className="text-[#D4AF37]" />
+                    <span className="text-xs font-bold uppercase text-[#D4AF37]">Crédito Pré-Aprovado</span>
                   </div>
-                  <div className="bg-black/30 p-3 rounded-xl">
-                    <p className="text-xs text-zinc-500">Taxa</p>
-                    <p className="text-lg font-bold text-white">{installmentOffer.interestRate}% a.m.</p>
+                  <div className="text-2xl font-bold text-white mb-3">
+                    R$ {preApprovedAmount.toLocaleString('pt-BR')}
                   </div>
-                  <div className="bg-black/30 p-3 rounded-xl">
-                    <p className="text-xs text-zinc-500">Total</p>
-                    <p className="text-lg font-bold text-white">R$ {installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                  </div>
-                  <div className="bg-black/30 p-3 rounded-xl">
-                    <p className="text-xs text-zinc-500">Parcela</p>
-                    <p className="text-lg font-bold text-emerald-400">{installmentOffer.installments}x R$ {installmentOffer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                  </div>
+                  <p className="text-xs text-zinc-400 mb-3">
+                    Valor disponível para contratação imediata!
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setIsOffersModalOpen(false);
+                      navigate(`/wizard?amount=${preApprovedAmount}`);
+                    }}
+                    className="w-full bg-[#D4AF37] hover:bg-[#FDB931] text-black font-bold border-none"
+                  >
+                    <CheckCircle size={16} className="mr-2" /> Contratar Agora
+                  </Button>
                 </div>
-                <p className="text-xs text-zinc-500 text-center">
-                  Proposta enviada em {new Date(installmentOffer.createdAt).toLocaleDateString('pt-BR')}
-                </p>
-                <Button
-                  onClick={() => {
-                    setIsOffersModalOpen(false);
-                    navigate(`/wizard?amount=${installmentOffer.amount}&installments=${installmentOffer.installments}&rate=${installmentOffer.interestRate}`);
-                  }}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-none"
-                >
-                  <CheckCircle size={16} className="mr-2" /> Aceitar Proposta
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-zinc-500">
-                <Calculator size={48} className="mx-auto mb-4 opacity-30" />
-                <p>Nenhuma oferta disponível no momento.</p>
-              </div>
-            )}
+              )}
+
+              {/* Oferta de Parcelamento */}
+              {installmentOffer && (
+                <div className="bg-gradient-to-r from-emerald-900/30 to-emerald-900/10 border border-emerald-600/50 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Calculator size={16} className="text-emerald-400" />
+                    <span className="text-xs font-bold uppercase text-emerald-400">Oferta de Parcelamento</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="bg-black/30 p-3 rounded-xl">
+                      <p className="text-xs text-zinc-500">Valor</p>
+                      <p className="text-lg font-bold text-white">R$ {installmentOffer.amount.toLocaleString('pt-BR')}</p>
+                    </div>
+                    <div className="bg-black/30 p-3 rounded-xl">
+                      <p className="text-xs text-zinc-500">Taxa</p>
+                      <p className="text-lg font-bold text-white">{installmentOffer.interestRate}% a.m.</p>
+                    </div>
+                    <div className="bg-black/30 p-3 rounded-xl">
+                      <p className="text-xs text-zinc-500">Total</p>
+                      <p className="text-lg font-bold text-white">R$ {installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="bg-black/30 p-3 rounded-xl">
+                      <p className="text-xs text-zinc-500">Parcela</p>
+                      <p className="text-lg font-bold text-emerald-400">{installmentOffer.installments}x R$ {installmentOffer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-500 text-center mb-3">
+                    Proposta enviada em {new Date(installmentOffer.createdAt).toLocaleDateString('pt-BR')}
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setIsOffersModalOpen(false);
+                      navigate(`/wizard?amount=${installmentOffer.amount}&installments=${installmentOffer.installments}&rate=${installmentOffer.interestRate}`);
+                    }}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+                  >
+                    <CheckCircle size={16} className="mr-2" /> Aceitar Proposta
+                  </Button>
+                </div>
+              )}
+
+              {/* Nenhuma oferta */}
+              {!preApprovedAmount && !installmentOffer && (
+                <div className="text-center py-8 text-zinc-500">
+                  <Calculator size={48} className="mx-auto mb-4 opacity-30" />
+                  <p>Nenhuma oferta disponível no momento.</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -72,8 +72,9 @@ export const MessagesPage: React.FC = () => {
             return;
         }
 
+        const template = templates.find(t => t.id === massMessageData.templateId);
         const message = massMessageData.templateId
-            ? templates.find(t => t.id === massMessageData.templateId)?.content || ''
+            ? template?.content || ''
             : massMessageData.customMessage;
 
         if (!message) {
@@ -90,7 +91,6 @@ export const MessagesPage: React.FC = () => {
         addToast(`Iniciando envio para ${massMessageData.selectedCustomers.length} destinatários...`, 'info');
         setIsMassModalOpen(false);
 
-        // Simulate sending (in production, would use whatsappService)
         let sent = 0;
         let failed = 0;
 
@@ -100,11 +100,30 @@ export const MessagesPage: React.FC = () => {
                 try {
                     // Replace variables
                     let finalMessage = message
-                        .replace('{nome}', customer.name)
-                        .replace('{valor}', customer.totalDebt?.toLocaleString() || '0');
+                        .replace(/{nome}/g, customer.name?.split(' ')[0] || 'Cliente')
+                        .replace(/{valor}/g, (customer.totalDebt || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+                        .replace(/{vencimento}/g, '--/--');
 
-                    // In production: await whatsappService.sendText(customer.phone, finalMessage);
+                    // Adicionar link do app no final
+                    const fullMessage = finalMessage +
+                        `\n\n📱 *Acesse o App:*\nhttps://tubaraoemprestimo.vercel.app/\n\n_Tubarão Empréstimos 🦈_`;
 
+                    // 📱 Enviar WhatsApp REAL
+                    if (customer.phone) {
+                        await whatsappService.sendMessage(customer.phone, fullMessage);
+                    }
+
+                    // 🔔 Criar Notificação na tela do cliente
+                    if (customer.email) {
+                        await supabaseService.createNotification(
+                            customer.email,
+                            template?.name || '📢 Nova Mensagem',
+                            finalMessage.substring(0, 150) + (finalMessage.length > 150 ? '...' : ''),
+                            'INFO'
+                        );
+                    }
+
+                    // Log da conversa
                     conversationService.add({
                         customerId: customer.id,
                         direction: 'OUT',
@@ -116,6 +135,7 @@ export const MessagesPage: React.FC = () => {
 
                     sent++;
                 } catch (e) {
+                    console.error('Erro ao enviar para', customer.name, e);
                     failed++;
                 }
             }

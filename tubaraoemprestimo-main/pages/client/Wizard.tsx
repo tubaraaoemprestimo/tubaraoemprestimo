@@ -14,6 +14,7 @@ import { supabaseService } from '../../services/supabaseService';
 import { loanSettingsService, LoanSettings } from '../../services/loanSettingsService';
 import { antifraudService } from '../../services/antifraudService';
 import { emailService } from '../../services/emailService';
+import { autoNotificationService } from '../../services/autoNotificationService';
 import { useToast } from '../../components/Toast';
 import { InstallPwaButton } from '../../components/InstallPwaButton';
 
@@ -360,6 +361,13 @@ export const Wizard: React.FC = () => {
         amount: getAmount(),
         installments: settings.defaultInstallments,
       }).catch(() => { });
+
+      // 📱 Enviar WhatsApp e Notificação automática (silencioso)
+      autoNotificationService.onLoanRequested(
+        formData.email,
+        getAmount(),
+        formData.name
+      ).catch(() => { });
 
       setLoading(false);
       addToast("Solicitação enviada!", 'success');

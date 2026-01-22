@@ -46,6 +46,16 @@ serve(async (req: Request) => {
             })
         }
 
+        // 🚫 Ignore group messages - only respond to individual chats
+        // Groups end with @g.us, individual chats end with @s.whatsapp.net
+        const remoteJid = payload.data?.key?.remoteJid || ''
+        if (remoteJid.endsWith('@g.us')) {
+            console.log('[Webhook] Ignoring group message from:', remoteJid)
+            return new Response(JSON.stringify({ status: 'ignored_group' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+        }
+
         // Extract message text
         const messageText = payload.data?.message?.conversation
             || payload.data?.message?.extendedTextMessage?.text
@@ -250,14 +260,29 @@ async function generatePerplexityResponse(
             }))
         ]
 
-        const response = await fetch('https://api.perplexity.ai/chat/completions', {
+        let url = 'https://api.perplexity.ai/chat/completions'
+        let model = 'llama-3.1-sonar-large-128k-online'
+
+        // Smart Router based on API Key prefix
+        const cleanKey = apiKey.trim()
+        if (cleanKey.startsWith('gsk_')) {
+            // Groq
+            url = 'https://api.groq.com/openai/v1/chat/completions'
+            model = 'llama-3.1-8b-instant'
+        } else if (cleanKey.startsWith('sk-')) {
+            // OpenAI
+            url = 'https://api.openai.com/v1/chat/completions'
+            model = 'gpt-3.5-turbo'
+        }
+
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': `Bearer ${cleanKey}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama-3.1-sonar-small-128k-online',
+                model: model,
                 messages: formattedMessages,
                 max_tokens: 500,
                 temperature: 0.7

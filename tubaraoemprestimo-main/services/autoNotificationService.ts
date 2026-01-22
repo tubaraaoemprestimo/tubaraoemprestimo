@@ -1,10 +1,32 @@
 // 🔔 Auto Notification Service - Notificações Automáticas
 // Triggers automáticos para enviar notificações ao cliente
-// Agora integrado com Firebase Push Notifications
+// Integrado com Firebase Push Notifications e WhatsApp
 
 import { supabase } from './supabaseClient';
 import { scoreService } from './scoreService';
 import { firebasePushService } from './firebasePushService';
+import { whatsappService } from './whatsappService';
+
+const APP_LINK = 'https://tubaraoemprestimo.vercel.app/';
+
+// Helper para buscar telefone do cliente pelo email
+async function getCustomerPhone(email: string): Promise<string | null> {
+    const { data } = await supabase
+        .from('customers')
+        .select('phone, name')
+        .eq('email', email)
+        .single();
+    return data?.phone || null;
+}
+
+async function getCustomerData(email: string): Promise<{ phone: string | null; name: string }> {
+    const { data } = await supabase
+        .from('customers')
+        .select('phone, name')
+        .eq('email', email)
+        .single();
+    return { phone: data?.phone || null, name: data?.name || 'Cliente' };
+}
 
 export const autoNotificationService = {
     // ============================================
@@ -41,25 +63,84 @@ export const autoNotificationService = {
     },
 
     // ============================================
+    // NOTIFICAÇÕES DE BOAS-VINDAS
+    // ============================================
+
+    // Boas-vindas ao cliente (após cadastro)
+    onWelcome: async (customerEmail: string, customerName: string, customerPhone?: string): Promise<void> => {
+        const firstName = customerName.split(' ')[0];
+
+        // Notificação no banco
+        await autoNotificationService.createNotification(
+            customerEmail,
+            'Bem-vindo(a) ao Tubarão Empréstimos! 🦈',
+            `Olá ${firstName}! Seu cadastro foi realizado com sucesso. Agora você pode solicitar seu empréstimo de forma rápida e segura!`,
+            'SUCCESS',
+            '/client/dashboard'
+        );
+
+        // 📱 Enviar WhatsApp
+        if (customerPhone) {
+            whatsappService.sendMessage(
+                customerPhone,
+                `👋 *BEM-VINDO(A) AO TUBARÃO EMPRÉSTIMOS!*\n\n` +
+                `Olá ${firstName}!\n\n` +
+                `Seu cadastro foi realizado com sucesso! 🎉\n\n` +
+                `Agora você pode solicitar seu empréstimo de forma rápida e segura.\n\n` +
+                `✅ *Vantagens:*\n` +
+                `• Processo 100% digital\n` +
+                `• Aprovação em até 24h\n` +
+                `• Taxas competitivas\n\n` +
+                `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
+
+        // Push para o cliente
+        firebasePushService.sendPush({
+            to: customerEmail,
+            title: '👋 Bem-vindo ao Tubarão Empréstimos!',
+            body: 'Seu cadastro foi realizado com sucesso!',
+            link: '/client/dashboard'
+        }).catch(() => { });
+    },
+
+    // ============================================
     // NOTIFICAÇÕES DE EMPRÉSTIMO
     // ============================================
 
     // Solicitação recebida
     onLoanRequested: async (customerEmail: string, amount: number, clientName?: string): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
+        const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
         // Notificação no banco
         await autoNotificationService.createNotification(
             customerEmail,
             'Solicitação Recebida ✓',
-            `Recebemos sua solicitação de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}. Estamos analisando seus dados.`,
+            `Recebemos sua solicitação de R$ ${formattedAmount}. Estamos analisando seus dados.`,
             'INFO',
             '/client/contracts'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `📝 *SOLICITAÇÃO RECEBIDA!*\n\n` +
+                `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                `Recebemos sua solicitação de empréstimo no valor de *R$ ${formattedAmount}*.\n\n` +
+                `⏳ Nossa equipe está analisando e em breve você receberá uma resposta.\n\n` +
+                `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
 
         // Push para o cliente
         firebasePushService.sendPush({
             to: customerEmail,
             title: '📝 Solicitação Recebida',
-            body: `Recebemos sua solicitação de R$ ${amount.toLocaleString('pt-BR')}`,
+            body: `Recebemos sua solicitação de R$ ${formattedAmount}`,
             link: '/client/contracts'
         }).catch(() => { });
 
@@ -67,47 +148,112 @@ export const autoNotificationService = {
         firebasePushService.sendPush({
             to: 'admin',
             title: '📝 Nova Solicitação',
-            body: `${clientName || 'Cliente'} solicitou R$ ${amount.toLocaleString('pt-BR')}`,
+            body: `${clientName || customer.name} solicitou R$ ${formattedAmount}`,
             link: '/admin/requests'
         }).catch(() => { });
     },
 
     // Empréstimo aprovado
     onLoanApproved: async (customerEmail: string, amount: number): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
+        const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
         await autoNotificationService.createNotification(
             customerEmail,
             'Empréstimo Aprovado! 🎉',
-            `Parabéns! Seu empréstimo de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} foi aprovado! O valor será liberado em breve.`,
+            `Parabéns! Seu empréstimo de R$ ${formattedAmount} foi aprovado! O valor será liberado em breve.`,
             'SUCCESS',
             '/client/contracts'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `🎉 *EMPRÉSTIMO APROVADO!*\n\n` +
+                `Parabéns ${customer.name.split(' ')[0]}!\n\n` +
+                `Seu empréstimo de *R$ ${formattedAmount}* foi *APROVADO*!\n\n` +
+                `O valor será liberado em até 24 horas após assinatura do contrato.\n\n` +
+                `📱 *Acesse o App para assinar:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
 
         // Push para o cliente
         firebasePushService.sendPush({
             to: customerEmail,
             title: '✅ Empréstimo Aprovado!',
-            body: `Parabéns! Seu empréstimo de R$ ${amount.toLocaleString('pt-BR')} foi aprovado!`,
+            body: `Parabéns! Seu empréstimo de R$ ${formattedAmount} foi aprovado!`,
             link: '/client/contracts'
         }).catch(() => { });
     },
 
     // Empréstimo rejeitado
     onLoanRejected: async (customerEmail: string, reason?: string): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
+        const message = reason || 'Infelizmente sua solicitação não foi aprovada neste momento. Tente novamente em 30 dias.';
+
         await autoNotificationService.createNotification(
             customerEmail,
             'Solicitação Não Aprovada',
-            reason || 'Infelizmente sua solicitação não foi aprovada neste momento. Tente novamente em 30 dias.',
+            message,
             'ALERT',
             '/client/dashboard'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `Olá ${customer.name.split(' ')[0]},\n\n` +
+                `${message}\n\n` +
+                `Você pode fazer uma nova solicitação em 30 dias.\n\n` +
+                `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
 
         // Push para o cliente
         firebasePushService.sendPush({
             to: customerEmail,
             title: '❌ Solicitação Não Aprovada',
-            body: reason || 'Sua solicitação não foi aprovada neste momento.',
+            body: message,
             link: '/client/dashboard'
         }).catch(() => { });
+    },
+
+    // Contrato assinado
+    onContractSigned: async (customerEmail: string, clientName?: string): Promise<void> => {
+        const title = "Contrato Assinado!";
+        const message = "Seu contrato foi assinado com sucesso. Aguarde a liberação do valor.";
+
+        await autoNotificationService.createNotification(customerEmail, title, message, 'SUCCESS');
+
+        // 📱 Enviar WhatsApp
+        try {
+            const { phone, name } = await getCustomerData(customerEmail);
+            if (phone) {
+                let content = `Olá ${name?.split(' ')[0] || clientName?.split(' ')[0]}! Seu contrato foi assinado com sucesso. O valor será liberado em breve.`;
+
+                // Tenta buscar template
+                const { data: template } = await supabase
+                    .from('message_templates')
+                    .select('content')
+                    .eq('trigger_event', 'CONTRACT_SIGNED')
+                    .eq('is_active', true)
+                    .single();
+
+                if (template) {
+                    content = template.content.replace('{nome}', name?.split(' ')[0] || clientName?.split(' ')[0] || 'Cliente');
+                } else {
+                    content += `\n\n📱 *Acesse:* ${APP_LINK}`;
+                }
+
+                await whatsappService.sendMessage(phone, content);
+            }
+        } catch (err) {
+            console.error('Erro ao enviar WhatsApp de contrato assinado:', err);
+        }
     },
 
     // ============================================
@@ -116,36 +262,84 @@ export const autoNotificationService = {
 
     // Parcela vencendo (3 dias antes)
     onInstallmentDueSoon: async (customerEmail: string, amount: number, dueDate: string): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
         const date = new Date(dueDate).toLocaleDateString('pt-BR');
+        const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
         await autoNotificationService.createNotification(
             customerEmail,
             'Parcela Vencendo',
-            `Sua parcela de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} vence em ${date}. Evite juros!`,
+            `Sua parcela de R$ ${formattedAmount} vence em ${date}. Evite juros!`,
             'WARNING',
             '/client/contracts'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `📅 *LEMBRETE DE VENCIMENTO*\n\n` +
+                `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                `Sua parcela de *R$ ${formattedAmount}* vence em *${date}*.\n\n` +
+                `💡 Pague em dia e evite juros!\n\n` +
+                `📱 *Acesse o App para pagar:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
     },
 
     // Parcela vencendo hoje
     onInstallmentDueToday: async (customerEmail: string, amount: number): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
+        const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
         await autoNotificationService.createNotification(
             customerEmail,
             '⚠️ Parcela Vence Hoje!',
-            `Sua parcela de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} vence HOJE. Pague agora para evitar multa.`,
+            `Sua parcela de R$ ${formattedAmount} vence HOJE. Pague agora para evitar multa.`,
             'ALERT',
             '/client/contracts'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `🔔 *VENCIMENTO HOJE!*\n\n` +
+                `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                `Sua parcela de *R$ ${formattedAmount}* vence *HOJE*.\n\n` +
+                `⚡ Pague agora e evite cobranças adicionais!\n\n` +
+                `📱 *Acesse o App para pagar:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
     },
 
     // Parcela atrasada
     onInstallmentOverdue: async (customerEmail: string, amount: number, daysLate: number): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
+        const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
         await autoNotificationService.createNotification(
             customerEmail,
             '🚨 Parcela em Atraso',
-            `Você possui uma parcela de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em atraso há ${daysLate} dia(s). Regularize para evitar juros adicionais.`,
+            `Você possui uma parcela de R$ ${formattedAmount} em atraso há ${daysLate} dia(s). Regularize para evitar juros adicionais.`,
             'ALERT',
             '/client/contracts'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `⚠️ *PARCELA EM ATRASO*\n\n` +
+                `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                `Sua parcela de *R$ ${formattedAmount}* está em atraso há *${daysLate} dia(s)*.\n\n` +
+                `💡 Regularize o quanto antes para evitar juros adicionais.\n\n` +
+                `📱 *Acesse o App para pagar:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
 
         // Atualizar score por atraso
         await scoreService.onPaymentLate(customerEmail, daysLate);
@@ -153,16 +347,18 @@ export const autoNotificationService = {
 
     // Pagamento confirmado
     onPaymentConfirmed: async (customerEmail: string, amount: number, wasOnTime: boolean, wasEarly: boolean): Promise<void> => {
+        const customer = await getCustomerData(customerEmail);
+        const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
         let message: string;
 
         if (wasEarly) {
-            message = `Pagamento antecipado de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmado! Seu score aumentou. 🌟`;
+            message = `Pagamento antecipado de R$ ${formattedAmount} confirmado! Seu score aumentou. 🌟`;
             await scoreService.onPaymentEarly(customerEmail);
         } else if (wasOnTime) {
-            message = `Pagamento de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmado! Obrigado por pagar em dia.`;
+            message = `Pagamento de R$ ${formattedAmount} confirmado! Obrigado por pagar em dia.`;
             await scoreService.onPaymentOnTime(customerEmail);
         } else {
-            message = `Pagamento de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} confirmado!`;
+            message = `Pagamento de R$ ${formattedAmount} confirmado!`;
         }
 
         await autoNotificationService.createNotification(
@@ -172,6 +368,19 @@ export const autoNotificationService = {
             'SUCCESS',
             '/client/contracts'
         );
+
+        // 📱 Enviar WhatsApp
+        if (customer.phone) {
+            whatsappService.sendMessage(
+                customer.phone,
+                `✅ *PAGAMENTO CONFIRMADO!*\n\n` +
+                `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                `Recebemos seu pagamento de *R$ ${formattedAmount}*.\n\n` +
+                `${wasEarly ? '🌟 Pagamento antecipado! Seu score aumentou!' : wasOnTime ? '👏 Obrigado por pagar em dia!' : ''}\n\n` +
+                `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`
+            ).catch(console.error);
+        }
     },
 
     // ============================================
@@ -280,6 +489,99 @@ export const autoNotificationService = {
                     }
                 }
             }
+        }
+    },
+
+    // ============================================
+    // 📱 WHATSAPP - CAMPANHAS E CUPONS
+    // ============================================
+
+    /**
+     * Envia uma campanha para todos os clientes via WhatsApp
+     */
+    sendWhatsAppCampaign: async (campaignId: string): Promise<{ success: boolean; sent?: number; error?: string }> => {
+        try {
+            const { data, error } = await supabase.functions.invoke('send-campaign', {
+                body: { type: 'campaign', id: campaignId }
+            });
+
+            if (error) throw error;
+
+            return { success: true, sent: data.sent };
+        } catch (error: any) {
+            console.error('[WhatsApp] Campaign error:', error);
+            return { success: false, error: error.message || 'Erro ao enviar campanha' };
+        }
+    },
+
+    /**
+     * Envia um cupom para todos os clientes via WhatsApp
+     */
+    sendWhatsAppCoupon: async (couponId: string): Promise<{ success: boolean; sent?: number; error?: string }> => {
+        try {
+            // Use fetch directly with anon key to avoid auth issues
+            const response = await fetch('https://cwhiujeragsethxjekkb.supabase.co/functions/v1/send-campaign', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ',
+                    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ'
+                },
+                body: JSON.stringify({ type: 'coupon', id: couponId })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[WhatsApp] Coupon API error:', errorText);
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+
+            const data = await response.json();
+            return { success: true, sent: data.sent };
+        } catch (error: any) {
+            console.error('[WhatsApp] Coupon error:', error);
+            return { success: false, error: error.message || 'Erro de conexão' };
+        }
+    },
+
+    /**
+     * Executa cobranças automáticas via WhatsApp baseado nas regras
+     */
+    runWhatsAppCollections: async (): Promise<{ success: boolean; sent?: number; error?: string }> => {
+        try {
+            const response = await fetch(`https://cwhiujeragsethxjekkb.supabase.co/functions/v1/auto-notifications`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'collections' })
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                return { success: false, error: data.error };
+            }
+            return { success: true, sent: data.results?.collections?.sent || 0 };
+        } catch (error) {
+            console.error('[WhatsApp] Collections error:', error);
+            return { success: false, error: 'Erro de conexão' };
+        }
+    },
+
+    /**
+     * Busca histórico de notificações WhatsApp enviadas
+     */
+    getWhatsAppHistory: async (limit: number = 50) => {
+        try {
+            const { data, error } = await supabase
+                .from('notification_logs')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(limit);
+
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('[WhatsApp] History error:', error);
+            return [];
         }
     }
 };

@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient';
 import { autoNotificationService } from './autoNotificationService';
+import { whatsappService } from './whatsappService';
+import { emailService } from './emailService';
 import {
     LoanRequest,
     LoanStatus,
@@ -793,6 +795,9 @@ export const supabaseService = {
                 return false;
             }
             customerId = newCustomer.id;
+
+            // 🎉 Novo cliente! Enviar boas-vindas
+            autoNotificationService.onWelcome(data.email, data.name, data.phone).catch(console.error);
         }
 
         // Create loan request
@@ -1104,6 +1109,14 @@ export const supabaseService = {
     },
 
     sendPreApproval: async (customerId: string, amount: number) => {
+        // Buscar dados do cliente
+        const { data: customer } = await supabase
+            .from('customers')
+            .select('name, email, phone')
+            .eq('id', customerId)
+            .single();
+
+        // Atualizar no banco
         const { error } = await supabase
             .from('customers')
             .update({
@@ -1111,7 +1124,48 @@ export const supabaseService = {
                 pre_approved_at: new Date().toISOString()
             })
             .eq('id', customerId);
-        return !error;
+
+        if (error) return false;
+
+        // Enviar notificações se cliente encontrado
+        if (customer) {
+            const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+            // 📱 Enviar WhatsApp
+            if (customer.phone) {
+                const whatsappMsg = `🎉 *OFERTA PRÉ-APROVADA!*\n\n` +
+                    `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                    `Você tem *R$ ${formattedAmount}* pré-aprovados para empréstimo!\n\n` +
+                    `✅ Aproveite essa oportunidade exclusiva!\n\n` +
+                    `📱 *Acesse o App:*\nhttps://tubaraoemprestimo.vercel.app/\n\n` +
+                    `_Tubarão Empréstimos 🦈_`;
+
+                whatsappService.sendMessage(customer.phone, whatsappMsg).catch(console.error);
+            }
+
+            // 📧 Enviar Email
+            if (customer.email) {
+                emailService.sendEmail({
+                    to: customer.email,
+                    subject: `🎉 Você tem R$ ${formattedAmount} pré-aprovados!`,
+                    html: `<h1>Parabéns ${customer.name}!</h1>
+                        <p>Você tem <strong>R$ ${formattedAmount}</strong> pré-aprovados para empréstimo!</p>
+                        <p>Aproveite essa oportunidade exclusiva. Acesse seu app para contratar.</p>
+                        <p>Tubarão Empréstimos 🦈</p>`
+                }).catch(console.error);
+
+                // 🔔 Notificação no app (UMA VEZ apenas)
+                autoNotificationService.createNotification(
+                    customer.email,
+                    '🎉 Crédito Pré-Aprovado',
+                    `Você tem R$ ${formattedAmount} pré-aprovados para empréstimo! Aproveite!`,
+                    'SUCCESS',
+                    '/client/dashboard'
+                ).catch(console.error);
+            }
+        }
+
+        return true;
     },
 
     updateCustomerRates: async (customerId: string, rates?: {
@@ -1143,6 +1197,16 @@ export const supabaseService = {
         totalAmount: number;
         expiresAt?: string;
     }) => {
+        // Buscar dados do cliente
+        const { data: customer } = await supabase
+            .from('customers')
+            .select('name, email, phone')
+            .eq('id', customerId)
+            .single();
+
+        const expiresAt = offer.expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        // Salvar no banco
         const { error } = await supabase
             .from('customers')
             .update({
@@ -1152,13 +1216,64 @@ export const supabaseService = {
                     interest_rate: offer.interestRate,
                     installment_value: offer.installmentValue,
                     total_amount: offer.totalAmount,
-                    expires_at: offer.expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    expires_at: expiresAt,
                     created_at: new Date().toISOString()
                 }
             })
             .eq('id', customerId);
 
-        return !error;
+        if (error) return false;
+
+        // Enviar notificações se cliente encontrado
+        if (customer) {
+            const formattedAmount = offer.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+            const formattedInstallment = offer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+            const expiresDate = new Date(expiresAt).toLocaleDateString('pt-BR');
+
+            // 📱 Enviar WhatsApp
+            if (customer.phone) {
+                const whatsappMsg = `💰 *OFERTA ESPECIAL DE PARCELAMENTO!*\n\n` +
+                    `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                    `Preparamos uma oferta exclusiva para você:\n\n` +
+                    `💵 Valor: *R$ ${formattedAmount}*\n` +
+                    `📅 Parcelas: *${offer.installments}x de R$ ${formattedInstallment}*\n` +
+                    `📊 Taxa: *${offer.interestRate}% a.m.*\n\n` +
+                    `⏰ Válido até: ${expiresDate}\n\n` +
+                    `📱 *Acesse o App:*\nhttps://tubaraoemprestimo.vercel.app/\n\n` +
+                    `_Tubarão Empréstimos 🦈_`;
+
+                whatsappService.sendMessage(customer.phone, whatsappMsg).catch(console.error);
+            }
+
+            // 📧 Enviar Email
+            if (customer.email) {
+                emailService.sendEmail({
+                    to: customer.email,
+                    subject: `💰 Oferta Especial: R$ ${formattedAmount} em ${offer.installments}x!`,
+                    html: `<h1>Olá ${customer.name}!</h1>
+                        <p>Preparamos uma oferta especial de parcelamento para você:</p>
+                        <ul>
+                            <li><strong>Valor:</strong> R$ ${formattedAmount}</li>
+                            <li><strong>Parcelas:</strong> ${offer.installments}x de R$ ${formattedInstallment}</li>
+                            <li><strong>Taxa:</strong> ${offer.interestRate}% a.m.</li>
+                        </ul>
+                        <p>⏰ <strong>Válido até:</strong> ${expiresDate}</p>
+                        <p>Acesse seu app para aceitar essa oferta exclusiva!</p>
+                        <p>Tubarão Empréstimos 🦈</p>`
+                }).catch(console.error);
+
+                // 🔔 Notificação no app (UMA VEZ apenas)
+                autoNotificationService.createNotification(
+                    customer.email,
+                    '💰 Oferta Especial de Parcelamento!',
+                    `R$ ${formattedAmount} em ${offer.installments}x de R$ ${formattedInstallment}. Válido até ${expiresDate}.`,
+                    'SUCCESS',
+                    '/client/dashboard'
+                ).catch(console.error);
+            }
+        }
+
+        return true;
     },
 
     deleteInstallmentOffer: async (customerId: string) => {
@@ -1204,6 +1319,46 @@ export const supabaseService = {
             totalAmount: offer.total_amount,
             createdAt: offer.created_at
         };
+    },
+
+    getClientNotifications: async () => {
+        const user = loadFromStorage<any>(STORAGE_KEYS.USER, null);
+        if (!user) return [];
+
+        const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('customer_email', user.email)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (error || !data) return [];
+
+        return data.map((n: any) => ({
+            id: n.id,
+            title: n.title,
+            message: n.message,
+            type: n.type,
+            created_at: n.created_at,
+            read: n.read || false
+        }));
+    },
+
+    // Criar notificação para um cliente
+    createNotification: async (
+        customerEmail: string,
+        title: string,
+        message: string,
+        type: 'INFO' | 'WARNING' | 'ALERT' | 'SUCCESS' = 'INFO'
+    ): Promise<boolean> => {
+        const { error } = await supabase.from('notifications').insert({
+            customer_email: customerEmail,
+            title,
+            message,
+            type,
+            read: false
+        });
+        return !error;
     },
 
     getClientCoupons: async () => {
@@ -1267,7 +1422,9 @@ export const supabaseService = {
         expiresAt: string;
         active: boolean;
     }) => {
-        const { error } = await supabase.from('coupons').upsert({
+        const isNew = !coupon.id;
+
+        const { data: savedCoupon, error } = await supabase.from('coupons').upsert({
             id: coupon.id || undefined,
             code: coupon.code,
             discount: coupon.discount,
@@ -1275,8 +1432,48 @@ export const supabaseService = {
             customer_email: coupon.customerEmail,
             expires_at: coupon.expiresAt,
             active: coupon.active
-        });
-        return !error;
+        }).select().single();
+
+        if (error) return false;
+
+        // 📢 Se for um NOVO cupom ativo, enviar notificação
+        if (isNew && coupon.active && savedCoupon) {
+            const expiresDate = new Date(coupon.expiresAt).toLocaleDateString('pt-BR');
+
+            if (coupon.customerEmail) {
+                // Cupom para cliente específico
+                await autoNotificationService.createNotification(
+                    coupon.customerEmail,
+                    '🎟️ Cupom Exclusivo!',
+                    `Use o código ${coupon.code} e ganhe ${coupon.discount}% de desconto! Válido até ${expiresDate}.`,
+                    'SUCCESS',
+                    '/client/dashboard'
+                );
+
+                // Buscar telefone do cliente
+                const { data: customer } = await supabase
+                    .from('customers')
+                    .select('phone, name')
+                    .eq('email', coupon.customerEmail)
+                    .single();
+
+                if (customer?.phone) {
+                    whatsappService.sendMessage(
+                        customer.phone,
+                        `🎟️ *CUPOM EXCLUSIVO!*\n\n` +
+                        `Olá ${customer.name?.split(' ')[0] || 'Cliente'}!\n\n` +
+                        `Use o código *${coupon.code}* e ganhe *${coupon.discount}% de desconto*!\n\n` +
+                        `📋 ${coupon.description || 'Aproveite essa oferta!'}\n` +
+                        `⏰ Válido até: ${expiresDate}\n\n` +
+                        `📱 *Acesse o App:*\nhttps://tubaraoemprestimo.vercel.app/\n\n` +
+                        `_Tubarão Empréstimos 🦈_`
+                    ).catch(console.error);
+                }
+            }
+            // Nota: Cupons para todos os clientes são enviados via Edge Function send-campaign
+        }
+
+        return true;
     },
 
     deleteCoupon: async (id: string) => {
@@ -1402,7 +1599,9 @@ export const supabaseService = {
     },
 
     saveCampaign: async (cmp: Campaign) => {
-        const { error } = await supabase.from('campaigns').upsert({
+        const isNew = !cmp.id;
+
+        const { data: savedCampaign, error } = await supabase.from('campaigns').upsert({
             id: cmp.id || undefined,
             title: cmp.title,
             description: cmp.description,
@@ -1413,8 +1612,36 @@ export const supabaseService = {
             frequency: cmp.frequency,
             active: cmp.active,
             priority: cmp.priority
-        });
-        return !error;
+        }).select().single();
+
+        if (error) return false;
+
+        // 📢 Se for uma NOVA campanha ativa, enviar notificação para todos os clientes
+        if (isNew && cmp.active && savedCampaign) {
+            // Buscar todos os clientes com email
+            const { data: customers } = await supabase
+                .from('customers')
+                .select('email')
+                .not('email', 'is', null);
+
+            if (customers) {
+                // Criar notificação para cada cliente
+                for (const customer of customers) {
+                    if (customer.email) {
+                        autoNotificationService.createNotification(
+                            customer.email,
+                            `📢 ${cmp.title}`,
+                            cmp.description,
+                            'INFO',
+                            cmp.link || '/client/dashboard'
+                        ).catch(console.error);
+                    }
+                }
+            }
+            // Nota: O WhatsApp para campanhas é enviado via Edge Function send-campaign na página Marketing
+        }
+
+        return true;
     },
 
     deleteCampaign: async (id: string) => {

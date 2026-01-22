@@ -100,7 +100,7 @@ export const NotificationCenter: React.FC = () => {
 
             {/* Dropdown */}
             {isOpen && (
-                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute left-0 top-full mt-2 w-[380px] sm:w-[420px] lg:w-[480px] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in slide-in-from-top-2 duration-200">
                     {/* Header */}
                     <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950">
                         <h3 className="font-bold text-white flex items-center gap-2">
@@ -122,7 +122,7 @@ export const NotificationCenter: React.FC = () => {
                     </div>
 
                     {/* Notifications List */}
-                    <div className="max-h-[400px] overflow-y-auto">
+                    <div className="max-h-[500px] overflow-y-auto">
                         {notifications.length === 0 ? (
                             <div className="p-8 text-center">
                                 <Bell size={40} className="mx-auto text-zinc-700 mb-3" />
@@ -138,19 +138,19 @@ export const NotificationCenter: React.FC = () => {
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <h4 className={`text-sm font-semibold truncate ${!notification.read ? 'text-white' : 'text-zinc-400'}`}>
+                                                <h4 className={`text-sm font-semibold ${!notification.read ? 'text-white' : 'text-zinc-400'}`}>
                                                     {notification.title}
                                                 </h4>
                                                 {!notification.read && (
                                                     <span className="w-2 h-2 rounded-full bg-[#D4AF37] flex-shrink-0"></span>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-zinc-500 line-clamp-2">{notification.message}</p>
-                                            <div className="flex items-center justify-between mt-2">
+                                            <p className="text-sm text-zinc-400 leading-relaxed">{notification.message}</p>
+                                            <div className="flex items-center justify-between mt-3">
                                                 <span className="text-[10px] text-zinc-600 uppercase">{formatTime(notification.timestamp)}</span>
                                                 {notification.actionLabel && (
-                                                    <span className="text-[10px] text-[#D4AF37] flex items-center gap-1">
-                                                        {notification.actionLabel} <ExternalLink size={10} />
+                                                    <span className="text-xs text-[#D4AF37] flex items-center gap-1 font-medium">
+                                                        {notification.actionLabel} <ExternalLink size={12} />
                                                     </span>
                                                 )}
                                             </div>
@@ -160,10 +160,10 @@ export const NotificationCenter: React.FC = () => {
                                                 e.stopPropagation();
                                                 notificationService.delete(notification.id);
                                             }}
-                                            className="p-1 text-zinc-600 hover:text-red-500 transition-colors rounded"
+                                            className="p-1.5 text-zinc-600 hover:text-red-500 hover:bg-red-900/20 transition-colors rounded-lg"
                                             title="Remover"
                                         >
-                                            <X size={14} />
+                                            <X size={16} />
                                         </button>
                                     </div>
                                 </div>
