@@ -97,9 +97,13 @@ serve(async (req: Request) => {
         const supabase = createClient(supabaseUrl, supabaseKey);
 
         // Buscar configuração do WhatsApp
+        // Buscar configuração do WhatsApp (Pegar a mais recente válida)
         const { data: waConfig, error: waError } = await supabase
             .from('whatsapp_config')
             .select('*')
+            .neq('api_url', '')
+            .neq('api_key', '')
+            .order('updated_at', { ascending: false })
             .limit(1)
             .single();
 
