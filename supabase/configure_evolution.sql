@@ -1,6 +1,7 @@
 -- ==============================================
 -- CONFIGURAR EVOLUTION API - TUBARÃO EMPRÉSTIMOS
 -- Execute este script no Supabase SQL Editor
+-- Última atualização: 22/01/2026
 -- ==============================================
 
 UPDATE whatsapp_config
