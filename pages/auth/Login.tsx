@@ -6,6 +6,8 @@ import { Logo } from '../../components/Logo';
 import { supabaseService } from '../../services/supabaseService';
 import { InstallPwaButton } from '../../components/InstallPwaButton';
 
+import { antifraudService } from '../../services/antifraudService';
+
 export const Login: React.FC = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({ identifier: '', password: '' });
@@ -44,12 +46,23 @@ export const Login: React.FC = () => {
     try {
       const { user } = await supabaseService.auth.signIn(creds) as any;
       if (user) {
+        // Antifraud Log
+        antifraudService.logRiskEvent('LOGIN_SUCCESS', user.id, {
+          role: user.role,
+          method: creds.identifier === 'admin' ? 'PASSWORD_ADMIN' : 'PASSWORD_CLIENT'
+        });
+
         if (user.role === 'ADMIN') {
           navigate('/admin');
         } else {
           navigate('/client/dashboard');
         }
       } else {
+        // Antifraud Log - Failed Attempt
+        antifraudService.logRiskEvent('LOGIN_FAILED', undefined, {
+          identifier: creds.identifier,
+          reason: 'Invalid Credentials'
+        });
         setError('Credenciais inválidas.');
       }
     } catch (error) {
