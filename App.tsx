@@ -264,7 +264,7 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
         </nav>
       )}
 
-      <div className={showNav ? 'pt-16' : ''}>{children}</div>
+      <div className={`${showNav ? 'pt-16' : ''} ${showBottomNav ? 'pb-24' : 'pb-8'}`}>{children}</div>
       {showBottomNav && <BottomNav />}
       <Chatbot />
     </div>

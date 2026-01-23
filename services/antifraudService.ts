@@ -18,6 +18,7 @@ export interface DeviceFingerprint {
     touchSupport: boolean;
     webglVendor?: string;
     webglRenderer?: string;
+    deviceModel?: string;
 }
 
 export interface RiskData {
@@ -92,10 +93,31 @@ export const antifraudService = {
             }
         } catch (e) { }
 
+        // Tenta obter dados de alta entropia (modelo do dispositivo)
+        let uaDataModel = '';
+        let uaDataPlatform = '';
+        let uaDataPlatformVersion = '';
+
+        if ((navigator as any).userAgentData) {
+            try {
+                const uaData = await (navigator as any).userAgentData.getHighEntropyValues([
+                    "model",
+                    "platform",
+                    "platformVersion",
+                    "uaFullVersion"
+                ]);
+                uaDataModel = uaData.model;
+                uaDataPlatform = uaData.platform;
+                uaDataPlatformVersion = uaData.platformVersion;
+            } catch (e) {
+                console.log('Client Hints API error', e);
+            }
+        }
+
         const fingerprint: DeviceFingerprint = {
             ip: '', // Será preenchido pelo servidor
             userAgent: navigator.userAgent,
-            platform: navigator.platform,
+            platform: uaDataPlatform || navigator.platform,
             language: navigator.language,
             screenResolution: `${screen.width}x${screen.height}`,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -105,6 +127,7 @@ export const antifraudService = {
             touchSupport: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
             webglVendor,
             webglRenderer,
+            deviceModel: uaDataModel // Novo campo para o modelo real
         };
 
         return fingerprint;
@@ -277,7 +300,7 @@ export const antifraudService = {
                 action,
                 risk_score: score,
                 risk_factors: factors,
-                additional_data: additionalData,
+                additional_data: { ...additionalData, deviceModel: fingerprint.deviceModel, fingerprint },
             });
 
             return riskData;
