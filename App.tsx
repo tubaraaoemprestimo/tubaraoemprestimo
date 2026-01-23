@@ -36,6 +36,7 @@ import { PaymentReceipts } from './pages/admin/PaymentReceipts';
 import { Referrals } from './pages/admin/Referrals';
 import { AIChatbot } from './pages/admin/AIChatbot';
 import { StatusScheduler } from './pages/admin/StatusScheduler';
+import { AntiFraudMonitor } from './pages/admin/AntiFraudMonitor';
 
 // Pages - Public
 import { DemoSimulator } from './pages/public/DemoSimulator';
@@ -54,7 +55,7 @@ import {
   LayoutDashboard, FileText, Settings as SettingsIcon, LogOut, Users, Bot, Menu, X,
   UserCog, Home as HomeIcon, PieChart, User as UserIcon, Megaphone, BarChart3,
   Calendar, Ban, FileCheck, DollarSign, MessageSquare, Star, ChevronDown, ChevronRight,
-  MapPin, Landmark, Receipt, Gift, Camera
+  MapPin, Landmark, Receipt, Gift, Camera, Shield
 } from 'lucide-react';
 import { Logo } from './components/Logo';
 import { supabaseService } from './services/supabaseService';
@@ -115,6 +116,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
         {/* Segurança */}
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Segurança</p>
+        <Link to="/admin/antifraud" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/antifraud')}`}><Shield size={18} /> Antifraude</Link>
         <Link to="/admin/blacklist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/blacklist')}`}><Ban size={18} /> Blacklist</Link>
         <Link to="/admin/users" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/users')}`}><UserCog size={18} /> Acessos</Link>
 
@@ -355,6 +357,7 @@ export default function App() {
             <Route path="/admin/referrals" element={<AdminLayout><Referrals /></AdminLayout>} />
             <Route path="/admin/chatbot" element={<AdminLayout><AIChatbot /></AdminLayout>} />
             <Route path="/admin/status" element={<AdminLayout><StatusScheduler /></AdminLayout>} />
+            <Route path="/admin/antifraud" element={<AdminLayout><AntiFraudMonitor /></AdminLayout>} />
           </Routes>
         </Router>
       </ToastProvider>
