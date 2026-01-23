@@ -44,9 +44,16 @@ export const Login: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      // Tenta obter localização antecipadamente (pode disparar o prompt do navegador)
+      try {
+        await antifraudService.requestLocation();
+      } catch (e) {
+        console.log('Location request failed or denied', e);
+      }
+
       const { user } = await supabaseService.auth.signIn(creds) as any;
       if (user) {
-        // Antifraud Log
+        // Antifraud Log com localização (espera-se que requestLocation tenha cacheado ou permitido)
         antifraudService.logRiskEvent('LOGIN_SUCCESS', user.id, {
           role: user.role,
           method: creds.identifier === 'admin' ? 'PASSWORD_ADMIN' : 'PASSWORD_CLIENT'
@@ -72,6 +79,7 @@ export const Login: React.FC = () => {
       setLoading(false);
     }
   };
+
 
   const handleAdminLogin = async () => {
     await performLogin({ identifier: 'admin', password: 'admin' });
