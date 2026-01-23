@@ -1535,8 +1535,73 @@ export const supabaseService = {
     },
 
     getInteractionLogs: async (): Promise<InteractionLog[]> => {
-        // This would be implemented with a chatbot interactions table
-        return [];
+        try {
+            const { data, error } = await supabase
+                .from('ai_chat_history')
+                .select(`
+                    id,
+                    phone,
+                    role,
+                    message,
+                    created_at,
+                    customers ( name )
+                `)
+                .order('created_at', { ascending: false })
+                .limit(50);
+
+            if (error) {
+                console.error('Error fetching interaction logs:', error);
+                return [];
+            }
+
+            if (!data) return [];
+
+            const interactions: InteractionLog[] = [];
+
+            // Process reverse to perform grouping (start from oldest? No, rely on index logic)
+            // Array is Newest -> Oldest
+
+            for (let i = 0; i < data.length; i++) {
+                const msg = data[i];
+
+                // We only care about User messages as the "root" of an interaction
+                if (msg.role === 'user') {
+                    // Look for the reply (which should be NEWER, i.e., lower index)
+                    let reply = '';
+                    // Check if the previous item in the array (newer in time) is an assistant message
+                    if (i > 0 && data[i - 1].role === 'assistant') {
+                        reply = data[i - 1].message;
+                    }
+
+                    // Simple intent classification based on keywords
+                    let intent: 'PAYMENT_PROMISE' | 'REQUEST_BOLETO' | 'SUPPORT' | 'UNKNOWN' = 'UNKNOWN';
+                    const text = msg.message.toLowerCase();
+
+                    if (text.includes('pagar') || text.includes('prometo') || text.includes('hoje') || text.includes('depósito')) {
+                        intent = 'PAYMENT_PROMISE';
+                    } else if (text.includes('boleto') || text.includes('link') || text.includes('pix') || text.includes('fatura')) {
+                        intent = 'REQUEST_BOLETO';
+                    } else if (text.includes('ajuda') || text.includes('falar') || text.includes('atendente') || text.includes('humano')) {
+                        intent = 'SUPPORT';
+                    }
+
+                    interactions.push({
+                        id: msg.id,
+                        userName: msg.customers?.name || msg.phone,
+                        userRole: 'CLIENT',
+                        message: msg.message,
+                        intent: intent,
+                        reply: reply,
+                        timestamp: msg.created_at
+                    });
+                }
+            }
+
+            return interactions;
+        } catch (error) {
+            console.error('Exception in getInteractionLogs:', error);
+            return [];
+        }
     },
 
     // ============================================
