@@ -115,10 +115,25 @@ export const antifraudService = {
      */
     async getPublicIP(): Promise<string> {
         try {
-            const response = await fetch('https://api.ipify.org?format=json');
-            const data = await response.json();
-            return data.ip;
-        } catch {
+            // Tenta ipify com timestamp para evitar cache
+            const response = await fetch(`https://api.ipify.org?format=json&t=${Date.now()}`);
+            if (response.ok) {
+                const data = await response.json();
+                return data.ip;
+            }
+            throw new Error('Ipify failed');
+        } catch (e) {
+            try {
+                // Fallback para ip-api.com (gratuito para uso não comercial, sem https as vezes, mas tenta)
+                // Ou usar outro serviço confiável https
+                const response = await fetch('https://api.db-ip.com/v2/free/self');
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.ipAddress;
+                }
+            } catch (err) {
+                return 'unknown';
+            }
             return 'unknown';
         }
     },

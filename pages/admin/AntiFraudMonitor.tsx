@@ -299,11 +299,11 @@ export const AntiFraudMonitor: React.FC = () => {
                                 key={risk}
                                 onClick={() => setFilterRisk(risk as any)}
                                 className={`px-3 py-2 text-xs rounded-lg transition-colors ${filterRisk === risk
-                                        ? risk === 'HIGH' ? 'bg-red-600 text-white'
-                                            : risk === 'MEDIUM' ? 'bg-yellow-600 text-white'
-                                                : risk === 'LOW' ? 'bg-green-600 text-white'
-                                                    : 'bg-zinc-700 text-white'
-                                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                    ? risk === 'HIGH' ? 'bg-red-600 text-white'
+                                        : risk === 'MEDIUM' ? 'bg-yellow-600 text-white'
+                                            : risk === 'LOW' ? 'bg-green-600 text-white'
+                                                : 'bg-zinc-700 text-white'
+                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                                     }`}
                             >
                                 {risk === 'ALL' ? 'Todos' : risk === 'HIGH' ? 'Alto' : risk === 'MEDIUM' ? 'Médio' : 'Baixo'}
@@ -363,9 +363,12 @@ export const AntiFraudMonitor: React.FC = () => {
                                                     {getDeviceIcon(deviceInfo)}
                                                     {deviceInfo.os} • {deviceInfo.browser}
                                                 </span>
-                                                <span className="flex items-center gap-1">
+                                                <span className="flex items-center gap-1 font-mono text-zinc-300">
                                                     <Clock size={12} />
                                                     {new Date(log.created_at).toLocaleString('pt-BR')}
+                                                    <span className="text-zinc-500 text-xs ml-1">
+                                                        ({Math.floor((Date.now() - new Date(log.created_at).getTime()) / 60000)} min atrás)
+                                                    </span>
                                                 </span>
                                             </div>
                                             <div className="text-xs text-zinc-500 mt-1">
