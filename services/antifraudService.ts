@@ -93,31 +93,64 @@ export const antifraudService = {
             }
         } catch (e) { }
 
-        // Tenta obter dados de alta entropia (modelo do dispositivo)
+        // Tenta obter dados de alta entropia (modelo do dispositivo) via Client Hints API
         let uaDataModel = '';
         let uaDataPlatform = '';
         let uaDataPlatformVersion = '';
+        let uaDataBrands: string[] = [];
 
         if ((navigator as any).userAgentData) {
             try {
+                // Solicita TODOS os campos de alta entropia disponíveis
                 const uaData = await (navigator as any).userAgentData.getHighEntropyValues([
                     "model",
                     "platform",
                     "platformVersion",
-                    "uaFullVersion"
+                    "uaFullVersion",
+                    "fullVersionList",
+                    "architecture",
+                    "bitness",
+                    "formFactor"
                 ]);
-                uaDataModel = uaData.model;
-                uaDataPlatform = uaData.platform;
-                uaDataPlatformVersion = uaData.platformVersion;
+
+                uaDataModel = uaData.model || '';
+                uaDataPlatform = uaData.platform || '';
+                uaDataPlatformVersion = uaData.platformVersion || '';
+
+                // Tenta pegar marcas/versões
+                if (uaData.fullVersionList) {
+                    uaDataBrands = uaData.fullVersionList.map((b: any) => b.brand);
+                }
+
+                console.log('[Antifraud] Client Hints Data:', {
+                    model: uaDataModel,
+                    platform: uaDataPlatform,
+                    platformVersion: uaDataPlatformVersion,
+                    brands: uaDataBrands,
+                    formFactor: uaData.formFactor,
+                    architecture: uaData.architecture
+                });
             } catch (e) {
-                console.log('Client Hints API error', e);
+                console.log('[Antifraud] Client Hints API error:', e);
             }
         }
 
+        // Se Client Hints não retornou modelo, tenta extrair do User-Agent
+        if (!uaDataModel || uaDataModel === 'K' || uaDataModel.length < 2) {
+            uaDataModel = this.parseDeviceModel(navigator.userAgent);
+            console.log('[Antifraud] Model from UA parsing:', uaDataModel);
+        }
+
+        // Monta string de plataforma mais informativa
+        let platformString = uaDataPlatform || navigator.platform;
+        if (uaDataPlatformVersion && uaDataPlatform) {
+            platformString = `${uaDataPlatform} ${uaDataPlatformVersion}`;
+        }
+
         const fingerprint: DeviceFingerprint = {
-            ip: '', // Será preenchido pelo servidor
+            ip: '', // Será preenchido depois
             userAgent: navigator.userAgent,
-            platform: uaDataPlatform || navigator.platform,
+            platform: platformString,
             language: navigator.language,
             screenResolution: `${screen.width}x${screen.height}`,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -127,8 +160,14 @@ export const antifraudService = {
             touchSupport: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
             webglVendor,
             webglRenderer,
-            deviceModel: uaDataModel // Novo campo para o modelo real
+            deviceModel: uaDataModel
         };
+
+        console.log('[Antifraud] Fingerprint collected:', {
+            deviceModel: fingerprint.deviceModel,
+            platform: fingerprint.platform,
+            touchSupport: fingerprint.touchSupport
+        });
 
         return fingerprint;
     },
@@ -259,34 +298,99 @@ export const antifraudService = {
 
     /**
      * Extrai modelo do dispositivo do User-Agent (fallback)
+     * Tenta múltiplos padrões para maximizar a chance de sucesso
      */
     parseDeviceModel(userAgent: string): string {
-        // Android: tenta extrair modelo entre "; " e " Build" ou ")"
-        const androidMatch = userAgent.match(/;\s*([^;]+(?:POCO|Xiaomi|Samsung|Redmi|Realme|OPPO|vivo|OnePlus|Huawei|Motorola|LG|Sony|Nokia|Google|Pixel)[^;]*?)\s*(?:Build|;|\))/i);
-        if (androidMatch) {
-            return androidMatch[1].trim();
+        const ua = userAgent;
+
+        // Lista de marcas conhecidas para matching mais preciso
+        const knownBrands = [
+            'POCO', 'Xiaomi', 'Redmi', 'Samsung', 'SM-', 'Galaxy',
+            'Realme', 'RMX', 'OPPO', 'CPH', 'vivo', 'V20', 'V21', 'V23', 'V25', 'V27', 'V29',
+            'OnePlus', 'Huawei', 'Honor', 'Motorola', 'moto', 'LG', 'Sony', 'Xperia',
+            'Nokia', 'Google', 'Pixel', 'Asus', 'ZenFone', 'ROG', 'Lenovo', 'TCL'
+        ];
+
+        // Padrão 1: Procura por marcas conhecidas no UA
+        for (const brand of knownBrands) {
+            const brandRegex = new RegExp(`(${brand}[\\s_-]?[A-Z0-9]+[A-Z0-9\\s_-]*)(?:\\s+Build|\\/|;|\\))`, 'i');
+            const match = ua.match(brandRegex);
+            if (match && match[1]) {
+                const model = match[1].trim().replace(/\s+Build.*$/i, '').replace(/[;)]/g, '').trim();
+                if (model.length > 2 && model !== 'K') {
+                    console.log('[Antifraud] Brand match found:', brand, '->', model);
+                    return model;
+                }
+            }
         }
 
-        // Fallback: pega qualquer coisa entre Android X.X; e Build
-        const genericAndroid = userAgent.match(/Android\s+[\d.]+;\s*([^)]+?)(?:\s+Build|\))/i);
-        if (genericAndroid) {
-            // Remove "K" genérico que Chrome usa para privacidade
-            const model = genericAndroid[1].trim();
-            if (model !== 'K' && model.length > 2) {
+        // Padrão 2: Android X.X; MODEL Build/
+        const androidBuildMatch = ua.match(/Android\s+[\d.]+;\s*([^)]+?)\s+Build\//i);
+        if (androidBuildMatch && androidBuildMatch[1]) {
+            const model = androidBuildMatch[1].trim();
+            // Ignora placeholders de privacidade do Chrome
+            if (model !== 'K' && model.length > 2 && !model.startsWith('wv')) {
+                console.log('[Antifraud] Android Build pattern:', model);
                 return model;
             }
         }
 
-        // iPhone
-        if (userAgent.includes('iPhone')) {
+        // Padrão 3: Android X.X; MODEL) - sem Build
+        const androidParenMatch = ua.match(/Android\s+[\d.]+;\s*([^;)]+)[;)]/i);
+        if (androidParenMatch && androidParenMatch[1]) {
+            const model = androidParenMatch[1].trim();
+            if (model !== 'K' && model.length > 2 && !model.startsWith('wv')) {
+                console.log('[Antifraud] Android paren pattern:', model);
+                return model;
+            }
+        }
+
+        // Padrão 4: Mobile Safari com modelo depois do ;
+        const mobileSafariMatch = ua.match(/;\s*([A-Z][A-Za-z0-9\s_-]+)\s+like\s+Mac\s+OS/i);
+        if (mobileSafariMatch && mobileSafariMatch[1]) {
+            const model = mobileSafariMatch[1].trim();
+            if (model !== 'K' && model.length > 2) {
+                console.log('[Antifraud] Mobile Safari pattern:', model);
+                return model;
+            }
+        }
+
+        // iPhone/iPad
+        if (ua.includes('iPhone')) {
+            // Tenta pegar versão do iOS para inferir modelo aproximado
+            const iosMatch = ua.match(/iPhone\s*OS\s*([\d_]+)/i);
+            if (iosMatch) {
+                const version = iosMatch[1].replace(/_/g, '.');
+                return `iPhone (iOS ${version})`;
+            }
             return 'iPhone';
         }
 
-        // iPad
-        if (userAgent.includes('iPad')) {
+        if (ua.includes('iPad')) {
+            const iosMatch = ua.match(/OS\s*([\d_]+)/i);
+            if (iosMatch) {
+                const version = iosMatch[1].replace(/_/g, '.');
+                return `iPad (iOS ${version})`;
+            }
             return 'iPad';
         }
 
+        // Windows
+        if (ua.includes('Windows')) {
+            return 'PC Windows';
+        }
+
+        // Mac
+        if (ua.includes('Macintosh') || ua.includes('Mac OS')) {
+            return 'Mac';
+        }
+
+        // Linux
+        if (ua.includes('Linux') && !ua.includes('Android')) {
+            return 'PC Linux';
+        }
+
+        console.log('[Antifraud] No device model pattern matched for UA:', ua.substring(0, 100));
         return '';
     },
 
