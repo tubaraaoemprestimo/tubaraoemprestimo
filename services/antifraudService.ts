@@ -163,24 +163,37 @@ export const antifraudService = {
 
     /**
      * Solicita localização do usuário
+     * Usa mesmas configurações do locationTrackingService para consistência
      */
     async requestLocation(): Promise<{ latitude: number; longitude: number; accuracy: number } | null> {
         return new Promise((resolve) => {
             if (!navigator.geolocation) {
+                console.log('[Antifraud] Geolocation not supported');
                 resolve(null);
                 return;
             }
 
+            console.log('[Antifraud] Requesting location...');
+
             navigator.geolocation.getCurrentPosition(
                 (position) => {
+                    const { latitude, longitude, accuracy } = position.coords;
+                    console.log(`[Antifraud] Location captured: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`);
                     resolve({
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                        accuracy: position.coords.accuracy,
+                        latitude,
+                        longitude,
+                        accuracy,
                     });
                 },
-                () => resolve(null),
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                (error) => {
+                    console.log('[Antifraud] Location error:', error.code, error.message);
+                    resolve(null);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 15000, // 15 segundos
+                    maximumAge: 60000 // 1 minuto de cache, igual ao locationTrackingService
+                }
             );
         });
     },
