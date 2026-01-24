@@ -245,8 +245,38 @@ export const antifraudService = {
     },
 
     /**
-     * Registra evento de risco no banco
+     * Extrai modelo do dispositivo do User-Agent (fallback)
      */
+    parseDeviceModel(userAgent: string): string {
+        // Android: tenta extrair modelo entre "; " e " Build" ou ")"
+        const androidMatch = userAgent.match(/;\s*([^;]+(?:POCO|Xiaomi|Samsung|Redmi|Realme|OPPO|vivo|OnePlus|Huawei|Motorola|LG|Sony|Nokia|Google|Pixel)[^;]*?)\s*(?:Build|;|\))/i);
+        if (androidMatch) {
+            return androidMatch[1].trim();
+        }
+
+        // Fallback: pega qualquer coisa entre Android X.X; e Build
+        const genericAndroid = userAgent.match(/Android\s+[\d.]+;\s*([^)]+?)(?:\s+Build|\))/i);
+        if (genericAndroid) {
+            // Remove "K" genérico que Chrome usa para privacidade
+            const model = genericAndroid[1].trim();
+            if (model !== 'K' && model.length > 2) {
+                return model;
+            }
+        }
+
+        // iPhone
+        if (userAgent.includes('iPhone')) {
+            return 'iPhone';
+        }
+
+        // iPad
+        if (userAgent.includes('iPad')) {
+            return 'iPad';
+        }
+
+        return '';
+    },
+
     async logRiskEvent(
         action: string,
         userId?: string,
@@ -254,13 +284,23 @@ export const antifraudService = {
     ): Promise<RiskData | null> {
         try {
             const sessionId = this.getSessionId();
-            const [fingerprint, ip, location] = await Promise.all([
+            const [fingerprint, ip] = await Promise.all([
                 this.collectFingerprint(),
                 this.getPublicIP(),
-                this.requestLocation(),
             ]);
 
             fingerprint.ip = ip;
+
+            // Usa localização pré-capturada se disponível, senão tenta solicitar
+            let location = additionalData?.locationCaptured || null;
+            if (!location) {
+                location = await this.requestLocation();
+            }
+
+            // Se Client Hints não retornou modelo, tenta parsing do UA
+            if (!fingerprint.deviceModel) {
+                fingerprint.deviceModel = this.parseDeviceModel(fingerprint.userAgent);
+            }
 
             // Verificar quantas solicitações do mesmo IP
             const { count: sameIpCount } = await supabase
@@ -300,7 +340,19 @@ export const antifraudService = {
                 action,
                 risk_score: score,
                 risk_factors: factors,
-                additional_data: { ...additionalData, deviceModel: fingerprint.deviceModel, fingerprint },
+                additional_data: {
+                    ...additionalData,
+                    deviceModel: fingerprint.deviceModel,
+                    fingerprint,
+                    platformVersion: fingerprint.platform
+                },
+            });
+
+            console.log('[Antifraud] Risk event logged:', {
+                ip,
+                model: fingerprint.deviceModel,
+                location: location ? `${location.latitude},${location.longitude}` : 'denied',
+                score
             });
 
             return riskData;

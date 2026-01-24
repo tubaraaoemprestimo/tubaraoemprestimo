@@ -373,6 +373,11 @@ export const AntiFraudMonitor: React.FC = () => {
                                             </div>
                                             <div className="text-xs text-zinc-500 mt-1">
                                                 Ação: <span className="text-zinc-400">{log.action}</span>
+                                                {log.additional_data?.deviceModel && (
+                                                    <span className="ml-2 text-pink-400 font-medium">
+                                                        📱 {log.additional_data.deviceModel}
+                                                    </span>
+                                                )}
                                                 {log.latitude && log.longitude && (
                                                     <span className="ml-2">
                                                         <MapPin size={10} className="inline" />
@@ -473,6 +478,19 @@ export const AntiFraudMonitor: React.FC = () => {
                                                 <span className="text-zinc-400 text-sm">Tipo de Dispositivo</span>
                                             </div>
                                             <p className="text-white">{deviceInfo.device}</p>
+                                        </div>
+
+                                        {/* Modelo do Dispositivo */}
+                                        <div className="bg-zinc-800 rounded-lg p-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Smartphone size={16} className="text-pink-400" />
+                                                <span className="text-zinc-400 text-sm">Modelo do Aparelho</span>
+                                            </div>
+                                            <p className="text-white font-semibold">
+                                                {selectedLog.additional_data?.deviceModel ||
+                                                    selectedLog.additional_data?.fingerprint?.deviceModel ||
+                                                    'Não identificado'}
+                                            </p>
                                         </div>
 
                                         {/* Resolução */}

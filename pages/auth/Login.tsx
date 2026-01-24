@@ -43,20 +43,24 @@ export const Login: React.FC = () => {
   const performLogin = async (creds: any) => {
     setLoading(true);
     setError(null);
-    try {
-      // Tenta obter localização antecipadamente (pode disparar o prompt do navegador)
-      try {
-        await antifraudService.requestLocation();
-      } catch (e) {
-        console.log('Location request failed or denied', e);
-      }
 
+    // Captura localização ANTES de qualquer outra operação
+    let locationData: { latitude: number; longitude: number; accuracy: number } | null = null;
+    try {
+      locationData = await antifraudService.requestLocation();
+      console.log('[Antifraud] Location captured:', locationData);
+    } catch (e) {
+      console.log('[Antifraud] Location request failed or denied', e);
+    }
+
+    try {
       const { user } = await supabaseService.auth.signIn(creds) as any;
       if (user) {
-        // Antifraud Log com localização (espera-se que requestLocation tenha cacheado ou permitido)
-        antifraudService.logRiskEvent('LOGIN_SUCCESS', user.id, {
+        // Antifraud Log com localização capturada
+        await antifraudService.logRiskEvent('LOGIN_SUCCESS', user.id, {
           role: user.role,
-          method: creds.identifier === 'admin' ? 'PASSWORD_ADMIN' : 'PASSWORD_CLIENT'
+          method: creds.identifier === 'admin' ? 'PASSWORD_ADMIN' : 'PASSWORD_CLIENT',
+          locationCaptured: locationData
         });
 
         if (user.role === 'ADMIN') {
@@ -66,9 +70,10 @@ export const Login: React.FC = () => {
         }
       } else {
         // Antifraud Log - Failed Attempt
-        antifraudService.logRiskEvent('LOGIN_FAILED', undefined, {
+        await antifraudService.logRiskEvent('LOGIN_FAILED', undefined, {
           identifier: creds.identifier,
-          reason: 'Invalid Credentials'
+          reason: 'Invalid Credentials',
+          locationCaptured: locationData
         });
         setError('Credenciais inválidas.');
       }
