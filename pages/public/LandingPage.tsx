@@ -70,7 +70,7 @@ export const LandingPage: React.FC = () => {
             <section className="relative z-10 pt-20 pb-32 overflow-hidden">
                 <div className="container mx-auto px-6">
                     <div className="flex flex-col md:flex-row items-center gap-12">
-                        <div className="flex-1 space-y-8 animate-in slide-in-from-left duration-1000">
+                        <div className="flex-1 space-y-8 animate-slide-up">
                             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-700 text-[#D4AF37] text-sm font-medium">
                                 <Star size={16} fill="currentColor" />
                                 <span>O sistema de crédito mais completo do mercado</span>
@@ -118,7 +118,7 @@ export const LandingPage: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="flex-1 relative animate-in slide-in-from-right duration-1000 delay-200">
+                        <div className="flex-1 relative animate-fade-in">
                             <div className="relative z-10 bg-gradient-to-tr from-zinc-900 to-black p-6 rounded-[2rem] border border-zinc-800 shadow-2xl rotate-[-2deg] hover:rotate-0 transition-all duration-500 hover:scale-105">
                                 <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/5 to-transparent rounded-[2rem] pointer-events-none" />
 
