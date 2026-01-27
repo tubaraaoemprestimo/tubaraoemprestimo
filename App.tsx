@@ -40,6 +40,7 @@ import { AntiFraudMonitor } from './pages/admin/AntiFraudMonitor';
 
 // Pages - Public
 import { DemoSimulator } from './pages/public/DemoSimulator';
+import { LandingPage } from './pages/public/LandingPage';
 
 
 // Components
@@ -316,8 +317,8 @@ export default function App() {
           <InstallPrompt />
           <PushPermissionBanner />
           <Routes>
-            {/* Redirect Root to Login */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            {/* Landing Page as Root */}
+            <Route path="/" element={<LandingPage />} />
 
             {/* Auth / Public */}
             <Route path="/login" element={<Login />} />
