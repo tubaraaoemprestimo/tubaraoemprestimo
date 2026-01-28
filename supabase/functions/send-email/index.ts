@@ -32,16 +32,14 @@ serve(async (req) => {
         }
 
         // Configurações
-        // Prioridade: Variável de Ambiente > Chave Hardcoded (Dev)
-        const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "re_6DYdKCiT_LBxanBQsDLeQrN6U6UNh6C4J";
+        const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
-        // Domínio configurado: tubaraoemprestimo.com.br
-        // IMPORTANTE: O email 'from' deve ser de um domínio verificado no Resend.
-        // Se o domínio ainda não propagou, use 'onboarding@resend.dev' para testes (apenas para seu email de cadastro).
+        // Domínio configurado
         const FROM_EMAIL = "Tubarão Empréstimos <contato@tubaraoemprestimo.com.br>";
 
         if (!RESEND_API_KEY) {
-            throw new Error("RESEND_API_KEY não configurada");
+            console.error("RESEND_API_KEY não encontrada nas variáveis de ambiente");
+            throw new Error("Serviço de email não configurado corretamente (API Key ausente)");
         }
 
         console.log(`[SendEmail] Enviando via Resend para: ${to}`);
