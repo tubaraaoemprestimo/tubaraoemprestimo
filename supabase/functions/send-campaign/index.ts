@@ -196,20 +196,42 @@ serve(async (req: Request) => {
         }
 
         // ============================================
-        // 📨 SEND MESSAGES
+        // 📨 SEND MESSAGES (WhatsApp + Email)
         // ============================================
         for (const customer of targetCustomers) {
-            if (!customer.phone) continue;
 
-            // Add delay to avoid spam detection
-            await new Promise(r => setTimeout(r, 2000));
+            // 1. Enviar WhatsApp
+            if (customer.phone) {
+                // Add delay to avoid spam detection
+                await new Promise(r => setTimeout(r, 1500));
 
-            const success = await sendWhatsAppMessage(waConfig, customer.phone, message);
+                const waSuccess = await sendWhatsAppMessage(waConfig, customer.phone, message);
+                if (waSuccess) sent++; else failed++;
+            }
 
-            if (success) {
-                sent++;
-            } else {
-                failed++;
+            // 2. Enviar Email (Disparo assíncrono para não travar o loop)
+            if (customer.email) {
+                // Formatar corpo do email (Markdown simples para HTML básico)
+                const emailHtml = `
+                    <div style="font-family: sans-serif; color: #333;">
+                        ${message.replace(/\n/g, '<br>')}
+                    </div>
+                `;
+
+                // Não aguardamos o e-mail para não atrasar o WhatsApp em massa, 
+                // mas idealmente poderia ser uma fila separada.
+                fetch(`${supabaseUrl}/functions/v1/send-email`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        to: customer.email,
+                        subject: type === 'campaign' ? 'Novidade Tubarão Empréstimos! 🦈' : 'Cupom de Desconto Especial! 🎁',
+                        html: emailHtml
+                    })
+                }).catch(err => console.error(`[SendCampaign] Email failed for ${customer.email}:`, err));
             }
         }
 
