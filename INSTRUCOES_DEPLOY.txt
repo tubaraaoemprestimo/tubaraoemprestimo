@@ -1,0 +1,52 @@
+
+==============================================================================
+INSTRUÇÕES PARA DEPLOY E PUSH (Tubarão Empréstimos)
+==============================================================================
+
+Olá! O código da Landing Page e Integração de Email (Resend) está pronto e salvo
+localmente no seu computador.
+
+Porém, o envio automático falhou devido a permissões de conta.
+Siga os passos abaixo para finalizar:
+
+------------------------------------------------------------------------------
+PASSO 1: CONFIGURAR SUPABASE CLI (Deploy das Funções)
+------------------------------------------------------------------------------
+A conta logada no seu terminal não está vendo o projeto do Tubarão.
+
+1. Abra seu terminal (PowerShell ou CMD) na pasta do projeto:
+   d:\Projetos\TUBARÃO EMPRESTIMOS
+
+2. Faça login novamente na CLI (Use a mesma conta do Dashboard):
+   supabase login
+
+3. Vincule o projeto corretamente:
+   supabase link --project-ref cwhiujeragsethxjekkb
+   (Vai pedir a senha do banco de dados do Supabase)
+
+4. Faça o deploy das funções atualizadas:
+   supabase functions deploy send-email --no-verify-jwt
+   supabase functions deploy send-campaign --no-verify-jwt
+
+------------------------------------------------------------------------------
+PASSO 2: ENVIAR CÓDIGO PARA O GITHUB (Salvar na Nuvem)
+------------------------------------------------------------------------------
+Seu usuário Git local não tem permissão de escrita no repositório.
+
+1. No terminal, tente enviar manualmente:
+   git push origin main
+
+2. Se pedir senha, use seu Token de Acesso Pessoal (PAT) do GitHub, não a senha.
+   Se falhar, verifique se você aceitou o convite de colaborador no repo:
+   https://github.com/tubaraaoemprestimo/tubaraoemprestimo
+
+------------------------------------------------------------------------------
+RESUMO DO QUE FOI FEITO (JÁ SALVO LOCALMENTE):
+------------------------------------------------------------------------------
+✅ Landing Page Espetacular: Nova página inicial moderna e responsiva.
+✅ Antifraude Melhorado: Detecção exata de modelos Android e iPhone.
+✅ API de Email: Integração com Resend para envio de campanhas e notificações.
+✅ UI de Teste: Botão de teste de email em Admin > Configurações > Integração.
+
+Tudo pronto para uso local! (npm run dev)
+==============================================================================
