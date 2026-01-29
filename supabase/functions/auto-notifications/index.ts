@@ -230,11 +230,7 @@ serve(async (req: Request) => {
             .single();
 
         if (!waConfig || !waConfig.api_url || !waConfig.api_key) {
-            console.error('[AutoNotify] WhatsApp not configured');
-            return new Response(JSON.stringify({ error: 'WhatsApp not configured' }), {
-                status: 400,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
+            console.warn('[AutoNotify] WhatsApp not fully configured. Skipping WhatsApp messages.');
         }
 
         // Get all active customers with phone
@@ -300,7 +296,7 @@ serve(async (req: Request) => {
                     const message = `🎯 *${campaign.title}*\n\n${campaign.description || ''}\n\n${campaign.link ? `👉 Acesse: ${campaign.link}` : ''}\n\n📱 *Baixe o App:*\nhttps://tubaraoemprestimo.vercel.app/\n\n_Tubarão Empréstimos 🦈_`;
 
                     for (const customer of customers) {
-                        if (customer.phone) {
+                        if (waConfig && customer.phone) {
                             // Add small delay
                             await new Promise(r => setTimeout(r, 500));
                             const success = await sendWhatsAppMessage(waConfig, customer.phone, message);
@@ -384,8 +380,8 @@ serve(async (req: Request) => {
                         : customers;
 
                     for (const customer of targetCustomers) {
-                        if (customer.phone) {
-                            await new Promise(r => setTimeout(r, 2000));
+                        if (waConfig && customer.phone) {
+                            await new Promise(r => setTimeout(r, 500));
                             const success = await sendWhatsAppMessage(waConfig, customer.phone, message);
                             if (success) results.coupons.sent++; else results.coupons.failed++;
                         }
@@ -493,9 +489,9 @@ serve(async (req: Request) => {
                                 dias_atraso: diff > 0 ? diff : 0
                             });
 
-                            if (customer.phone) {
-                                await new Promise(r => setTimeout(r, 2000));
-                                const success = await sendWhatsAppMessage(waConfig, customer.phone, message);
+                            if (waConfig && customer.phone) {
+                                await new Promise(r => setTimeout(r, 500));
+                                await sendWhatsAppMessage(waConfig, customer.phone, message);
                             }
 
                             // Log collection send (always log attempt)
