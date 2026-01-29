@@ -147,7 +147,7 @@ async function sendEmailNotification(
             </html>
         `;
 
-        fetch(`${supabaseUrl}/functions/v1/send-email`, {
+        await fetch(`${supabaseUrl}/functions/v1/send-email`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${supabaseKey}`,
@@ -158,7 +158,7 @@ async function sendEmailNotification(
                 subject: subject,
                 html: html
             })
-        }).catch(e => console.error('[AutoNotify] Email fetch error:', e));
+        });
 
     } catch (err) {
         console.error('[AutoNotify] Exception sending email:', err);
@@ -174,7 +174,7 @@ async function sendPushNotification(
     body: string
 ): Promise<void> {
     try {
-        fetch(`${supabaseUrl}/functions/v1/send-push`, {
+        await fetch(`${supabaseUrl}/functions/v1/send-push`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${supabaseKey}`,
@@ -187,7 +187,7 @@ async function sendPushNotification(
                     body: body
                 }
             })
-        }).catch(e => console.error('[AutoNotify] Push fetch error:', e));
+        });
 
     } catch (err) {
         console.error('[AutoNotify] Exception sending push:', err);
@@ -301,8 +301,8 @@ serve(async (req: Request) => {
 
                     for (const customer of customers) {
                         if (customer.phone) {
-                            // Add delay to avoid spam detection
-                            await new Promise(r => setTimeout(r, 2000));
+                            // Add small delay
+                            await new Promise(r => setTimeout(r, 500));
                             const success = await sendWhatsAppMessage(waConfig, customer.phone, message);
                             if (success) results.campaigns.sent++; else results.campaigns.failed++;
                         }
@@ -315,10 +315,10 @@ serve(async (req: Request) => {
                                 <p>${campaign.description || ''}</p>
                                 ${(campaign.link) ? `<div style="text-align: center; margin: 20px 0;"><a href="${campaign.link}" style="background: #D4AF37; color: #000; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Acessar Agora</a></div>` : ''}
                             `;
-                            sendEmailNotification(supabaseUrl, supabaseKey, customer.email, `📢 ${campaign.title}`, emailBody);
+                            await sendEmailNotification(supabaseUrl, supabaseKey, customer.email, `📢 ${campaign.title}`, emailBody);
 
                             // Push
-                            sendPushNotification(supabaseUrl, supabaseKey, customer.email, campaign.title, campaign.description || 'Nova oferta disponível!');
+                            await sendPushNotification(supabaseUrl, supabaseKey, customer.email, campaign.title, campaign.description || 'Nova oferta disponível!');
                         }
                     }
 
@@ -403,10 +403,10 @@ serve(async (req: Request) => {
                                     <a href="https://tubaraoemprestimo.com.br" style="background: #28a745; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Usar Cupom</a>
                                 </div>
                             `;
-                            sendEmailNotification(supabaseUrl, supabaseKey, customer.email, `🎁 Cupom Especial: ${coupon.code}`, emailBody);
+                            await sendEmailNotification(supabaseUrl, supabaseKey, customer.email, `🎁 Cupom Especial: ${coupon.code}`, emailBody);
 
                             // Push
-                            sendPushNotification(supabaseUrl, supabaseKey, customer.email, `🎁 Cupom: ${coupon.code}`, `Desconto de ${coupon.discount}% para você!`);
+                            await sendPushNotification(supabaseUrl, supabaseKey, customer.email, `🎁 Cupom: ${coupon.code}`, `Desconto de ${coupon.discount}% para você!`);
                         }
                     }
 
@@ -528,8 +528,8 @@ serve(async (req: Request) => {
                                     ? `🚨 Aviso de Atraso: ${diff} dias`
                                     : (diff < 0 ? `⏰ Lembrete de Vencimento` : `⚠️ Sua Fatura Vence Hoje`);
 
-                                sendEmailNotification(supabaseUrl, supabaseKey, customer.email, subject, emailBody);
-                                sendPushNotification(supabaseUrl, supabaseKey, customer.email, subject, `Acesse o app para detalhes da sua fatura.`);
+                                await sendEmailNotification(supabaseUrl, supabaseKey, customer.email, subject, emailBody);
+                                await sendPushNotification(supabaseUrl, supabaseKey, customer.email, subject, `Acesse o app para detalhes da sua fatura.`);
                             }
                         }
                     }
