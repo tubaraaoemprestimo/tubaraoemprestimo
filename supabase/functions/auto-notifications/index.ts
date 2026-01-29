@@ -115,6 +115,52 @@ async function sendWhatsAppMessage(
         return false;
     }
 }
+}
+
+// Send Email via send-email Edge Function
+async function sendEmailNotification(
+    supabaseUrl: string,
+    supabaseKey: string,
+    to: string,
+    subject: string,
+    bodyHtml: string
+): Promise<void> {
+    try {
+        // Simple HTML Wrapper
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                    <h2 style="color: #D4AF37; text-align: center;">🦈 TUBARÃO EMPRÉSTIMOS</h2>
+                    <div style="color: #333; line-height: 1.6;">
+                        ${bodyHtml}
+                    </div>
+                    <p style="text-align: center; font-size: 12px; color: #888; margin-top: 30px;">
+                        © Tubarão Empréstimos - Enviado automaticamente.
+                    </p>
+                </div>
+            </body>
+            </html>
+        `;
+
+        fetch(`${supabaseUrl}/functions/v1/send-email`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                to: to,
+                subject: subject,
+                html: html
+            })
+        }).catch(e => console.error('[AutoNotify] Email fetch error:', e));
+
+    } catch (err) {
+        console.error('[AutoNotify] Exception sending email:', err);
+    }
+}
 
 serve(async (req: Request) => {
     // Handle CORS preflight
@@ -230,6 +276,16 @@ serve(async (req: Request) => {
                         } else {
                             results.campaigns.failed++;
                         }
+
+                        // 📧 Send Email in parallel
+                        if (customer.email) {
+                            const emailBody = `
+                                <h3>${campaign.title}</h3>
+                                <p>${campaign.description || ''}</p>
+                                ${(campaign.link) ? `<div style="text-align: center; margin: 20px 0;"><a href="${campaign.link}" style="background: #D4AF37; color: #000; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Acessar Agora</a></div>` : ''}
+                            `;
+                            sendEmailNotification(supabaseUrl, supabaseKey, customer.email, `📢 ${campaign.title}`, emailBody);
+                        }
                     }
 
                     // Log campaign send
@@ -305,6 +361,21 @@ serve(async (req: Request) => {
                         } else {
                             results.coupons.failed++;
                         }
+
+                        // 📧 Send Email in parallel
+                        if (customer.email) {
+                            const emailBody = `
+                                <div style="text-align: center;">
+                                    <h1 style="color: #28a745; font-size: 32px; margin: 10px 0;">${coupon.discount}% OFF</h1>
+                                    <p style="font-size: 18px;">Use o código: <strong style="background: #eee; padding: 5px 10px; border-radius: 4px;">${coupon.code}</strong></p>
+                                    <p>${coupon.description || ''}</p>
+                                    ${expiresText ? `<p style="color: #d9534f;">${expiresText}</p>` : ''}
+                                    <br>
+                                    <a href="https://tubaraoemprestimo.com.br" style="background: #28a745; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Usar Cupom</a>
+                                </div>
+                            `;
+                            sendEmailNotification(supabaseUrl, supabaseKey, customer.email, `🎁 Cupom Especial: ${coupon.code}`, emailBody);
+                        }
                     }
 
                     // Log coupon send
@@ -367,6 +438,7 @@ serve(async (req: Request) => {
                             if (!customer || !customer.phone) continue;
 
                             // Check if already sent today for this installment
+                            // ... (mantido igual, sem alteração na lógica de verificação)
                             const { data: existingLog } = await supabase
                                 .from('notification_logs')
                                 .select('id')
@@ -405,6 +477,27 @@ serve(async (req: Request) => {
                                     sent_count: 1,
                                     failed_count: 0
                                 });
+
+                                // 📧 Send Email in parallel (Cobrança)
+                                if (customer.email) {
+                                    const emailBody = `
+                                        <h3>Olá, ${customer.name.split(' ')[0]}</h3>
+                                        <div style="background: #fff3cd; color: #856404; padding: 15px; border-left: 5px solid #ffc107; margin: 20px 0;">
+                                            <p>${message.replace(/\n/g, '<br>')}</p>
+                                        </div>
+                                        <p>Para regularizar, acesse o aplicativo ou entre em contato.</p>
+                                        <div style="text-align: center; margin-top: 20px;">
+                                            <a href="https://tubaraoemprestimo.com.br" style="background: #007bff; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Acessar Fatura</a>
+                                        </div>
+                                    `;
+
+                                    const subject = diff > 0
+                                        ? `🚨 Aviso de Atraso: ${diff} dias`
+                                        : (diff < 0 ? `⏰ Lembrete de Vencimento` : `⚠️ Sua Fatura Vence Hoje`);
+
+                                    sendEmailNotification(supabaseUrl, supabaseKey, customer.email, subject, emailBody);
+                                }
+
                             } else {
                                 results.collections.failed++;
                             }
