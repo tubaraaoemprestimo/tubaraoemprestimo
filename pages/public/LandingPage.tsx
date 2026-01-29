@@ -3,12 +3,24 @@ import { Link } from 'react-router-dom';
 import {
     ShieldCheck, Smartphone, Zap, Bot, Lock, CreditCard,
     ArrowRight, CheckCircle2, ChevronRight, Menu, X, Star,
-    Globe, LayoutDashboard, Clock, FileCheck
+    Globe, LayoutDashboard, Clock, FileCheck, Briefcase, Store, Car, CheckSquare, UploadCloud, Banknote
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Logo } from '../../components/Logo';
 
 export const LandingPage: React.FC = () => {
     const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+    const [selectedProfile, setSelectedProfile] = React.useState<'clt' | 'business' | 'vehicle' | null>(null);
+    const [hasEntry, setHasEntry] = React.useState(false);
+    const navigate = useNavigate();
+
+    const handleStartApplication = () => {
+        // Redireciona para cadastro com parâmetros de pré-seleção (pode ser usado no futuro para pré-preencher)
+        const params = new URLSearchParams();
+        if (selectedProfile) params.append('profile', selectedProfile);
+        if (hasEntry) params.append('has_entry', 'true');
+        navigate(`/auth/register?${params.toString()}`);
+    };
 
     return (
         <div className="min-h-screen bg-black text-white selection:bg-[#D4AF37] selection:text-black overflow-x-hidden">
@@ -66,96 +78,129 @@ export const LandingPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Hero Section */}
-            <section className="relative z-10 pt-20 pb-32 overflow-hidden">
+            {/* Hero Section - ALTA CONVERSÃO & TRIAGEM */}
+            <section className="relative z-10 pt-24 pb-32">
                 <div className="container mx-auto px-6">
-                    <div className="flex flex-col md:flex-row items-center gap-12">
-                        <div className="flex-1 space-y-8 animate-slide-up">
-                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-700 text-[#D4AF37] text-sm font-medium">
-                                <Star size={16} fill="currentColor" />
-                                <span>O sistema de crédito mais completo do mercado</span>
+                    <div className="text-center max-w-4xl mx-auto mb-12 animate-fade-in">
+                        <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-[#D4AF37] text-black font-bold text-sm mb-6 shadow-lg shadow-[#D4AF37]/20 uppercase tracking-wide">
+                            <Zap size={16} fill="currentColor" />
+                            Aprovação em segundos via IA
+                        </div>
+                        <h1 className="text-5xl md:text-7xl font-bold leading-tight mb-6">
+                            Dinheiro na conta <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] to-[#F2D785]">HOJE.</span><br />
+                            Qual o seu perfil?
+                        </h1>
+                        <p className="text-zinc-400 text-xl md:text-2xl leading-relaxed max-w-2xl mx-auto">
+                            Selecione sua categoria abaixo para liberar sua proposta personalizada imediatamente. Sem filas, sem papelada.
+                        </p>
+                    </div>
+
+                    {/* TRIAGEM - SELETOR DE PERFIL */}
+                    <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                        {/* CARD CLT */}
+                        <div
+                            onClick={() => setSelectedProfile('clt')}
+                            className={`cursor-pointer group relative p-8 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-2 ${selectedProfile === 'clt' ? 'bg-zinc-900 border-[#D4AF37] shadow-2xl shadow-[#D4AF37]/10' : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'}`}
+                        >
+                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 text-3xl transition-colors ${selectedProfile === 'clt' ? 'bg-[#D4AF37] text-black' : 'bg-zinc-800 text-zinc-400 group-hover:bg-[#D4AF37]/20 group-hover:text-[#D4AF37]'}`}>
+                                <Briefcase />
                             </div>
+                            <h3 className={`text-2xl font-bold mb-2 ${selectedProfile === 'clt' ? 'text-white' : 'text-zinc-300'}`}>Sou CLT</h3>
+                            <p className="text-zinc-500 text-sm leading-relaxed">Para quem trabalha registrado e quer crédito rápido com as melhores taxas.</p>
 
-                            <h1 className="text-5xl md:text-7xl font-bold leading-tight">
-                                Crédito rápido, <br />
-                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] to-[#F2D785]">inteligente</span> e seguro.
-                            </h1>
-
-                            <p className="text-zinc-400 text-lg md:text-xl max-w-xl leading-relaxed">
-                                A Tubarão Empréstimos revoluciona a forma como você acessa crédito.
-                                Sem burocracia, com aprovação via IA e dinheiro na conta em segundos via Pix.
-                            </p>
-
-                            <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                                <Link
-                                    to="/wizard"
-                                    className="bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold text-lg px-8 py-4 rounded-xl transition-all transform hover:scale-105 shadow-xl shadow-[#D4AF37]/20 flex items-center justify-center gap-2"
-                                >
-                                    <Zap size={20} fill="currentColor" />
-                                    Quero Empréstimo
-                                </Link>
-                                <Link
-                                    to="/login"
-                                    className="bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-lg px-8 py-4 rounded-xl border border-zinc-700 hover:border-[#D4AF37]/50 transition-all flex items-center justify-center gap-2"
-                                >
-                                    Já sou Cliente
-                                </Link>
-                            </div>
-
-                            <div className="flex items-center gap-6 text-sm text-zinc-500 pt-4">
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle2 size={16} className="text-green-500" />
-                                    <span>Aprovação em minutos</span>
+                            {selectedProfile === 'clt' && (
+                                <div className="mt-6 space-y-3 animate-slide-up">
+                                    <div className="p-4 bg-zinc-950/50 rounded-lg border border-zinc-800">
+                                        <p className="text-[#D4AF37] text-xs font-bold uppercase mb-2">Documentos Necessários</p>
+                                        <ul className="text-sm text-zinc-300 space-y-2">
+                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> RG ou CNH</li>
+                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> Holerite Recente</li>
+                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> Comp. Residência</li>
+                                        </ul>
+                                    </div>
+                                    <button onClick={handleStartApplication} className="w-full bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/20 transition-all">
+                                        Solicitar Empréstimo <ArrowRight size={18} />
+                                    </button>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle2 size={16} className="text-green-500" />
-                                    <span>Sem taxas escondidas</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle2 size={16} className="text-green-500" />
-                                    <span>Segurança bancária</span>
-                                </div>
-                            </div>
+                            )}
                         </div>
 
-                        <div className="flex-1 relative animate-fade-in">
-                            <div className="relative z-10 bg-gradient-to-tr from-zinc-900 to-black p-6 rounded-[2rem] border border-zinc-800 shadow-2xl rotate-[-2deg] hover:rotate-0 transition-all duration-500 hover:scale-105">
-                                <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/5 to-transparent rounded-[2rem] pointer-events-none" />
-
-                                {/* Mockup Content */}
-                                <div className="bg-black/50 backdrop-blur-xl rounded-xl p-6 border border-zinc-800 space-y-6">
-                                    <div className="flex justify-between items-center pb-6 border-b border-zinc-800">
-                                        <div>
-                                            <p className="text-zinc-400 text-sm">Saldo Disponível</p>
-                                            <h3 className="text-3xl font-bold text-white">R$ 12.500,00</h3>
-                                        </div>
-                                        <div className="w-12 h-12 bg-[#D4AF37]/20 rounded-full flex items-center justify-center text-[#D4AF37]">
-                                            <CreditCard size={24} />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="bg-zinc-800/50 p-4 rounded-lg border border-zinc-700/50">
-                                            <Clock className="text-[#D4AF37] mb-2" size={24} />
-                                            <p className="font-bold">Aprovação</p>
-                                            <p className="text-xs text-zinc-400">Em 2 minutos</p>
-                                        </div>
-                                        <div className="bg-zinc-800/50 p-4 rounded-lg border border-zinc-700/50">
-                                            <Smartphone className="text-[#D4AF37] mb-2" size={24} />
-                                            <p className="font-bold">100% Digital</p>
-                                            <p className="text-xs text-zinc-400">Sem papelada</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-[#D4AF37] p-4 rounded-lg text-black font-bold text-center">
-                                        Dinheiro na conta AGORA
-                                    </div>
-                                </div>
+                        {/* CARD AUTÔNOMO */}
+                        <div
+                            onClick={() => setSelectedProfile('business')}
+                            className={`cursor-pointer group relative p-8 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-2 ${selectedProfile === 'business' ? 'bg-zinc-900 border-[#D4AF37] shadow-2xl shadow-[#D4AF37]/10' : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'}`}
+                        >
+                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 text-3xl transition-colors ${selectedProfile === 'business' ? 'bg-[#D4AF37] text-black' : 'bg-zinc-800 text-zinc-400 group-hover:bg-[#D4AF37]/20 group-hover:text-[#D4AF37]'}`}>
+                                <Store />
                             </div>
+                            <h3 className={`text-2xl font-bold mb-2 ${selectedProfile === 'business' ? 'text-white' : 'text-zinc-300'}`}>Autônomo / Comerciante</h3>
+                            <p className="text-zinc-500 text-sm leading-relaxed">Crédito para impulsionar seu negócio. Sem burocracia bancária.</p>
 
-                            {/* Decorative Elements */}
-                            <div className="absolute bg-zinc-800 w-full h-full top-4 left-4 rounded-[2rem] -z-10 opacity-30 rotate-[2deg]" />
+                            {selectedProfile === 'business' && (
+                                <div className="mt-6 space-y-3 animate-slide-up">
+                                    <div className="p-4 bg-zinc-950/50 rounded-lg border border-zinc-800">
+                                        <p className="text-[#D4AF37] text-xs font-bold uppercase mb-2">Documentos Necessários</p>
+                                        <ul className="text-sm text-zinc-300 space-y-2">
+                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> CNPJ e RG</li>
+                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> Comp. Endereço (Comercial + Res.)</li>
+                                            <li className="flex items-center gap-2"><UploadCloud size={14} className="text-green-500" /> Vídeo do Estabelecimento</li>
+                                        </ul>
+                                    </div>
+                                    <button onClick={handleStartApplication} className="w-full bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/20 transition-all">
+                                        Solicitar Capital <ArrowRight size={18} />
+                                    </button>
+                                </div>
+                            )}
                         </div>
+
+                        {/* CARD VEÍCULO */}
+                        <div
+                            onClick={() => setSelectedProfile('vehicle')}
+                            className={`cursor-pointer group relative p-8 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-2 ${selectedProfile === 'vehicle' ? 'bg-zinc-900 border-[#D4AF37] shadow-2xl shadow-[#D4AF37]/10' : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'}`}
+                        >
+                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 text-3xl transition-colors ${selectedProfile === 'vehicle' ? 'bg-[#D4AF37] text-black' : 'bg-zinc-800 text-zinc-400 group-hover:bg-[#D4AF37]/20 group-hover:text-[#D4AF37]'}`}>
+                                <Car />
+                            </div>
+                            <h3 className={`text-2xl font-bold mb-2 ${selectedProfile === 'vehicle' ? 'text-white' : 'text-zinc-300'}`}>Empréstimo c/ Garantia (Moto)</h3>
+                            <p className="text-zinc-500 text-sm leading-relaxed">Taxas menores usando sua moto como garantia. Rápido e fácil.</p>
+
+                            {selectedProfile === 'vehicle' && (
+                                <div className="mt-6 space-y-3 animate-slide-up">
+                                    <div className="p-4 bg-zinc-950/50 rounded-lg border border-zinc-800">
+                                        <p className="text-[#D4AF37] text-xs font-bold uppercase mb-2">Documentos Necessários</p>
+                                        <ul className="text-sm text-zinc-300 space-y-2">
+                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> CNH Válida</li>
+                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> Comp. Endereço</li>
+                                        </ul>
+                                        <div className="mt-3 pt-3 border-t border-zinc-800">
+                                            <label className="flex items-center gap-3 cursor-pointer group">
+                                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${hasEntry ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-zinc-600 group-hover:border-[#D4AF37]'}`}>
+                                                    {hasEntry && <CheckSquare size={14} className="text-black" />}
+                                                </div>
+                                                <input
+                                                    type="checkbox"
+                                                    className="hidden"
+                                                    checked={hasEntry}
+                                                    onChange={() => setHasEntry(!hasEntry)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                                <span className="text-sm text-white">Tenho valor para entrada</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <button onClick={handleStartApplication} className="w-full bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/20 transition-all">
+                                        Simular Financiamento <ArrowRight size={18} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="mt-16 bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 text-center max-w-2xl mx-auto backdrop-blur-sm">
+                        <Banknote className="w-8 h-8 text-[#D4AF37] mx-auto mb-3" />
+                        <p className="text-zinc-400">
+                            Não sabe qual escolher? <Link to="/login" className="text-white underline hover:text-[#D4AF37]">Fale com nosso consultor IA</Link> ou chame no WhatsApp.
+                        </p>
                     </div>
                 </div>
             </section>
