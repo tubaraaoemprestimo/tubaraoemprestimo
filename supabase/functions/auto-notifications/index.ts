@@ -218,7 +218,7 @@ serve(async (req: Request) => {
         console.log(`[AutoNotify] Starting with action: ${action}`);
 
         // Initialize Supabase client
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!.replace(/\/$/, '');
         const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -445,7 +445,8 @@ serve(async (req: Request) => {
                             customers!inner (
                                 id,
                                 name,
-                                phone
+                                phone,
+                                email
                             )
                         )
                     `)
