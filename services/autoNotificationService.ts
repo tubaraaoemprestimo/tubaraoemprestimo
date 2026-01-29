@@ -499,70 +499,54 @@ export const autoNotificationService = {
     /**
      * Envia uma campanha para todos os clientes via WhatsApp
      */
-    sendWhatsAppCampaign: async (campaignId: string): Promise<{ success: boolean; sent?: number; error?: string }> => {
+    /**
+     * Dispara automação de CAMPANHA (WhatsApp + Email + Push)
+     */
+    triggerManualCampaign: async (campaignId: string): Promise<{ success: boolean; results?: any; error?: string }> => {
         try {
-            const { data, error } = await supabase.functions.invoke('send-campaign', {
-                body: { type: 'campaign', id: campaignId }
+            const { data, error } = await supabase.functions.invoke('auto-notifications', {
+                body: { action: 'campaign', campaignId: campaignId }
             });
 
             if (error) throw error;
-
-            return { success: true, sent: data.sent };
+            return { success: true, results: data.results };
         } catch (error: any) {
-            console.error('[WhatsApp] Campaign error:', error);
-            return { success: false, error: error.message || 'Erro ao enviar campanha' };
+            console.error('[Auto] Campaign error:', error);
+            return { success: false, error: error.message || 'Erro ao processar campanha' };
         }
     },
 
     /**
-     * Envia um cupom para todos os clientes via WhatsApp
+     * Dispara automação de CUPOM (WhatsApp + Email + Push)
      */
-    sendWhatsAppCoupon: async (couponId: string): Promise<{ success: boolean; sent?: number; error?: string }> => {
+    triggerManualCoupon: async (couponId: string): Promise<{ success: boolean; results?: any; error?: string }> => {
         try {
-            // Use fetch directly with anon key to avoid auth issues
-            const response = await fetch('https://cwhiujeragsethxjekkb.supabase.co/functions/v1/send-campaign', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ',
-                    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ'
-                },
-                body: JSON.stringify({ type: 'coupon', id: couponId })
+            const { data, error } = await supabase.functions.invoke('auto-notifications', {
+                body: { action: 'coupon', couponId: couponId }
             });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('[WhatsApp] Coupon API error:', errorText);
-                throw new Error(`HTTP ${response.status}: ${errorText}`);
-            }
-
-            const data = await response.json();
-            return { success: true, sent: data.sent };
+            if (error) throw error;
+            return { success: true, results: data.results };
         } catch (error: any) {
-            console.error('[WhatsApp] Coupon error:', error);
-            return { success: false, error: error.message || 'Erro de conexão' };
+            console.error('[Auto] Coupon error:', error);
+            return { success: false, error: error.message || 'Erro ao processar cupom' };
         }
     },
 
     /**
-     * Executa cobranças automáticas via WhatsApp baseado nas regras
+     * Dispara automação de COBRANÇAS (WhatsApp + Email + Push)
      */
-    runWhatsAppCollections: async (): Promise<{ success: boolean; sent?: number; error?: string }> => {
+    triggerManualCollections: async (): Promise<{ success: boolean; results?: any; error?: string }> => {
         try {
-            const response = await fetch(`https://cwhiujeragsethxjekkb.supabase.co/functions/v1/auto-notifications`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'collections' })
+            const { data, error } = await supabase.functions.invoke('auto-notifications', {
+                body: { action: 'collections' }
             });
 
-            const data = await response.json();
-            if (!response.ok) {
-                return { success: false, error: data.error };
-            }
-            return { success: true, sent: data.results?.collections?.sent || 0 };
-        } catch (error) {
-            console.error('[WhatsApp] Collections error:', error);
-            return { success: false, error: 'Erro de conexão' };
+            if (error) throw error;
+            return { success: true, results: data.results };
+        } catch (error: any) {
+            console.error('[Auto] Collections error:', error);
+            return { success: false, error: error.message || 'Erro ao processar cobranças' };
         }
     },
 

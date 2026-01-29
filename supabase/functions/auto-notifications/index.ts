@@ -1,4 +1,5 @@
-// Supabase Edge Function - Automação de Notificações WhatsApp
+
+// Supabase Edge Function - Automação de Notificações WhatsApp + Email + Push
 // Envia campanhas, cupons e cobranças automáticas para clientes
 // Deve ser chamado por um CRON job (ex: Supabase pg_cron ou serviço externo)
 
@@ -28,9 +29,11 @@ interface Campaign {
     id: string;
     title: string;
     description: string;
+    link?: string;
     start_date: string;
     end_date: string;
     active: boolean;
+    frequency?: string;
 }
 
 interface Coupon {
@@ -40,6 +43,7 @@ interface Coupon {
     description: string;
     expires_at: string;
     active: boolean;
+    customer_email?: string;
 }
 
 interface CollectionRule {
@@ -115,7 +119,6 @@ async function sendWhatsAppMessage(
         return false;
     }
 }
-}
 
 // Send Email via send-email Edge Function
 async function sendEmailNotification(
@@ -159,6 +162,35 @@ async function sendEmailNotification(
 
     } catch (err) {
         console.error('[AutoNotify] Exception sending email:', err);
+    }
+}
+
+// Send Push Notification via send-push Edge Function
+async function sendPushNotification(
+    supabaseUrl: string,
+    supabaseKey: string,
+    to: string,
+    title: string,
+    body: string
+): Promise<void> {
+    try {
+        fetch(`${supabaseUrl}/functions/v1/send-push`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                to: to,
+                notification: {
+                    title: title,
+                    body: body
+                }
+            })
+        }).catch(e => console.error('[AutoNotify] Push fetch error:', e));
+
+    } catch (err) {
+        console.error('[AutoNotify] Exception sending push:', err);
     }
 }
 
@@ -264,27 +296,25 @@ serve(async (req: Request) => {
                     const message = `🎯 *${campaign.title}*\n\n${campaign.description || ''}\n\n${campaign.link ? `👉 Acesse: ${campaign.link}` : ''}\n\n📱 *Baixe o App:*\nhttps://tubaraoemprestimo.vercel.app/\n\n_Tubarão Empréstimos 🦈_`;
 
                     for (const customer of customers) {
-                        if (!customer.phone) continue;
-
-                        // Add delay to avoid spam detection
-                        await new Promise(r => setTimeout(r, 2000));
-
-                        const success = await sendWhatsAppMessage(waConfig, customer.phone, message);
-
-                        if (success) {
-                            results.campaigns.sent++;
-                        } else {
-                            results.campaigns.failed++;
+                        if (customer.phone) {
+                            // Add delay to avoid spam detection
+                            await new Promise(r => setTimeout(r, 2000));
+                            const success = await sendWhatsAppMessage(waConfig, customer.phone, message);
+                            if (success) results.campaigns.sent++; else results.campaigns.failed++;
                         }
 
-                        // 📧 Send Email in parallel
+                        // 📧 Send Email and Push in parallel
                         if (customer.email) {
+                            // Email
                             const emailBody = `
                                 <h3>${campaign.title}</h3>
                                 <p>${campaign.description || ''}</p>
                                 ${(campaign.link) ? `<div style="text-align: center; margin: 20px 0;"><a href="${campaign.link}" style="background: #D4AF37; color: #000; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Acessar Agora</a></div>` : ''}
                             `;
                             sendEmailNotification(supabaseUrl, supabaseKey, customer.email, `📢 ${campaign.title}`, emailBody);
+
+                            // Push
+                            sendPushNotification(supabaseUrl, supabaseKey, customer.email, campaign.title, campaign.description || 'Nova oferta disponível!');
                         }
                     }
 
@@ -350,20 +380,15 @@ serve(async (req: Request) => {
                         : customers;
 
                     for (const customer of targetCustomers) {
-                        if (!customer.phone) continue;
-
-                        await new Promise(r => setTimeout(r, 2000));
-
-                        const success = await sendWhatsAppMessage(waConfig, customer.phone, message);
-
-                        if (success) {
-                            results.coupons.sent++;
-                        } else {
-                            results.coupons.failed++;
+                        if (customer.phone) {
+                            await new Promise(r => setTimeout(r, 2000));
+                            const success = await sendWhatsAppMessage(waConfig, customer.phone, message);
+                            if (success) results.coupons.sent++; else results.coupons.failed++;
                         }
 
-                        // 📧 Send Email in parallel
+                        // 📧 Send Email and Push in parallel
                         if (customer.email) {
+                            // Email
                             const emailBody = `
                                 <div style="text-align: center;">
                                     <h1 style="color: #28a745; font-size: 32px; margin: 10px 0;">${coupon.discount}% OFF</h1>
@@ -375,6 +400,9 @@ serve(async (req: Request) => {
                                 </div>
                             `;
                             sendEmailNotification(supabaseUrl, supabaseKey, customer.email, `🎁 Cupom Especial: ${coupon.code}`, emailBody);
+
+                            // Push
+                            sendPushNotification(supabaseUrl, supabaseKey, customer.email, `🎁 Cupom: ${coupon.code}`, `Desconto de ${coupon.discount}% para você!`);
                         }
                     }
 
@@ -460,46 +488,43 @@ serve(async (req: Request) => {
                                 dias_atraso: diff > 0 ? diff : 0
                             });
 
-                            await new Promise(r => setTimeout(r, 2000));
+                            if (customer.phone) {
+                                await new Promise(r => setTimeout(r, 2000));
+                                const success = await sendWhatsAppMessage(waConfig, customer.phone, message);
+                            }
 
-                            const success = await sendWhatsAppMessage(waConfig, customer.phone, message);
+                            // Log collection send (always log attempt)
+                            await supabase.from('notification_logs').insert({
+                                type: 'COLLECTION',
+                                reference_id: inst.id,
+                                rule_id: matchingRule.id,
+                                customer_id: customer.id,
+                                recipients_count: 1,
+                                sent_count: 1,
+                                failed_count: 0
+                            });
 
-                            if (success) {
-                                results.collections.sent++;
+                            results.collections.sent++;
 
-                                // Log collection send
-                                await supabase.from('notification_logs').insert({
-                                    type: 'COLLECTION',
-                                    reference_id: inst.id,
-                                    rule_id: matchingRule.id,
-                                    customer_id: customer.id,
-                                    recipients_count: 1,
-                                    sent_count: 1,
-                                    failed_count: 0
-                                });
+                            // 📧 Send Email and Push in parallel (Cobrança)
+                            if (customer.email) {
+                                const emailBody = `
+                                    <h3>Olá, ${customer.name.split(' ')[0]}</h3>
+                                    <div style="background: #fff3cd; color: #856404; padding: 15px; border-left: 5px solid #ffc107; margin: 20px 0;">
+                                        <p>${message.replace(/\n/g, '<br>')}</p>
+                                    </div>
+                                    <p>Para regularizar, acesse o aplicativo ou entre em contato.</p>
+                                    <div style="text-align: center; margin-top: 20px;">
+                                        <a href="https://tubaraoemprestimo.com.br" style="background: #007bff; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Acessar Fatura</a>
+                                    </div>
+                                `;
 
-                                // 📧 Send Email in parallel (Cobrança)
-                                if (customer.email) {
-                                    const emailBody = `
-                                        <h3>Olá, ${customer.name.split(' ')[0]}</h3>
-                                        <div style="background: #fff3cd; color: #856404; padding: 15px; border-left: 5px solid #ffc107; margin: 20px 0;">
-                                            <p>${message.replace(/\n/g, '<br>')}</p>
-                                        </div>
-                                        <p>Para regularizar, acesse o aplicativo ou entre em contato.</p>
-                                        <div style="text-align: center; margin-top: 20px;">
-                                            <a href="https://tubaraoemprestimo.com.br" style="background: #007bff; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Acessar Fatura</a>
-                                        </div>
-                                    `;
+                                const subject = diff > 0
+                                    ? `🚨 Aviso de Atraso: ${diff} dias`
+                                    : (diff < 0 ? `⏰ Lembrete de Vencimento` : `⚠️ Sua Fatura Vence Hoje`);
 
-                                    const subject = diff > 0
-                                        ? `🚨 Aviso de Atraso: ${diff} dias`
-                                        : (diff < 0 ? `⏰ Lembrete de Vencimento` : `⚠️ Sua Fatura Vence Hoje`);
-
-                                    sendEmailNotification(supabaseUrl, supabaseKey, customer.email, subject, emailBody);
-                                }
-
-                            } else {
-                                results.collections.failed++;
+                                sendEmailNotification(supabaseUrl, supabaseKey, customer.email, subject, emailBody);
+                                sendPushNotification(supabaseUrl, supabaseKey, customer.email, subject, `Acesse o app para detalhes da sua fatura.`);
                             }
                         }
                     }
@@ -517,9 +542,9 @@ serve(async (req: Request) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('[AutoNotify] Error:', error);
-        return new Response(JSON.stringify({ error: error.message }), {
+        return new Response(JSON.stringify({ error: error.message || 'Unknown error' }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

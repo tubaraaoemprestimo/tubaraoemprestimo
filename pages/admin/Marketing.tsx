@@ -205,63 +205,27 @@ export const Marketing: React.FC = () => {
     const [sendingCampaign, setSendingCampaign] = useState<string | null>(null);
 
     const handleSendCampaign = async (campaign: Campaign) => {
-        if (!confirm(`Disparar campanha "${campaign.title}" para ${customers.length} clientes?\n\nIsso enviará:\n• Push notification para todos\n• Email para todos\n• WhatsApp para todos`)) {
+        if (!confirm(`Disparar campanha "${campaign.title}" para TODOS os clientes?\n\nIsso enviará:\n• WhatsApp\n• Email\n• Push Notification\n\nConfirma o disparo em massa?`)) {
             return;
         }
 
         setSendingCampaign(campaign.id);
 
         try {
-            let pushSent = 0;
-            let emailSent = 0;
-            let whatsappSent = 0;
-            let failed = 0;
+            const result = await autoNotificationService.triggerManualCampaign(campaign.id);
 
-            // 📱 Enviar via WhatsApp (Edge Function)
-            const whatsappResult = await autoNotificationService.sendWhatsAppCampaign(campaign.id);
-            if (whatsappResult.success) {
-                whatsappSent = whatsappResult.sent || 0;
+            if (result.success) {
+                const stats = result.results?.campaigns || {};
+                addToast(
+                    `Campanha disparada com sucesso!\n✅ Enviados: ${stats.sent || 0}\n❌ Falhas: ${stats.failed || 0}`,
+                    'success'
+                );
+            } else {
+                throw new Error(result.error);
             }
-
-            // 🔔 Enviar Push para todos
-            const pushResult = await firebasePushService.sendPush({
-                to: 'all',
-                title: `📢 ${campaign.title}`,
-                body: campaign.description,
-                link: campaign.link || '/client/dashboard'
-            });
-            pushSent = pushResult.sent || 0;
-
-            // 📧 Enviar Email para cada cliente com email válido
-            const clientsWithEmail = customers.filter(c => c.email && c.email.includes('@'));
-
-            for (const customer of clientsWithEmail) {
-                try {
-                    await emailService.sendMarketingCampaign({
-                        clientName: customer.name,
-                        clientEmail: customer.email,
-                        amount: 0,
-                        campaignTitle: campaign.title,
-                        campaignDescription: campaign.description,
-                        campaignLink: campaign.link || undefined
-                    });
-                    emailSent++;
-                } catch (err) {
-                    console.error(`Email failed for ${customer.email}:`, err);
-                    failed++;
-                }
-
-                // Pequena pausa entre emails (evitar rate limit)
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
-
-            addToast(
-                `Campanha disparada!\n📱 ${whatsappSent} WhatsApp\n🔔 ${pushSent} Push\n📧 ${emailSent} Emails${failed > 0 ? `\n❌ ${failed} falhas` : ''}`,
-                'success'
-            );
-        } catch (error) {
+        } catch (error: any) {
             console.error('Campaign send error:', error);
-            addToast('Erro ao disparar campanha. Verifique o console.', 'error');
+            addToast(`Erro ao disparar campanha: ${error.message}`, 'error');
         } finally {
             setSendingCampaign(null);
         }
@@ -271,16 +235,17 @@ export const Marketing: React.FC = () => {
     const [sendingCoupon, setSendingCoupon] = useState<string | null>(null);
 
     const handleSendCouponWhatsApp = async (couponId: string, couponCode: string) => {
-        if (!confirm(`Enviar cupom "${couponCode}" via WhatsApp para todos os clientes?`)) {
+        if (!confirm(`Enviar cupom "${couponCode}" para todos os clientes?\n(WhatsApp + Email + Push)`)) {
             return;
         }
 
         setSendingCoupon(couponId);
 
         try {
-            const result = await autoNotificationService.sendWhatsAppCoupon(couponId);
+            const result = await autoNotificationService.triggerManualCoupon(couponId);
             if (result.success) {
-                addToast(`Cupom enviado para ${result.sent} clientes via WhatsApp!`, 'success');
+                const stats = result.results?.coupons || {};
+                addToast(`Cupom enviado para ${stats.sent || 0} clientes!`, 'success');
             } else {
                 addToast(`Erro: ${result.error}`, 'error');
             }
