@@ -242,7 +242,7 @@ serve(async (req: Request) => {
             .from('customers')
             .select('id, name, phone, email, status')
             .eq('status', 'ACTIVE')
-            .not('phone', 'is', null);
+            .or('phone.neq.null,email.neq.null');
 
         if (!customers || customers.length === 0) {
             return new Response(JSON.stringify({ message: 'No customers to notify' }), {
@@ -268,7 +268,11 @@ serve(async (req: Request) => {
                 .gte('end_date', new Date().toISOString().split('T')[0]);
 
             if (campaignId) {
-                campaignQuery = campaignQuery.eq('id', campaignId);
+                // Manual Trigger: Fetch specific campaign regardless of dates
+                campaignQuery = supabase
+                    .from('campaigns')
+                    .select('*')
+                    .eq('id', campaignId);
             }
 
             const { data: campaigns } = await campaignQuery;
@@ -287,8 +291,8 @@ serve(async (req: Request) => {
                         .gte('created_at', today)
                         .limit(1);
 
-                    // Skip if already sent today (unless it's frequency ALWAYS)
-                    if (existingLog && existingLog.length > 0 && campaign.frequency !== 'ALWAYS') {
+                    // Skip if already sent today (unless it's frequency ALWAYS or MANUAL trigger)
+                    if (!campaignId && existingLog && existingLog.length > 0 && campaign.frequency !== 'ALWAYS') {
                         console.log(`[AutoNotify] Campaign ${campaign.title} already sent today`);
                         continue;
                     }
