@@ -1823,12 +1823,21 @@ export const supabaseService = {
             const fakeEmail = `${phone.replace(/\D/g, '')}@whatsapp.lead`;
 
             // Tenta inserir
+            // Truncar telefone para garantir que cabe em varchar(20)
+            const safePhone = phone.replace(/[^0-9+]/g, '').substring(0, 20);
+
+            // Gerar CPF fake de 11 dígitos
+            // Usa números do telefone para gerar algo 'quase' único mas fixo tamanho
+            const numbers = phone.replace(/\D/g, '');
+            const safeCpf = `9${numbers.padEnd(10, '0').slice(-10)}`; // Começa com 9, 11 chars total
+
             const { error } = await supabase.from('customers').insert({
-                name: name || `WhatsApp ${phone}`,
-                phone: phone,
+                name: (name || `WhatsApp ${safePhone}`).substring(0, 50), // Garante nome curto se precisar
+                phone: safePhone,
                 email: fakeEmail,
-                cpf: `LEAD${phone.slice(-7)}`, // Fake CPF to avoid constraint if any. Max 11 chars usually? CPF is 11. 'LEAD' + 7 digits = 11.
+                cpf: safeCpf,
                 status: 'LEAD',
+                // origin: 'WAPP', // Removido origin pois pode não existir no schema ou ser curto
                 internal_score: 500,
                 total_debt: 0,
                 active_loans_count: 0
