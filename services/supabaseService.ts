@@ -1137,7 +1137,7 @@ export const supabaseService = {
                     `Olá ${customer.name.split(' ')[0]}!\n\n` +
                     `Você tem *R$ ${formattedAmount}* pré-aprovados para empréstimo!\n\n` +
                     `✅ Aproveite essa oportunidade exclusiva!\n\n` +
-                    `📱 *Acesse o App:*\nhttps://www.tubaraoemprestimo.com.br/#/login\n\n` +
+                    `📱 *Acesse o App:*\nhttps://www.tubaraoemprestimo.com.br/\n\n` +
                     `_Tubarão Empréstimos 🦈_`;
 
                 whatsappService.sendMessage(customer.phone, whatsappMsg).catch(console.error);
@@ -1239,7 +1239,7 @@ export const supabaseService = {
                     `📅 Parcelas: *${offer.installments}x de R$ ${formattedInstallment}*\n` +
                     `📊 Taxa: *${offer.interestRate}% a.m.*\n\n` +
                     `⏰ Válido até: ${expiresDate}\n\n` +
-                    `📱 *Acesse o App:*\nhttps://www.tubaraoemprestimo.com.br/#/login\n\n` +
+                    `📱 *Acesse o App:*\nhttps://www.tubaraoemprestimo.com.br/\n\n` +
                     `_Tubarão Empréstimos 🦈_`;
 
                 whatsappService.sendMessage(customer.phone, whatsappMsg).catch(console.error);
@@ -1465,7 +1465,7 @@ export const supabaseService = {
                         `Use o código *${coupon.code}* e ganhe *${coupon.discount}% de desconto*!\n\n` +
                         `📋 ${coupon.description || 'Aproveite essa oferta!'}\n` +
                         `⏰ Válido até: ${expiresDate}\n\n` +
-                        `📱 *Acesse o App:*\nhttps://www.tubaraoemprestimo.com.br/#/login\n\n` +
+                        `📱 *Acesse o App:*\nhttps://www.tubaraoemprestimo.com.br/\n\n` +
                         `_Tubarão Empréstimos 🦈_`
                     ).catch(console.error);
                 }

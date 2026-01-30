@@ -293,7 +293,7 @@ serve(async (req: Request) => {
                         continue;
                     }
 
-                    const message = `🎯 *${campaign.title}*\n\n${campaign.description || ''}\n\n${campaign.link ? `👉 Acesse: ${campaign.link}` : ''}\n\n📱 *Baixe o App:*\nhttps://www.tubaraoemprestimo.com.br/#/login\n\n_Tubarão Empréstimos 🦈_`;
+                    const message = `🎯 *${campaign.title}*\n\n${campaign.description || ''}\n\n${campaign.link ? `👉 Acesse: ${campaign.link}` : ''}\n\n📱 *Baixe o App:*\nhttps://www.tubaraoemprestimo.com.br/\n\n_Tubarão Empréstimos 🦈_`;
 
                     for (const customer of customers) {
                         if (waConfig && customer.phone) {
@@ -371,7 +371,7 @@ serve(async (req: Request) => {
                         `Use o código *${coupon.code}* e ganhe *${coupon.discount}% de desconto*!\n` +
                         `${coupon.description || ''}\n` +
                         `${expiresText}\n\n` +
-                        `📱 *Acesse o App:*\nhttps://www.tubaraoemprestimo.com.br/#/login\n\n` +
+                        `📱 *Acesse o App:*\nhttps://www.tubaraoemprestimo.com.br/\n\n` +
                         `_Tubarão Empréstimos 🦈_`;
 
                     // If coupon is for specific customer
@@ -396,7 +396,7 @@ serve(async (req: Request) => {
                                     <p>${coupon.description || ''}</p>
                                     ${expiresText ? `<p style="color: #d9534f;">${expiresText}</p>` : ''}
                                     <br>
-                                    <a href="https://www.tubaraoemprestimo.com.br/#/login" style="background: #28a745; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Usar Cupom</a>
+                                    <a href="https://www.tubaraoemprestimo.com.br/" style="background: #28a745; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Usar Cupom</a>
                                 </div>
                             `;
                             await sendEmailNotification(supabaseUrl, supabaseKey, customer.email, `🎁 Cupom Especial: ${coupon.code}`, emailBody);
@@ -516,7 +516,7 @@ serve(async (req: Request) => {
                                     </div>
                                     <p>Para regularizar, acesse o aplicativo ou entre em contato.</p>
                                     <div style="text-align: center; margin-top: 20px;">
-                                        <a href="https://www.tubaraoemprestimo.com.br/#/login" style="background: #007bff; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Acessar Fatura</a>
+                                        <a href="https://www.tubaraoemprestimo.com.br/" style="background: #007bff; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Acessar Fatura</a>
                                     </div>
                                 `;
 

@@ -7,7 +7,7 @@ import { scoreService } from './scoreService';
 import { firebasePushService } from './firebasePushService';
 import { whatsappService } from './whatsappService';
 
-const APP_LINK = 'https://www.tubaraoemprestimo.com.br/#/login';
+const APP_LINK = 'https://www.tubaraoemprestimo.com.br/';
 
 // Helper para buscar telefone do cliente pelo email
 async function getCustomerPhone(email: string): Promise<string | null> {

@@ -106,7 +106,7 @@ export const MessagesPage: React.FC = () => {
 
                     // Adicionar link do app no final
                     const fullMessage = finalMessage +
-                        `\n\n📱 *Acesse o App:*\nhttps://www.tubaraoemprestimo.com.br/#/login\n\n_Tubarão Empréstimos 🦈_`;
+                        `\n\n📱 *Acesse o App:*\nhttps://www.tubaraoemprestimo.com.br/\n\n_Tubarão Empréstimos 🦈_`;
 
                     // 📱 Enviar WhatsApp REAL
                     if (customer.phone) {

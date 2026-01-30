@@ -317,10 +317,9 @@ export default function App() {
           <InstallPrompt />
           <PushPermissionBanner />
           <Routes>
-            {/* Landing Page as Root */}
-            <Route path="/" element={<LandingPage />} />
-
-            {/* Auth / Public */}
+            {/* Public Routes */}
+            <Route path="/" element={<Login />} />
+            <Route path="/site" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/wizard" element={<ClientLayout><Wizard /></ClientLayout>} />
             <Route path="/demo" element={<DemoSimulator />} />
