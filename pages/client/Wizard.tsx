@@ -4,7 +4,8 @@ import {
   Check, ChevronLeft, User, MapPin,
   AlertCircle, FileText, ScanFace, X, Plus, Loader2,
   Phone, Users, Video, DollarSign, Shield, Clock, Landmark, CheckCircle2, FileCheck, Percent,
-  Car, Smartphone, Tv, Home, Package, Camera as CameraIcon
+  Car, Smartphone, Tv, Home, Package, Camera as CameraIcon,
+  Briefcase, Store, Bike, Banknote, Rocket
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Camera } from '../../components/Camera';
@@ -28,14 +29,18 @@ const guaranteeTypes = [
   { id: 'outro', label: 'Outro', icon: Package },
 ];
 
+// Tipos de Perfil
+type ProfileType = 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA_VEICULO' | '';
+
 // Steps
 const steps = [
-  { id: 1, title: 'Valores', icon: DollarSign },
-  { id: 2, title: 'Termos', icon: Shield },
-  { id: 3, title: 'Dados', icon: User },
-  { id: 4, title: 'Documentos', icon: FileText },
-  { id: 5, title: 'Banco', icon: Landmark },
-  { id: 6, title: 'Confirmar', icon: CheckCircle2 },
+  { id: 1, title: 'Perfil', icon: Users },
+  { id: 2, title: 'Valores', icon: DollarSign },
+  { id: 3, title: 'Termos', icon: Shield },
+  { id: 4, title: 'Dados', icon: User },
+  { id: 5, title: 'Documentos', icon: FileText },
+  { id: 6, title: 'Banco', icon: Landmark },
+  { id: 7, title: 'Confirmar', icon: CheckCircle2 },
 ];
 
 export const Wizard: React.FC = () => {
@@ -53,6 +58,10 @@ export const Wizard: React.FC = () => {
   // Configurações do banco
   const [settings, setSettings] = useState<LoanSettings | null>(null);
 
+  // Perfil e Condicionais
+  const [profileType, setProfileType] = useState<ProfileType>('');
+  const [hasEntryValue, setHasEntryValue] = useState(false); // Para Moto
+
   // Aceites
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -61,7 +70,7 @@ export const Wizard: React.FC = () => {
   const [customAmount, setCustomAmount] = useState<string>('');
   const [needsGuarantee, setNeedsGuarantee] = useState(false);
 
-  // Garantia
+  // Garantia Universal (usado para Garantia Veículo tb)
   const [guarantee, setGuarantee] = useState({
     type: '',
     description: '',
@@ -78,6 +87,8 @@ export const Wizard: React.FC = () => {
     contactTrust2: '', contactTrust2Name: '',
     instagram: '',
     occupation: '', companyName: '', companyAddress: '', workTime: '',
+    // Autônomo
+    cnpj: '', businessAddress: '',
     cep: '', address: '', number: '', income: '',
     selfie: '',
     idCardFront: [] as string[],
@@ -87,11 +98,12 @@ export const Wizard: React.FC = () => {
     workCard: [] as string[],
     billInName: [] as string[],
     bankStatement: [] as string[],
-    hasVehicle: false,
+    // Moto / Veículo
+    cnh: [] as string[],
     vehicleCRLV: [] as string[],
     vehicleFront: [] as string[],
     videoSelfie: '',
-    videoHouse: '',
+    videoHouse: '', // ou video estabelecimento se autonomo
     bankName: '',
     pixKey: '',
     pixKeyType: 'cpf',
@@ -115,8 +127,6 @@ export const Wizard: React.FC = () => {
 
       // Verificar se veio de uma oferta aceita (via URL params)
       const amountParam = searchParams.get('amount');
-      const installmentsParam = searchParams.get('installments');
-      const rateParam = searchParams.get('rate');
 
       if (amountParam) {
         const amount = parseFloat(amountParam);
@@ -125,10 +135,14 @@ export const Wizard: React.FC = () => {
         setIsFromOffer(true);
         setTermsAccepted(true); // Marcar termos como aceitos (já veio da proposta)
 
-        // Pular diretamente para o step 3 (Dados)
-        setCurrentStep(3);
+        // Se vier de oferta, assumimos CLT por padrão ou deixamos ele escolher?
+        // Vamos deixar ele escolher o perfil por segurança (STEP 1), mas com valores preenchidos.
+        // Ou pulamos para Step 4 (Dados)? 
+        // Vamos pular para Step 4 (Dados) e assumir CLT se não tiver info, mas ideal é forçar escolha.
+        // Decisão: Forçar escolha de perfil no Step 1, mas já com valores preenchidos.
+        setCurrentStep(1);
 
-        addToast('Proposta aceita! Complete seus dados para finalizar.', 'success');
+        addToast('Proposta iniciada! Confirme seu perfil e dados.', 'success');
       }
     };
     loadSettings();
@@ -138,8 +152,14 @@ export const Wizard: React.FC = () => {
   useEffect(() => {
     if (!settings) return;
     const amount = customAmount ? parseFloat(customAmount) || 0 : selectedAmount;
-    setNeedsGuarantee(amount > settings.maxLoanNoGuarantee);
-  }, [selectedAmount, customAmount, settings]);
+    // Se for perfil Garantia Veículo, sempre precisa de garantia
+    if (profileType === 'GARANTIA_VEICULO') {
+      setNeedsGuarantee(true);
+      setGuarantee(prev => ({ ...prev, type: 'carro' }));
+    } else {
+      setNeedsGuarantee(amount > settings.maxLoanNoGuarantee);
+    }
+  }, [selectedAmount, customAmount, settings, profileType]);
 
   // Cálculos com taxas REAIS do banco
   const getAmount = () => customAmount ? parseFloat(customAmount) || 0 : selectedAmount;
@@ -180,9 +200,14 @@ export const Wizard: React.FC = () => {
     const { name, value } = e.target;
     let newValue = value;
 
-    if (name === 'cpf' || name === 'accountHolderCpf') {
-      const nums = value.replace(/\D/g, '').slice(0, 11);
-      newValue = nums.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    if (name === 'cpf' || name === 'accountHolderCpf' || name === 'cnpj') {
+      const nums = value.replace(/\D/g, '');
+      // Mascara simples
+      if (nums.length <= 11) {
+        newValue = nums.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+      } else {
+        newValue = nums.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
+      }
       if (name === 'cpf') setErrors(prev => ({ ...prev, cpf: validateCPF(newValue) }));
     }
 
@@ -241,7 +266,16 @@ export const Wizard: React.FC = () => {
   const handleNext = async () => {
     if (!settings) return;
 
+    // STEP 1: Perfil
     if (currentStep === 1) {
+      if (!profileType) {
+        addToast("Qual é o seu perfil?", 'warning');
+        return;
+      }
+    }
+
+    // STEP 2: Valores
+    if (currentStep === 2) {
       const amount = getAmount();
       if (amount < settings.minLoanAmount) {
         addToast(`Valor mínimo é R$ ${settings.minLoanAmount}`, 'warning');
@@ -259,47 +293,65 @@ export const Wizard: React.FC = () => {
         addToast("Envie fotos do bem em garantia.", 'warning');
         return;
       }
+
+      // Validação Moto
+      if (profileType === 'MOTO' && !hasEntryValue) {
+        addToast("Para financiamento de moto, é necessário ter R$ 2.000,00 de entrada.", 'warning');
+        return;
+      }
     }
 
-    if (currentStep === 2 && !termsAccepted) {
+    // STEP 3: Termos
+    if (currentStep === 3 && !termsAccepted) {
       addToast("Aceite os termos para continuar.", 'warning');
       return;
     }
 
-    if (currentStep === 3) {
+    // STEP 4: Dados
+    if (currentStep === 4) {
       if (!formData.name || !formData.cpf || !formData.email || !formData.phone) {
         addToast("Preencha todos os dados pessoais.", 'warning');
         return;
       }
-      if (!formData.whatsappPersonal || !formData.contactTrust1 || !formData.contactTrust2) {
-        addToast("Preencha os contatos.", 'warning');
-        return;
-      }
-      if (!formData.occupation || !formData.companyName) {
-        addToast("Informe dados profissionais.", 'warning');
+      if (profileType === 'AUTONOMO' && !formData.cnpj) {
+        addToast("Informe seu CNPJ.", 'warning');
         return;
       }
     }
 
-    if (currentStep === 4) {
+    // STEP 5: Documentos
+    if (currentStep === 5) {
       if (!formData.selfie || formData.idCardFront.length === 0) {
-        addToast("Envie selfie e documento.", 'warning');
+        addToast("Envie selfie e documento de identidade.", 'warning');
         return;
       }
+
+      if (profileType === 'MOTO') {
+        if (formData.cnh.length === 0) {
+          addToast("Envie sua CNH.", 'warning');
+          return;
+        }
+      }
+
+      if (profileType === 'GARANTIA_VEICULO' || profileType === 'MOTO') {
+        // Validar docs de veiculo
+      }
+
       if (!formData.videoSelfie) {
         addToast("Grave o vídeo de confirmação.", 'warning');
         return;
       }
     }
 
-    if (currentStep === 5) {
+    // STEP 6: Banco
+    if (currentStep === 6) {
       if (!formData.bankName || !formData.pixKey || !formData.accountHolderName) {
         addToast("Preencha dados bancários.", 'warning');
         return;
       }
     }
 
-    if (currentStep < 6) setCurrentStep(c => c + 1);
+    if (currentStep < 7) setCurrentStep(c => c + 1);
   };
 
   const handleBack = () => { if (currentStep > 1) setCurrentStep(c => c - 1); };
@@ -325,8 +377,16 @@ export const Wizard: React.FC = () => {
       }
 
       // Submeter o pedido
+      // Submeter o pedido
+      // Concatenar Perfil e CNPJ na profissão para visualização no admin
+      const finalOccupation = `[${profileType}] ${formData.occupation || ''} ${formData.cnpj ? '- CNPJ: ' + formData.cnpj : ''}`;
+
       const success = await supabaseService.submitRequest({
         ...formData,
+        occupation: finalOccupation,
+        // Para Moto, usar CNH como documento principal se disponível
+        idCardFront: (profileType === 'MOTO' && formData.cnh.length > 0) ? formData.cnh : formData.idCardFront,
+
         amount: getAmount(),
         installments: settings.defaultInstallments,
         totalAmount: calculateTotal(),
@@ -434,7 +494,7 @@ export const Wizard: React.FC = () => {
             const isCompleted = step.id < currentStep;
             return (
               <div key={step.id} className="bg-black px-1 z-10">
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center ${isActive ? 'bg-[#D4AF37] text-black' : isCompleted ? 'bg-zinc-800 text-[#D4AF37] border border-[#D4AF37]' : 'bg-zinc-900 text-zinc-600 border border-zinc-800'
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#D4AF37] text-black scale-110' : isCompleted ? 'bg-zinc-800 text-[#D4AF37] border border-[#D4AF37]' : 'bg-zinc-900 text-zinc-600 border border-zinc-800'
                   }`}>
                   {isCompleted ? <Check size={16} /> : <Icon size={16} />}
                 </div>
@@ -443,62 +503,123 @@ export const Wizard: React.FC = () => {
           })}
         </div>
 
-        <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 shadow-2xl">
+        <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
 
-          {/* STEP 1: Valores */}
+          {/* STEP 1: Perfil (NOVO) */}
           {currentStep === 1 && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold">Quanto você precisa?</h2>
-                <p className="text-zinc-400 text-sm mt-2">Valores até R$ {settings.maxLoanNoGuarantee.toLocaleString('pt-BR')}</p>
+                <h2 className="text-2xl font-bold">Qual o seu perfil?</h2>
+                <p className="text-zinc-400 text-sm mt-2">Selecione a opção que melhor se encaixa.</p>
               </div>
 
-              {/* Pacotes */}
-              <div className="grid grid-cols-3 gap-3">
-                {settings.loanPackages.map((pkg, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => { setSelectedAmount(pkg); setCustomAmount(''); }}
-                    className={`p-4 rounded-xl border-2 transition-all ${selectedAmount === pkg && !customAmount ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600'
-                      }`}
-                  >
-                    <span className="text-lg font-bold">R$ {pkg.toLocaleString('pt-BR')}</span>
-                  </button>
-                ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  onClick={() => setProfileType('CLT')}
+                  className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${profileType === 'CLT' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-800 bg-black hover:border-zinc-600'}`}
+                >
+                  <Briefcase size={32} className={profileType === 'CLT' ? 'text-[#D4AF37]' : 'text-zinc-500'} />
+                  <span className="font-bold">CLT / Assalariado</span>
+                </button>
+
+                <button
+                  onClick={() => setProfileType('AUTONOMO')}
+                  className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${profileType === 'AUTONOMO' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-800 bg-black hover:border-zinc-600'}`}
+                >
+                  <Store size={32} className={profileType === 'AUTONOMO' ? 'text-[#D4AF37]' : 'text-zinc-500'} />
+                  <span className="font-bold">Autônomo / Comércio</span>
+                </button>
+
+                <button
+                  onClick={() => setProfileType('MOTO')}
+                  className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${profileType === 'MOTO' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-800 bg-black hover:border-zinc-600'}`}
+                >
+                  <Bike size={32} className={profileType === 'MOTO' ? 'text-[#D4AF37]' : 'text-zinc-500'} />
+                  <span className="font-bold">Financiamento Moto</span>
+                </button>
+
+                <button
+                  onClick={() => setProfileType('GARANTIA_VEICULO')}
+                  className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${profileType === 'GARANTIA_VEICULO' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-800 bg-black hover:border-zinc-600'}`}
+                >
+                  <Car size={32} className={profileType === 'GARANTIA_VEICULO' ? 'text-[#D4AF37]' : 'text-zinc-500'} />
+                  <span className="font-bold">Empréstimo c/ Veículo</span>
+                </button>
               </div>
+            </div>
+          )}
+
+          {/* STEP 2: Valores */}
+          {currentStep === 2 && (
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center p-3 bg-[#D4AF37]/10 rounded-full mb-4">
+                  <Rocket size={32} className="text-[#D4AF37]" />
+                </div>
+                <h2 className="text-2xl font-bold">Quanto você precisa?</h2>
+                <p className="text-zinc-400 text-sm mt-2">Simule agora e receba em instantes.</p>
+              </div>
+
+              {/* Pacotes (Ocultar se for Moto/Garantia, ou mostrar valores maiores) */}
+              {profileType !== 'GARANTIA_VEICULO' && (
+                <div className="grid grid-cols-3 gap-3">
+                  {settings.loanPackages.map((pkg, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => { setSelectedAmount(pkg); setCustomAmount(''); }}
+                      className={`p-4 rounded-xl border-2 transition-all ${selectedAmount === pkg && !customAmount ? 'border-[#D4AF37] bg-[#D4AF37]/10 scale-105' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600'
+                        }`}
+                    >
+                      <span className="text-lg font-bold">R$ {pkg.toLocaleString('pt-BR')}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Valor personalizado */}
               <div className="space-y-2">
-                <label className="text-sm text-zinc-400">Ou digite outro valor:</label>
+                <label className="text-sm text-zinc-400">Digite o valor desejado:</label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">R$</span>
                   <input
                     type="number"
                     value={customAmount}
                     onChange={(e) => setCustomAmount(e.target.value)}
-                    placeholder="0,00"
+                    placeholder={profileType === 'GARANTIA_VEICULO' ? "Ex: 15000" : "0,00"}
                     className="w-full bg-black border border-zinc-700 rounded-xl pl-12 pr-4 py-4 text-white text-xl font-bold focus:border-[#D4AF37] outline-none"
                   />
                 </div>
               </div>
 
+              {/* Checkbox Moto */}
+              {profileType === 'MOTO' && (
+                <label className="flex items-center gap-3 p-4 bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer hover:border-[#D4AF37] transition-all">
+                  <input
+                    type="checkbox"
+                    checked={hasEntryValue}
+                    onChange={(e) => setHasEntryValue(e.target.checked)}
+                    className="w-6 h-6 accent-[#D4AF37]"
+                  />
+                  <span className="font-bold text-white">Tenho R$ 2.000,00 para entrada</span>
+                </label>
+              )}
+
               {/* Aviso de análise */}
               <div className="bg-blue-900/20 border border-blue-600/30 rounded-xl p-4">
                 <p className="text-sm text-blue-400">
                   <AlertCircle size={16} className="inline mr-2" />
-                  Todos os valores passam por <strong>análise de crédito</strong>.
+                  Todos os valores passam por <strong>análise de crédito</strong> imediata.
                 </p>
               </div>
 
-              {/* Aviso de garantia */}
-              {needsGuarantee && (
-                <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-xl p-4 space-y-4">
+              {/* Aviso de garantia (Se não for Perfil Garantia que já tem isso implicito) */}
+              {needsGuarantee && profileType !== 'GARANTIA_VEICULO' && (
+                <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-xl p-4 space-y-4 animate-in fade-in">
                   <p className="text-sm text-yellow-400 flex items-start gap-2">
                     <AlertCircle size={18} className="shrink-0 mt-0.5" />
                     <span>Valores acima de <strong>R$ {settings.maxLoanNoGuarantee.toLocaleString('pt-BR')}</strong> precisam de um <strong>bem como garantia</strong>.</span>
                   </p>
 
-                  {/* Tipo de garantia */}
                   <div className="space-y-3">
                     <label className="text-sm text-zinc-400">Selecione o tipo de bem:</label>
                     <div className="grid grid-cols-3 gap-2">
@@ -519,41 +640,20 @@ export const Wizard: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Detalhes do bem */}
+                  {/* Detalhes do bem (Geral) */}
                   {guarantee.type && (
                     <div className="space-y-3 pt-3 border-t border-zinc-800">
-                      <Input label="Descrição do Bem" name="description" value={guarantee.description}
-                        onChange={(e) => setGuarantee(prev => ({ ...prev, description: e.target.value }))}
-                        placeholder="Ex: iPhone 13 Pro Max 256GB" />
-
-                      <Input label="Condições do Bem" name="condition" value={guarantee.condition}
-                        onChange={(e) => setGuarantee(prev => ({ ...prev, condition: e.target.value }))}
-                        placeholder="Ex: Excelente, com nota fiscal" />
-
-                      <Input label="Valor Estimado (R$)" name="estimatedValue" type="number"
-                        value={guarantee.estimatedValue}
-                        onChange={(e) => setGuarantee(prev => ({ ...prev, estimatedValue: e.target.value }))}
-                        placeholder="0,00" />
-
-                      {/* Fotos do bem */}
-                      {renderUploadArea('photos', 'Fotos do Bem (obrigatório)', guarantee.photos, true)}
-
-                      {/* Vídeo do bem */}
-                      <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                        <VideoUpload
-                          label="Vídeo do Bem (opcional)"
-                          subtitle="Mostre o bem funcionando"
-                          videoUrl={guarantee.video}
-                          onUpload={(url) => setGuarantee(prev => ({ ...prev, video: url }))}
-                          onRemove={() => setGuarantee(prev => ({ ...prev, video: '' }))}
-                        />
-                      </div>
+                      <Input label="Descrição do Bem" name="description" value={guarantee.description} onChange={(e) => setGuarantee(prev => ({ ...prev, description: e.target.value }))} placeholder="Ex: iPhone 13" />
+                      {renderUploadArea('photos', 'Fotos do Bem', guarantee.photos, true)}
                     </div>
                   )}
+
                 </div>
               )}
 
-              {/* Informação sobre próximos passos */}
+              {/* Se for Garantia Veículo, mostramos inputs específicos aqui ou no STEP DADOS? */}
+              {/* Vamos deixar para STEP DADOS/DOCS para não poluir valores */}
+
               <div className="bg-black border border-zinc-700 rounded-2xl p-5">
                 <div className="text-center space-y-3">
                   <Clock size={32} className="mx-auto text-[#D4AF37]" />
@@ -561,16 +661,13 @@ export const Wizard: React.FC = () => {
                   <p className="text-3xl font-bold text-[#D4AF37]">
                     R$ {getAmount().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
-                  <p className="text-sm text-zinc-400">
-                    Após a análise, apresentaremos as condições de pagamento.
-                  </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* STEP 2: Termos */}
-          {currentStep === 2 && (
+          {/* STEP 3: Termos */}
+          {currentStep === 3 && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center mb-4">
                 <Shield size={48} className="mx-auto text-[#D4AF37] mb-3" />
@@ -580,40 +677,31 @@ export const Wizard: React.FC = () => {
               {/* Taxas REAIS do banco */}
               <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-3">
                 <h3 className="font-bold text-red-400 text-sm uppercase flex items-center gap-2">
-                  <AlertCircle size={16} /> Taxas e Juros
+                  <AlertCircle size={16} /> Transparência Total
                 </h3>
 
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="bg-black/30 p-3 rounded-lg">
-                    <p className="text-zinc-500 text-xs">Juros ao Dia</p>
-                    <p className="text-white font-bold text-lg">{settings.interestRateDaily.toFixed(2)}%</p>
-                  </div>
                   <div className="bg-black/30 p-3 rounded-lg">
                     <p className="text-zinc-500 text-xs">Juros ao Mês</p>
                     <p className="text-white font-bold text-lg">{settings.interestRateMonthly}%</p>
                   </div>
                   <div className="bg-black/30 p-3 rounded-lg">
-                    <p className="text-zinc-500 text-xs">Juros ao Ano</p>
-                    <p className="text-white font-bold text-lg">{settings.interestRateYearly}%</p>
+                    <p className="text-zinc-500 text-xs">Aprovação</p>
+                    <p className="text-white font-bold text-lg">Imediata</p>
                   </div>
-                  <div className="bg-black/30 p-3 rounded-lg">
-                    <p className="text-zinc-500 text-xs">Multa Fixa Atraso</p>
-                    <p className="text-white font-bold text-lg">R$ {settings.lateFeeFixed.toFixed(2)}</p>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-red-900/50 text-xs text-red-300 space-y-1">
-                  <p>• Em atraso: <strong>{settings.lateFeeDaily}% ao dia</strong> + multa fixa</p>
-                  <p>• Juros moratórios: <strong>{settings.lateFeeMonthly}% ao mês</strong></p>
                 </div>
               </div>
 
-              {/* Documentos */}
               <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-3">
                 <h3 className="font-bold text-[#D4AF37] text-sm uppercase flex items-center gap-2">
-                  <FileCheck size={16} /> Documentos Necessários
+                  <FileCheck size={16} /> O que vamos precisar:
                 </h3>
-                {['Nome completo', 'Tempo de carteira (mín. 3 meses)', 'Profissão e empresa', 'Holerite ou extrato', 'Selfie com RG ou CNH', 'Comprovante de endereço + boleto', 'Carteira de Trabalho Digital', 'Vídeo confirmando juros'].map((doc, idx) => (
+                {/* Lista dinâmica baseada no Perfil */}
+                {(profileType === 'CLT' ? ['RG ou CNH', 'Comprovante Residência', 'Holerite/Extrato'] :
+                  profileType === 'AUTONOMO' ? ['CNPJ e RG/CNH', 'Comp. Endereço (Res+Com)', 'Vídeo do Local'] :
+                    profileType === 'MOTO' ? ['CNH A', 'Comprovante Residência', 'Entrada de R$ 2.000'] :
+                      ['Dados do Veículo', 'Fotos e Vídeos', 'CNH', 'Documentão em dia']
+                ).map((doc, idx) => (
                   <div key={idx} className="flex items-start gap-3 py-2 border-b border-zinc-900 last:border-0">
                     <CheckCircle2 size={16} className="text-green-500 mt-0.5 shrink-0" />
                     <span className="text-sm text-zinc-300">{doc}</span>
@@ -621,87 +709,116 @@ export const Wizard: React.FC = () => {
                 ))}
               </div>
 
-              <div className="bg-green-900/20 border border-green-600/30 rounded-xl p-4">
-                <p className="text-sm text-green-400 flex items-center gap-2">
-                  <Clock size={18} /> Liberação em até <strong>{settings.releaseTimeHours}h</strong> após aprovação.
-                </p>
-              </div>
-
               <label className="flex items-start gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer hover:border-[#D4AF37]">
                 <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-[#D4AF37] w-6 h-6" />
                 <div>
-                  <span className="text-white font-bold">Li e aceito os termos</span>
-                  <p className="text-xs text-zinc-500 mt-1">Estou ciente dos juros de {settings.interestRateMonthly}% a.m. e multas.</p>
+                  <span className="text-white font-bold">Aceito avançar com a simulação</span>
+                  <p className="text-xs text-zinc-500 mt-1">Concordo com a consulta dos meus dados nos órgãos de proteção ao crédito.</p>
                 </div>
               </label>
             </div>
           )}
 
-          {/* STEP 3-6: Dados, Documentos, Banco, Confirmação */}
-          {currentStep === 3 && (
+          {/* STEP 4: Dados */}
+          {currentStep === 4 && (
             <div className="space-y-5 animate-in slide-in-from-right">
-              <h2 className="text-xl font-bold">Seus Dados</h2>
+              <h2 className="text-xl font-bold">Seus Dados Pessoais</h2>
+
               <div className="space-y-4">
-                <Input label="Nome Completo" name="name" value={formData.name} onChange={handleChange} placeholder="Seu nome" />
+                <Input label="Nome Completo" name="name" value={formData.name} onChange={handleChange} placeholder="Como no documento" />
                 <Input label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00" error={errors.cpf} />
-                <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="email@email.com" />
-                <Input label="Nascimento" type="date" name="birthDate" value={formData.birthDate} onChange={handleChange} />
-                <Input label="WhatsApp" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
+                <Input label="WhatsApp Principal" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
+                <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} />
               </div>
+
+              {/* Dados Específicos por Perfil */}
+              {profileType === 'AUTONOMO' && (
+                <div className="pt-4 border-t border-zinc-800 space-y-4">
+                  <h3 className="text-sm font-bold text-[#D4AF37]">Dados do Negócio</h3>
+                  <Input label="CNPJ" name="cnpj" value={formData.cnpj} onChange={handleChange} placeholder="00.000.000/0000-00" />
+                  <Input label="Endereço Comercial" name="businessAddress" value={formData.businessAddress} onChange={handleChange} />
+                  <Input label="Renda Mensal Média" name="income" value={formData.income} onChange={handleChange} placeholder="0,00" />
+                </div>
+              )}
+
+              {(profileType === 'MOTO' || profileType === 'GARANTIA_VEICULO' || profileType === 'CLT') && (
+                <div className="pt-4 border-t border-zinc-800 space-y-4">
+                  <h3 className="text-sm font-bold text-[#D4AF37]">Dados Profissionais</h3>
+                  <Input label="Profissão" name="occupation" value={formData.occupation} onChange={handleChange} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input label="Renda Mensal" name="income" value={formData.income} onChange={handleChange} />
+                    <Input label="Dia Pagamento" name="workTime" value={formData.workTime} onChange={handleChange} placeholder="Dia 05" />
+                  </div>
+                </div>
+              )}
+
               <div className="pt-4 border-t border-zinc-800 space-y-4">
-                <h3 className="text-sm font-bold text-[#D4AF37]">Contatos</h3>
-                <Input label="Outro WhatsApp" name="whatsappPersonal" value={formData.whatsappPersonal} onChange={handleChange} placeholder="(00) 00000-0000" />
-                <Input label="Contato 1 - Nome" name="contactTrust1Name" value={formData.contactTrust1Name} onChange={handleChange} placeholder="Nome" />
-                <Input label="Contato 1 - Tel" name="contactTrust1" value={formData.contactTrust1} onChange={handleChange} placeholder="(00) 00000-0000" />
-                <Input label="Contato 2 - Nome" name="contactTrust2Name" value={formData.contactTrust2Name} onChange={handleChange} placeholder="Nome" />
-                <Input label="Contato 2 - Tel" name="contactTrust2" value={formData.contactTrust2} onChange={handleChange} placeholder="(00) 00000-0000" />
-                <Input label="Instagram" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="@usuario" />
-              </div>
-              <div className="pt-4 border-t border-zinc-800 space-y-4">
-                <h3 className="text-sm font-bold text-[#D4AF37]">Profissional</h3>
-                <Input label="Profissão" name="occupation" value={formData.occupation} onChange={handleChange} placeholder="Ex: Vendedor" />
-                <Input label="Empresa" name="companyName" value={formData.companyName} onChange={handleChange} placeholder="Nome" />
-                <Input label="Endereço Empresa" name="companyAddress" value={formData.companyAddress} onChange={handleChange} placeholder="Endereço" />
-                <Input label="Tempo Carteira" name="workTime" value={formData.workTime} onChange={handleChange} placeholder="Ex: 6 meses" />
-              </div>
-              <div className="pt-4 border-t border-zinc-800 space-y-4">
-                <h3 className="text-sm font-bold text-[#D4AF37]">Endereço</h3>
+                <h3 className="text-sm font-bold text-[#D4AF37]">Endereço Residencial</h3>
                 <Input label="CEP" name="cep" value={formData.cep} onChange={handleChange} placeholder="00000-000" />
                 <Input label="Endereço" name="address" value={formData.address} readOnly className="opacity-60" />
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="Número" name="number" value={formData.number} onChange={handleChange} placeholder="123" />
-                  <Input label="Renda" name="income" type="number" value={formData.income} onChange={handleChange} placeholder="0,00" />
-                </div>
+                <Input label="Número" name="number" value={formData.number} onChange={handleChange} placeholder="123" />
               </div>
             </div>
           )}
 
-          {currentStep === 4 && (
+          {/* STEP 5: Documentos */}
+          {currentStep === 5 && (
             <div className="space-y-6 animate-in slide-in-from-right">
-              <h2 className="text-xl font-bold">Documentos</h2>
+              <h2 className="text-xl font-bold">Documentação</h2>
+              <p className="text-zinc-400 text-sm">Envie fotos legíveis para agilizar a aprovação.</p>
+
+              {/* Obrigatórios para todos */}
               <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                <Camera label="Selfie com Documento" onCapture={(img) => setFormData({ ...formData, selfie: img })} />
+                <Camera label="Selfie Segurando Documento" onCapture={(img) => setFormData({ ...formData, selfie: img })} />
               </div>
-              <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                <VideoUpload label="Vídeo Confirmação" subtitle={`Diga seu nome e que está ciente dos juros de ${settings.interestRateMonthly}%`}
+
+              {renderUploadArea('idCardFront', 'RG ou CNH (Frente)', formData.idCardFront)}
+              {renderUploadArea('idCardBack', 'RG ou CNH (Verso)', formData.idCardBack)}
+
+              {/* Específicos */}
+              {profileType === 'MOTO' && (
+                <div className="space-y-6 border-t border-zinc-800 pt-6">
+                  <h3 className="font-bold text-[#D4AF37]">Habilitação</h3>
+                  {renderUploadArea('cnh', 'Foto da CNH (Obrigatório)', formData.cnh || [])}
+                </div>
+              )}
+
+              {profileType === 'GARANTIA_VEICULO' && (
+                <div className="space-y-6 border-t border-zinc-800 pt-6">
+                  <h3 className="font-bold text-[#D4AF37]">Dados do Veículo</h3>
+                  {renderUploadArea('vehicleCRLV', 'Documento do Carro (CRLV)', formData.vehicleCRLV)}
+                  {renderUploadArea('vehicleFront', 'Fotos do Veículo', formData.vehicleFront)}
+                </div>
+              )}
+
+              {profileType === 'AUTONOMO' && (
+                <div className="space-y-6 border-t border-zinc-800 pt-6">
+                  <h3 className="font-bold text-[#D4AF37]">Comprovantes do Negócio</h3>
+                  <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                    <VideoUpload label="Vídeo do Estabelecimento" subtitle="Mostre seu local de trabalho"
+                      videoUrl={formData.videoHouse} onUpload={(url) => setFormData({ ...formData, videoHouse: url })}
+                      onRemove={() => setFormData({ ...formData, videoHouse: '' })} />
+                  </div>
+                </div>
+              )}
+
+              {renderUploadArea('proofAddress', 'Comprovante de Endereço', formData.proofAddress)}
+
+              {/* Video de confirmação sempre bom */}
+              <div className="bg-black p-4 rounded-xl border border-zinc-800 mt-6">
+                <VideoUpload label="Vídeo de Aceite" subtitle={`Diga seu nome e: "Confirmo o pedido de empréstimo"`}
                   videoUrl={formData.videoSelfie} onUpload={(url) => setFormData({ ...formData, videoSelfie: url })}
                   onRemove={() => setFormData({ ...formData, videoSelfie: '' })} />
               </div>
-              {renderUploadArea('idCardFront', 'RG/CNH Frente', formData.idCardFront)}
-              {renderUploadArea('idCardBack', 'RG/CNH Verso', formData.idCardBack)}
-              {renderUploadArea('proofAddress', 'Comprovante Endereço', formData.proofAddress)}
-              {renderUploadArea('billInName', 'Boleto em seu Nome', formData.billInName)}
-              {renderUploadArea('proofIncome', 'Holerite/Extrato', formData.proofIncome)}
-              {renderUploadArea('workCard', 'Carteira de Trabalho', formData.workCard)}
-              {renderUploadArea('bankStatement', 'Extrato Bancário', formData.bankStatement)}
             </div>
           )}
 
-          {currentStep === 5 && (
+          {/* STEP 6: Banco */}
+          {currentStep === 6 && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center">
                 <Landmark size={48} className="mx-auto text-[#D4AF37] mb-3" />
-                <h2 className="text-xl font-bold">Dados para Depósito</h2>
+                <h2 className="text-xl font-bold">Onde depositamos o dinheiro?</h2>
               </div>
               <Input label="Banco" name="bankName" value={formData.bankName} onChange={handleChange} placeholder="Ex: Nubank" />
               <div className="grid grid-cols-4 gap-2">
@@ -712,11 +829,11 @@ export const Wizard: React.FC = () => {
               </div>
               <Input label="Chave PIX" name="pixKey" value={formData.pixKey} onChange={handleChange} placeholder="Sua chave" />
               <Input label="Nome Titular" name="accountHolderName" value={formData.accountHolderName} onChange={handleChange} placeholder="Nome no banco" />
-              <Input label="CPF Titular" name="accountHolderCpf" value={formData.accountHolderCpf} onChange={handleChange} placeholder="000.000.000-00" />
             </div>
           )}
 
-          {currentStep === 6 && (
+          {/* STEP 7: Confirmar */}
+          {currentStep === 7 && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center">
                 <CheckCircle2 size={48} className="mx-auto text-green-500 mb-3" />
@@ -725,33 +842,19 @@ export const Wizard: React.FC = () => {
 
               <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-zinc-400">Valor:</span><span className="font-bold">R$ {getAmount().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Taxa:</span><span className="font-bold">{settings.interestRateMonthly}% a.m.</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Total:</span><span className="font-bold">R$ {calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Perfil:</span><span className="font-bold">{profileType}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Parcela:</span><span className="font-bold text-[#D4AF37]">{settings.defaultInstallments}x R$ {calculateInstallment().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                {needsGuarantee && <div className="flex justify-between"><span className="text-zinc-400">Garantia:</span><span className="font-bold text-yellow-400">{guarantee.description}</span></div>}
               </div>
 
               {/* TERMO FINAL */}
               <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-2">
                 <h3 className="font-bold text-red-400 text-xs uppercase">TERMO DE COMPROMISSO</h3>
-                <ul className="text-xs text-zinc-400 space-y-1 ml-4 list-disc">
-                  <li>Juros: <strong className="text-white">{settings.interestRateMonthly}% ao mês</strong> ({settings.interestRateDaily.toFixed(2)}%/dia | {settings.interestRateYearly}%/ano)</li>
-                  <li>Atraso: <strong className="text-white">{settings.lateFeeDaily}% ao dia</strong></li>
-                  <li>Multa fixa: <strong className="text-white">R$ {settings.lateFeeFixed.toFixed(2)}</strong></li>
-                  <li>Mora: <strong className="text-white">{settings.lateFeeMonthly}% ao mês</strong></li>
-                </ul>
+                <p className="text-xs text-zinc-400">Ao assinar, declaro que as informações são verdadeiras e autorizo a emissão de CCB (Cédula de Crédito Bancário).</p>
               </div>
 
               <div>
-                <h3 className="font-bold mb-3">Assinatura Digital</h3>
+                <h3 className="font-bold mb-3">Sua Assinatura</h3>
                 <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
-              </div>
-
-              <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl p-4 text-center">
-                <p className="text-sm text-[#D4AF37]">
-                  <Clock size={16} className="inline mr-2" />
-                  Depósito em até <strong>{settings.releaseTimeHours}h</strong> após aprovação.
-                </p>
               </div>
             </div>
           )}
@@ -760,11 +863,13 @@ export const Wizard: React.FC = () => {
         {/* Buttons */}
         <div className="fixed bottom-0 left-0 w-full p-4 bg-black/90 border-t border-zinc-900 flex gap-4 z-40 backdrop-blur-md">
           {currentStep > 1 && <Button onClick={handleBack} variant="secondary" className="flex-1">Voltar</Button>}
-          {currentStep < 6 ? (
-            <Button onClick={handleNext} className="flex-1">Continuar</Button>
+          {currentStep < 7 ? (
+            <Button onClick={handleNext} className="flex-1 font-bold text-lg">
+              {currentStep === 1 ? 'Começar Simulação' : 'Continuar'}
+            </Button>
           ) : (
-            <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700" isLoading={loading} disabled={!formData.signature}>
-              Enviar Solicitação
+            <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading} disabled={!formData.signature}>
+              SOLICITAR MEU FINANCIAMENTO
             </Button>
           )}
         </div>
