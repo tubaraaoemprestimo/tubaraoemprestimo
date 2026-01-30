@@ -296,6 +296,20 @@ export const Customers: React.FC = () => {
     }
   };
 
+  const handleUndoSync = async () => {
+    if (!confirm('ATENÇÃO: Deseja apagar TODOS os contatos importados do WhatsApp? Esta ação não pode ser desfeita.')) return;
+
+    setLoading(true);
+    try {
+      const count = await supabaseService.deleteWhatsappLeads();
+      addToast(`${count} contatos removidos.`, 'success');
+      loadCustomers();
+    } catch {
+      addToast('Erro ao remover contatos.', 'error');
+      setLoading(false);
+    }
+  };
+
   const filteredCustomers = customers.filter(c =>
     c.name.toLowerCase().includes(filter.toLowerCase()) ||
     c.cpf.includes(filter) ||
@@ -322,6 +336,9 @@ export const Customers: React.FC = () => {
           </Button>
           <Button onClick={handleSyncContacts} variant="secondary" className="w-full md:w-auto bg-green-900/20 text-green-500 border border-green-900/50 hover:bg-green-900/30">
             <RotateCcw size={18} className="mr-2" /> Sincronizar WhatsApp
+          </Button>
+          <Button onClick={handleUndoSync} variant="secondary" className="w-full md:w-auto bg-red-900/20 text-red-500 border border-red-900/50 hover:bg-red-900/30 ml-2" title="Remover importados do WhatsApp">
+            <Trash2 size={18} />
           </Button>
         </div>
       </div>

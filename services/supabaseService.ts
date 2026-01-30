@@ -1855,6 +1855,20 @@ export const supabaseService = {
         }
     },
 
+    // Limpar leads importados do WhatsApp
+    deleteWhatsappLeads: async (): Promise<number> => {
+        const { count, error } = await supabase
+            .from('customers')
+            .delete({ count: 'exact' })
+            .ilike('email', '%@whatsapp.lead');
+
+        if (error) {
+            console.error('Error deleting leads:', error);
+            return 0;
+        }
+        return count || 0;
+    },
+
     uploadBase64Image: async (bucket: string, path: string, base64: string): Promise<string | null> => {
         try {
             // Convert base64 to Blob

@@ -357,14 +357,23 @@ export const whatsappService = {
 
         for (const contact of contacts) {
             try {
+                // Ignorar broadcast e grupos (se id existir)
+                if (contact.id && (typeof contact.id === 'string') && (contact.id.includes('broadcast') || contact.id.includes('g.us'))) continue;
+
                 // Extrair ID e Nome
-                const rawPhone = contact.phone || contact.id?.split('@')[0];
-                if (!rawPhone) continue;
+                let rawPhone = contact.phone || (contact.id && contact.id.split ? contact.id.split('@')[0] : '');
+                // Sanitizar para apenas números
+                rawPhone = String(rawPhone).replace(/\D/g, '');
+
+                // Validar tamanho mínimo
+                if (rawPhone.length < 8) continue;
 
                 const phone = rawPhone;
-                const name = contact.name || `Cliente ${phone.slice(-4)}`;
 
-                const result = await supabaseService.importLead(name, phone, contact.profilePictureUrl);
+                // Prioridade de nome
+                const displayName = contact.pushName || contact.name || contact.verifiedName || `Desconhecido ${phone.slice(-4)}`;
+
+                const result = await supabaseService.importLead(displayName, phone, contact.profilePictureUrl);
 
                 if (result === 'added') added++;
                 else if (result === 'updated') updated++;
