@@ -1836,7 +1836,7 @@ export const supabaseService = {
                 phone: safePhone,
                 email: fakeEmail,
                 cpf: safeCpf,
-                status: 'LEAD',
+                status: 'ACTIVE',
                 // origin: 'WAPP', // Removido origin pois pode não existir no schema ou ser curto
                 internal_score: 500,
                 total_debt: 0,
