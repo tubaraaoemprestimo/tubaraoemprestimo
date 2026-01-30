@@ -365,8 +365,13 @@ export const whatsappService = {
                 // Sanitizar para apenas números
                 rawPhone = String(rawPhone).replace(/\D/g, '');
 
+                // Normalização BR (Supor DDI 55 se vier sem)
+                if (rawPhone.length >= 10 && rawPhone.length <= 11) {
+                    rawPhone = '55' + rawPhone;
+                }
+
                 // Validar tamanho mínimo
-                if (rawPhone.length < 8) continue;
+                if (rawPhone.length < 12) continue;
 
                 const phone = rawPhone;
 
