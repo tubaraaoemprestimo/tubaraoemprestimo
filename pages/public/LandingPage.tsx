@@ -12,6 +12,14 @@ export const LandingPage: React.FC = () => {
     const [isMenuOpen, setIsMenuOpen] = React.useState(false);
     const navigate = useNavigate();
 
+    const scrollToSection = (id: string) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth' });
+        }
+        setIsMenuOpen(false);
+    };
+
     return (
         <div className="min-h-screen bg-black text-white selection:bg-[#D4AF37] selection:text-black overflow-x-hidden">
             {/* Background Gradients */}
@@ -26,9 +34,9 @@ export const LandingPage: React.FC = () => {
                     <Logo size="md" />
 
                     <div className="hidden md:flex items-center gap-8">
-                        <a href="#features" className="text-zinc-400 hover:text-white transition-colors">Funcionalidades</a>
-                        <a href="#security" className="text-zinc-400 hover:text-white transition-colors">Segurança</a>
-                        <a href="#mobile" className="text-zinc-400 hover:text-white transition-colors">App Mobile</a>
+                        <button onClick={() => scrollToSection('features')} className="text-zinc-400 hover:text-white transition-colors cursor-pointer bg-transparent border-0">Funcionalidades</button>
+                        <button onClick={() => scrollToSection('security')} className="text-zinc-400 hover:text-white transition-colors cursor-pointer bg-transparent border-0">Segurança</button>
+                        <button onClick={() => scrollToSection('mobile')} className="text-zinc-400 hover:text-white transition-colors cursor-pointer bg-transparent border-0">App Mobile</button>
 
                         <div className="flex items-center gap-4 pl-4 border-l border-zinc-800">
                             <Link to="/login" className="text-white hover:text-[#D4AF37] font-medium transition-colors border border-zinc-700 px-4 py-2 rounded-lg text-sm">
@@ -56,9 +64,9 @@ export const LandingPage: React.FC = () => {
             {isMenuOpen && (
                 <div className="fixed inset-0 z-40 bg-black pt-24 px-6 md:hidden">
                     <div className="flex flex-col gap-6 text-lg">
-                        <a href="#features" onClick={() => setIsMenuOpen(false)} className="text-zinc-400">Funcionalidades</a>
-                        <a href="#security" onClick={() => setIsMenuOpen(false)} className="text-zinc-400">Segurança</a>
-                        <a href="#mobile" onClick={() => setIsMenuOpen(false)} className="text-zinc-400">App White Label</a>
+                        <button onClick={() => scrollToSection('features')} className="text-zinc-400 text-left">Funcionalidades</button>
+                        <button onClick={() => scrollToSection('security')} className="text-zinc-400 text-left">Segurança</button>
+                        <button onClick={() => scrollToSection('mobile')} className="text-zinc-400 text-left">App White Label</button>
                         <hr className="border-zinc-800" />
                         <Link to="/login" className="text-white border border-zinc-700 p-2 text-center rounded">Área do Cliente (Login)</Link>
                         <a href="https://wa.me/5511915712203" className="bg-[#D4AF37] text-black font-bold p-4 text-center rounded-lg">
