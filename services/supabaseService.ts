@@ -1806,7 +1806,46 @@ export const supabaseService = {
         }
     },
 
-    // Helper to upload base64 image
+    // Lead Import Helper
+    importLead: async (name: string, phone: string, profilePic?: string): Promise<'added' | 'updated' | 'error'> => {
+        try {
+            // Verifica se cliente já existe pelo telefone
+            const { data: existing } = await supabase
+                .from('customers')
+                .select('id')
+                .eq('phone', phone)
+                .maybeSingle();
+
+            if (existing) return 'updated';
+
+            // Cria novo lead
+            // Email fake para garantir constraint unique se houver
+            const fakeEmail = `${phone.replace(/\D/g, '')}@whatsapp.lead`;
+
+            // Tenta inserir
+            const { error } = await supabase.from('customers').insert({
+                name: name || `WhatsApp ${phone}`,
+                phone: phone,
+                email: fakeEmail,
+                cpf: `LEAD${phone.slice(-7)}`, // Fake CPF to avoid constraint if any. Max 11 chars usually? CPF is 11. 'LEAD' + 7 digits = 11.
+                status: 'LEAD',
+                internal_score: 500,
+                total_debt: 0,
+                active_loans_count: 0
+            });
+
+            if (error) {
+                // Se der erro de Unique Constraint no CPF ou Email, ignorar e considerar 'updated'
+                console.warn('Import lead minor error (likely dup):', error.message);
+                return 'error';
+            }
+            return 'added';
+        } catch (e) {
+            console.error('Import Lead Exception:', e);
+            return 'error';
+        }
+    },
+
     uploadBase64Image: async (bucket: string, path: string, base64: string): Promise<string | null> => {
         try {
             // Convert base64 to Blob

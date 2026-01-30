@@ -275,6 +275,27 @@ export const Customers: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const handleSyncContacts = async () => {
+    if (!confirm('Deseja sincronizar os contatos do WhatsApp conectados à API?')) return;
+
+    addToast('Iniciando sincronização...', 'info');
+    setLoading(true);
+
+    try {
+      const res = await whatsappService.syncContacts();
+      addToast(`Sincronização concluída! ${res.added} novos, ${res.updated} atualizados.`, 'success');
+      if (res.added > 0 || res.updated > 0) {
+        loadCustomers();
+      } else {
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error(error);
+      addToast('Erro ao sincronizar contatos.', 'error');
+      setLoading(false);
+    }
+  };
+
   const filteredCustomers = customers.filter(c =>
     c.name.toLowerCase().includes(filter.toLowerCase()) ||
     c.cpf.includes(filter) ||
@@ -298,6 +319,9 @@ export const Customers: React.FC = () => {
           </div>
           <Button onClick={handleExportCSV} variant="secondary" className="w-full md:w-auto bg-zinc-900 border border-zinc-800 hover:border-[#D4AF37]">
             <Download size={18} className="mr-2" /> Exportar CSV
+          </Button>
+          <Button onClick={handleSyncContacts} variant="secondary" className="w-full md:w-auto bg-green-900/20 text-green-500 border border-green-900/50 hover:bg-green-900/30">
+            <RotateCcw size={18} className="mr-2" /> Sincronizar WhatsApp
           </Button>
         </div>
       </div>

@@ -279,5 +279,68 @@ export const whatsappService = {
             console.error("[WhatsApp Service] Network/Logic Error:", error);
             return false;
         }
+    },
+
+    // Buscar Contatos da API
+    fetchContacts: async (): Promise<any[]> => {
+        const config = await supabaseService.getWhatsappConfig();
+        if (!config.apiUrl || !config.apiKey) return [];
+
+        try {
+            const baseUrl = cleanUrl(config.apiUrl);
+            // Tenta buscar contatos (Endpoint Evolution pode variar, tentando v2/chat/findContacts)
+            const response = await fetch(`${baseUrl}/chat/findContacts/${config.instanceName}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': config.apiKey,
+                    'ngrok-skip-browser-warning': 'true'
+                }
+            });
+
+            if (!response.ok) {
+                console.error('[WhatsApp] Failed to fetch contacts:', await response.text());
+                return [];
+            }
+
+            const data = await response.json();
+            return Array.isArray(data) ? data : (data || []);
+        } catch (e) {
+            console.error('[WhatsApp] Except fetching contacts:', e);
+            return [];
+        }
+    },
+
+    // Sincronizar contatos com Supabase
+    syncContacts: async (): Promise<{ added: number, updated: number, errors: number }> => {
+        const contacts = await whatsappService.fetchContacts();
+        if (contacts.length === 0) return { added: 0, updated: 0, errors: 0 };
+
+        let added = 0;
+        let updated = 0;
+        let errors = 0;
+
+        for (const contact of contacts) {
+            try {
+                // Extrair ID e Nome
+                const rawPhone = contact.phone || contact.id?.split('@')[0];
+                if (!rawPhone) continue;
+
+                const phone = rawPhone;
+                const name = contact.name || `Cliente ${phone.slice(-4)}`;
+
+                const result = await supabaseService.importLead(name, phone, contact.profilePictureUrl);
+
+                if (result === 'added') added++;
+                else if (result === 'updated') updated++;
+                else errors++;
+
+            } catch (e) {
+                errors++;
+            }
+        }
+
+        return { added, updated, errors };
     }
 };
+
