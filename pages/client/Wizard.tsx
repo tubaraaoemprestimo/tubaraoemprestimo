@@ -480,7 +480,7 @@ export const Wizard: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <InstallPwaButton className="!py-1.5 !px-3" />
-          <div className="text-sm font-medium text-[#D4AF37]">{currentStep}/6</div>
+          <div className="text-sm font-medium text-[#D4AF37]">{currentStep}/{steps.length}</div>
         </div>
       </div>
 
