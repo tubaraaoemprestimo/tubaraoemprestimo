@@ -10,17 +10,7 @@ import { Logo } from '../../components/Logo';
 
 export const LandingPage: React.FC = () => {
     const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-    const [selectedProfile, setSelectedProfile] = React.useState<'clt' | 'business' | 'vehicle' | null>(null);
-    const [hasEntry, setHasEntry] = React.useState(false);
     const navigate = useNavigate();
-
-    const handleStartApplication = () => {
-        // Redireciona para cadastro com parâmetros de pré-seleção (pode ser usado no futuro para pré-preencher)
-        const params = new URLSearchParams();
-        if (selectedProfile) params.append('profile', selectedProfile);
-        if (hasEntry) params.append('has_entry', 'true');
-        navigate(`/auth/register?${params.toString()}`);
-    };
 
     return (
         <div className="min-h-screen bg-black text-white selection:bg-[#D4AF37] selection:text-black overflow-x-hidden">
@@ -41,15 +31,15 @@ export const LandingPage: React.FC = () => {
                         <a href="#mobile" className="text-zinc-400 hover:text-white transition-colors">App Mobile</a>
 
                         <div className="flex items-center gap-4 pl-4 border-l border-zinc-800">
-                            <Link to="/login" className="text-white hover:text-[#D4AF37] font-medium transition-colors">
+                            <Link to="/login" className="text-white hover:text-[#D4AF37] font-medium transition-colors border border-zinc-700 px-4 py-2 rounded-lg text-sm">
                                 Área do Cliente
                             </Link>
-                            <Link
-                                to="/wizard"
+                            <a
+                                href="https://wa.me/5511999999999"
                                 className="bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold px-6 py-2.5 rounded-lg transition-all transform hover:scale-105 shadow-lg shadow-[#D4AF37]/20 flex items-center gap-2"
                             >
-                                Simular Agora <ArrowRight size={18} />
-                            </Link>
+                                Contratar Sistema <ArrowRight size={18} />
+                            </a>
                         </div>
                     </div>
 
@@ -68,139 +58,115 @@ export const LandingPage: React.FC = () => {
                     <div className="flex flex-col gap-6 text-lg">
                         <a href="#features" onClick={() => setIsMenuOpen(false)} className="text-zinc-400">Funcionalidades</a>
                         <a href="#security" onClick={() => setIsMenuOpen(false)} className="text-zinc-400">Segurança</a>
-                        <a href="#mobile" onClick={() => setIsMenuOpen(false)} className="text-zinc-400">App Mobile</a>
+                        <a href="#mobile" onClick={() => setIsMenuOpen(false)} className="text-zinc-400">App White Label</a>
                         <hr className="border-zinc-800" />
-                        <Link to="/login" className="text-white">Área do Cliente</Link>
-                        <Link to="/wizard" className="bg-[#D4AF37] text-black font-bold p-4 text-center rounded-lg">
-                            Simular Agora
-                        </Link>
+                        <Link to="/login" className="text-white border border-zinc-700 p-2 text-center rounded">Área do Cliente (Login)</Link>
+                        <a href="https://wa.me/5511999999999" className="bg-[#D4AF37] text-black font-bold p-4 text-center rounded-lg">
+                            Contratar Sistema
+                        </a>
                     </div>
                 </div>
             )}
 
-            {/* Hero Section - ALTA CONVERSÃO & TRIAGEM */}
+            {/* Hero Section - VENDA DO SOFTWARE (B2B) */}
             <section className="relative z-10 pt-24 pb-32">
                 <div className="container mx-auto px-6">
-                    <div className="text-center max-w-4xl mx-auto mb-12 animate-fade-in">
-                        <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-[#D4AF37] text-black font-bold text-sm mb-6 shadow-lg shadow-[#D4AF37]/20 uppercase tracking-wide">
-                            <Zap size={16} fill="currentColor" />
-                            Aprovação em segundos via IA
-                        </div>
-                        <h1 className="text-5xl md:text-7xl font-bold leading-tight mb-6">
-                            Dinheiro na conta <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] to-[#F2D785]">HOJE.</span><br />
-                            Qual o seu perfil?
-                        </h1>
-                        <p className="text-zinc-400 text-xl md:text-2xl leading-relaxed max-w-2xl mx-auto">
-                            Selecione sua categoria abaixo para liberar sua proposta personalizada imediatamente. Sem filas, sem papelada.
-                        </p>
-                    </div>
-
-                    {/* TRIAGEM - SELETOR DE PERFIL */}
-                    <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-                        {/* CARD CLT */}
-                        <div
-                            onClick={() => setSelectedProfile('clt')}
-                            className={`cursor-pointer group relative p-8 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-2 ${selectedProfile === 'clt' ? 'bg-zinc-900 border-[#D4AF37] shadow-2xl shadow-[#D4AF37]/10' : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'}`}
-                        >
-                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 text-3xl transition-colors ${selectedProfile === 'clt' ? 'bg-[#D4AF37] text-black' : 'bg-zinc-800 text-zinc-400 group-hover:bg-[#D4AF37]/20 group-hover:text-[#D4AF37]'}`}>
-                                <Briefcase />
+                    <div className="flex flex-col md:flex-row items-center gap-12">
+                        <div className="flex-1 space-y-8 animate-slide-up">
+                            <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-[#D4AF37] text-black font-bold text-sm mb-6 shadow-lg shadow-[#D4AF37]/20 uppercase tracking-wide">
+                                <Zap size={16} fill="currentColor" />
+                                Sistema para Financeiras e Bancos Digitais
                             </div>
-                            <h3 className={`text-2xl font-bold mb-2 ${selectedProfile === 'clt' ? 'text-white' : 'text-zinc-300'}`}>Sou CLT</h3>
-                            <p className="text-zinc-500 text-sm leading-relaxed">Para quem trabalha registrado e quer crédito rápido com as melhores taxas.</p>
+                            <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6">
+                                Tenha sua Própria <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] to-[#F2D785]">Techfin</span> em 24 horas.
+                            </h1>
+                            <p className="text-zinc-400 text-lg md:text-xl leading-relaxed max-w-xl">
+                                O único sistema do mercado com <strong>Automação de Cobrança 360º</strong> (WhatsApp, Email e Push), Análise de Crédito com IA e App Mobile White Label incluso.
+                            </p>
 
-                            {selectedProfile === 'clt' && (
-                                <div className="mt-6 space-y-3 animate-slide-up">
-                                    <div className="p-4 bg-zinc-950/50 rounded-lg border border-zinc-800">
-                                        <p className="text-[#D4AF37] text-xs font-bold uppercase mb-2">Documentos Necessários</p>
-                                        <ul className="text-sm text-zinc-300 space-y-2">
-                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> RG ou CNH</li>
-                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> Holerite Recente</li>
-                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> Comp. Residência</li>
-                                        </ul>
-                                    </div>
-                                    <button onClick={handleStartApplication} className="w-full bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/20 transition-all">
-                                        Solicitar Empréstimo <ArrowRight size={18} />
-                                    </button>
+                            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                                <a
+                                    href="https://wa.me/5511999999999?text=Quero%20conhecer%20o%20sistema%20Tubarao"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold text-lg px-8 py-4 rounded-xl transition-all transform hover:scale-105 shadow-xl shadow-[#D4AF37]/20 flex items-center justify-center gap-2"
+                                >
+                                    <Smartphone size={20} />
+                                    Agendar Demo Grátis
+                                </a>
+                                <Link
+                                    to="/login"
+                                    className="bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-lg px-8 py-4 rounded-xl border border-zinc-700 hover:border-[#D4AF37]/50 transition-all flex items-center justify-center gap-2"
+                                >
+                                    Acesso Administrativo
+                                </Link>
+                            </div>
+
+                            <div className="flex items-center gap-6 text-sm text-zinc-500 pt-4">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 size={16} className="text-green-500" />
+                                    <span>Setup Imediato</span>
                                 </div>
-                            )}
-                        </div>
-
-                        {/* CARD AUTÔNOMO */}
-                        <div
-                            onClick={() => setSelectedProfile('business')}
-                            className={`cursor-pointer group relative p-8 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-2 ${selectedProfile === 'business' ? 'bg-zinc-900 border-[#D4AF37] shadow-2xl shadow-[#D4AF37]/10' : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'}`}
-                        >
-                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 text-3xl transition-colors ${selectedProfile === 'business' ? 'bg-[#D4AF37] text-black' : 'bg-zinc-800 text-zinc-400 group-hover:bg-[#D4AF37]/20 group-hover:text-[#D4AF37]'}`}>
-                                <Store />
-                            </div>
-                            <h3 className={`text-2xl font-bold mb-2 ${selectedProfile === 'business' ? 'text-white' : 'text-zinc-300'}`}>Autônomo / Comerciante</h3>
-                            <p className="text-zinc-500 text-sm leading-relaxed">Crédito para impulsionar seu negócio. Sem burocracia bancária.</p>
-
-                            {selectedProfile === 'business' && (
-                                <div className="mt-6 space-y-3 animate-slide-up">
-                                    <div className="p-4 bg-zinc-950/50 rounded-lg border border-zinc-800">
-                                        <p className="text-[#D4AF37] text-xs font-bold uppercase mb-2">Documentos Necessários</p>
-                                        <ul className="text-sm text-zinc-300 space-y-2">
-                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> CNPJ e RG</li>
-                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> Comp. Endereço (Comercial + Res.)</li>
-                                            <li className="flex items-center gap-2"><UploadCloud size={14} className="text-green-500" /> Vídeo do Estabelecimento</li>
-                                        </ul>
-                                    </div>
-                                    <button onClick={handleStartApplication} className="w-full bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/20 transition-all">
-                                        Solicitar Capital <ArrowRight size={18} />
-                                    </button>
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 size={16} className="text-green-500" />
+                                    <span>Cobrança Automática</span>
                                 </div>
-                            )}
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 size={16} className="text-green-500" />
+                                    <span>App Android/iOS</span>
+                                </div>
+                            </div>
                         </div>
 
-                        {/* CARD VEÍCULO */}
-                        <div
-                            onClick={() => setSelectedProfile('vehicle')}
-                            className={`cursor-pointer group relative p-8 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-2 ${selectedProfile === 'vehicle' ? 'bg-zinc-900 border-[#D4AF37] shadow-2xl shadow-[#D4AF37]/10' : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'}`}
-                        >
-                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 text-3xl transition-colors ${selectedProfile === 'vehicle' ? 'bg-[#D4AF37] text-black' : 'bg-zinc-800 text-zinc-400 group-hover:bg-[#D4AF37]/20 group-hover:text-[#D4AF37]'}`}>
-                                <Car />
-                            </div>
-                            <h3 className={`text-2xl font-bold mb-2 ${selectedProfile === 'vehicle' ? 'text-white' : 'text-zinc-300'}`}>Empréstimo c/ Garantia (Moto)</h3>
-                            <p className="text-zinc-500 text-sm leading-relaxed">Taxas menores usando sua moto como garantia. Rápido e fácil.</p>
-
-                            {selectedProfile === 'vehicle' && (
-                                <div className="mt-6 space-y-3 animate-slide-up">
-                                    <div className="p-4 bg-zinc-950/50 rounded-lg border border-zinc-800">
-                                        <p className="text-[#D4AF37] text-xs font-bold uppercase mb-2">Documentos Necessários</p>
-                                        <ul className="text-sm text-zinc-300 space-y-2">
-                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> CNH Válida</li>
-                                            <li className="flex items-center gap-2"><CheckSquare size={14} className="text-green-500" /> Comp. Endereço</li>
-                                        </ul>
-                                        <div className="mt-3 pt-3 border-t border-zinc-800">
-                                            <label className="flex items-center gap-3 cursor-pointer group">
-                                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${hasEntry ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-zinc-600 group-hover:border-[#D4AF37]'}`}>
-                                                    {hasEntry && <CheckSquare size={14} className="text-black" />}
+                        {/* MOCKUP DO DASHBOARD (Visual Power) */}
+                        <div className="flex-1 relative animate-fade-in group">
+                            <div className="relative z-10 bg-zinc-950 p-2 rounded-2xl border border-zinc-800 shadow-2xl rotate-[-2deg] group-hover:rotate-0 transition-all duration-700">
+                                <div className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 relative">
+                                    {/* Abstract Dashboard UI Representation */}
+                                    <div className="p-6 space-y-6">
+                                        <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
+                                            <div className="w-32 h-4 bg-zinc-800 rounded"></div>
+                                            <div className="flex gap-2">
+                                                <div className="w-8 h-8 rounded-full bg-red-500/20"></div>
+                                                <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20"></div>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-zinc-800/50 p-4 rounded-lg space-y-2">
+                                                <p className="text-xs text-zinc-500">Inadimplência</p>
+                                                <p className="text-2xl font-bold text-red-400">1.2% <span className="text-xs text-zinc-600">📉 -0.5%</span></p>
+                                            </div>
+                                            <div className="bg-zinc-800/50 p-4 rounded-lg space-y-2">
+                                                <p className="text-xs text-zinc-500">Lucro Líquido</p>
+                                                <p className="text-2xl font-bold text-green-400">+ R$ 450k</p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-zinc-800/30 p-4 rounded-lg border border-zinc-800/50">
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="w-8 h-8 rounded bg-green-900/30 flex items-center justify-center text-green-400"><Zap size={16} /></div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-white">Bot de Cobrança</p>
+                                                    <p className="text-xs text-zinc-500">Ativo agora</p>
                                                 </div>
-                                                <input
-                                                    type="checkbox"
-                                                    className="hidden"
-                                                    checked={hasEntry}
-                                                    onChange={() => setHasEntry(!hasEntry)}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                                <span className="text-sm text-white">Tenho valor para entrada</span>
-                                            </label>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2 text-xs text-zinc-400">
+                                                    <CheckCircle2 size={12} className="text-green-500" />
+                                                    <span>150 cobranças enviadas via WhatsApp</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-xs text-zinc-400">
+                                                    <CheckCircle2 size={12} className="text-green-500" />
+                                                    <span>98% de taxa de entrega</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <button onClick={handleStartApplication} className="w-full bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/20 transition-all">
-                                        Simular Financiamento <ArrowRight size={18} />
-                                    </button>
                                 </div>
-                            )}
-                        </div>
-                    </div>
+                            </div>
 
-                    <div className="mt-16 bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 text-center max-w-2xl mx-auto backdrop-blur-sm">
-                        <Banknote className="w-8 h-8 text-[#D4AF37] mx-auto mb-3" />
-                        <p className="text-zinc-400">
-                            Não sabe qual escolher? <Link to="/login" className="text-white underline hover:text-[#D4AF37]">Fale com nosso consultor IA</Link> ou chame no WhatsApp.
-                        </p>
+                            {/* Decorative Glow */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-[#D4AF37]/10 blur-[100px] -z-10 rounded-full" />
+                        </div>
                     </div>
                 </div>
             </section>
@@ -209,15 +175,15 @@ export const LandingPage: React.FC = () => {
             <section id="features" className="py-24 bg-zinc-950 border-y border-zinc-900">
                 <div className="container mx-auto px-6">
                     <div className="text-center max-w-3xl mx-auto mb-16">
-                        <h2 className="text-3xl md:text-5xl font-bold mb-6">Tecnologia que trabalha por <span className="text-[#D4AF37]">você</span></h2>
-                        <p className="text-zinc-400 text-lg">Nosso sistema une Inteligência Artificial e design intuitivo para oferecer a melhor experiência financeira.</p>
+                        <h2 className="text-3xl md:text-5xl font-bold mb-6">Tecnologia para <span className="text-[#D4AF37]">Escalar</span> sua Financeira</h2>
+                        <p className="text-zinc-400 text-lg">Elimine processos manuais, reduza a inadimplência com Cobrança Automática e aprove clientes em segundos com nossa IA.</p>
                     </div>
 
                     <div className="grid md:grid-cols-3 gap-8">
                         <FeatureCard
                             icon={<Bot size={32} />}
-                            title="IA Avançada"
-                            description="Nossa inteligência artificial analisa seu perfil em tempo real e oferece as melhores taxas personalizadas, além de atendimento automático 24h via WhatsApp."
+                            title="Análise de Score IA"
+                            description="Nossa inteligência artificial analisa o risco de cada cliente em segundos, sugerindo limites seguros e reduzindo calotes drasticamente."
                             color="text-purple-400"
                         />
                         <FeatureCard
@@ -228,14 +194,14 @@ export const LandingPage: React.FC = () => {
                         />
                         <FeatureCard
                             icon={<Smartphone size={32} />}
-                            title="App PWA"
-                            description="Instale nosso aplicativo diretamente no seu celular sem precisar de lojas de app. Leve, rápido e funciona até com internet lenta."
+                            title="App White Label"
+                            description="Seu próprio aplicativo Android/iOS com sua marca. O cliente instala direto pelo navegador (PWA) e recebe notificações push."
                             color="text-blue-400"
                         />
                         <FeatureCard
-                            icon={<Clock size={32} />}
-                            title="Pix Imediato"
-                            description="Aprovou, caiu. O dinheiro é transferido para sua conta via Pix instantaneamente após a assinatura digital do contrato."
+                            icon={<Zap size={32} />}
+                            title="Cobrança Automática"
+                            description="O sistema cobra seus clientes sozinho: WhatsApp, SMS, Email e Push Notification. Diga adeus à cobrança manual cansativa."
                             color="text-yellow-400"
                         />
                         <FeatureCard
@@ -246,8 +212,8 @@ export const LandingPage: React.FC = () => {
                         />
                         <FeatureCard
                             icon={<Globe size={32} />}
-                            title="Tudo em um Lugar"
-                            description="Acompanhe parcelas, emita boletos, renegocie dívidas e veja seu score diretamente pelo nosso painel intuitivo."
+                            title="Painel Gestão Central"
+                            description="Acompanhe fluxo de caixa, DRE, ranking de clientes bons/ruins e produtividade da equipe em um único dashboard."
                             color="text-cyan-400"
                         />
                     </div>
@@ -309,22 +275,22 @@ export const LandingPage: React.FC = () => {
 
                         <div className="relative z-10 max-w-4xl mx-auto space-y-8">
                             <h2 className="text-4xl md:text-6xl font-bold text-black mb-6">
-                                Pronto para realizar seus sonhos?
+                                Leve sua Financeira para o Futuro
                             </h2>
                             <p className="text-black/80 text-xl font-medium mb-8 max-w-2xl mx-auto">
-                                Não deixe para depois. Simule seu empréstimo agora mesmo e descubra como a Tubarão Empréstimos pode impulsionar sua vida.
+                                Pare de perder tempo com planilhas e processos manuais. Teste o Sistema Tubarão e veja seu lucro aumentar.
                             </p>
 
                             <div className="flex flex-col sm:flex-row justify-center gap-4">
-                                <Link
-                                    to="/wizard"
+                                <a
+                                    href="https://wa.me/5511999999999"
                                     className="bg-black hover:bg-zinc-800 text-white font-bold text-lg px-10 py-5 rounded-xl transition-all shadow-xl hover:shadow-2xl transform hover:-translate-y-1 block md:inline-block"
                                 >
-                                    Simular Empréstimo Grátis
-                                </Link>
+                                    Solicitar Orçamento do Sistema
+                                </a>
                             </div>
                             <p className="text-black/60 text-sm font-medium mt-6">
-                                *Sujeito a análise de crédito. Taxas a partir de 1.99% a.m.
+                                *Planos a partir de R$ 97/mês. Cancele quando quiser.
                             </p>
                         </div>
                     </div>
