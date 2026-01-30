@@ -390,9 +390,7 @@ export const LandingPage: React.FC = () => {
                                     Solicitar Orçamento do Sistema
                                 </a>
                             </div>
-                            <p className="text-black/60 text-sm font-medium mt-6">
-                                *Planos a partir de R$ 97/mês. Cancele quando quiser.
-                            </p>
+
                         </div>
                     </div>
                 </div>
