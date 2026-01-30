@@ -286,25 +286,60 @@ export const whatsappService = {
         const config = await supabaseService.getWhatsappConfig();
         if (!config.apiUrl || !config.apiKey) return [];
 
-        try {
-            const baseUrl = cleanUrl(config.apiUrl);
-            // Tenta buscar contatos (Endpoint Evolution pode variar, tentando v2/chat/findContacts)
-            const response = await fetch(`${baseUrl}/chat/findContacts/${config.instanceName}`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': config.apiKey,
-                    'ngrok-skip-browser-warning': 'true'
-                }
-            });
+        const baseUrl = cleanUrl(config.apiUrl);
+        const headers = {
+            'Content-Type': 'application/json',
+            'apikey': config.apiKey,
+            'ngrok-skip-browser-warning': 'true'
+        };
 
-            if (!response.ok) {
-                console.error('[WhatsApp] Failed to fetch contacts:', await response.text());
+        const tryEndpoint = async (path: string) => {
+            try {
+                const res = await fetch(`${baseUrl}${path}/${config.instanceName}`, {
+                    method: 'GET', // Tentar GET primeiro
+                    headers
+                });
+
+                // Se 404, tenta POST pois algumas versões usam POST para busca
+                if (res.status === 404 || res.status === 405) {
+                    const resPost = await fetch(`${baseUrl}${path}/${config.instanceName}`, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({}) // Body vazio para pegar tudo
+                    });
+                    if (resPost.ok) return resPost;
+                    return res; // Retorna o erro original de GET ou o 404 do POST
+                }
+
+                return res;
+            } catch (e) {
+                return null;
+            }
+        };
+
+        try {
+            // Tentativa 1: Endpoint de Contatos padrão (v1/v2 legacy)
+            let response = await tryEndpoint('/contact/find');
+
+            // Tentativa 2: Endpoint de Chat (algumas v2)
+            if (!response || !response.ok) {
+                response = await tryEndpoint('/chat/findContacts');
+            }
+
+            if (!response || !response.ok) {
+                const errText = response ? await response.text() : 'Network error';
+                console.error('[WhatsApp] Failed to fetch contacts (all endpoints):', errText);
                 return [];
             }
 
             const data = await response.json();
-            return Array.isArray(data) ? data : (data || []);
+            // Normalizar resposta (pode ser array direto ou objeto com contacts)
+            const list = Array.isArray(data) ? data : (data.contacts || data || []);
+
+            // Log para debug
+            console.log(`[WhatsApp] Fetched ${list.length} contacts`);
+            return list;
+
         } catch (e) {
             console.error('[WhatsApp] Except fetching contacts:', e);
             return [];
