@@ -35,7 +35,7 @@ export const LandingPage: React.FC = () => {
                                 Área do Cliente
                             </Link>
                             <a
-                                href="https://wa.me/5511999999999"
+                                href="https://wa.me/5511915712203"
                                 className="bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold px-6 py-2.5 rounded-lg transition-all transform hover:scale-105 shadow-lg shadow-[#D4AF37]/20 flex items-center gap-2"
                             >
                                 Contratar Sistema <ArrowRight size={18} />
@@ -61,7 +61,7 @@ export const LandingPage: React.FC = () => {
                         <a href="#mobile" onClick={() => setIsMenuOpen(false)} className="text-zinc-400">App White Label</a>
                         <hr className="border-zinc-800" />
                         <Link to="/login" className="text-white border border-zinc-700 p-2 text-center rounded">Área do Cliente (Login)</Link>
-                        <a href="https://wa.me/5511999999999" className="bg-[#D4AF37] text-black font-bold p-4 text-center rounded-lg">
+                        <a href="https://wa.me/5511915712203" className="bg-[#D4AF37] text-black font-bold p-4 text-center rounded-lg">
                             Contratar Sistema
                         </a>
                     </div>
@@ -86,7 +86,7 @@ export const LandingPage: React.FC = () => {
 
                             <div className="flex flex-col sm:flex-row gap-4 pt-4">
                                 <a
-                                    href="https://wa.me/5511999999999?text=Quero%20conhecer%20o%20sistema%20Tubarao"
+                                    href="https://wa.me/5511915712203?text=Quero%20conhecer%20o%20sistema%20Tubarao"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold text-lg px-8 py-4 rounded-xl transition-all transform hover:scale-105 shadow-xl shadow-[#D4AF37]/20 flex items-center justify-center gap-2"
@@ -266,6 +266,99 @@ export const LandingPage: React.FC = () => {
                 </div>
             </section>
 
+            {/* Mobile App Section */}
+            <section id="mobile" className="py-24 bg-zinc-900 border-y border-zinc-800">
+                <div className="container mx-auto px-6">
+                    <div className="flex flex-col md:flex-row items-center gap-16">
+                        <div className="flex-1 space-y-8">
+                            <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-blue-500/10 text-blue-400 font-bold text-xs uppercase tracking-wide border border-blue-500/20">
+                                <Smartphone size={14} />
+                                App White Label
+                            </div>
+                            <h2 className="text-3xl md:text-5xl font-bold leading-tight">
+                                Seu Cliente com o <br />
+                                <span className="text-white">Seu App Instalado</span>
+                            </h2>
+                            <p className="text-zinc-400 text-lg leading-relaxed">
+                                Ofereça uma experiência profissional. Seus clientes instalam o aplicativo direto pelo navegador (Tecnologia PWA), recebem notificações de cobrança e acompanham empréstimos na palma da mão.
+                            </p>
+
+                            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                                <button className="bg-white text-black hover:bg-zinc-200 font-bold px-8 py-4 rounded-xl flex items-center justify-center gap-3 transition-all" onClick={() => window.open('https://www.tubaraoemprestimo.com.br/#/login', '_blank')}>
+                                    <Smartphone className="fill-black" /> Testar App Agora
+                                </button>
+                                <span className="text-zinc-500 text-sm flex items-center max-w-xs">
+                                    *Disponível para Android e iOS sem necessidade de Loja de Aplicativos.
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-6 pt-6">
+                                <div>
+                                    <h4 className="text-white font-bold mb-1">Push Notifications</h4>
+                                    <p className="text-zinc-500 text-sm">Lembretes automáticos de pagamento na tela do celular.</p>
+                                </div>
+                                <div>
+                                    <h4 className="text-white font-bold mb-1">Sem Custo de Store</h4>
+                                    <p className="text-zinc-500 text-sm">Não pague taxas da Apple ou Google. Instalação direta.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Phone Mockup */}
+                        <div className="flex-1 relative">
+                            <div className="relative mx-auto border-gray-800 bg-gray-800 border-[14px] rounded-[2.5rem] h-[600px] w-[300px] shadow-xl transform rotate-3 hover:rotate-0 transition-all duration-500">
+                                <div className="w-[148px] h-[18px] bg-gray-800 top-0 rounded-b-[1rem] left-1/2 -translate-x-1/2 absolute"></div>
+                                <div className="h-[32px] w-[3px] bg-gray-800 absolute -start-[17px] top-[72px] rounded-s-lg"></div>
+                                <div className="h-[46px] w-[3px] bg-gray-800 absolute -start-[17px] top-[124px] rounded-s-lg"></div>
+                                <div className="h-[46px] w-[3px] bg-gray-800 absolute -start-[17px] top-[178px] rounded-s-lg"></div>
+                                <div className="h-[64px] w-[3px] bg-gray-800 absolute -end-[17px] top-[142px] rounded-e-lg"></div>
+                                <div className="rounded-[2rem] overflow-hidden w-[272px] h-[572px] bg-zinc-950 relative">
+                                    {/* Screen Content */}
+                                    <div className="bg-[#D4AF37] h-40 pt-12 px-6 relative">
+                                        <p className="text-black/60 text-xs font-bold uppercase">Olá, Cliente</p>
+                                        <p className="text-black font-bold text-2xl">R$ 5.000,00</p>
+                                        <p className="text-black/80 text-sm">Limite Disponível</p>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800">
+                                            <p className="text-zinc-400 text-xs mb-1">Próxima Parcela</p>
+                                            <div className="flex justify-between items-center">
+                                                <p className="text-white font-bold">R$ 450,00</p>
+                                                <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded">Vence Hoje</span>
+                                            </div>
+                                        </div>
+                                        <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-500"><CheckCircle2 size={18} /></div>
+                                            <div>
+                                                <p className="text-white text-sm font-bold">Empréstimo Ativo</p>
+                                                <p className="text-zinc-500 text-xs">3/12 parcelas pagas</p>
+                                            </div>
+                                        </div>
+                                        <div className="h-32 bg-zinc-900/50 rounded-xl border border-zinc-900 flex items-center justify-center text-zinc-700">
+                                            <div className="text-center">
+                                                <p className="text-sm">Histórico</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Install Banner Mockup */}
+                                    <div className="absolute bottom-4 left-4 right-4 bg-zinc-800 p-3 rounded-xl border border-zinc-700 flex items-center justify-between shadow-2xl animate-bounce">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-[#D4AF37] rounded-lg flex items-center justify-center"><Logo size="sm" /></div>
+                                            <div>
+                                                <p className="text-white text-xs font-bold">Instalar App</p>
+                                                <p className="text-zinc-400 text-[10px]">Adicionar à Tela Inicial</p>
+                                            </div>
+                                        </div>
+                                        <button className="text-[#D4AF37] text-xs font-bold">Instalar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* CTA Section */}
             <section className="py-24">
                 <div className="container mx-auto px-6">
@@ -283,7 +376,7 @@ export const LandingPage: React.FC = () => {
 
                             <div className="flex flex-col sm:flex-row justify-center gap-4">
                                 <a
-                                    href="https://wa.me/5511999999999"
+                                    href="https://wa.me/5511915712203"
                                     className="bg-black hover:bg-zinc-800 text-white font-bold text-lg px-10 py-5 rounded-xl transition-all shadow-xl hover:shadow-2xl transform hover:-translate-y-1 block md:inline-block"
                                 >
                                     Solicitar Orçamento do Sistema
