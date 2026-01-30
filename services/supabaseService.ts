@@ -1587,7 +1587,7 @@ export const supabaseService = {
 
                     interactions.push({
                         id: msg.id,
-                        userName: msg.customers?.name || msg.phone,
+                        userName: (Array.isArray(msg.customers) ? (msg.customers[0] as any)?.name : (msg.customers as any)?.name) || msg.phone,
                         userRole: 'CLIENT',
                         message: msg.message,
                         intent: intent,
