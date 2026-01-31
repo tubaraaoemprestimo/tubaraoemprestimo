@@ -47,6 +47,16 @@ export const Customers: React.FC = () => {
   const [isEditingOffer, setIsEditingOffer] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  // 1. Definição de Dados Derivados
+  const filteredCustomers = customers.filter(c =>
+    c.name.toLowerCase().includes(filter.toLowerCase()) ||
+    c.cpf.includes(filter) ||
+    c.email.toLowerCase().includes(filter.toLowerCase()) ||
+    c.phone.includes(filter)
+  );
+
+  const totalImported = customers.filter(c => c.email.includes('@whatsapp.lead')).length;
+
   // Selection Logic
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredCustomers.length && filteredCustomers.length > 0) {
@@ -316,30 +326,26 @@ export const Customers: React.FC = () => {
 
   const processVCF = async (content: string) => {
     setLoading(true);
-    addToast('Lendo arquivo de contatos...', 'info');
+    addToast('Processando arquivo VCF...', 'info');
 
     const cards = content.split('BEGIN:VCARD');
-    let count = 0;
+    const leadsToImport: { name: string, phone: string }[] = [];
     let skipped = 0;
 
     for (const card of cards) {
       if (!card.includes('END:VCARD')) continue;
 
       try {
-        // Extrair Nome
         let name = 'Desconhecido';
         const nameMatch = card.match(/FN(?:;.*?)?:(.*)/);
 
         if (nameMatch) {
           let rawName = nameMatch[1].trim();
-          // Tentar decode Quoted-Printable (ex: =C3=A1)
           if (card.includes('ENCODING=QUOTED-PRINTABLE') && rawName.includes('=')) {
             try {
               rawName = rawName.replace(/=\r?\n/g, '');
               rawName = decodeURIComponent(rawName.replace(/=/g, '%'));
-            } catch (e) {
-              // Fallback
-            }
+            } catch (e) { }
           }
           name = rawName;
         } else {
@@ -347,9 +353,8 @@ export const Customers: React.FC = () => {
           if (nMatch) name = nMatch[1].replace(/;/g, ' ').trim();
         }
 
-        // Telefones
         const telMatches = [...card.matchAll(/TEL(?:;.*?)?:(.*)/g)];
-        let imported = false;
+        let foundValid = false;
 
         for (const match of telMatches) {
           let rawPhone = match[1];
@@ -363,22 +368,27 @@ export const Customers: React.FC = () => {
           }
 
           if (clean.length >= 12) {
-            await supabaseService.importLead(name, clean, '');
-            imported = true;
+            leadsToImport.push({ name, phone: clean });
+            foundValid = true;
             break;
           }
         }
-
-        if (imported) count++;
-        else skipped++;
+        if (!foundValid) skipped++;
 
       } catch (err) {
         console.error('Error parsing card', err);
       }
     }
 
+    if (leadsToImport.length > 0) {
+      addToast(`Importando ${leadsToImport.length} contatos...`, 'info');
+      const result = await supabaseService.bulkImportLeads(leadsToImport);
+      addToast(`Importação finalizada! ${result.added} adicionados.`, 'success');
+    } else {
+      addToast('Nenhum contato válido encontrado.', 'warning');
+    }
+
     setLoading(false);
-    addToast(`Importação VCF finalizada! ${count} adicionados.`, 'success');
     loadCustomers();
   };
 
@@ -436,15 +446,6 @@ export const Customers: React.FC = () => {
     if (clean.length === 12) return `+${clean.slice(0, 2)} (${clean.slice(2, 4)}) ${clean.slice(4, 8)}-${clean.slice(8)}`;
     return phone;
   };
-
-  const filteredCustomers = customers.filter(c =>
-    c.name.toLowerCase().includes(filter.toLowerCase()) ||
-    c.cpf.includes(filter) ||
-    c.email.toLowerCase().includes(filter.toLowerCase()) ||
-    c.phone.includes(filter)
-  );
-
-  const totalImported = customers.filter(c => c.email.includes('@whatsapp.lead')).length;
 
   return (
     <div className="p-4 md:p-8 bg-black min-h-screen text-white">

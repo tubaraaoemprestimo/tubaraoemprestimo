@@ -1063,7 +1063,8 @@ export const supabaseService = {
         const { data, error } = await supabase
             .from('customers')
             .select('*')
-            .order('joined_at', { ascending: false });
+            .order('joined_at', { ascending: false })
+            .limit(5000);
 
         if (error) return [];
 
@@ -1853,6 +1854,44 @@ export const supabaseService = {
             console.error('Import Lead Exception:', e);
             return 'error';
         }
+    },
+
+    bulkImportLeads: async (leads: { name: string; phone: string }[]): Promise<{ added: number; errors: number }> => {
+        const processedLeads = leads.map(l => {
+            const safePhone = l.phone.replace(/[^0-9+]/g, '').substring(0, 20);
+            const numbers = l.phone.replace(/\D/g, '');
+            const safeCpf = `9${numbers.padEnd(10, '0').slice(-10)}`;
+            const fakeEmail = `${numbers}@whatsapp.lead`;
+
+            return {
+                name: (l.name || `WhatsApp ${safePhone}`).substring(0, 50),
+                phone: safePhone,
+                email: fakeEmail,
+                cpf: safeCpf,
+                status: 'ACTIVE',
+                internal_score: 500,
+                total_debt: 0,
+                active_loans_count: 0
+            };
+        });
+
+        const BATCH_SIZE = 100;
+        let added = 0;
+        let errors = 0;
+
+        for (let i = 0; i < processedLeads.length; i += BATCH_SIZE) {
+            const batch = processedLeads.slice(i, i + BATCH_SIZE);
+            const { error } = await supabase.from('customers')
+                .upsert(batch, { onConflict: 'phone', ignoreDuplicates: true });
+
+            if (error) {
+                console.error('Batch import error:', error);
+                errors += batch.length;
+            } else {
+                added += batch.length;
+            }
+        }
+        return { added, errors };
     },
 
     // Limpar leads importados do WhatsApp
