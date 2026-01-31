@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings, Calendar, RotateCcw, Calculator, Edit2, Trash2, Gift } from 'lucide-react';
+import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings, Calendar, RotateCcw, Calculator, Edit2, Trash2, Gift, Upload } from 'lucide-react';
 import { supabaseService } from '../../services/supabaseService';
 import { whatsappService } from '../../services/whatsappService';
 import { Customer, SystemSettings } from '../../types';
@@ -275,6 +275,89 @@ export const Customers: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const processVCF = async (content: string) => {
+    setLoading(true);
+    addToast('Lendo arquivo de contatos...', 'info');
+
+    const cards = content.split('BEGIN:VCARD');
+    let count = 0;
+    let skipped = 0;
+
+    for (const card of cards) {
+      if (!card.includes('END:VCARD')) continue;
+
+      try {
+        // Extrair Nome
+        let name = 'Desconhecido';
+        const nameMatch = card.match(/FN(?:;.*?)?:(.*)/);
+
+        if (nameMatch) {
+          let rawName = nameMatch[1].trim();
+          // Tentar decode Quoted-Printable (ex: =C3=A1)
+          if (card.includes('ENCODING=QUOTED-PRINTABLE') && rawName.includes('=')) {
+            try {
+              rawName = rawName.replace(/=\r?\n/g, '');
+              rawName = decodeURIComponent(rawName.replace(/=/g, '%'));
+            } catch (e) {
+              // Fallback
+            }
+          }
+          name = rawName;
+        } else {
+          const nMatch = card.match(/N(?:;.*?)?:(.*)/);
+          if (nMatch) name = nMatch[1].replace(/;/g, ' ').trim();
+        }
+
+        // Telefones
+        const telMatches = [...card.matchAll(/TEL(?:;.*?)?:(.*)/g)];
+        let imported = false;
+
+        for (const match of telMatches) {
+          let rawPhone = match[1];
+          let clean = rawPhone.replace(/\D/g, '');
+
+          while (clean.startsWith('0')) clean = clean.substring(1);
+          if (clean.length >= 10 && clean.length <= 11) clean = '55' + clean;
+          if (clean.startsWith('55') && clean.length >= 5 && clean[4] === '0') clean = clean.substring(0, 4) + clean.substring(5);
+          if (clean.startsWith('55') && clean.length === 12) {
+            if (['7', '8', '9'].includes(clean[4])) clean = clean.substring(0, 4) + '9' + clean.substring(4);
+          }
+
+          if (clean.length >= 12) {
+            await supabaseService.importLead(name, clean, '');
+            imported = true;
+            break;
+          }
+        }
+
+        if (imported) count++;
+        else skipped++;
+
+      } catch (err) {
+        console.error('Error parsing card', err);
+      }
+    }
+
+    setLoading(false);
+    addToast(`Importação VCF finalizada! ${count} adicionados.`, 'success');
+    loadCustomers();
+  };
+
+  const handleImportVCF = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const content = e.target?.result as string;
+      if (content) await processVCF(content);
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
+
   const handleSyncContacts = async () => {
     if (!confirm('Deseja sincronizar os contatos do WhatsApp conectados à API?')) return;
 
@@ -310,6 +393,13 @@ export const Customers: React.FC = () => {
     }
   };
 
+  const formatPhone = (phone: string) => {
+    const clean = phone.replace(/\D/g, '');
+    if (clean.length === 13) return `+${clean.slice(0, 2)} (${clean.slice(2, 4)}) ${clean.slice(4, 9)}-${clean.slice(9)}`;
+    if (clean.length === 12) return `+${clean.slice(0, 2)} (${clean.slice(2, 4)}) ${clean.slice(4, 8)}-${clean.slice(8)}`;
+    return phone;
+  };
+
   const filteredCustomers = customers.filter(c =>
     c.name.toLowerCase().includes(filter.toLowerCase()) ||
     c.cpf.includes(filter) ||
@@ -331,6 +421,10 @@ export const Customers: React.FC = () => {
               className="w-full md:w-80 bg-zinc-900 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-[#D4AF37] outline-none"
             />
           </div>
+          <Button onClick={() => fileInputRef.current?.click()} variant="secondary" className="w-full md:w-auto bg-blue-900/20 text-blue-500 border border-blue-900/50 hover:bg-blue-900/30">
+            <Upload size={18} className="mr-2" /> Importar VCF
+          </Button>
+          <input type="file" accept=".vcf" ref={fileInputRef} className="hidden" onChange={handleImportVCF} />
           <Button onClick={handleExportCSV} variant="secondary" className="w-full md:w-auto bg-zinc-900 border border-zinc-800 hover:border-[#D4AF37]">
             <Download size={18} className="mr-2" /> Exportar CSV
           </Button>
@@ -376,7 +470,7 @@ export const Customers: React.FC = () => {
                         </div>
                         {cust.name}
                       </div>
-                      <div className="text-xs text-zinc-500 pl-10">{cust.cpf} • {cust.phone}</div>
+                      <div className="text-xs text-zinc-500 pl-10">{cust.cpf} • {formatPhone(cust.phone)}</div>
                     </td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-bold flex w-fit items-center gap-1 ${cust.status === 'ACTIVE' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
