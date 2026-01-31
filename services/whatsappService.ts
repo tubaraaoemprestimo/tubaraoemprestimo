@@ -240,10 +240,24 @@ export const whatsappService = {
         const config = await supabaseService.getWhatsappConfig();
         if (!config.apiUrl || !config.apiKey) return false;
 
-        // Validate formatting
+        // Validate and clean formatting
         let number = phone.replace(/\D/g, '');
-        if (!number.startsWith('55') && number.length >= 10) {
-            number = '55' + number;
+        while (number.startsWith('0')) number = number.substring(1);
+
+        // Sanitização Avançada para Operadoras BR
+        if (!number.startsWith('55')) {
+            // Tratamento para números com código de operadora (ex: 1511999999999 - 13 dígitos)
+            if (number.length === 13) {
+                number = number.slice(-11); // Pega apenas DDD + 9 dígitos
+            } else if (number.length === 12) {
+                // Possível fixo com operadora (XX YY ZZZZ-ZZZZ)
+                number = number.slice(-10); // Pega apenas DDD + 8 dígitos
+            }
+
+            // Adiciona DDI Brasil se estiver no formato correto (10 ou 11 dígitos)
+            if (number.length >= 10 && number.length <= 11) {
+                number = '55' + number;
+            }
         }
 
         console.log(`[WhatsApp Service] Sending to ${number} via Evolution API...`);
@@ -272,7 +286,7 @@ export const whatsappService = {
             } else {
                 const errorText = await response.text();
                 // Treat 401/403 as disconnected info potentially?
-                console.error("[WhatsApp Service] API Error:", errorText);
+                console.error(`[WhatsApp Service] Failed to send to ${number}. Status: ${response.status}. API Error: ${errorText}`);
                 return false;
             }
         } catch (error) {
@@ -363,17 +377,33 @@ export const whatsappService = {
                 // Extrair ID e Nome
                 let rawPhone = contact.phone || (contact.id && contact.id.split ? contact.id.split('@')[0] : '');
                 // Sanitizar para apenas números
-                rawPhone = String(rawPhone).replace(/\D/g, '');
+                let clean = String(rawPhone).replace(/\D/g, '');
+
+                // Remove zeros a esquerda
+                while (clean.startsWith('0')) clean = clean.substring(1);
 
                 // Normalização BR (Supor DDI 55 se vier sem)
-                if (rawPhone.length >= 10 && rawPhone.length <= 11) {
-                    rawPhone = '55' + rawPhone;
+                if (clean.length >= 10 && clean.length <= 11) {
+                    clean = '55' + clean;
+                }
+
+                // Correção: Remover 0 após DDD (ex: 55 32 0...)
+                if (clean.startsWith('55') && clean.length >= 5 && clean[4] === '0') {
+                    clean = clean.substring(0, 4) + clean.substring(5);
+                }
+
+                // Tratamento do 9º dígito
+                if (clean.startsWith('55') && clean.length === 12) {
+                    const thirdDigit = clean[4];
+                    if (['7', '8', '9'].includes(thirdDigit)) {
+                        clean = clean.substring(0, 4) + '9' + clean.substring(4);
+                    }
                 }
 
                 // Validar tamanho mínimo
-                if (rawPhone.length < 12) continue;
+                if (clean.length < 12) continue;
 
-                const phone = rawPhone;
+                const phone = clean;
 
                 // Prioridade de nome
                 const displayName = contact.pushName || contact.name || contact.verifiedName || `Desconhecido ${phone.slice(-4)}`;

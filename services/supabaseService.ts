@@ -1874,14 +1874,24 @@ export const supabaseService = {
         const processedPhones = new Set(); // Para evitar duplicatas dentro do próprio arquivo VCF
 
         for (const l of leads) {
-            const safePhone = l.phone.replace(/[^0-9+]/g, '').substring(0, 20);
+            // Sanitização robusta de telefone (igual ao whatsappService)
+            let clean = l.phone.replace(/\D/g, '');
+            while (clean.startsWith('0')) clean = clean.substring(1);
+
+            if (!clean.startsWith('55')) {
+                if (clean.length === 13) clean = clean.slice(-11);
+                else if (clean.length === 12) clean = clean.slice(-10);
+
+                if (clean.length >= 10 && clean.length <= 11) clean = '55' + clean;
+            }
+            const safePhone = clean.substring(0, 20);
 
             // Se já existe no banco ou já foi processado neste lote, pula
             if (existingPhones.has(safePhone) || processedPhones.has(safePhone)) continue;
 
             processedPhones.add(safePhone);
 
-            const numbers = l.phone.replace(/\D/g, '');
+            const numbers = safePhone.replace(/\D/g, '');
             const safeCpf = `9${numbers.padEnd(10, '0').slice(-10)}`;
             const fakeEmail = `${numbers}@whatsapp.lead`;
 
