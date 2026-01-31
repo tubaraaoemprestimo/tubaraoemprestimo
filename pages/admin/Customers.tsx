@@ -47,13 +47,25 @@ export const Customers: React.FC = () => {
   const [isEditingOffer, setIsEditingOffer] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'BLOCKED'>('ALL');
+  const [originFilter, setOriginFilter] = useState<'ALL' | 'IMPORTED' | 'ORGANIC'>('ALL');
+
   // 1. Definição de Dados Derivados
-  const filteredCustomers = customers.filter(c =>
-    c.name.toLowerCase().includes(filter.toLowerCase()) ||
-    c.cpf.includes(filter) ||
-    c.email.toLowerCase().includes(filter.toLowerCase()) ||
-    c.phone.includes(filter)
-  );
+  const filteredCustomers = customers.filter(c => {
+    const matchesText = c.name.toLowerCase().includes(filter.toLowerCase()) ||
+      c.cpf.includes(filter) ||
+      c.email.toLowerCase().includes(filter.toLowerCase()) ||
+      c.phone.includes(filter);
+
+    const matchesStatus = statusFilter === 'ALL' || c.status === statusFilter;
+
+    const isImported = c.email.includes('@whatsapp.lead');
+    const matchesOrigin = originFilter === 'ALL' ||
+      (originFilter === 'IMPORTED' && isImported) ||
+      (originFilter === 'ORGANIC' && !isImported);
+
+    return matchesText && matchesStatus && matchesOrigin;
+  });
 
   const totalImported = customers.filter(c => c.email.includes('@whatsapp.lead')).length;
 
@@ -464,30 +476,45 @@ export const Customers: React.FC = () => {
             </div>
           )}
         </div>
-        <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-          <div className="relative w-full md:w-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={20} />
-            <input
-              type="text"
-              placeholder="Buscar por nome ou CPF..."
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="w-full md:w-80 bg-zinc-900 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-[#D4AF37] outline-none"
-            />
+        <div className="flex flex-col gap-4 w-full md:w-auto">
+          <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+            <div className="flex bg-zinc-900 rounded-lg p-1 border border-zinc-800">
+              <button onClick={() => setStatusFilter('ALL')} className={`px-3 py-1 rounded-md text-sm transition-colors ${statusFilter === 'ALL' ? 'bg-[#D4AF37] text-black font-bold' : 'text-zinc-400 hover:text-white'}`}>Todos</button>
+              <button onClick={() => setStatusFilter('ACTIVE')} className={`px-3 py-1 rounded-md text-sm transition-colors ${statusFilter === 'ACTIVE' ? 'bg-green-600 text-white font-bold' : 'text-zinc-400 hover:text-white'}`}>Ativos</button>
+              <button onClick={() => setStatusFilter('BLOCKED')} className={`px-3 py-1 rounded-md text-sm transition-colors ${statusFilter === 'BLOCKED' ? 'bg-red-600 text-white font-bold' : 'text-zinc-400 hover:text-white'}`}>Bloqueados</button>
+            </div>
+            <div className="flex bg-zinc-900 rounded-lg p-1 border border-zinc-800">
+              <button onClick={() => setOriginFilter('ALL')} className={`px-3 py-1 rounded-md text-sm transition-colors ${originFilter === 'ALL' ? 'bg-blue-600 text-white font-bold' : 'text-zinc-400 hover:text-white'}`}>Tudo</button>
+              <button onClick={() => setOriginFilter('IMPORTED')} className={`px-3 py-1 rounded-md text-sm transition-colors ${originFilter === 'IMPORTED' ? 'bg-blue-600/50 text-blue-200 border border-blue-500/50' : 'text-zinc-400 hover:text-white'}`}>Importados</button>
+              <button onClick={() => setOriginFilter('ORGANIC')} className={`px-3 py-1 rounded-md text-sm transition-colors ${originFilter === 'ORGANIC' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-400 hover:text-white'}`}>Site</button>
+            </div>
           </div>
-          <Button onClick={() => fileInputRef.current?.click()} variant="secondary" className="w-full md:w-auto bg-blue-900/20 text-blue-500 border border-blue-900/50 hover:bg-blue-900/30">
-            <Upload size={18} className="mr-2" /> Importar VCF
-          </Button>
-          <input type="file" accept=".vcf" ref={fileInputRef} className="hidden" onChange={handleImportVCF} />
-          <Button onClick={handleExportCSV} variant="secondary" className="w-full md:w-auto bg-zinc-900 border border-zinc-800 hover:border-[#D4AF37]">
-            <Download size={18} className="mr-2" /> Exportar CSV
-          </Button>
-          <Button onClick={handleSyncContacts} variant="secondary" className="w-full md:w-auto bg-green-900/20 text-green-500 border border-green-900/50 hover:bg-green-900/30">
-            <RotateCcw size={18} className="mr-2" /> Sincronizar WhatsApp
-          </Button>
-          <Button onClick={handleUndoSync} variant="secondary" className="w-full md:w-auto bg-red-900/20 text-red-500 border border-red-900/50 hover:bg-red-900/30 ml-2" title="Remover importados do WhatsApp">
-            <Trash2 size={18} />
-          </Button>
+
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative w-full md:w-auto">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={20} />
+              <input
+                type="text"
+                placeholder="Buscar nome, CPF ou telefone..."
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="w-full md:w-80 bg-zinc-900 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-[#D4AF37] outline-none"
+              />
+            </div>
+            <Button onClick={() => fileInputRef.current?.click()} variant="secondary" className="w-full md:w-auto bg-blue-900/20 text-blue-500 border border-blue-900/50 hover:bg-blue-900/30">
+              <Upload size={18} className="mr-2" /> Importar
+            </Button>
+            <input type="file" accept=".vcf" ref={fileInputRef} className="hidden" onChange={handleImportVCF} />
+            <Button onClick={handleExportCSV} variant="secondary" className="w-full md:w-auto bg-zinc-900 border border-zinc-800 hover:border-[#D4AF37]">
+              <Download size={18} className="mr-2" /> CSV
+            </Button>
+            <Button onClick={handleSyncContacts} variant="secondary" className="w-full md:w-auto bg-green-900/20 text-green-500 border border-green-900/50 hover:bg-green-900/30" title="Sincronizar Whats">
+              <RotateCcw size={18} />
+            </Button>
+            <Button onClick={handleUndoSync} variant="secondary" className="w-full md:w-auto bg-red-900/20 text-red-500 border border-red-900/50 hover:bg-red-900/30" title="Limpar Importados">
+              <Trash2 size={18} />
+            </Button>
+          </div>
         </div>
       </div>
 
