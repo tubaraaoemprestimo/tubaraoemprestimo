@@ -1857,13 +1857,35 @@ export const supabaseService = {
     },
 
     bulkImportLeads: async (leads: { name: string; phone: string }[]): Promise<{ added: number; errors: number }> => {
-        const processedLeads = leads.map(l => {
+        // 1. Buscar telefones já existentes para evitar erros de constraint e duplicatas
+        const { data: existingData, error: fetchError } = await supabase
+            .from('customers')
+            .select('phone');
+
+        if (fetchError) {
+            console.error('Error fetching existing phones:', fetchError);
+            return { added: 0, errors: leads.length };
+        }
+
+        const existingPhones = new Set(existingData?.map(c => c.phone) || []);
+
+        // 2. Processar e filtrar apenas NOVOS leads
+        const newLeads = [];
+        const processedPhones = new Set(); // Para evitar duplicatas dentro do próprio arquivo VCF
+
+        for (const l of leads) {
             const safePhone = l.phone.replace(/[^0-9+]/g, '').substring(0, 20);
+
+            // Se já existe no banco ou já foi processado neste lote, pula
+            if (existingPhones.has(safePhone) || processedPhones.has(safePhone)) continue;
+
+            processedPhones.add(safePhone);
+
             const numbers = l.phone.replace(/\D/g, '');
             const safeCpf = `9${numbers.padEnd(10, '0').slice(-10)}`;
             const fakeEmail = `${numbers}@whatsapp.lead`;
 
-            return {
+            newLeads.push({
                 name: (l.name || `WhatsApp ${safePhone}`).substring(0, 50),
                 phone: safePhone,
                 email: fakeEmail,
@@ -1871,22 +1893,33 @@ export const supabaseService = {
                 status: 'ACTIVE',
                 internal_score: 500,
                 total_debt: 0,
-                active_loans_count: 0
-            };
-        });
+                active_loans_count: 0,
+                joined_at: new Date().toISOString()
+            });
+        }
 
+        if (newLeads.length === 0) {
+            return { added: 0, errors: 0 };
+        }
+
+        // 3. Batch Insert dos novos
         const BATCH_SIZE = 100;
         let added = 0;
         let errors = 0;
 
-        for (let i = 0; i < processedLeads.length; i += BATCH_SIZE) {
-            const batch = processedLeads.slice(i, i + BATCH_SIZE);
-            const { error } = await supabase.from('customers')
-                .upsert(batch, { onConflict: 'phone', ignoreDuplicates: true });
+        for (let i = 0; i < newLeads.length; i += BATCH_SIZE) {
+            const batch = newLeads.slice(i, i + BATCH_SIZE);
+            const { error } = await supabase.from('customers').insert(batch);
 
             if (error) {
-                console.error('Batch import error:', error);
-                errors += batch.length;
+                console.error('Batch insert error:', error);
+
+                // Se falhar o batch, tentar um a um para salvar os que não derem erro (fallback)
+                for (const item of batch) {
+                    const { error: singleError } = await supabase.from('customers').insert(item);
+                    if (!singleError) added++;
+                    else errors++;
+                }
             } else {
                 added += batch.length;
             }
