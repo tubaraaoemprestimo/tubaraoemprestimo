@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings, Calendar, RotateCcw, Calculator, Edit2, Trash2, Gift, Upload } from 'lucide-react';
 import { supabaseService } from '../../services/supabaseService';
 import { whatsappService } from '../../services/whatsappService';
