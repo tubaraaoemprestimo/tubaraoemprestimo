@@ -1869,6 +1869,19 @@ export const supabaseService = {
         return count || 0;
     },
 
+    bulkDeleteCustomers: async (ids: string[]): Promise<boolean> => {
+        const { error } = await supabase
+            .from('customers')
+            .delete()
+            .in('id', ids);
+
+        if (error) {
+            console.error('Error deleting customers:', error);
+            return false;
+        }
+        return true;
+    },
+
     uploadBase64Image: async (bucket: string, path: string, base64: string): Promise<string | null> => {
         try {
             // Convert base64 to Blob

@@ -45,6 +45,43 @@ export const Customers: React.FC = () => {
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 7 dias
   });
   const [isEditingOffer, setIsEditingOffer] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Selection Logic
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredCustomers.length && filteredCustomers.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredCustomers.map(c => c.id));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter(sid => sid !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Tem certeza que deseja apagar ${selectedIds.length} clientes selecionados? Esta ação é irreversível e apagará empréstimos vinculados.`)) return;
+
+    setLoading(true);
+    addToast('Excluindo clientes...', 'info');
+
+    try {
+      await supabaseService.bulkDeleteCustomers(selectedIds);
+      addToast(`${selectedIds.length} clientes excluídos.`, 'success');
+      setSelectedIds([]);
+      loadCustomers();
+    } catch (e) {
+      console.error(e);
+      addToast('Erro ao excluir clientes.', 'error');
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadCustomers();
@@ -403,13 +440,29 @@ export const Customers: React.FC = () => {
   const filteredCustomers = customers.filter(c =>
     c.name.toLowerCase().includes(filter.toLowerCase()) ||
     c.cpf.includes(filter) ||
-    c.email.toLowerCase().includes(filter.toLowerCase())
+    c.email.toLowerCase().includes(filter.toLowerCase()) ||
+    c.phone.includes(filter)
   );
+
+  const totalImported = customers.filter(c => c.email.includes('@whatsapp.lead')).length;
 
   return (
     <div className="p-4 md:p-8 bg-black min-h-screen text-white">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <h1 className="text-3xl font-bold text-[#D4AF37]">Gestão de Clientes</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-[#D4AF37]">Gestão de Clientes</h1>
+          <p className="text-zinc-500 text-sm mt-1">
+            {customers.length} total • {filteredCustomers.length} visíveis • {totalImported} importados
+          </p>
+          {selectedIds.length > 0 && (
+            <div className="mt-2 text-white bg-zinc-800 px-3 py-1 rounded-full text-sm inline-flex items-center gap-2 animate-in fade-in">
+              <span className="font-bold text-[#D4AF37]">{selectedIds.length}</span> selecionados
+              <button onClick={handleBulkDelete} className="text-red-400 hover:text-red-300 ml-2 font-bold underline flex items-center">
+                <Trash2 size={12} className="mr-1" /> Excluir
+              </button>
+            </div>
+          )}
+        </div>
         <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
           <div className="relative w-full md:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={20} />
@@ -442,6 +495,14 @@ export const Customers: React.FC = () => {
           <table className="w-full text-left min-w-[800px]">
             <thead className="bg-zinc-950 text-zinc-400 text-sm uppercase tracking-wider">
               <tr>
+                <th className="p-4 w-10">
+                  <input
+                    type="checkbox"
+                    checked={filteredCustomers.length > 0 && selectedIds.length === filteredCustomers.length}
+                    onChange={toggleSelectAll}
+                    className="rounded bg-zinc-800 border-zinc-700 text-[#D4AF37] focus:ring-[#D4AF37]"
+                  />
+                </th>
                 <th className="p-4">Cliente</th>
                 <th className="p-4">Status</th>
                 <th className="p-4">Score Interno</th>
@@ -462,7 +523,15 @@ export const Customers: React.FC = () => {
                 </tr>
               ) : (
                 filteredCustomers.map((cust) => (
-                  <tr key={cust.id} className="hover:bg-zinc-800/50 transition-colors group">
+                  <tr key={cust.id} className={`hover:bg-zinc-800/50 transition-colors group ${selectedIds.includes(cust.id) ? 'bg-zinc-800/30' : ''}`}>
+                    <td className="p-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(cust.id)}
+                        onChange={() => toggleSelectOne(cust.id)}
+                        className="rounded bg-zinc-800 border-zinc-700 text-[#D4AF37] focus:ring-[#D4AF37]"
+                      />
+                    </td>
                     <td className="p-4">
                       <div className="font-bold text-white flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-[#D4AF37] text-xs">
