@@ -37,6 +37,7 @@ import { Referrals } from './pages/admin/Referrals';
 import { AIChatbot } from './pages/admin/AIChatbot';
 import { StatusScheduler } from './pages/admin/StatusScheduler';
 import { AntiFraudMonitor } from './pages/admin/AntiFraudMonitor';
+import { ImportContacts } from './pages/admin/ImportContacts';
 
 // Pages - Public
 import { DemoSimulator } from './pages/public/DemoSimulator';
@@ -56,7 +57,7 @@ import {
   LayoutDashboard, FileText, Settings as SettingsIcon, LogOut, Users, Bot, Menu, X,
   UserCog, Home as HomeIcon, PieChart, User as UserIcon, Megaphone, BarChart3,
   Calendar, Ban, FileCheck, DollarSign, MessageSquare, Star, ChevronDown, ChevronRight,
-  MapPin, Landmark, Receipt, Gift, Camera, Shield
+  MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload
 } from 'lucide-react';
 import { Logo } from './components/Logo';
 import { supabaseService } from './services/supabaseService';
@@ -92,6 +93,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin')}`}><LayoutDashboard size={18} /> Dashboard</Link>
         <Link to="/admin/requests" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/requests')}`}><FileText size={18} /> Solicitações</Link>
         <Link to="/admin/customers" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/customers')}`}><Users size={18} /> Clientes</Link>
+        <Link to="/admin/import-contacts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/import-contacts')}`}><Upload size={18} /> Importar Contatos <span className="ml-auto text-[10px] bg-green-600 text-white px-1.5 py-0.5 rounded-full font-bold">NEW</span></Link>
 
         {/* Financeiro */}
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Financeiro</p>
@@ -337,6 +339,7 @@ export default function App() {
             <Route path="/admin" element={<AdminLayout><Dashboard /></AdminLayout>} />
             <Route path="/admin/requests" element={<AdminLayout><Requests /></AdminLayout>} />
             <Route path="/admin/customers" element={<AdminLayout><Customers /></AdminLayout>} />
+            <Route path="/admin/import-contacts" element={<AdminLayout><ImportContacts /></AdminLayout>} />
             <Route path="/admin/reports" element={<AdminLayout><Reports /></AdminLayout>} />
             <Route path="/admin/marketing" element={<AdminLayout><Marketing /></AdminLayout>} />
             <Route path="/admin/users" element={<AdminLayout><UsersPage /></AdminLayout>} />
