@@ -1109,6 +1109,83 @@ export const supabaseService = {
         return !error;
     },
 
+    updateCustomer: async (id: string, data: {
+        name?: string;
+        cpf?: string;
+        email?: string;
+        phone?: string;
+        address?: string;
+        neighborhood?: string;
+        city?: string;
+        state?: string;
+        zipCode?: string;
+        monthlyIncome?: number;
+    }): Promise<boolean> => {
+        const updateData: any = {};
+        if (data.name) updateData.name = data.name;
+        if (data.cpf) updateData.cpf = data.cpf;
+        if (data.email) updateData.email = data.email;
+        if (data.phone) updateData.phone = data.phone;
+        if (data.address) updateData.address = data.address;
+        if (data.neighborhood) updateData.neighborhood = data.neighborhood;
+        if (data.city) updateData.city = data.city;
+        if (data.state) updateData.state = data.state;
+        if (data.zipCode) updateData.zip_code = data.zipCode;
+        if (data.monthlyIncome !== undefined) updateData.monthly_income = data.monthlyIncome;
+
+        const { error } = await supabase
+            .from('customers')
+            .update(updateData)
+            .eq('id', id);
+
+        return !error;
+    },
+
+    createUserFromCustomer: async (customerId: string, password: string): Promise<{ success: boolean; error?: string }> => {
+        // Buscar dados do cliente
+        const { data: customer, error: fetchError } = await supabase
+            .from('customers')
+            .select('name, email, phone, cpf')
+            .eq('id', customerId)
+            .single();
+
+        if (fetchError || !customer) {
+            return { success: false, error: 'Cliente não encontrado' };
+        }
+
+        // Verificar se já existe usuário com esse email ou CPF
+        const { data: existingUser } = await supabase
+            .from('users')
+            .select('id')
+            .or(`email.eq.${customer.email},cpf.eq.${customer.cpf}`)
+            .single();
+
+        if (existingUser) {
+            return { success: false, error: 'Já existe um usuário com este email ou CPF' };
+        }
+
+        // Criar usuário
+        const { error: insertError } = await supabase
+            .from('users')
+            .insert({
+                name: customer.name,
+                email: customer.email,
+                cpf: customer.cpf,
+                phone: customer.phone,
+                password: password, // Em produção, deveria ser hash
+                role: 'client',
+                customer_id: customerId,
+                created_at: new Date().toISOString()
+            });
+
+        if (insertError) {
+            console.error('Error creating user:', insertError);
+            return { success: false, error: insertError.message };
+        }
+
+        return { success: true };
+    },
+
     sendPreApproval: async (customerId: string, amount: number) => {
         // Buscar dados do cliente
         const { data: customer } = await supabase

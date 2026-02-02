@@ -191,20 +191,61 @@ export const ImportContacts: React.FC = () => {
                 return;
             }
 
+            console.log('[ImportContacts] Raw WhatsApp contacts sample:', whatsappContacts.slice(0, 3));
+
             const parsed: ParsedContact[] = [];
             const seenPhones = new Set<string>();
 
             for (const contact of whatsappContacts) {
-                const name = contact.pushName || contact.name || contact.verifiedName || 'WhatsApp';
-                const rawPhone = contact.id?.replace('@s.whatsapp.net', '') || contact.remoteJid?.replace('@s.whatsapp.net', '') || '';
-                const sanitized = sanitizePhone(rawPhone);
+                // Ignorar grupos e broadcasts
+                const contactId = contact.id || contact.remoteJid || '';
+                if (contactId.includes('g.us') || contactId.includes('broadcast')) continue;
 
-                if (sanitized.length >= 12 && !seenPhones.has(sanitized)) {
-                    seenPhones.add(sanitized);
+                // Extrair nome
+                const name = contact.pushName || contact.name || contact.verifiedName || contact.notify || 'WhatsApp';
+
+                // Extrair telefone de múltiplos campos possíveis
+                let rawPhone = '';
+                if (contact.id) rawPhone = String(contact.id).replace('@s.whatsapp.net', '').replace('@c.us', '');
+                else if (contact.remoteJid) rawPhone = String(contact.remoteJid).replace('@s.whatsapp.net', '').replace('@c.us', '');
+                else if (contact.phone) rawPhone = String(contact.phone);
+                else if (contact.jid) rawPhone = String(contact.jid).replace('@s.whatsapp.net', '').replace('@c.us', '');
+
+                // Limpar para apenas dígitos
+                let clean = rawPhone.replace(/\D/g, '');
+
+                // Validar e sanitizar número brasileiro
+                // WhatsApp IDs geralmente já vêm com DDI (55)
+                if (clean.length < 10 || clean.length > 15) continue; // Número inválido
+
+                // Se não começa com 55 e tem 10-11 dígitos, adicionar
+                if (!clean.startsWith('55') && clean.length >= 10 && clean.length <= 11) {
+                    clean = '55' + clean;
+                }
+
+                // Se começa com 55, garantir formato correto
+                if (clean.startsWith('55')) {
+                    // Remover zeros após DDD (55 XX 0...) 
+                    if (clean.length >= 5 && clean[4] === '0') {
+                        clean = clean.substring(0, 4) + clean.substring(5);
+                    }
+
+                    // Adicionar 9º dígito se necessário (celular com 8 dígitos)
+                    if (clean.length === 12) {
+                        const firstDigitAfterDDD = clean[4];
+                        if (['6', '7', '8', '9'].includes(firstDigitAfterDDD)) {
+                            clean = clean.substring(0, 4) + '9' + clean.substring(4);
+                        }
+                    }
+                }
+
+                // Validar tamanho final (12-13 dígitos para BR)
+                if (clean.length >= 12 && clean.length <= 13 && !seenPhones.has(clean)) {
+                    seenPhones.add(clean);
                     parsed.push({
-                        id: `${sanitized}-${Date.now()}-${Math.random()}`,
+                        id: `${clean}-${Date.now()}-${Math.random()}`,
                         name: name.substring(0, 50),
-                        phone: sanitized,
+                        phone: clean,
                         selected: true,
                         status: 'pending'
                     });
@@ -212,7 +253,7 @@ export const ImportContacts: React.FC = () => {
             }
 
             setContacts(parsed);
-            addToast(`${parsed.length} contatos sincronizados do WhatsApp.`, 'success');
+            addToast(`${parsed.length} contatos válidos sincronizados do WhatsApp.`, 'success');
         } catch (err) {
             console.error('WhatsApp Sync Error:', err);
             addToast('Erro ao sincronizar com WhatsApp. Verifique a configuração da API.', 'error');

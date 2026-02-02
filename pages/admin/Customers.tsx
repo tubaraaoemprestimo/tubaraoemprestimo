@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings, Calendar, RotateCcw, Calculator, Edit2, Trash2, Gift, Upload } from 'lucide-react';
+import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings, Calendar, RotateCcw, Calculator, Edit2, Trash2, Gift, Upload, UserPlus, Save, Key } from 'lucide-react';
 import { supabaseService } from '../../services/supabaseService';
 import { whatsappService } from '../../services/whatsappService';
 import { Customer, SystemSettings } from '../../types';
@@ -49,6 +49,18 @@ export const Customers: React.FC = () => {
 
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'BLOCKED'>('ALL');
   const [originFilter, setOriginFilter] = useState<'ALL' | 'IMPORTED' | 'ORGANIC'>('ALL');
+
+  // Edit Customer Modal
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editData, setEditData] = useState({
+    name: '', cpf: '', email: '', phone: '',
+    address: '', neighborhood: '', city: '', state: '', zipCode: '',
+    monthlyIncome: 0
+  });
+
+  // Create User Modal
+  const [createUserModalOpen, setCreateUserModalOpen] = useState(false);
+  const [newUserPassword, setNewUserPassword] = useState('');
 
   // 1. Definição de Dados Derivados
   const filteredCustomers = customers.filter(c => {
@@ -138,6 +150,72 @@ export const Customers: React.FC = () => {
     setMessageText(`Olá ${cust.name.split(' ')[0]}, `);
     setMsgModalOpen(true);
   };
+
+  // Edit Customer
+  const openEditModal = (cust: Customer) => {
+    setSelectedCustomer(cust);
+    setEditData({
+      name: cust.name || '',
+      cpf: cust.cpf || '',
+      email: cust.email || '',
+      phone: cust.phone || '',
+      address: cust.address || '',
+      neighborhood: cust.neighborhood || '',
+      city: cust.city || '',
+      state: cust.state || '',
+      zipCode: cust.zipCode || '',
+      monthlyIncome: cust.monthlyIncome || 0
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleSaveCustomer = async () => {
+    if (!selectedCustomer) return;
+    setSending(true);
+
+    const success = await supabaseService.updateCustomer(selectedCustomer.id, editData);
+
+    setSending(false);
+    setEditModalOpen(false);
+
+    if (success) {
+      addToast('Cliente atualizado com sucesso!', 'success');
+      loadCustomers();
+    } else {
+      addToast('Erro ao atualizar cliente.', 'error');
+    }
+  };
+
+  // Create User from Customer
+  const openCreateUserModal = (cust: Customer) => {
+    setSelectedCustomer(cust);
+    setNewUserPassword('');
+    setCreateUserModalOpen(true);
+  };
+
+  const handleCreateUser = async () => {
+    if (!selectedCustomer || !newUserPassword) {
+      addToast('Defina uma senha para o usuário.', 'warning');
+      return;
+    }
+
+    if (newUserPassword.length < 6) {
+      addToast('A senha deve ter pelo menos 6 caracteres.', 'warning');
+      return;
+    }
+
+    setSending(true);
+    const result = await supabaseService.createUserFromCustomer(selectedCustomer.id, newUserPassword);
+    setSending(false);
+
+    if (result.success) {
+      addToast('Usuário criado com sucesso! O cliente agora pode fazer login.', 'success');
+      setCreateUserModalOpen(false);
+    } else {
+      addToast(result.error || 'Erro ao criar usuário.', 'error');
+    }
+  };
+
 
   const openPreApproveModal = (cust: Customer) => {
     setSelectedCustomer(cust);
@@ -655,6 +733,24 @@ export const Customers: React.FC = () => {
                             </Button>
                           </>
                         )}
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => openEditModal(cust)}
+                          title="Editar Cliente"
+                          className="text-cyan-400 hover:text-cyan-300 bg-cyan-900/20 border border-cyan-700/50"
+                        >
+                          <Edit2 size={14} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => openCreateUserModal(cust)}
+                          title="Criar Acesso para Cliente"
+                          className="text-amber-400 hover:text-amber-300 bg-amber-900/20 border border-amber-700/50"
+                        >
+                          <UserPlus size={14} />
+                        </Button>
                         <Button size="sm" variant="secondary" onClick={() => openMessageModal(cust)}>
                           <MessageSquare size={16} />
                         </Button>
@@ -933,6 +1029,157 @@ export const Customers: React.FC = () => {
 
               <Button onClick={handleSendInstallmentOffer} isLoading={sending} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white">
                 <Send size={16} className="mr-2" /> {isEditingOffer ? 'Atualizar Oferta' : 'Enviar Oferta'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Customer Modal */}
+      {editModalOpen && selectedCustomer && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl p-6 shadow-2xl animate-in fade-in zoom-in duration-200 my-8">
+            <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
+              <h3 className="text-xl font-bold text-cyan-400 flex items-center gap-2">
+                <Edit2 size={20} /> Editar Cliente
+              </h3>
+              <button onClick={() => setEditModalOpen(false)} className="text-zinc-500 hover:text-white"><X /></button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Nome Completo</label>
+                <input
+                  value={editData.name}
+                  onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-cyan-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">CPF</label>
+                <input
+                  value={editData.cpf}
+                  onChange={(e) => setEditData(prev => ({ ...prev, cpf: e.target.value }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-cyan-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Email</label>
+                <input
+                  type="email"
+                  value={editData.email}
+                  onChange={(e) => setEditData(prev => ({ ...prev, email: e.target.value }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-cyan-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Telefone</label>
+                <input
+                  value={editData.phone}
+                  onChange={(e) => setEditData(prev => ({ ...prev, phone: e.target.value }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-cyan-500 outline-none"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Endereço</label>
+                <input
+                  value={editData.address}
+                  onChange={(e) => setEditData(prev => ({ ...prev, address: e.target.value }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-cyan-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Bairro</label>
+                <input
+                  value={editData.neighborhood}
+                  onChange={(e) => setEditData(prev => ({ ...prev, neighborhood: e.target.value }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-cyan-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Cidade</label>
+                <input
+                  value={editData.city}
+                  onChange={(e) => setEditData(prev => ({ ...prev, city: e.target.value }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-cyan-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Estado</label>
+                <input
+                  value={editData.state}
+                  onChange={(e) => setEditData(prev => ({ ...prev, state: e.target.value }))}
+                  maxLength={2}
+                  placeholder="SP"
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-cyan-500 outline-none uppercase"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">CEP</label>
+                <input
+                  value={editData.zipCode}
+                  onChange={(e) => setEditData(prev => ({ ...prev, zipCode: e.target.value }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-cyan-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Renda Mensal</label>
+                <input
+                  type="number"
+                  value={editData.monthlyIncome}
+                  onChange={(e) => setEditData(prev => ({ ...prev, monthlyIncome: Number(e.target.value) }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-cyan-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-zinc-800">
+              <Button onClick={handleSaveCustomer} isLoading={sending} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white">
+                <Save size={16} className="mr-2" /> Salvar Alterações
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create User Modal */}
+      {createUserModalOpen && selectedCustomer && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
+              <h3 className="text-xl font-bold text-amber-400 flex items-center gap-2">
+                <UserPlus size={20} /> Criar Acesso
+              </h3>
+              <button onClick={() => setCreateUserModalOpen(false)} className="text-zinc-500 hover:text-white"><X /></button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-zinc-800/50 rounded-xl p-4">
+                <p className="text-zinc-400 text-sm mb-2">Criando acesso para:</p>
+                <p className="text-white font-bold">{selectedCustomer.name}</p>
+                <p className="text-zinc-500 text-sm">{selectedCustomer.email}</p>
+              </div>
+
+              <div>
+                <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">
+                  <Key size={12} className="inline mr-1" /> Definir Senha
+                </label>
+                <input
+                  type="password"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-amber-500 outline-none"
+                />
+              </div>
+
+              <div className="bg-amber-900/20 border border-amber-700/50 rounded-xl p-3 text-sm">
+                <p className="text-amber-400 font-bold mb-1">⚠️ Importante</p>
+                <p className="text-zinc-400">O cliente poderá fazer login com o email cadastrado e essa senha.</p>
+              </div>
+
+              <Button onClick={handleCreateUser} isLoading={sending} className="w-full bg-amber-600 hover:bg-amber-700 text-white">
+                <UserPlus size={16} className="mr-2" /> Criar Usuário
               </Button>
             </div>
           </div>
