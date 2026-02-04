@@ -5,6 +5,7 @@
 
 // URL do Supabase
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://cwhiujeragsethxjekkb.supabase.co';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MTAyODUsImV4cCI6MjA4MzQ4NjI4NX0.7e7P2PVY8DnvBYxsdpVWnNYK2Z3E6WgbiaS_XcChKvI';
 
 export type ApiProvider = 'apicpf' | 'hubdev';
 
@@ -54,7 +55,8 @@ export const dataEnrichmentService = {
             const response = await fetch(`${SUPABASE_URL}/functions/v1/cpf-lookup`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
                 },
                 body: JSON.stringify({
                     cpf: cleanCpf,
