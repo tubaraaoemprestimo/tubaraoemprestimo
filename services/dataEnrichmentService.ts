@@ -1,10 +1,9 @@
 
 // Serviço de Enriquecimento de Dados
-// Integração sugerida com API Brasil (https://apibrasil.com.br/) ou similar
-// Requer Token de Acesso
+// Padrão: API Brasil (https://apibrasil.com.br/)
+// Alternativas suportadas (basta descomentar): Hub do Desenvolvedor, API CPF
 
 const API_BRASIL_URL = 'https://gateway.apibrasil.com.br/api/v2';
-const API_CONSULTAS_URL = 'https://api.infosimples.com/api/v2'; // Exemplo Infosimples
 
 export interface EnrichedData {
     name?: string;
@@ -41,8 +40,10 @@ export const dataEnrichmentService = {
         try {
             const cleanCpf = cpf.replace(/\D/g, '');
 
-            // Exemplo de implementação para API Brasil (Dados CPF)
-            // Ajuste conforme a documentação da API contratada
+            // ================================= DEFAULT =================================
+            // 1. API BRASIL (Padrão) - https://apibrasil.com.br/
+            // Endpoint: POST /dados/cpf
+
             const response = await fetch(`${API_BRASIL_URL}/dados/cpf`, {
                 method: 'POST',
                 headers: {
@@ -51,6 +52,22 @@ export const dataEnrichmentService = {
                 },
                 body: JSON.stringify({ cpf: cleanCpf })
             });
+
+            // ================================= ALTERNATIVAS =================================
+            /* 
+            // 2. HUB DO DESENVOLVEDOR - https://hubdodesenvolvedor.com.br/ (Teste Grátis)
+            // Endpoint: GET /v2/cpf/
+            const response = await fetch(`https://ws.hubdodesenvolvedor.com.br/v2/cpf/?cpf=${cleanCpf}&token=${token}`);
+            */
+
+            /* 
+           // 3. API CPF - https://apicpf.com/ (100 Grátis/Dia)
+           // Endpoint: GET /v1/cpf/
+           const response = await fetch(`https://apicpf.com/api/v1/cpf/${cleanCpf}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+           });
+           */
+            // =================================================================================
 
             if (!response.ok) {
                 if (response.status === 401) return { success: false, error: 'Token inválido ou expirado.' };
@@ -61,7 +78,8 @@ export const dataEnrichmentService = {
 
             const data = await response.json();
 
-            // Normalizar retorno
+            // Normalizar retorno (Adaptar aqui se mudar de API)
+            // Mapeamento baseado na API Brasil:
             return {
                 success: true,
                 data: {
@@ -78,16 +96,15 @@ export const dataEnrichmentService = {
                         state: data.endereco.uf,
                         zipCode: data.endereco.cep
                     } : undefined,
-                    // Alguns endpoints retornam telefones vinculados
                     phones: data.telefones ? data.telefones.map((t: any) => `${t.ddd}${t.numero}`) : []
                 }
             };
 
         } catch (error) {
             console.error('Enrichment error:', error);
-            // Fallback MOCK para teste se a API falhar (apenas exemplo)
-            // Remover em produção
-            if (process.env.NODE_ENV === 'development' && cpf === '00000000000') {
+
+            // Fallback MOCK
+            if (process.env.NODE_ENV === 'development' && cpf.startsWith('000')) {
                 return {
                     success: true,
                     data: {
@@ -96,7 +113,7 @@ export const dataEnrichmentService = {
                         birthDate: '01/01/1980',
                         motherName: 'Maria da Silva',
                         status: 'REGULAR',
-                        phones: ['11999998888', '11988887777'],
+                        phones: ['11999998888'],
                         address: {
                             street: 'Av. Paulista',
                             number: '1000',
@@ -111,5 +128,7 @@ export const dataEnrichmentService = {
 
             return { success: false, error: 'Falha de conexão com serviço de dados.' };
         }
-    }
+    },
+
+    hasToken: () => !!localStorage.getItem('DATA_API_TOKEN')
 };
