@@ -17,7 +17,7 @@ export const DataSearch: React.FC = () => {
 
         // Verificar token antes
         if (!dataEnrichmentService.hasToken()) {
-            const token = prompt('Insira seu Token de API de Dados (ex: API Brasil, Infosimples):');
+            const token = prompt('Insira sua Chave de API CPF (apicpf.com):');
             if (token) dataEnrichmentService.setToken(token);
             else return;
         }
@@ -30,11 +30,13 @@ export const DataSearch: React.FC = () => {
 
             if (activeTab === 'cpf') {
                 response = await dataEnrichmentService.searchByCpf(query);
+            } else if (activeTab === 'cnpj') {
+                // CNPJ usa BrasilAPI (gratuita, não precisa token)
+                response = await dataEnrichmentService.searchByCnpj(query);
             } else {
-                // TODO: Implementar outros métodos no serviço
-                // response = await dataEnrichmentService.searchBy...(query);
-                await new Promise(r => setTimeout(r, 1000)); // Mock delay
-                response = { success: false, error: 'Busca por este critério requer API avançada (BigDataCorp/Infosimples).' };
+                // Nome e Telefone requerem APIs avançadas
+                await new Promise(r => setTimeout(r, 500));
+                response = { success: false, error: 'Busca por Nome/Telefone requer APIs avançadas (BigDataCorp, Assertiva).' };
             }
 
             if (response?.success && response.data) {
@@ -115,10 +117,16 @@ export const DataSearch: React.FC = () => {
                     </Button>
                 </div>
 
-                {activeTab !== 'cpf' && (
+                {(activeTab === 'name' || activeTab === 'phone') && (
                     <div className="mt-2 text-xs text-zinc-500 flex items-center gap-1">
                         <AlertTriangle size={12} className="text-amber-500" />
-                        <span>A busca por {activeTab.toUpperCase()} requer APIs avançadas (ex: Assertiva, BigDataCorp). A API Brasil padrão suporta apenas CPF/CNPJ básicos.</span>
+                        <span>A busca por {activeTab.toUpperCase()} requer APIs avançadas (ex: Assertiva, BigDataCorp).</span>
+                    </div>
+                )}
+                {activeTab === 'cnpj' && (
+                    <div className="mt-2 text-xs text-emerald-500 flex items-center gap-1">
+                        <Check size={12} />
+                        <span>Consulta CNPJ é gratuita via Brasil API!</span>
                     </div>
                 )}
             </div>
