@@ -1,9 +1,12 @@
 
 // Serviço de Enriquecimento de Dados
-// Configurado para API CPF (https://apicpf.com/)
-// Plano Grátis: 100 consultas/dia
+// Usa Edge Function do Supabase como proxy para API CPF (resolve CORS)
+// API CPF: https://apicpf.com/ - 100 consultas/dia grátis
 
-const API_CPF_URL = 'https://apicpf.com/api/consulta';
+import { supabase } from './supabaseClient';
+
+// URL da Edge Function (será preenchida automaticamente pelo Supabase)
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 
 export interface EnrichedData {
     name?: string;
@@ -30,7 +33,7 @@ export const dataEnrichmentService = {
 
     hasToken: () => !!localStorage.getItem('DATA_API_TOKEN'),
 
-    // Consultar dados por CPF via API CPF (apicpf.com)
+    // Consultar dados por CPF via Edge Function (resolve CORS)
     searchByCpf: async (cpf: string): Promise<{ success: boolean; data?: EnrichedData; error?: string }> => {
         const token = dataEnrichmentService.getToken();
 
@@ -41,82 +44,60 @@ export const dataEnrichmentService = {
         try {
             const cleanCpf = cpf.replace(/\D/g, '');
 
-            // API CPF (apicpf.com) - Endpoint com header de autenticação
-            const response = await fetch(`${API_CPF_URL}?cpf=${cleanCpf}`, {
-                method: 'GET',
+            console.log('[DataEnrichment] Consultando CPF via Edge Function:', cleanCpf);
+
+            // Chamar Edge Function do Supabase (proxy para API CPF)
+            const response = await fetch(`${SUPABASE_URL}/functions/v1/cpf-lookup`, {
+                method: 'POST',
                 headers: {
-                    'Accept': 'application/json',
-                    'X-API-KEY': token
-                }
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`
+                },
+                body: JSON.stringify({ cpf: cleanCpf, api_key: token })
             });
-            console.log('[DataEnrichment] Consultando CPF:', cleanCpf);
-            console.log('[DataEnrichment] Token (primeiros 10 chars):', token.substring(0, 10) + '...');
 
-            if (!response.ok) {
-                // Tentar ler mensagem de erro da API
-                let errorMsg = '';
-                try {
-                    const errorData = await response.json();
-                    console.log('[DataEnrichment] Erro da API:', errorData);
-                    errorMsg = errorData.message || errorData.error || errorData.msg || '';
-                } catch (e) {
-                    console.log('[DataEnrichment] Status HTTP:', response.status);
-                }
+            const result = await response.json();
+            console.log('[DataEnrichment] Resposta:', result);
 
-                if (response.status === 401 || response.status === 403) {
-                    return { success: false, error: errorMsg || 'Token inválido ou sem permissão.' };
-                }
-                if (response.status === 404) {
-                    return { success: false, error: errorMsg || 'CPF não encontrado na base de dados.' };
-                }
-                if (response.status === 429) {
-                    return { success: false, error: 'Limite de consultas atingido. Aguarde.' };
-                }
-                return { success: false, error: errorMsg || `Erro na API: ${response.status}` };
+            // Verificar erro
+            if (!response.ok || result.error) {
+                const errorMsg = result.message || result.error || result.msg || `Erro: ${response.status}`;
+                return { success: false, error: errorMsg };
             }
 
-            const data = await response.json();
+            // A API retorna { code: 200, data: { ... } }
+            const data = result.data || result;
 
-            // Verificar se houve erro no retorno da API
-            if (data.error || data.status === 'error') {
-                return { success: false, error: data.message || data.error || 'Erro desconhecido na API.' };
-            }
-
-            // Normalizar retorno da API CPF
-            // Campos esperados: nome, genero, nascimento (ou data_nascimento)
+            // Normalizar retorno
             return {
                 success: true,
                 data: {
                     name: data.nome || data.name,
                     cpf: data.cpf || cleanCpf,
-                    birthDate: data.nascimento || data.data_nascimento || data.birthDate,
+                    birthDate: data.data_nascimento || data.nascimento || data.birthDate,
                     gender: data.genero || data.gender || data.sexo,
-                    motherName: data.mae || data.nome_mae || data.motherName,
-                    status: data.situacao || data.situacao_cadastral || data.status || 'Consulta realizada',
-                    // Endereço (se retornado)
+                    motherName: data.mae || data.nome_mae,
+                    status: data.situacao || 'Consulta realizada',
                     address: data.endereco ? {
-                        street: data.endereco.logradouro || data.endereco.rua || '',
+                        street: data.endereco.logradouro || '',
                         number: data.endereco.numero || '',
                         neighborhood: data.endereco.bairro || '',
                         city: data.endereco.cidade || data.endereco.municipio || '',
-                        state: data.endereco.uf || data.endereco.estado || '',
+                        state: data.endereco.uf || '',
                         zipCode: data.endereco.cep || ''
                     } : undefined,
-                    // Telefones (se retornados)
-                    phones: data.telefones || data.phones || []
+                    phones: data.telefones || []
                 }
             };
 
         } catch (error) {
-            console.error('Enrichment error:', error);
-            return { success: false, error: 'Falha de conexão com o serviço de dados.' };
+            console.error('[DataEnrichment] Erro:', error);
+            return { success: false, error: 'Falha de conexão com o serviço.' };
         }
     },
 
-    // Consultar por CNPJ (placeholder - API CPF pode não suportar isso)
+    // Consultar por CNPJ (Brasil API - gratuita, sem CORS issues)
     searchByCnpj: async (cnpj: string): Promise<{ success: boolean; data?: any; error?: string }> => {
-        // A maioria das APIs CPF não têm CNPJ
-        // Usar API pública BrasilAPI como fallback para CNPJ
         try {
             const cleanCnpj = cnpj.replace(/\D/g, '');
             const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`);
