@@ -41,25 +41,38 @@ export const dataEnrichmentService = {
         try {
             const cleanCpf = cpf.replace(/\D/g, '');
 
-            // API CPF (apicpf.com) - Endpoint
-            const response = await fetch(`${API_CPF_URL}?cpf=${cleanCpf}&api_key=${token}`, {
+            // API CPF (apicpf.com) - Endpoint com header de autenticação
+            const response = await fetch(`${API_CPF_URL}?cpf=${cleanCpf}`, {
                 method: 'GET',
                 headers: {
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
+                    'X-API-KEY': token
                 }
             });
+            console.log('[DataEnrichment] Consultando CPF:', cleanCpf);
+            console.log('[DataEnrichment] Token (primeiros 10 chars):', token.substring(0, 10) + '...');
 
             if (!response.ok) {
+                // Tentar ler mensagem de erro da API
+                let errorMsg = '';
+                try {
+                    const errorData = await response.json();
+                    console.log('[DataEnrichment] Erro da API:', errorData);
+                    errorMsg = errorData.message || errorData.error || errorData.msg || '';
+                } catch (e) {
+                    console.log('[DataEnrichment] Status HTTP:', response.status);
+                }
+
                 if (response.status === 401 || response.status === 403) {
-                    return { success: false, error: 'Token inválido ou sem permissão.' };
+                    return { success: false, error: errorMsg || 'Token inválido ou sem permissão.' };
                 }
                 if (response.status === 404) {
-                    return { success: false, error: 'CPF não encontrado na base de dados.' };
+                    return { success: false, error: errorMsg || 'CPF não encontrado na base de dados.' };
                 }
                 if (response.status === 429) {
                     return { success: false, error: 'Limite de consultas atingido. Aguarde.' };
                 }
-                return { success: false, error: `Erro na API: ${response.status}` };
+                return { success: false, error: errorMsg || `Erro na API: ${response.status}` };
             }
 
             const data = await response.json();
