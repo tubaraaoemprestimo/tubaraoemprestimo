@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
-import { Search, User, Briefcase, Phone, MapPin, Database, Copy, Check, AlertTriangle, Building2, UserSearch } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, User, Briefcase, Phone, MapPin, Database, Copy, Check, AlertTriangle, Building2, UserSearch, Settings } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { dataEnrichmentService, EnrichedData } from '../../services/dataEnrichmentService';
+import { dataEnrichmentService, EnrichedData, ApiProvider } from '../../services/dataEnrichmentService';
 import { useToast } from '../../components/Toast';
 
 export const DataSearch: React.FC = () => {
@@ -11,13 +11,20 @@ export const DataSearch: React.FC = () => {
     const [query, setQuery] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<any | null>(null);
+    const [provider, setProvider] = useState<ApiProvider>(dataEnrichmentService.getProvider());
+    const [showConfig, setShowConfig] = useState(false);
+
+    useEffect(() => {
+        dataEnrichmentService.setProvider(provider);
+    }, [provider]);
 
     const handleSearch = async () => {
         if (!query) return;
 
         // Verificar token antes
         if (!dataEnrichmentService.hasToken()) {
-            const token = prompt('Insira sua Chave de API CPF (apicpf.com):');
+            const providerName = provider === 'hubdev' ? 'Hub do Desenvolvedor' : 'API CPF (apicpf.com)';
+            const token = prompt(`Insira seu Token do ${providerName}:`);
             if (token) dataEnrichmentService.setToken(token);
             else return;
         }
@@ -60,14 +67,77 @@ export const DataSearch: React.FC = () => {
 
     return (
         <div className="p-8 bg-black min-h-screen text-white">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-[#D4AF37] flex items-center gap-3">
-                    <Database size={32} /> Central de Investigação e Dados
-                </h1>
-                <p className="text-zinc-500 mt-2">
-                    Consulte bases oficiais para validação cadastral, análise de crédito e enriquecimento de dados.
-                </p>
+            <div className="mb-8 flex items-start justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-[#D4AF37] flex items-center gap-3">
+                        <Database size={32} /> Central de Investigação e Dados
+                    </h1>
+                    <p className="text-zinc-500 mt-2">
+                        Consulte bases oficiais para validação cadastral, análise de crédito e enriquecimento de dados.
+                    </p>
+                </div>
+                <button
+                    onClick={() => setShowConfig(!showConfig)}
+                    className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+                    title="Configurações de API"
+                >
+                    <Settings size={24} />
+                </button>
             </div>
+
+            {/* Painel de Configuração */}
+            {showConfig && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-6 animate-in fade-in slide-in-from-top-2">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <Settings size={20} /> Configuração de API
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Provedor de API</label>
+                            <select
+                                value={provider}
+                                onChange={(e) => {
+                                    setProvider(e.target.value as ApiProvider);
+                                    localStorage.removeItem('DATA_API_TOKEN'); // Limpar token ao mudar
+                                    addToast('Provedor alterado. Insira o novo token na próxima consulta.', 'info');
+                                }}
+                                className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                            >
+                                <option value="apicpf">API CPF (apicpf.com) - 100/dia grátis</option>
+                                <option value="hubdev">Hub do Desenvolvedor - Receita Federal</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs text-zinc-500 uppercase font-bold mb-2 block">Token Salvo</label>
+                            <div className="flex gap-2">
+                                <input
+                                    type="password"
+                                    value={dataEnrichmentService.getToken() ? '••••••••••••••••' : ''}
+                                    readOnly
+                                    placeholder="Nenhum token configurado"
+                                    className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-zinc-400"
+                                />
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => {
+                                        localStorage.removeItem('DATA_API_TOKEN');
+                                        addToast('Token removido.', 'success');
+                                        setShowConfig(false);
+                                    }}
+                                    className="bg-red-900/30 text-red-400 border-red-700/50"
+                                >
+                                    Limpar
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                    <p className="text-xs text-zinc-600 mt-4">
+                        {provider === 'hubdev'
+                            ? '📌 Hub do Desenvolvedor: Consulta oficial na Receita Federal. Requer conta e saldo.'
+                            : '📌 API CPF: 100 consultas/dia grátis. Retorna nome, nascimento e gênero.'}
+                    </p>
+                </div>
+            )}
 
             {/* Search Box */}
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-8 shadow-xl">
