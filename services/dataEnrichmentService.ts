@@ -3,10 +3,8 @@
 // Usa Edge Function do Supabase como proxy para API CPF (resolve CORS)
 // API CPF: https://apicpf.com/ - 100 consultas/dia grátis
 
-import { supabase } from './supabaseClient';
-
-// URL da Edge Function (será preenchida automaticamente pelo Supabase)
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+// URL do Supabase
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://cwhiujeragsethxjekkb.supabase.co';
 
 export interface EnrichedData {
     name?: string;
@@ -50,8 +48,7 @@ export const dataEnrichmentService = {
             const response = await fetch(`${SUPABASE_URL}/functions/v1/cpf-lookup`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ cpf: cleanCpf, api_key: token })
             });
