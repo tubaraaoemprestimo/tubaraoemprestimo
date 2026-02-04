@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings, Calendar, RotateCcw, Calculator, Edit2, Trash2, Gift, Upload, UserPlus, Save, Key } from 'lucide-react';
 import { supabaseService } from '../../services/supabaseService';
 import { whatsappService } from '../../services/whatsappService';
+import { dataEnrichmentService } from '../../services/dataEnrichmentService';
 import { Customer, SystemSettings } from '../../types';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
@@ -167,6 +168,54 @@ export const Customers: React.FC = () => {
       monthlyIncome: cust.monthlyIncome || 0
     });
     setEditModalOpen(true);
+  };
+
+  const handleEnrichData = async () => {
+    if (!editData.cpf) return;
+
+    // Verificar token (simples prompt para MVP)
+    if (!dataEnrichmentService.hasToken()) {
+      const token = prompt('Para consultar dados reais (Nome, Endereço, Telefones), insira seu Token da API Brasil (ou similar configurada):');
+      if (token) {
+        dataEnrichmentService.setToken(token);
+      } else {
+        addToast('É necessário um token de API para consultar dados externos.', 'warning');
+        return;
+      }
+    }
+
+    setSending(true);
+    addToast('Consultando bases de dados...', 'info');
+
+    const result = await dataEnrichmentService.searchByCpf(editData.cpf);
+    setSending(false);
+
+    if (result.success && result.data) {
+      setEditData(prev => ({
+        ...prev,
+        name: result.data!.name || prev.name,
+        address: result.data!.address?.street || prev.address,
+        neighborhood: result.data!.address?.neighborhood || prev.neighborhood,
+        city: result.data!.address?.city || prev.city,
+        state: result.data!.address?.state || prev.state,
+        zipCode: result.data!.address?.zipCode || prev.zipCode,
+      }));
+
+      // Se tiver telefones e o campo atual estiver vazio ou usuário confirmar
+      if (result.data.phones && result.data.phones.length > 0) {
+        const foundPhone = result.data.phones[0];
+        if (!editData.phone || confirm(`Encontrado telefone ${foundPhone}. Deseja substituir o atual (${editData.phone})?`)) {
+          setEditData(prev => ({ ...prev, phone: foundPhone }));
+        }
+      }
+
+      addToast('Dados preenchidos com sucesso!', 'success');
+    } else {
+      addToast(result.error || 'Dados não encontrados.', 'error');
+      if (result.error?.includes('Token')) {
+        localStorage.removeItem('DATA_API_TOKEN');
+      }
+    }
   };
 
   const handleSaveCustomer = async () => {
@@ -1057,11 +1106,24 @@ export const Customers: React.FC = () => {
               </div>
               <div>
                 <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">CPF</label>
-                <input
-                  value={editData.cpf}
-                  onChange={(e) => setEditData(prev => ({ ...prev, cpf: e.target.value }))}
-                  className="w-full bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-cyan-500 outline-none"
-                />
+                <div className="flex gap-2">
+                  <input
+                    value={editData.cpf}
+                    onChange={(e) => setEditData(prev => ({ ...prev, cpf: e.target.value }))}
+                    className="flex-1 bg-black border border-zinc-700 rounded-lg p-2.5 text-white focus:border-cyan-500 outline-none"
+                    placeholder="Apenas números"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="bg-cyan-900/30 text-cyan-400 border border-cyan-700/50"
+                    onClick={handleEnrichData}
+                    isLoading={sending}
+                    title="Buscar dados na Receita/Bureaus"
+                  >
+                    <Search size={18} />
+                  </Button>
+                </div>
               </div>
               <div>
                 <label className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Email</label>
