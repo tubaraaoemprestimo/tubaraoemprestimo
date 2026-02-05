@@ -3,7 +3,7 @@ import { AIGenerateCaption } from '../../components/AIGenerateCaption';
 import {
     Camera, Plus, Trash2, Clock, CheckCircle, XCircle,
     AlertCircle, Calendar, Image as ImageIcon, Send, Loader2,
-    RefreshCw, Play, Edit, Repeat, CalendarDays
+    RefreshCw, Play, Edit, Repeat, CalendarDays, CheckSquare, Square
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { supabase } from '../../services/supabaseClient';
@@ -424,6 +424,10 @@ export const StatusScheduler: React.FC = () => {
     // Estado do filtro
     const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'POSTED' | 'FAILED'>('ALL');
 
+    // Estado de seleção múltipla
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [isDeleting, setIsDeleting] = useState(false);
+
     // Estatísticas
     const stats = {
         total: scheduledStatus.length,
@@ -436,6 +440,64 @@ export const StatusScheduler: React.FC = () => {
     const filteredStatus = filter === 'ALL'
         ? scheduledStatus
         : scheduledStatus.filter(s => s.status === filter);
+
+    // Pendentes filtrados (para selecionar todos)
+    const pendingItems = scheduledStatus.filter(s => s.status === 'PENDING');
+
+    // Toggle seleção individual
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) {
+                newSet.delete(id);
+            } else {
+                newSet.add(id);
+            }
+            return newSet;
+        });
+    };
+
+    // Selecionar todos os pendentes
+    const selectAllPending = () => {
+        const pendingIds = pendingItems.map(s => s.id);
+        setSelectedIds(new Set(pendingIds));
+        addToast(`${pendingIds.length} itens pendentes selecionados.`, 'info');
+    };
+
+    // Limpar seleção
+    const clearSelection = () => {
+        setSelectedIds(new Set());
+    };
+
+    // Excluir todos selecionados
+    const handleDeleteSelected = async () => {
+        if (selectedIds.size === 0) {
+            addToast('Nenhum item selecionado.', 'warning');
+            return;
+        }
+
+        if (!confirm(`Excluir ${selectedIds.size} agendamento(s) selecionado(s)?`)) return;
+
+        setIsDeleting(true);
+
+        try {
+            const { error } = await supabase
+                .from('scheduled_status')
+                .delete()
+                .in('id', Array.from(selectedIds));
+
+            if (error) throw error;
+
+            addToast(`${selectedIds.size} agendamento(s) excluído(s).`, 'success');
+            setSelectedIds(new Set());
+            loadScheduledStatus();
+        } catch (err: any) {
+            console.error('Delete error:', err);
+            addToast(`Erro ao excluir: ${err.message}`, 'error');
+        }
+
+        setIsDeleting(false);
+    };
 
     const previewDatesCount = recurrence !== 'single' ? generateRecurringDates().length : 1;
 
@@ -523,6 +585,49 @@ export const StatusScheduler: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Barra de Ações em Massa */}
+                <div className="p-3 border-b border-zinc-800 bg-zinc-950 flex flex-wrap items-center gap-3">
+                    <button
+                        onClick={selectAllPending}
+                        disabled={pendingItems.length === 0}
+                        className="px-4 py-2 text-sm rounded-lg bg-yellow-600/20 text-yellow-400 border border-yellow-700 hover:bg-yellow-600/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                    >
+                        <CheckSquare size={16} />
+                        Selecionar Todos Pendentes ({stats.pending})
+                    </button>
+
+                    {selectedIds.size > 0 && (
+                        <>
+                            <button
+                                onClick={clearSelection}
+                                className="px-4 py-2 text-sm rounded-lg bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2 transition-colors"
+                            >
+                                <Square size={16} />
+                                Limpar Seleção
+                            </button>
+
+                            <button
+                                onClick={handleDeleteSelected}
+                                disabled={isDeleting}
+                                className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 transition-colors"
+                            >
+                                {isDeleting ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                    <Trash2 size={16} />
+                                )}
+                                Excluir {selectedIds.size} Selecionado(s)
+                            </button>
+                        </>
+                    )}
+
+                    {selectedIds.size > 0 && (
+                        <span className="text-sm text-zinc-400 ml-auto">
+                            {selectedIds.size} item(s) selecionado(s)
+                        </span>
+                    )}
+                </div>
+
                 {loading ? (
                     <div className="p-8 text-center text-zinc-400">
                         <Loader2 className="animate-spin mx-auto mb-2" />
@@ -537,7 +642,18 @@ export const StatusScheduler: React.FC = () => {
                 ) : (
                     <div className="divide-y divide-zinc-800">
                         {filteredStatus.map((item) => (
-                            <div key={item.id} className="p-4 flex items-center gap-4 hover:bg-zinc-800/50 transition-colors">
+                            <div key={item.id} className={`p-4 flex items-center gap-4 hover:bg-zinc-800/50 transition-colors ${selectedIds.has(item.id) ? 'bg-yellow-900/20' : ''}`}>
+                                {/* Checkbox de Seleção */}
+                                <button
+                                    onClick={() => toggleSelect(item.id)}
+                                    className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${selectedIds.has(item.id)
+                                            ? 'bg-yellow-500 border-yellow-500 text-black'
+                                            : 'border-zinc-600 hover:border-yellow-500'
+                                        }`}
+                                >
+                                    {selectedIds.has(item.id) && <CheckCircle size={14} />}
+                                </button>
+
                                 {/* Thumbnail */}
                                 <div className="w-16 h-16 rounded-lg overflow-hidden bg-zinc-800 flex-shrink-0">
                                     <img

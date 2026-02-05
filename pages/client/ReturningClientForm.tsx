@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { Logo } from '../../components/Logo';
 import { useToast } from '../../components/Toast';
-import { supabaseService, LoanSettings } from '../../services/supabaseService';
+import { supabaseService } from '../../services/supabaseService';
+import { SystemSettings } from '../../types';
 
 // Componente Input
 const Input: React.FC<{
@@ -84,7 +85,7 @@ export const ReturningClientForm: React.FC = () => {
     const { addToast } = useToast();
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
-    const [settings, setSettings] = useState<LoanSettings | null>(null);
+    const [settings, setSettings] = useState<SystemSettings | null>(null);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -98,7 +99,7 @@ export const ReturningClientForm: React.FC = () => {
     });
 
     useEffect(() => {
-        supabaseService.getLoanSettings().then(setSettings);
+        supabaseService.getSettings().then(setSettings);
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
