@@ -4,6 +4,8 @@ import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate, useNa
 
 // Pages - Client
 import { Wizard } from './pages/client/Wizard';
+import { ClientWelcome } from './pages/client/ClientWelcome';
+import { ReturningClientForm } from './pages/client/ReturningClientForm';
 import { Login } from './pages/auth/Login';
 import { ClientDashboard } from './pages/client/ClientDashboard';
 import { Contracts } from './pages/client/Contracts';
@@ -327,6 +329,11 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/wizard" element={<ClientLayout><Wizard /></ClientLayout>} />
             <Route path="/demo" element={<DemoSimulator />} />
+
+            {/* Client Welcome & Onboarding */}
+            <Route path="/client/welcome" element={<ClientWelcome />} />
+            <Route path="/client/returning" element={<ReturningClientForm />} />
+            <Route path="/client/wizard" element={<ClientLayout><Wizard /></ClientLayout>} />
 
             {/* Client Protected */}
             {/* Set showNav={false} for Dashboard to avoid double headers */}

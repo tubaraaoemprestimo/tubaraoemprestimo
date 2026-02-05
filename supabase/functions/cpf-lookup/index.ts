@@ -12,11 +12,11 @@ serve(async (req) => {
     }
 
     try {
-        const { cpf, api_key, provider } = await req.json()
+        const { cpf, rapidapi_key } = await req.json()
 
-        if (!cpf || !api_key) {
+        if (!cpf || !rapidapi_key) {
             return new Response(
-                JSON.stringify({ error: 'CPF e api_key são obrigatórios' }),
+                JSON.stringify({ error: 'CPF e rapidapi_key são obrigatórios' }),
                 { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
@@ -24,55 +24,54 @@ serve(async (req) => {
         // Limpar CPF
         const cleanCpf = cpf.replace(/\D/g, '')
 
-        let response
-        let data
+        console.log('[cpf-lookup] Consultando CPF via RapidAPI CPF DataPro:', cleanCpf)
 
-        // Selecionar provedor de API
-        if (provider === 'hubdev') {
-            // Hub do Desenvolvedor - https://hubdodesenvolvedor.com.br
-            console.log('[cpf-lookup] Using Hub do Desenvolvedor')
-            response = await fetch(
-                `https://ws.hubdodesenvolvedor.com.br/v2/cpf/?cpf=${cleanCpf}&token=${api_key}`,
-                {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' }
-                }
-            )
-            data = await response.json()
-
-            // Normalizar resposta do Hub Dev
-            if (data.status === true && data.result) {
-                data = {
-                    code: 200,
-                    data: {
-                        cpf: data.result.numero_de_cpf || cleanCpf,
-                        nome: data.result.nome_da_pf,
-                        data_nascimento: data.result.data_nascimento,
-                        situacao: data.result.situacao_cadastral,
-                        data_inscricao: data.result.data_inscricao,
-                        digito_verificador: data.result.digito_verificador
-                    }
+        // Chamar RapidAPI CPF DataPro
+        const response = await fetch(
+            `https://cpf-datapro1.p.rapidapi.com/api-cpf.php?cpf=${cleanCpf}`,
+            {
+                method: 'GET',
+                headers: {
+                    'x-rapidapi-host': 'cpf-datapro1.p.rapidapi.com',
+                    'x-rapidapi-key': rapidapi_key
                 }
             }
-        } else {
-            // API CPF (padrão) - https://apicpf.com
-            console.log('[cpf-lookup] Using API CPF (default)')
-            response = await fetch(
-                `https://apicpf.com/api/consulta?cpf=${cleanCpf}&api_key=${api_key}`,
-                {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' }
-                }
+        )
+
+        console.log('[cpf-lookup] RapidAPI response status:', response.status)
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            console.error('[cpf-lookup] RapidAPI error:', errorText)
+
+            if (response.status === 401 || response.status === 403) {
+                return new Response(
+                    JSON.stringify({ error: 'Chave da RapidAPI inválida ou sem acesso.' }),
+                    { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                )
+            }
+
+            return new Response(
+                JSON.stringify({ error: `Erro na RapidAPI: ${response.status}`, details: errorText }),
+                { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
-            data = await response.json()
         }
 
-        console.log('[cpf-lookup] Response:', JSON.stringify(data))
+        const data = await response.json()
+        console.log('[cpf-lookup] RapidAPI result:', JSON.stringify(data))
+
+        // Verificar se retornou dados
+        if (!data || data.error || data.status === false) {
+            return new Response(
+                JSON.stringify({ error: data.message || data.error || 'CPF não encontrado.' }),
+                { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+        }
 
         return new Response(
-            JSON.stringify(data),
+            JSON.stringify({ success: true, data }),
             {
-                status: response.ok ? 200 : response.status,
+                status: 200,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             }
         )

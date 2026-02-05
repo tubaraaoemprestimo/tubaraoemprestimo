@@ -822,8 +822,12 @@ export const supabaseService = {
             video_selfie_url: data.videoSelfie,
             video_house_url: data.videoHouse,
             video_vehicle_url: data.videoVehicle,
-            signature_url: data.signature
+            signature_url: data.signature,
+            // Cliente recorrente
+            is_returning_client: data.isReturningClient || false,
+            returning_client_note: data.returningClientNote || ''
         });
+
 
         if (requestError) {
             console.error('Error creating request:', requestError);
@@ -831,6 +835,77 @@ export const supabaseService = {
         }
 
         return true;
+    },
+
+    // Submeter solicitação de cliente antigo (formulário simplificado)
+    submitReturningClientRequest: async (data: {
+        name: string;
+        cpf: string;
+        phone: string;
+        email: string;
+        instagram?: string;
+        birthDate?: string;
+        amount: number;
+        preferredDueDay: number;
+    }): Promise<boolean> => {
+        try {
+            // Verificar se já existe cliente com esse CPF
+            let { data: existingCustomer } = await supabase
+                .from('customers')
+                .select('id')
+                .eq('cpf', data.cpf)
+                .single();
+
+            let customerId = existingCustomer?.id;
+
+            // Se não existe, criar cliente
+            if (!customerId) {
+                const { data: newCustomer, error: customerError } = await supabase
+                    .from('customers')
+                    .insert({
+                        name: data.name,
+                        cpf: data.cpf,
+                        email: data.email,
+                        phone: data.phone,
+                        status: 'ACTIVE',
+                        internal_score: 500,
+                        total_debt: 0,
+                        active_loans_count: 0
+                    })
+                    .select('id')
+                    .single();
+
+                if (customerError) {
+                    console.error('Error creating customer:', customerError);
+                    return false;
+                }
+                customerId = newCustomer.id;
+            }
+
+            // Criar loan_request com status RETURNING_PENDING
+            const { error: requestError } = await supabase.from('loan_requests').insert({
+                customer_id: customerId,
+                client_name: data.name,
+                cpf: data.cpf,
+                email: data.email,
+                phone: data.phone,
+                amount: data.amount,
+                installments: 12,
+                status: 'RETURNING_PENDING', // Status especial para cliente antigo
+                is_returning_client: true,
+                returning_client_note: `Instagram: ${data.instagram || 'N/A'} | Data Nasc: ${data.birthDate || 'N/A'} | Vencimento preferido: Dia ${data.preferredDueDay}`
+            });
+
+            if (requestError) {
+                console.error('Error creating returning client request:', requestError);
+                return false;
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Error in submitReturningClientRequest:', error);
+            return false;
+        }
     },
 
     approveLoan: async (id: string) => {

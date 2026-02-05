@@ -1,57 +1,124 @@
 
 // Serviço de Enriquecimento de Dados
-// Suporta múltiplos provedores: API CPF e Hub do Desenvolvedor
-// Usa Edge Function do Supabase como proxy (resolve CORS)
+// CNPJ: BrasilAPI (100% gratuita)
+// CPF: RapidAPI CPF DataPro
 
 // URL do Supabase
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://cwhiujeragsethxjekkb.supabase.co';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MTAyODUsImV4cCI6MjA4MzQ4NjI4NX0.7e7P2PVY8DnvBYxsdpVWnNYK2Z3E6WgbiaS_XcChKvI';
 
-export type ApiProvider = 'apicpf' | 'hubdev';
-
-export interface EnrichedData {
-    name?: string;
+export interface EnrichedCpfData {
     cpf?: string;
-    birthDate?: string;
+    name?: string;
     gender?: string;
+    birthDate?: string;
+    age?: number;
+    zodiac?: string;
     motherName?: string;
+    fatherName?: string;
     status?: string;
-    address?: {
-        street: string;
-        number: string;
-        neighborhood: string;
-        city: string;
-        state: string;
-        zipCode: string;
+    isDead?: boolean;
+    deathDate?: string;
+    emails?: string[];
+    phones?: { numero: string; tipo?: string; operadora?: string; whatsapp?: boolean }[];
+    addresses?: {
+        logradouro: string;
+        numero: string;
+        bairro: string;
+        cidade: string;
+        uf: string;
+        cep: string;
+        complemento?: string;
+    }[];
+    education?: string;
+    voterRegistration?: {
+        titulo: string;
+        zona: string;
+        secao: string;
+        municipio: string;
+        uf: string;
     };
-    phones?: string[];
+    rg?: {
+        numero: string;
+        orgaoExpedidor: string;
+        uf: string;
+        dataExpedicao: string;
+    };
+    cns?: string;
+    income?: string;
+    score?: number;
+    purchasingPower?: string;
+    purchasingPowerRange?: string;
+    occupations?: string[];
+    jobs?: { empresa: string; cargo: string; dataAdmissao: string; dataDemissao?: string }[];
+    companies?: { cnpj: string; razaoSocial: string; participacao: string }[];
+    relatives?: {
+        cpf: string;
+        name: string;
+        relationship?: string;
+        birthDate?: string;
+        age?: number;
+    }[];
+    neighbors?: { cpf: string; name: string; }[];
+    consumptionProfile?: Record<string, any>;
+    isPEP?: boolean;
+    rawData?: any;
+}
+
+export interface EnrichedCnpjData {
+    razaoSocial?: string;
+    nomeFantasia?: string;
+    cnpj?: string;
+    situacao?: string;
+    dataAbertura?: string;
+    naturezaJuridica?: string;
+    atividadePrincipal?: string;
+    atividadesSecundarias?: { codigo: number; descricao: string }[];
+    porte?: string;
+    capitalSocial?: number;
+    endereco?: {
+        logradouro: string;
+        numero: string;
+        complemento: string;
+        bairro: string;
+        cidade: string;
+        uf: string;
+        cep: string;
+    };
+    telefone?: string;
+    telefone2?: string;
+    email?: string;
+    socios?: {
+        nome: string;
+        qualificacao: string;
+        dataEntrada: string;
+        faixaEtaria: string;
+    }[];
+    simples?: boolean;
+    mei?: boolean;
+    regimeTributario?: string;
 }
 
 export const dataEnrichmentService = {
-    // Configuração de Token
-    getToken: () => localStorage.getItem('DATA_API_TOKEN') || '',
-    setToken: (token: string) => localStorage.setItem('DATA_API_TOKEN', token),
-    hasToken: () => !!localStorage.getItem('DATA_API_TOKEN'),
+    // Configuração de Token RapidAPI
+    getRapidApiKey: () => localStorage.getItem('RAPIDAPI_KEY') || '',
+    setRapidApiKey: (key: string) => localStorage.setItem('RAPIDAPI_KEY', key),
+    hasRapidApiKey: () => !!localStorage.getItem('RAPIDAPI_KEY'),
+    clearRapidApiKey: () => localStorage.removeItem('RAPIDAPI_KEY'),
 
-    // Configuração de Provedor
-    getProvider: (): ApiProvider => (localStorage.getItem('DATA_API_PROVIDER') as ApiProvider) || 'apicpf',
-    setProvider: (provider: ApiProvider) => localStorage.setItem('DATA_API_PROVIDER', provider),
+    // Consultar dados por CPF via RapidAPI CPF DataPro
+    searchByCpf: async (cpf: string): Promise<{ success: boolean; data?: EnrichedCpfData; error?: string }> => {
+        const rapidApiKey = dataEnrichmentService.getRapidApiKey();
 
-    // Consultar dados por CPF via Edge Function
-    searchByCpf: async (cpf: string): Promise<{ success: boolean; data?: EnrichedData; error?: string }> => {
-        const token = dataEnrichmentService.getToken();
-        const provider = dataEnrichmentService.getProvider();
-
-        if (!token) {
-            return { success: false, error: 'Token da API não configurado.' };
+        if (!rapidApiKey) {
+            return { success: false, error: 'Chave da RapidAPI não configurada. Configure nas configurações.' };
         }
 
         try {
             const cleanCpf = cpf.replace(/\D/g, '');
+            console.log('[DataEnrichment] Consultando CPF via RapidAPI:', cleanCpf);
 
-            console.log(`[DataEnrichment] Consultando CPF via ${provider}:`, cleanCpf);
-
-            // Chamar Edge Function do Supabase
+            // Chamar Edge Function do Supabase (proxy para RapidAPI)
             const response = await fetch(`${SUPABASE_URL}/functions/v1/cpf-lookup`, {
                 method: 'POST',
                 headers: {
@@ -60,87 +127,218 @@ export const dataEnrichmentService = {
                 },
                 body: JSON.stringify({
                     cpf: cleanCpf,
-                    api_key: token,
-                    provider: provider // 'apicpf' ou 'hubdev'
+                    rapidapi_key: rapidApiKey
                 })
             });
 
             const result = await response.json();
-            console.log('[DataEnrichment] Resposta:', result);
+            console.log('[DataEnrichment] Resposta CPF:', result);
 
             // Verificar erro
-            if (!response.ok || result.error || result.status === false) {
-                const errorMsg = result.message || result.error || result.msg || `Erro: ${response.status}`;
+            if (!response.ok || result.error) {
+                const errorMsg = result.message || result.error || `Erro: ${response.status}`;
                 return { success: false, error: errorMsg };
             }
 
-            // A API retorna { code: 200, data: { ... } }
+            // Dados da API
             const data = result.data || result;
+            const basicos = data.DadosBasicos || {};
+            const economicos = data.DadosEconomicos || {};
+            const profissao = data.profissao || {};
+            const empregos = data.empregos || [];
+            const empresas = data.empresas || [];
+            const rg = data.registroGeral || {};
+            const tituloEleitor = data.tituloEleitor || {};
+            const enderecos = data.enderecos || [];
+            const telefones = data.telefones || [];
+            const emails = data.emails || [];
+            const parentes = data.parentes || [];
+            const vizinhos = data.vizinhos || [];
+            const perfilConsumo = data.perfilConsumo || {};
+            const flags = data.flags || {};
 
-            // Normalizar retorno
+            // Normalizar resposta
             return {
                 success: true,
                 data: {
-                    name: data.nome || data.name || data.nome_da_pf,
-                    cpf: data.cpf || data.numero_de_cpf || cleanCpf,
-                    birthDate: data.data_nascimento || data.nascimento || data.birthDate,
-                    gender: data.genero || data.gender || data.sexo,
-                    motherName: data.mae || data.nome_mae,
-                    status: data.situacao || data.situacao_cadastral || 'Consulta realizada',
-                    address: data.endereco ? {
-                        street: data.endereco.logradouro || '',
-                        number: data.endereco.numero || '',
-                        neighborhood: data.endereco.bairro || '',
-                        city: data.endereco.cidade || data.endereco.municipio || '',
-                        state: data.endereco.uf || '',
-                        zipCode: data.endereco.cep || ''
+                    cpf: basicos.cpf || cleanCpf,
+                    name: basicos.nome,
+                    gender: basicos.sexo,
+                    birthDate: basicos.dataNascimento,
+                    age: basicos.idade,
+                    zodiac: basicos.signo,
+                    motherName: basicos.nomeMae,
+                    fatherName: basicos.nomePai,
+                    status: basicos.situacaoReceita || 'Regular',
+                    isDead: basicos.falecido === true || basicos.obito === 'SIM',
+                    cns: basicos.cns,
+
+                    // Telefones
+                    phones: telefones.map((t: any) => ({
+                        numero: t.numero || t.telefone || t,
+                        tipo: t.tipo,
+                        operadora: t.operadora,
+                        whatsapp: t.whatsapp || t.temWhatsApp
+                    })),
+
+                    // E-mails
+                    emails: emails.map((e: any) => typeof e === 'string' ? e : e.email),
+
+                    // Endereços
+                    addresses: enderecos.map((e: any) => ({
+                        logradouro: e.logradouro || e.endereco,
+                        numero: e.numero || 'S/N',
+                        bairro: e.bairro,
+                        cidade: e.cidade || e.municipio,
+                        uf: e.uf || e.estado,
+                        cep: e.cep,
+                        complemento: e.complemento
+                    })),
+
+                    // RG
+                    rg: rg.numero ? {
+                        numero: rg.numero,
+                        orgaoExpedidor: rg.orgaoExpedidor,
+                        uf: rg.uf,
+                        dataExpedicao: rg.dataExpedicao
                     } : undefined,
-                    phones: data.telefones || []
+
+                    // Título de Eleitor
+                    voterRegistration: tituloEleitor.numero ? {
+                        titulo: tituloEleitor.numero,
+                        zona: tituloEleitor.zona,
+                        secao: tituloEleitor.secao,
+                        municipio: tituloEleitor.municipio,
+                        uf: tituloEleitor.uf
+                    } : undefined,
+
+                    // Dados econômicos
+                    income: economicos.rendaPresumida || economicos.renda,
+                    score: economicos.score || economicos.scoreCredito,
+                    purchasingPower: economicos.poderAquisitivo,
+                    purchasingPowerRange: economicos.faixaRenda,
+
+                    // Profissão
+                    occupations: profissao.cbo ? [profissao.descricao || profissao.cbo] : [],
+
+                    // Empregos
+                    jobs: empregos.map((e: any) => ({
+                        empresa: e.empresa || e.razaoSocial,
+                        cargo: e.cargo || e.funcao,
+                        dataAdmissao: e.dataAdmissao || e.admissao,
+                        dataDemissao: e.dataDemissao || e.demissao
+                    })),
+
+                    // Empresas
+                    companies: empresas.map((e: any) => ({
+                        cnpj: e.cnpj,
+                        razaoSocial: e.razaoSocial || e.empresa,
+                        participacao: e.participacao || e.qualificacao
+                    })),
+
+                    // Parentes
+                    relatives: parentes.map((p: any) => ({
+                        cpf: p.cpf,
+                        name: p.nome,
+                        relationship: p.vinculo || p.parentesco,
+                        birthDate: p.dataNascimento,
+                        age: p.idade
+                    })),
+
+                    // Vizinhos
+                    neighbors: vizinhos.map((v: any) => ({
+                        cpf: v.cpf,
+                        name: v.nome
+                    })),
+
+                    // Perfil de Consumo
+                    consumptionProfile: perfilConsumo,
+
+                    // Flags
+                    isPEP: flags.__pessoa_exposta_politicamente__ === true,
+
+                    // Dados brutos
+                    rawData: data
                 }
             };
 
         } catch (error) {
-            console.error('[DataEnrichment] Erro:', error);
+            console.error('[DataEnrichment] Erro CPF:', error);
             return { success: false, error: 'Falha de conexão com o serviço.' };
         }
     },
 
-    // Consultar por CNPJ (Brasil API - gratuita)
-    searchByCnpj: async (cnpj: string): Promise<{ success: boolean; data?: any; error?: string }> => {
+    // Consultar por CNPJ (Brasil API - 100% gratuita)
+    searchByCnpj: async (cnpj: string): Promise<{ success: boolean; data?: EnrichedCnpjData; error?: string }> => {
         try {
             const cleanCnpj = cnpj.replace(/\D/g, '');
+            console.log('[DataEnrichment] Consultando CNPJ via BrasilAPI:', cleanCnpj);
+
             const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`);
 
             if (!response.ok) {
-                return { success: false, error: 'CNPJ não encontrado.' };
+                if (response.status === 404) {
+                    return { success: false, error: 'CNPJ não encontrado na base da Receita Federal.' };
+                }
+                return { success: false, error: `Erro ao consultar CNPJ: ${response.status}` };
             }
 
             const data = await response.json();
+            console.log('[DataEnrichment] Resposta CNPJ:', data);
+
+            // Formatar sócios (QSA)
+            const socios = data.qsa?.map((socio: any) => ({
+                nome: socio.nome_socio,
+                qualificacao: socio.qualificacao_socio,
+                dataEntrada: socio.data_entrada_sociedade,
+                faixaEtaria: socio.faixa_etaria
+            })) || [];
+
+            // Atividades secundárias
+            const atividadesSecundarias = data.cnaes_secundarios?.map((cnae: any) => ({
+                codigo: cnae.codigo,
+                descricao: cnae.descricao
+            })) || [];
+
+            // Regime tributário mais recente
+            const regimeTributarioRecente = data.regime_tributario?.length > 0
+                ? data.regime_tributario[data.regime_tributario.length - 1]?.forma_de_tributacao
+                : null;
 
             return {
                 success: true,
                 data: {
                     razaoSocial: data.razao_social,
-                    nomeFantasia: data.nome_fantasia,
+                    nomeFantasia: data.nome_fantasia || 'Não informado',
                     cnpj: data.cnpj,
                     situacao: data.descricao_situacao_cadastral,
                     dataAbertura: data.data_inicio_atividade,
                     naturezaJuridica: data.natureza_juridica,
                     atividadePrincipal: data.cnae_fiscal_descricao,
+                    atividadesSecundarias,
+                    porte: data.porte,
+                    capitalSocial: data.capital_social,
                     endereco: {
-                        logradouro: data.logradouro,
-                        numero: data.numero,
+                        logradouro: `${data.descricao_tipo_de_logradouro || ''} ${data.logradouro || ''}`.trim(),
+                        numero: data.numero || 'S/N',
+                        complemento: data.complemento || '',
                         bairro: data.bairro,
                         cidade: data.municipio,
                         uf: data.uf,
                         cep: data.cep
                     },
-                    telefone: data.ddd_telefone_1,
-                    email: data.email
+                    telefone: data.ddd_telefone_1 || null,
+                    telefone2: data.ddd_telefone_2 || null,
+                    email: data.email || null,
+                    socios,
+                    simples: data.opcao_pelo_simples,
+                    mei: data.opcao_pelo_mei,
+                    regimeTributario: regimeTributarioRecente
                 }
             };
         } catch (error) {
-            return { success: false, error: 'Erro ao consultar CNPJ.' };
+            console.error('[DataEnrichment] Erro CNPJ:', error);
+            return { success: false, error: 'Erro de conexão ao consultar CNPJ.' };
         }
     }
 };

@@ -8,6 +8,7 @@ export enum UserRole {
 export enum LoanStatus {
   PENDING = 'PENDING',
   WAITING_DOCS = 'WAITING_DOCS', // New Status
+  RETURNING_PENDING = 'RETURNING_PENDING', // Cliente antigo aguardando aprovação
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   PAID = 'PAID',

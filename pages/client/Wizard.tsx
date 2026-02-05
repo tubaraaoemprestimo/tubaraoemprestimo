@@ -62,6 +62,10 @@ export const Wizard: React.FC = () => {
   const [profileType, setProfileType] = useState<ProfileType>('');
   const [hasEntryValue, setHasEntryValue] = useState(false); // Para Moto
 
+  // Cliente recorrente (já fez empréstimo antes do sistema)
+  const [isReturningClient, setIsReturningClient] = useState<'sim' | 'nao' | ''>('');
+  const [returningClientNote, setReturningClientNote] = useState('');
+
   // Aceites
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -272,6 +276,10 @@ export const Wizard: React.FC = () => {
         addToast("Qual é o seu perfil?", 'warning');
         return;
       }
+      if (!isReturningClient) {
+        addToast("Por favor, informe se já é nosso cliente.", 'warning');
+        return;
+      }
     }
 
     // STEP 2: Valores
@@ -397,6 +405,9 @@ export const Wizard: React.FC = () => {
         lateFeeFixed: settings.lateFeeFixed,
         hasGuarantee: needsGuarantee,
         guarantee: needsGuarantee ? guarantee : null,
+        // Cliente recorrente
+        isReturningClient: isReturningClient === 'sim',
+        returningClientNote: isReturningClient === 'sim' ? returningClientNote : '',
         // Dados antifraude
         sessionId: antifraudService.getSessionId(),
         riskScore: riskData?.riskScore || 0,
@@ -546,6 +557,56 @@ export const Wizard: React.FC = () => {
                   <span className="font-bold">Empréstimo c/ Veículo</span>
                 </button>
               </div>
+
+              {/* Pergunta sobre cliente recorrente - aparece após selecionar perfil */}
+              {profileType && (
+                <div className="mt-6 p-5 bg-zinc-800/50 rounded-2xl border border-zinc-700 animate-in fade-in slide-in-from-bottom-2">
+                  <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                    <Users size={18} className="text-[#D4AF37]" />
+                    Você já fez empréstimo conosco antes?
+                  </h3>
+                  <p className="text-zinc-400 text-sm mb-4">
+                    Caso já tenha feito empréstimo antes do sistema existir, nos informe para agilizar o processo.
+                  </p>
+
+                  <div className="flex gap-3 mb-4">
+                    <button
+                      onClick={() => setIsReturningClient('sim')}
+                      className={`flex-1 p-3 rounded-xl border-2 font-bold transition-all ${isReturningClient === 'sim'
+                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
+                        : 'border-zinc-700 bg-black text-zinc-400 hover:border-zinc-500'
+                        }`}
+                    >
+                      ✅ Sim, já sou cliente
+                    </button>
+                    <button
+                      onClick={() => { setIsReturningClient('nao'); setReturningClientNote(''); }}
+                      className={`flex-1 p-3 rounded-xl border-2 font-bold transition-all ${isReturningClient === 'nao'
+                        ? 'border-blue-500 bg-blue-500/10 text-blue-400'
+                        : 'border-zinc-700 bg-black text-zinc-400 hover:border-zinc-500'
+                        }`}
+                    >
+                      🆕 Primeiro empréstimo
+                    </button>
+                  </div>
+
+                  {/* Campo de observação se for cliente recorrente */}
+                  {isReturningClient === 'sim' && (
+                    <div className="animate-in fade-in slide-in-from-top-2">
+                      <label className="text-sm text-zinc-400 block mb-2">
+                        Observação (opcional) - Ex: data aproximada do último empréstimo
+                      </label>
+                      <textarea
+                        value={returningClientNote}
+                        onChange={(e) => setReturningClientNote(e.target.value)}
+                        placeholder="Ex: Fiz um empréstimo em dezembro de 2024, valor de R$ 2.000..."
+                        className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white placeholder:text-zinc-600 focus:border-[#D4AF37] outline-none resize-none"
+                        rows={3}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

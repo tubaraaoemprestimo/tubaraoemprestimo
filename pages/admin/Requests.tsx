@@ -139,7 +139,7 @@ export const Requests: React.FC = () => {
 
             {/* Filters */}
             <div className="flex flex-wrap gap-2 mb-6">
-                {['ALL', LoanStatus.PENDING, LoanStatus.WAITING_DOCS, LoanStatus.APPROVED, LoanStatus.REJECTED].map((status) => (
+                {['ALL', LoanStatus.RETURNING_PENDING, LoanStatus.PENDING, LoanStatus.WAITING_DOCS, LoanStatus.APPROVED, LoanStatus.REJECTED].map((status) => (
                     <button
                         key={status}
                         onClick={() => setFilterStatus(status)}
@@ -148,7 +148,9 @@ export const Requests: React.FC = () => {
                             : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'
                             }`}
                     >
-                        {status === 'ALL' ? 'Todos' : status === 'WAITING_DOCS' ? 'Aguardando Doc.' : status}
+                        {status === 'ALL' ? 'Todos' :
+                            status === LoanStatus.RETURNING_PENDING ? '🔄 Cliente Antigo' :
+                                status === LoanStatus.WAITING_DOCS ? 'Aguardando Doc.' : status}
                     </button>
                 ))}
             </div>
@@ -182,9 +184,11 @@ export const Requests: React.FC = () => {
                                             <span className={`px-2 py-1 rounded-full text-xs font-bold ${req.status === LoanStatus.APPROVED ? 'bg-green-900/30 text-green-400' :
                                                 req.status === LoanStatus.REJECTED ? 'bg-red-900/30 text-red-400' :
                                                     req.status === LoanStatus.WAITING_DOCS ? 'bg-blue-900/30 text-blue-400' :
-                                                        'bg-yellow-900/30 text-yellow-400'
+                                                        req.status === 'RETURNING_PENDING' ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-700' :
+                                                            'bg-yellow-900/30 text-yellow-400'
                                                 }`}>
-                                                {req.status === LoanStatus.WAITING_DOCS ? 'AGUARDANDO DOC' : req.status}
+                                                {req.status === LoanStatus.WAITING_DOCS ? 'AGUARDANDO DOC' :
+                                                    req.status === 'RETURNING_PENDING' ? '🔄 CLIENTE ANTIGO' : req.status}
                                             </span>
                                         </td>
                                         <td className="p-4 text-zinc-500 text-sm">
@@ -216,9 +220,10 @@ export const Requests: React.FC = () => {
                                     <span className={`text-xs px-2 py-1 rounded-full border ${selectedRequest.status === LoanStatus.APPROVED ? 'bg-green-900/30 text-green-500 border-green-800' :
                                         selectedRequest.status === LoanStatus.REJECTED ? 'bg-red-900/30 text-red-500 border-red-800' :
                                             selectedRequest.status === LoanStatus.WAITING_DOCS ? 'bg-blue-900/30 text-blue-500 border-blue-800' :
-                                                'bg-yellow-900/30 text-yellow-500 border-yellow-800'
+                                                selectedRequest.status === 'RETURNING_PENDING' ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' :
+                                                    'bg-yellow-900/30 text-yellow-500 border-yellow-800'
                                         }`}>
-                                        {selectedRequest.status}
+                                        {selectedRequest.status === 'RETURNING_PENDING' ? '🔄 CLIENTE ANTIGO' : selectedRequest.status}
                                     </span>
                                 </h2>
                                 <p className="text-zinc-400 text-sm mt-1">ID: {selectedRequest.id} • {selectedRequest.email}</p>
@@ -384,7 +389,7 @@ export const Requests: React.FC = () => {
                         </div>
 
                         {/* Actions Footer */}
-                        {(selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === LoanStatus.WAITING_DOCS) && (
+                        {(selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === LoanStatus.WAITING_DOCS || selectedRequest.status === 'RETURNING_PENDING') && (
                             <div className="p-6 border-t border-zinc-800 bg-zinc-950 flex flex-col md:flex-row justify-between items-center gap-4">
                                 <span className="text-xs text-zinc-500 text-center md:text-left">
                                     Se aprovar agora, o saldo será liberado na carteira.
