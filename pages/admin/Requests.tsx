@@ -20,6 +20,11 @@ export const Requests: React.FC = () => {
     const [isDocRequestOpen, setIsDocRequestOpen] = useState(false);
     const [docRequestDesc, setDocRequestDesc] = useState('');
 
+    // Editing Values
+    const [isEditing, setIsEditing] = useState(false);
+    const [editAmount, setEditAmount] = useState(0);
+    const [editInstallments, setEditInstallments] = useState(0);
+
     // Filters
     const [filterStatus, setFilterStatus] = useState<string>('ALL');
 
@@ -96,6 +101,15 @@ export const Requests: React.FC = () => {
     const ensureArray = (src?: string | string[]): string[] => {
         if (!src) return [];
         if (Array.isArray(src)) return src;
+        // Tentar parsear como JSON (para arrays salvos como string)
+        if (typeof src === 'string' && src.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(src);
+                if (Array.isArray(parsed)) return parsed;
+            } catch {
+                // Não é JSON válido, retornar como array de um elemento
+            }
+        }
         return [src];
     };
 
@@ -162,7 +176,7 @@ export const Requests: React.FC = () => {
                             <tr>
                                 <th className="p-4 font-medium">Cliente</th>
                                 <th className="p-4 font-medium">Valor</th>
-                                <th className="p-4 font-medium">Parcelas</th>
+
                                 <th className="p-4 font-medium">Status</th>
                                 <th className="p-4 font-medium">Data</th>
                                 <th className="p-4 font-medium">Ações</th>
@@ -179,7 +193,7 @@ export const Requests: React.FC = () => {
                                             <div className="text-xs text-zinc-500">{req.cpf}</div>
                                         </td>
                                         <td className="p-4 font-bold text-[#D4AF37]">R$ {req.amount.toLocaleString()}</td>
-                                        <td className="p-4">{req.installments}x</td>
+
                                         <td className="p-4">
                                             <span className={`px-2 py-1 rounded-full text-xs font-bold ${req.status === LoanStatus.APPROVED ? 'bg-green-900/30 text-green-400' :
                                                 req.status === LoanStatus.REJECTED ? 'bg-red-900/30 text-red-400' :
@@ -195,7 +209,12 @@ export const Requests: React.FC = () => {
                                             {new Date(req.date).toLocaleDateString()}
                                         </td>
                                         <td className="p-4">
-                                            <Button variant="secondary" size="sm" className="py-1 px-3" onClick={() => setSelectedRequest(req)}>
+                                            <Button variant="secondary" size="sm" className="py-1 px-3" onClick={() => {
+                                                setSelectedRequest(req);
+                                                setEditAmount(req.amount);
+                                                setEditInstallments(req.installments);
+                                                setIsEditing(false);
+                                            }}>
                                                 <Eye size={16} className="mr-2" /> Detalhes
                                             </Button>
                                         </td>
@@ -228,9 +247,38 @@ export const Requests: React.FC = () => {
                                 </h2>
                                 <p className="text-zinc-400 text-sm mt-1">ID: {selectedRequest.id} • {selectedRequest.email}</p>
                             </div>
-                            <button onClick={() => setSelectedRequest(null)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-500 hover:text-white transition-colors">
-                                <X size={24} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {!isEditing && (selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === 'RETURNING_PENDING') && (
+                                    <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>
+                                        ✏️ Editar Valores
+                                    </Button>
+                                )}
+                                {isEditing && (
+                                    <>
+                                        <Button size="sm" variant="danger" onClick={() => setIsEditing(false)}>Cancelar</Button>
+                                        <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={async () => {
+                                            if (editAmount <= 0 || editInstallments <= 0) {
+                                                addToast('Valores inválidos', 'error');
+                                                return;
+                                            }
+                                            setProcessing('saving');
+                                            const success = await supabaseService.updateLoanRequestValues(selectedRequest.id, editAmount, editInstallments);
+                                            if (success) {
+                                                addToast('Proposta atualizada!', 'success');
+                                                setSelectedRequest({ ...selectedRequest, amount: editAmount, installments: editInstallments });
+                                                setIsEditing(false);
+                                                loadRequests();
+                                            } else {
+                                                addToast('Erro ao atualizar', 'error');
+                                            }
+                                            setProcessing(null);
+                                        }} isLoading={processing === 'saving'}>Salvar</Button>
+                                    </>
+                                )}
+                                <button onClick={() => setSelectedRequest(null)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-500 hover:text-white transition-colors">
+                                    <X size={24} />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Content Scrollable Area */}
@@ -240,8 +288,35 @@ export const Requests: React.FC = () => {
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <InfoBox label="Cliente" value={selectedRequest.clientName} />
                                 <InfoBox label="CPF" value={selectedRequest.cpf} />
-                                <InfoBox label="Valor Solicitado" value={`R$ ${selectedRequest.amount.toLocaleString()}`} highlight />
-                                <InfoBox label="Condição" value={`${selectedRequest.installments}x de R$ ${(selectedRequest.amount / selectedRequest.installments * 1.05).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`} />
+
+                                {isEditing ? (
+                                    <div className="p-4 rounded-xl border bg-zinc-800 border-[#D4AF37]">
+                                        <p className="text-xs text-[#D4AF37] mb-1 uppercase tracking-wide">Valor (R$)</p>
+                                        <input
+                                            type="number"
+                                            value={editAmount}
+                                            onChange={e => setEditAmount(Number(e.target.value))}
+                                            className="w-full bg-black border border-zinc-700 rounded p-2 text-white font-bold text-lg"
+                                        />
+                                    </div>
+                                ) : (
+                                    <InfoBox label="Valor Solicitado" value={`R$ ${selectedRequest.amount.toLocaleString()}`} highlight />
+                                )}
+
+                                {/* Parcelas - Só aparecem no modo edição */}
+                                {isEditing && (
+                                    <div className="p-4 rounded-xl border bg-zinc-800 border-[#D4AF37]">
+                                        <p className="text-xs text-[#D4AF37] mb-1 uppercase tracking-wide">Parcelas (opcional)</p>
+                                        <input
+                                            type="number"
+                                            value={editInstallments}
+                                            onChange={e => setEditInstallments(Number(e.target.value))}
+                                            className="w-full bg-black border border-zinc-700 rounded p-2 text-white font-bold text-lg"
+                                            placeholder="Ex: 4"
+                                        />
+                                        <p className="text-xs text-zinc-500 mt-1">Deixe 0 se não quiser propor parcelamento</p>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Supplemental Docs Section (If Active or Completed) */}

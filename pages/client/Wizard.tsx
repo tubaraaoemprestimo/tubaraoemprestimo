@@ -307,6 +307,18 @@ export const Wizard: React.FC = () => {
         addToast("Para financiamento de moto, é necessário ter R$ 2.000,00 de entrada.", 'warning');
         return;
       }
+
+      // Validação Garantia Veículo
+      if (profileType === 'GARANTIA_VEICULO') {
+        if (!guarantee.description.trim()) {
+          addToast("Descreva o veículo (modelo, ano, cor).", 'warning');
+          return;
+        }
+        if (guarantee.photos.length === 0) {
+          addToast("Envie fotos do veículo.", 'warning');
+          return;
+        }
+      }
     }
 
     // STEP 3: Termos
@@ -315,36 +327,87 @@ export const Wizard: React.FC = () => {
       return;
     }
 
-    // STEP 4: Dados
+    // STEP 4: Dados - TODOS OBRIGATÓRIOS
     if (currentStep === 4) {
-      if (!formData.name || !formData.cpf || !formData.email || !formData.phone) {
-        addToast("Preencha todos os dados pessoais.", 'warning');
+      // Dados pessoais básicos
+      if (!formData.name.trim()) {
+        addToast("Informe seu nome completo.", 'warning');
         return;
       }
+      if (!formData.cpf || formData.cpf.replace(/\D/g, '').length !== 11) {
+        addToast("Informe um CPF válido.", 'warning');
+        return;
+      }
+      if (!formData.phone || formData.phone.replace(/\D/g, '').length < 10) {
+        addToast("Informe seu WhatsApp.", 'warning');
+        return;
+      }
+      if (!formData.email.trim() || !formData.email.includes('@')) {
+        addToast("Informe um email válido.", 'warning');
+        return;
+      }
+      if (!formData.instagram.trim()) {
+        addToast("Informe seu Instagram.", 'warning');
+        return;
+      }
+
+      // Endereço
+      if (!formData.cep || formData.cep.replace(/\D/g, '').length !== 8) {
+        addToast("Informe seu CEP.", 'warning');
+        return;
+      }
+      if (!formData.address.trim()) {
+        addToast("Informe seu endereço.", 'warning');
+        return;
+      }
+      if (!formData.number.trim()) {
+        addToast("Informe o número da residência.", 'warning');
+        return;
+      }
+
+      // Dados profissionais
+      if (!formData.income.trim()) {
+        addToast("Informe sua renda mensal.", 'warning');
+        return;
+      }
+
+      // Específico por perfil
       if (profileType === 'AUTONOMO' && !formData.cnpj) {
         addToast("Informe seu CNPJ.", 'warning');
         return;
       }
     }
 
-    // STEP 5: Documentos
+    // STEP 5: Documentos - TODOS OBRIGATÓRIOS
     if (currentStep === 5) {
-      if (!formData.selfie || formData.idCardFront.length === 0) {
-        addToast("Envie selfie e documento de identidade.", 'warning');
+      if (!formData.selfie) {
+        addToast("Tire a selfie segurando o documento.", 'warning');
+        return;
+      }
+      if (formData.idCardFront.length === 0) {
+        addToast("Envie a frente do RG ou CNH.", 'warning');
+        return;
+      }
+      if (formData.idCardBack.length === 0) {
+        addToast("Envie o verso do RG ou CNH.", 'warning');
+        return;
+      }
+      if (formData.proofAddress.length === 0) {
+        addToast("Envie o comprovante de residência.", 'warning');
         return;
       }
 
-      if (profileType === 'MOTO') {
-        if (formData.cnh.length === 0) {
-          addToast("Envie sua CNH.", 'warning');
-          return;
-        }
+      // Específico por perfil
+      if (profileType === 'MOTO' && formData.cnh.length === 0) {
+        addToast("Envie sua CNH.", 'warning');
+        return;
+      }
+      if (profileType === 'CLT' && formData.workCard.length === 0) {
+        addToast("Envie sua Carteira de Trabalho.", 'warning');
+        return;
       }
 
-      if (profileType === 'GARANTIA_VEICULO' || profileType === 'MOTO') {
-        // Validar docs de veiculo
-      }
-
+      // Vídeo obrigatório
       if (!formData.videoSelfie) {
         addToast("Grave o vídeo de confirmação.", 'warning');
         return;
@@ -364,6 +427,59 @@ export const Wizard: React.FC = () => {
 
   const handleBack = () => { if (currentStep > 1) setCurrentStep(c => c - 1); };
 
+  // Função para converter base64/dataURL para File
+  const dataURLtoFile = (dataurl: string, filename: string): File | null => {
+    try {
+      const arr = dataurl.split(',');
+      const mimeMatch = arr[0].match(/:(.*?);/);
+      if (!mimeMatch) return null;
+      const mime = mimeMatch[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new File([u8arr], filename, { type: mime });
+    } catch {
+      return null;
+    }
+  };
+
+  // Função para upload de arquivo para Supabase Storage
+  const uploadToStorage = async (dataUrl: string, folder: string, index: number = 0): Promise<string> => {
+    // Se já for uma URL do Supabase, retornar diretamente
+    if (dataUrl.startsWith('http')) {
+      return dataUrl;
+    }
+
+    try {
+      const timestamp = Date.now();
+      const extension = dataUrl.includes('image/png') ? 'png' : dataUrl.includes('image/jpeg') ? 'jpg' : 'jpg';
+      const fileName = `${folder}_${timestamp}_${index}.${extension}`;
+      const filePath = `loan_documents/${formData.cpf.replace(/\D/g, '')}/${fileName}`;
+
+      const file = dataURLtoFile(dataUrl, fileName);
+      if (!file) {
+        console.error('Falha ao converter dataURL para file');
+        return dataUrl; // Fallback para URL original
+      }
+
+      const uploadedUrl = await supabaseService.uploadFile('documents', filePath, file);
+      return uploadedUrl || dataUrl;
+    } catch (error) {
+      console.error('Erro no upload:', error);
+      return dataUrl; // Fallback para URL original
+    }
+  };
+
+  // Função para upload de array de arquivos
+  const uploadMultiple = async (dataUrls: string[], folder: string): Promise<string[]> => {
+    if (!dataUrls || dataUrls.length === 0) return [];
+    const results = await Promise.all(dataUrls.map((url, index) => uploadToStorage(url, folder, index)));
+    return results;
+  };
+
   const handleSubmit = async () => {
     if (!formData.signature || !settings) {
       addToast("Assine para confirmar.", 'warning');
@@ -371,8 +487,57 @@ export const Wizard: React.FC = () => {
     }
 
     setLoading(true);
+    addToast("Enviando documentos... Aguarde.", 'info');
 
     try {
+      // Upload de todas as imagens para o Storage
+      const [
+        selfieUrl,
+        idCardFrontUrls,
+        idCardBackUrls,
+        proofAddressUrls,
+        proofIncomeUrls,
+        workCardUrls,
+        cnhUrls,
+        vehicleFrontUrls,
+        signatureUrl,
+        videoSelfieUrl,
+        videoHouseUrl,
+        guaranteePhotos
+      ] = await Promise.all([
+        formData.selfie ? uploadToStorage(formData.selfie, 'selfie') : Promise.resolve(''),
+        uploadMultiple(formData.idCardFront, 'id_front'),
+        uploadMultiple(formData.idCardBack, 'id_back'),
+        uploadMultiple(formData.proofAddress, 'proof_address'),
+        uploadMultiple(formData.proofIncome, 'proof_income'),
+        uploadMultiple(formData.workCard, 'work_card'),
+        uploadMultiple(formData.cnh, 'cnh'),
+        uploadMultiple(formData.vehicleFront, 'vehicle'),
+        formData.signature ? uploadToStorage(formData.signature, 'signature') : Promise.resolve(''),
+        formData.videoSelfie ? uploadToStorage(formData.videoSelfie, 'video_selfie') : Promise.resolve(''),
+        formData.videoHouse ? uploadToStorage(formData.videoHouse, 'video_house') : Promise.resolve(''),
+        needsGuarantee && guarantee.photos.length > 0 ? uploadMultiple(guarantee.photos, 'guarantee') : Promise.resolve([])
+      ]);
+
+      // Atualizar dados com URLs do Storage
+      const uploadedData = {
+        ...formData,
+        selfie: selfieUrl,
+        idCardFront: idCardFrontUrls,
+        idCardBack: idCardBackUrls,
+        proofAddress: proofAddressUrls,
+        proofIncome: proofIncomeUrls,
+        workCard: workCardUrls,
+        cnh: cnhUrls,
+        vehicleFront: vehicleFrontUrls,
+        signature: signatureUrl,
+        videoSelfie: videoSelfieUrl,
+        videoHouse: videoHouseUrl,
+      };
+
+      // Atualizar garantia se houver
+      const uploadedGuarantee = needsGuarantee ? { ...guarantee, photos: guaranteePhotos } : null;
+
       // Registrar evento de submissão (antifraude)
       const riskData = await antifraudService.logRiskEvent('form_submit', undefined, {
         amount: getAmount(),
@@ -387,13 +552,16 @@ export const Wizard: React.FC = () => {
       // Submeter o pedido
       // Submeter o pedido
       // Concatenar Perfil e CNPJ na profissão para visualização no admin
-      const finalOccupation = `[${profileType}] ${formData.occupation || ''} ${formData.cnpj ? '- CNPJ: ' + formData.cnpj : ''}`;
+      const finalOccupation = `[${profileType}] ${uploadedData.occupation || ''} ${uploadedData.cnpj ? '- CNPJ: ' + uploadedData.cnpj : ''}`;
 
       const success = await supabaseService.submitRequest({
-        ...formData,
+        ...uploadedData,
         occupation: finalOccupation,
         // Para Moto, usar CNH como documento principal se disponível
-        idCardFront: (profileType === 'MOTO' && formData.cnh.length > 0) ? formData.cnh : formData.idCardFront,
+        idCardFront: (profileType === 'MOTO' && cnhUrls.length > 0) ? cnhUrls : idCardFrontUrls,
+        idCardBack: idCardBackUrls,
+        proofAddress: proofAddressUrls,
+        vehicleFront: vehicleFrontUrls,
 
         amount: getAmount(),
         installments: settings.defaultInstallments,
@@ -404,7 +572,7 @@ export const Wizard: React.FC = () => {
         lateFeeMonthly: settings.lateFeeMonthly,
         lateFeeFixed: settings.lateFeeFixed,
         hasGuarantee: needsGuarantee,
-        guarantee: needsGuarantee ? guarantee : null,
+        guarantee: uploadedGuarantee,
         // Cliente recorrente
         isReturningClient: isReturningClient === 'sim',
         returningClientNote: isReturningClient === 'sim' ? returningClientNote : '',
@@ -712,6 +880,34 @@ export const Wizard: React.FC = () => {
                 </div>
               )}
 
+              {/* Seção de fotos para Garantia Veículo */}
+              {profileType === 'GARANTIA_VEICULO' && (
+                <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-xl p-4 space-y-4 animate-in fade-in">
+                  <p className="text-sm text-yellow-400 flex items-start gap-2">
+                    <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                    <span>Para empréstimo com <strong>veículo como garantia</strong>, envie os dados e fotos abaixo.</span>
+                  </p>
+
+                  <div className="space-y-4 pt-3 border-t border-zinc-800">
+                    <Input
+                      label="Descrição do Veículo"
+                      name="vehicleDescription"
+                      value={guarantee.description}
+                      onChange={(e) => setGuarantee(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Ex: Honda Civic 2020 Prata"
+                    />
+                    <Input
+                      label="Valor Estimado do Veículo"
+                      name="vehicleValue"
+                      value={guarantee.estimatedValue}
+                      onChange={(e) => setGuarantee(prev => ({ ...prev, estimatedValue: e.target.value }))}
+                      placeholder="Ex: 50000"
+                    />
+                    {renderUploadArea('photos', 'Fotos do Veículo (Frente, Lateral, Traseira)', guarantee.photos, true)}
+                  </div>
+                </div>
+              )}
+
               {/* Se for Garantia Veículo, mostramos inputs específicos aqui ou no STEP DADOS? */}
               {/* Vamos deixar para STEP DADOS/DOCS para não poluir valores */}
 
@@ -748,7 +944,7 @@ export const Wizard: React.FC = () => {
                   </div>
                   <div className="bg-black/30 p-3 rounded-lg">
                     <p className="text-zinc-500 text-xs">Aprovação</p>
-                    <p className="text-white font-bold text-lg">Imediata</p>
+                    <p className="text-white font-bold text-lg">Em até 72h</p>
                   </div>
                 </div>
               </div>
@@ -790,6 +986,7 @@ export const Wizard: React.FC = () => {
                 <Input label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00" error={errors.cpf} />
                 <Input label="WhatsApp Principal" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
                 <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} />
+                <Input label="Instagram" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="@seu_usuario" />
               </div>
 
               {/* Dados Específicos por Perfil */}
@@ -865,6 +1062,14 @@ export const Wizard: React.FC = () => {
 
               {renderUploadArea('proofAddress', 'Comprovante de Endereço', formData.proofAddress)}
 
+              {/* Carteira de Trabalho para CLT */}
+              {profileType === 'CLT' && (
+                <div className="space-y-6 border-t border-zinc-800 pt-6">
+                  <h3 className="font-bold text-[#D4AF37]">Comprovante de Vínculo</h3>
+                  {renderUploadArea('workCard', 'Carteira de Trabalho (Páginas de identificação e contrato atual)', formData.workCard)}
+                </div>
+              )}
+
               {/* Video de confirmação sempre bom */}
               <div className="bg-black p-4 rounded-xl border border-zinc-800 mt-6">
                 <VideoUpload label="Vídeo de Aceite" subtitle={`Diga seu nome e: "Confirmo o pedido de empréstimo"`}
@@ -902,9 +1107,10 @@ export const Wizard: React.FC = () => {
               </div>
 
               <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-zinc-400">Valor:</span><span className="font-bold">R$ {getAmount().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Tempo de Análise:</span><span className="font-bold text-[#D4AF37]">Até 72 Horas</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Valor Solicitado:</span><span className="font-bold">R$ {getAmount().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Perfil:</span><span className="font-bold">{profileType}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Parcela:</span><span className="font-bold text-[#D4AF37]">{settings.defaultInstallments}x R$ {calculateInstallment().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Juros Mensais:</span><span className="font-bold text-[#D4AF37]">{settings.interestRateMonthly}% ao mês</span></div>
               </div>
 
               {/* TERMO FINAL */}

@@ -84,10 +84,7 @@ const emailTemplates = {
               <div class="label">Valor Solicitado</div>
               <div class="value highlight">R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
-            <div class="info-box">
-              <div class="label">Parcelas</div>
-              <div class="value">${data.installments}x</div>
-            </div>
+
             <div style="text-align: center;">
               <a href="https://tubaraoemprestimo.com.br/#/admin/requests" class="button">Ver Solicitação</a>
             </div>
@@ -124,10 +121,7 @@ const emailTemplates = {
               <div class="value highlight">R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
             
-            <div class="info-box">
-              <div class="label">Parcelas</div>
-              <div class="value">${data.installments}x</div>
-            </div>
+
             
             <div style="text-align: center; margin: 25px 0;">
               <span class="badge badge-info">⏳ EM ANÁLISE</span>
@@ -186,10 +180,7 @@ const emailTemplates = {
               <div class="value success">R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
             
-            <div class="info-box">
-              <div class="label">Parcelas</div>
-              <div class="value">${data.installments}x</div>
-            </div>
+
             
             <div style="background: #D4EDDA; padding: 20px; border-radius: 12px; margin: 20px 0; text-align: center;">
               <strong>⏱️ Prazo de Liberação:</strong><br>

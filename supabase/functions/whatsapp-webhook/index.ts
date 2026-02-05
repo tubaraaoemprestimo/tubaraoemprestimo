@@ -133,6 +133,41 @@ Dívida Total: R$ ${customer.total_debt?.toLocaleString('pt-BR') || '0'}
 Empréstimos Ativos: ${customer.active_loans_count || 0}`
         }
 
+        // Check if conversation is PAUSED (Handover active)
+        // Verify if the last assistant message was a handover action within the last 24 hours
+        const { data: lastHandover } = await supabase
+            .from('ai_chat_history')
+            .select('created_at, message')
+            .eq('phone', phone)
+            .eq('role', 'system') // We use 'system' role to mark internal events
+            .eq('message', '[HANDOVER_ACTIVE]')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+
+        if (lastHandover) {
+            const handoverTime = new Date(lastHandover.created_at).getTime()
+            const nowTime = new Date().getTime()
+            const hoursSinceHandover = (nowTime - handoverTime) / (1000 * 60 * 60)
+
+            // If handover was less than 24 hours ago, DO NOT RESPOND
+            if (hoursSinceHandover < 24) {
+                console.log(`[Webhook] User ${phone} is in HANDOVER mode. Ignoring message.`)
+
+                // Save user message to history but do not trigger AI
+                await supabase.from('ai_chat_history').insert({
+                    phone,
+                    customer_id: customer?.id || null,
+                    role: 'user',
+                    message: messageText
+                })
+
+                return new Response(JSON.stringify({ status: 'ignored_handover' }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                })
+            }
+        }
+
         // Save user message to history
         await supabase.from('ai_chat_history').insert({
             phone,
@@ -168,6 +203,36 @@ Empréstimos Ativos: ${customer.active_loans_count || 0}`
 
         if (!aiResponse) {
             aiResponse = config.fallback_message || 'Desculpe, não entendi sua mensagem.'
+        }
+
+        // Check for TRANSFER command from AI
+        if (aiResponse.includes('[TRANSFERIR]')) {
+            console.log('[Webhook] AI requested TRANSFER to human')
+
+            const transferMessage = 'Entendo que sua solicitação precisa de atenção especial. Vou transferir seu atendimento para um de nossos especialistas humanos. Por favor, aguarde, entraremos em contato o mais breve possível. 👨‍💻'
+
+            // Send transfer message
+            await sendWhatsAppMessage(supabase, config, phone, transferMessage)
+
+            // Save AI response (the clean one) to history
+            await supabase.from('ai_chat_history').insert({
+                phone,
+                customer_id: customer?.id || null,
+                role: 'assistant',
+                message: transferMessage
+            })
+
+            // MARK CONVERSATION AS PAUSED (Handover Active)
+            await supabase.from('ai_chat_history').insert({
+                phone,
+                customer_id: customer?.id || null,
+                role: 'system', // Internal system mark
+                message: '[HANDOVER_ACTIVE]'
+            })
+
+            return new Response(JSON.stringify({ status: 'transferred_by_ai' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
         }
 
         // Save AI response to history

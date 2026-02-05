@@ -801,31 +801,43 @@ export const supabaseService = {
         }
 
         // Create loan request
+        // Helper para serializar arrays de URLs
+        const serializeUrls = (urls: string | string[]): string => {
+            if (!urls) return '';
+            if (Array.isArray(urls)) {
+                return urls.length > 0 ? JSON.stringify(urls) : '';
+            }
+            return urls;
+        };
+
         const { error: requestError } = await supabase.from('loan_requests').insert({
             customer_id: customerId,
             client_name: data.name,
             cpf: data.cpf,
             email: data.email,
             phone: data.phone || '',
-            amount: Number(data.income) * 3 || 5000,
-            installments: 12,
+            // CORREÇÃO CRÍTICA: Usar o valor solicitado, não a renda * 3
+            amount: Number(data.amount) || 1000,
+            installments: data.installments || 4, // Default ou o enviado
             status: 'PENDING',
             father_phone: data.fatherPhone,
             mother_phone: data.motherPhone,
             spouse_phone: data.spousePhone,
-            selfie_url: data.selfie,
-            id_card_url: data.idCardFront,
-            id_card_back_url: data.idCardBack,
-            proof_of_address_url: data.proofAddress,
-            proof_income_url: data.proofIncome,
-            vehicle_url: data.vehicleFront,
-            video_selfie_url: data.videoSelfie,
-            video_house_url: data.videoHouse,
-            video_vehicle_url: data.videoVehicle,
-            signature_url: data.signature,
-            // Cliente recorrente
+            selfie_url: typeof data.selfie === 'string' ? data.selfie : '',
+            id_card_url: serializeUrls(data.idCardFront),
+            id_card_back_url: serializeUrls(data.idCardBack),
+            proof_of_address_url: serializeUrls(data.proofAddress),
+            proof_income_url: serializeUrls(data.proofIncome),
+            vehicle_url: serializeUrls(data.vehicleFront),
+            video_selfie_url: typeof data.videoSelfie === 'string' ? data.videoSelfie : '',
+            video_house_url: typeof data.videoHouse === 'string' ? data.videoHouse : '',
+            video_vehicle_url: typeof data.videoVehicle === 'string' ? data.videoVehicle : '',
+            signature_url: typeof data.signature === 'string' ? data.signature : '',
+            // Cliente recorrente e novos campos
             is_returning_client: data.isReturningClient || false,
-            returning_client_note: data.returningClientNote || ''
+            returning_client_note: data.returningClientNote || '',
+            // Info extra concatenada para evitar erro de coluna inexistente
+            supplemental_description: `Profissão: ${data.occupation || 'N/A'} | Instagram: ${data.instagram || 'N/A'} | WorkCard: ${data.workCard?.length ? 'Enviado' : 'N/A'}`
         });
 
 
@@ -997,6 +1009,17 @@ export const supabaseService = {
                 supplemental_requested_at: new Date().toISOString()
             })
             .eq('id', requestId);
+        return !error;
+    },
+
+    updateLoanRequestValues: async (id: string, amount: number, installments: number) => {
+        const { error } = await supabase
+            .from('loan_requests')
+            .update({
+                amount: amount,
+                installments: installments
+            })
+            .eq('id', id);
         return !error;
     },
 
