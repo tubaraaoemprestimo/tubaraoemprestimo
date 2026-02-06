@@ -1,13 +1,33 @@
 
 
+
 import React, { useState, useEffect } from 'react';
-import { Check, X, Eye, Maximize, Layers, Download, Filter, Video, Users, Phone, FileWarning, Send } from 'lucide-react';
+import { Check, X, Eye, Maximize, Layers, Download, Filter, Video, Users, Phone, FileWarning, Send, AlertTriangle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { supabaseService } from '../../services/supabaseService';
 import { emailService } from '../../services/emailService';
 import { LoanRequest, LoanStatus } from '../../types';
 import { ImageViewer } from '../../components/ImageViewer';
 import { useToast } from '../../components/Toast';
+
+// Cores dos perfis para badges coloridas
+const PROFILE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
+    CLT: { bg: 'bg-gray-600', text: 'text-white', label: 'CLT' },
+    AUTONOMO: { bg: 'bg-green-600', text: 'text-white', label: 'Comércio' },
+    MOTO: { bg: 'bg-yellow-500', text: 'text-black', label: 'Moto' },
+    GARANTIA: { bg: 'bg-orange-500', text: 'text-white', label: '🔒 Garantia' },
+    LIMPA_NOME: { bg: 'bg-purple-600', text: 'text-white', label: 'Limpa Nome' },
+    GARANTIA_VEICULO: { bg: 'bg-orange-500', text: 'text-white', label: '🚗 Veículo' },
+};
+
+const getProfileBadge = (profileType: string | undefined) => {
+    const config = PROFILE_COLORS[profileType || ''] || { bg: 'bg-zinc-700', text: 'text-white', label: profileType || 'N/A' };
+    return (
+        <span className={`px-2 py-0.5 rounded text-xs font-bold ${config.bg} ${config.text}`}>
+            {config.label}
+        </span>
+    );
+};
 
 export const Requests: React.FC = () => {
     const { addToast } = useToast();
@@ -175,8 +195,8 @@ export const Requests: React.FC = () => {
                         <thead className="bg-zinc-950 text-zinc-400">
                             <tr>
                                 <th className="p-4 font-medium">Cliente</th>
+                                <th className="p-4 font-medium">Tipo</th>
                                 <th className="p-4 font-medium">Valor</th>
-
                                 <th className="p-4 font-medium">Status</th>
                                 <th className="p-4 font-medium">Data</th>
                                 <th className="p-4 font-medium">Ações</th>
@@ -184,15 +204,24 @@ export const Requests: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-zinc-800">
                             {filteredRequests.length === 0 ? (
-                                <tr><td colSpan={6} className="p-8 text-center text-zinc-500">Nenhuma solicitação encontrada com este filtro.</td></tr>
+                                <tr><td colSpan={7} className="p-8 text-center text-zinc-500">Nenhuma solicitação encontrada com este filtro.</td></tr>
                             ) : (
                                 filteredRequests.map((req) => (
-                                    <tr key={req.id} className="hover:bg-zinc-800/50 transition-colors">
+                                    <tr key={req.id} className={`hover:bg-zinc-800/50 transition-colors ${(req as any).profileType === 'GARANTIA' ? 'border-l-4 border-l-orange-500' : ''}`}>
                                         <td className="p-4">
                                             <div className="font-medium text-white">{req.clientName}</div>
                                             <div className="text-xs text-zinc-500">{req.cpf}</div>
                                         </td>
-                                        <td className="p-4 font-bold text-[#D4AF37]">R$ {req.amount.toLocaleString()}</td>
+                                        <td className="p-4">
+                                            {getProfileBadge((req as any).profileType)}
+                                            {(req as any).profileType === 'GARANTIA' && (
+                                                <div className="mt-1">
+                                                    <AlertTriangle size={12} className="inline text-orange-400" />
+                                                    <span className="text-xs text-orange-400 ml-1">Conferir docs</span>
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="p-4 font-bold text-[#D4AF37]">R$ {req.amount?.toLocaleString() || '0'}</td>
 
                                         <td className="p-4">
                                             <span className={`px-2 py-1 rounded-full text-xs font-bold ${req.status === LoanStatus.APPROVED ? 'bg-green-900/30 text-green-400' :

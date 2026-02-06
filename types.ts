@@ -45,6 +45,36 @@ export interface LoanRequest {
   status: LoanStatus;
   date: string;
 
+  // Tipo de Perfil/Serviço - Multi Sistema
+  profileType?: 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA' | 'LIMPA_NOME';
+
+  // Campos GARANTIA
+  guaranteeType?: 'veiculo' | 'eletronico';
+  guaranteeSubtype?: string;
+  guaranteeDescription?: string;
+  guaranteeEstimatedValue?: number;
+  guaranteePhotos?: string[];
+  guaranteeVideo?: string;
+  guaranteeDocument?: string;
+  guaranteeInPossession?: boolean;
+
+  // Campos LIMPA_NOME
+  limpaNomeContractSigned?: boolean;
+  limpaNomeContractDate?: string;
+
+  // Campos MOTO
+  motoEntryPaid?: boolean;
+  motoModel?: string;
+
+  // Campos AUTONOMO
+  autonomoCnpj?: string;
+  autonomoBusinessAddress?: string;
+
+  // Localização GPS
+  locationLatitude?: number;
+  locationLongitude?: number;
+  locationCapturedAt?: string;
+
   // New References
   references: {
     fatherPhone: string;

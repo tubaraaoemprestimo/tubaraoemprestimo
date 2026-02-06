@@ -5,7 +5,7 @@ import {
   AlertCircle, FileText, ScanFace, X, Plus, Loader2,
   Phone, Users, Video, DollarSign, Shield, Clock, Landmark, CheckCircle2, FileCheck, Percent,
   Car, Smartphone, Tv, Home, Package, Camera as CameraIcon,
-  Briefcase, Store, Bike, Banknote, Rocket
+  Briefcase, Store, Bike, Banknote, Rocket, CreditCard, FileSignature, Scale
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Camera } from '../../components/Camera';
@@ -19,7 +19,7 @@ import { autoNotificationService } from '../../services/autoNotificationService'
 import { useToast } from '../../components/Toast';
 import { InstallPwaButton } from '../../components/InstallPwaButton';
 
-// Tipos de garantia
+// Tipos de garantia (para CLT com valores altos)
 const guaranteeTypes = [
   { id: 'celular', label: 'Celular', icon: Smartphone },
   { id: 'tv', label: 'TV', icon: Tv },
@@ -29,19 +29,97 @@ const guaranteeTypes = [
   { id: 'outro', label: 'Outro', icon: Package },
 ];
 
-// Tipos de Perfil
-type ProfileType = 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA_VEICULO' | '';
+// NOVOS Tipos de Perfil - Multi Sistema (5 Serviços)
+type ProfileType = 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA' | 'LIMPA_NOME' | '';
 
-// Steps
-const steps = [
-  { id: 1, title: 'Perfil', icon: Users },
-  { id: 2, title: 'Valores', icon: DollarSign },
-  { id: 3, title: 'Termos', icon: Shield },
-  { id: 4, title: 'Dados', icon: User },
-  { id: 5, title: 'Documentos', icon: FileText },
-  { id: 6, title: 'Banco', icon: Landmark },
-  { id: 7, title: 'Confirmar', icon: CheckCircle2 },
+// Configuração dos perfis com descrições e cores para Admin
+const profileOptions = [
+  {
+    id: 'CLT',
+    label: 'CLT / Assalariado',
+    icon: Briefcase,
+    description: 'Empréstimo pessoal com juros de 30% ao mês',
+    color: 'text-blue-400',
+    adminColor: 'bg-gray-500'
+  },
+  {
+    id: 'AUTONOMO',
+    label: 'Autônomo / Comércio',
+    icon: Store,
+    description: 'Capital de giro com 30 diárias (seg-sáb)',
+    color: 'text-green-400',
+    adminColor: 'bg-green-500'
+  },
+  {
+    id: 'MOTO',
+    label: 'Financiamento Moto',
+    icon: Bike,
+    description: 'Compre sua moto: R$2.000 + 36x R$611',
+    color: 'text-yellow-400',
+    adminColor: 'bg-yellow-500'
+  },
+  {
+    id: 'GARANTIA',
+    label: 'Empréstimo c/ Garantia',
+    icon: Car,
+    description: 'Deixe um bem como garantia (veículo/eletrônico)',
+    color: 'text-orange-400',
+    adminColor: 'bg-orange-500'
+  },
+  {
+    id: 'LIMPA_NOME',
+    label: 'Limpa Nome',
+    icon: CreditCard,
+    description: 'Limpe seu CPF em até 12 meses',
+    color: 'text-purple-400',
+    adminColor: 'bg-purple-500'
+  },
 ];
+
+// Steps dinâmicos baseados no perfil
+const getStepsForProfile = (profile: ProfileType) => {
+  if (profile === 'LIMPA_NOME') {
+    return [
+      { id: 1, title: 'Serviço', icon: Users },
+      { id: 2, title: 'Termos', icon: Shield },
+      { id: 3, title: 'Dados', icon: User },
+      { id: 4, title: 'Documentos', icon: FileText },
+      { id: 5, title: 'Contrato', icon: FileSignature },
+      { id: 6, title: 'Confirmar', icon: CheckCircle2 },
+    ];
+  }
+  if (profile === 'MOTO') {
+    return [
+      { id: 1, title: 'Serviço', icon: Users },
+      { id: 2, title: 'Termos', icon: Shield },
+      { id: 3, title: 'Dados', icon: User },
+      { id: 4, title: 'Documentos', icon: FileText },
+      { id: 5, title: 'Confirmar', icon: CheckCircle2 },
+    ];
+  }
+  if (profile === 'GARANTIA') {
+    return [
+      { id: 1, title: 'Serviço', icon: Users },
+      { id: 2, title: 'Valores', icon: DollarSign },
+      { id: 3, title: 'Termos', icon: Shield },
+      { id: 4, title: 'Garantia', icon: Car },
+      { id: 5, title: 'Dados', icon: User },
+      { id: 6, title: 'Documentos', icon: FileText },
+      { id: 7, title: 'Banco', icon: Landmark },
+      { id: 8, title: 'Confirmar', icon: CheckCircle2 },
+    ];
+  }
+  // CLT e AUTONOMO usam o mesmo fluxo (7 etapas)
+  return [
+    { id: 1, title: 'Perfil', icon: Users },
+    { id: 2, title: 'Valores', icon: DollarSign },
+    { id: 3, title: 'Termos', icon: Shield },
+    { id: 4, title: 'Dados', icon: User },
+    { id: 5, title: 'Documentos', icon: FileText },
+    { id: 6, title: 'Banco', icon: Landmark },
+    { id: 7, title: 'Confirmar', icon: CheckCircle2 },
+  ];
+};
 
 export const Wizard: React.FC = () => {
   const navigate = useNavigate();
@@ -61,6 +139,9 @@ export const Wizard: React.FC = () => {
   // Perfil e Condicionais
   const [profileType, setProfileType] = useState<ProfileType>('');
   const [hasEntryValue, setHasEntryValue] = useState(false); // Para Moto
+
+  // Steps dinâmicos baseados no perfil selecionado
+  const steps = getStepsForProfile(profileType);
 
   // Cliente recorrente (já fez empréstimo antes do sistema)
   const [isReturningClient, setIsReturningClient] = useState<'sim' | 'nao' | ''>('');
@@ -276,20 +357,21 @@ export const Wizard: React.FC = () => {
   const handleNext = async () => {
     if (!settings) return;
 
-    // STEP 1: Perfil
+    // STEP 1: Perfil/Serviço
     if (currentStep === 1) {
       if (!profileType) {
-        addToast("Qual é o seu perfil?", 'warning');
+        addToast("Selecione um serviço para continuar.", 'warning');
         return;
       }
-      if (!isReturningClient) {
+      // Cliente recorrente apenas para CLT, AUTONOMO e GARANTIA
+      if ((profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'GARANTIA') && !isReturningClient) {
         addToast("Por favor, informe se já é nosso cliente.", 'warning');
         return;
       }
     }
 
-    // STEP 2: Valores
-    if (currentStep === 2) {
+    // STEP 2: Valores - PARA CLT, AUTONOMO e GARANTIA
+    if ((profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'GARANTIA') && currentStep === 2) {
       const amount = getAmount();
       if (amount < settings.minLoanAmount) {
         addToast(`Valor mínimo é R$ ${settings.minLoanAmount}`, 'warning');
@@ -299,42 +381,51 @@ export const Wizard: React.FC = () => {
         addToast(`Valor máximo é R$ ${settings.maxLoanAmount.toLocaleString('pt-BR')}`, 'warning');
         return;
       }
-      if (needsGuarantee && !guarantee.type) {
-        addToast("Selecione um bem como garantia.", 'warning');
-        return;
-      }
-      if (needsGuarantee && guarantee.photos.length === 0) {
-        addToast("Envie fotos do bem em garantia.", 'warning');
-        return;
-      }
-
-      // Validação Moto
-      if (profileType === 'MOTO' && !hasEntryValue) {
-        addToast("Para financiamento de moto, é necessário ter R$ 2.000,00 de entrada.", 'warning');
-        return;
-      }
-
-      // Validação Garantia Veículo
-      if (profileType === 'GARANTIA_VEICULO') {
-        if (!guarantee.description.trim()) {
-          addToast("Descreva o veículo (modelo, ano, cor).", 'warning');
+      // Garantia apenas para CLT com valores altos (não GARANTIA, pois esse tem step próprio)
+      if (profileType === 'CLT' && needsGuarantee) {
+        if (!guarantee.type) {
+          addToast("Selecione um bem como garantia.", 'warning');
           return;
         }
         if (guarantee.photos.length === 0) {
-          addToast("Envie fotos do veículo.", 'warning');
+          addToast("Envie fotos do bem em garantia.", 'warning');
           return;
         }
       }
     }
 
-    // STEP 3: Termos
-    if (currentStep === 3 && !termsAccepted) {
+    // STEP TERMOS - Dinâmico (Step 3 para CLT/AUTONOMO/GARANTIA, Step 2 para MOTO/LIMPA_NOME)
+    const termsStep = (profileType === 'MOTO' || profileType === 'LIMPA_NOME') ? 2 : 3;
+    if (currentStep === termsStep && !termsAccepted) {
       addToast("Aceite os termos para continuar.", 'warning');
       return;
     }
 
-    // STEP 4: Dados - TODOS OBRIGATÓRIOS
-    if (currentStep === 4) {
+    // STEP 4 para GARANTIA: Dados da garantia (veículo/eletrônico)
+    if (profileType === 'GARANTIA' && currentStep === 4) {
+      if (!guarantee.type) {
+        addToast("Selecione o tipo de garantia.", 'warning');
+        return;
+      }
+      if (!guarantee.description.trim()) {
+        addToast("Descreva o bem (marca, modelo, ano).", 'warning');
+        return;
+      }
+      if (guarantee.photos.length === 0) {
+        addToast("Envie fotos do bem em garantia.", 'warning');
+        return;
+      }
+      if (formData.vehicleCRLV.length === 0 && formData.proofAddress.length === 0) {
+        addToast("Envie o documento do bem (CRLV ou Nota Fiscal).", 'warning');
+        return;
+      }
+    }
+
+    // STEP DADOS - Dinâmico (Step 4 para CLT/AUTONOMO, Step 3 para MOTO/LIMPA_NOME, Step 5 para GARANTIA)
+    let dataStep = 4;
+    if (profileType === 'MOTO' || profileType === 'LIMPA_NOME') dataStep = 3;
+    if (profileType === 'GARANTIA') dataStep = 5;
+    if (currentStep === dataStep) {
       // Dados pessoais básicos
       if (!formData.name.trim()) {
         addToast("Informe seu nome completo.", 'warning');
@@ -352,40 +443,47 @@ export const Wizard: React.FC = () => {
         addToast("Informe um email válido.", 'warning');
         return;
       }
-      if (!formData.instagram.trim()) {
-        addToast("Informe seu Instagram.", 'warning');
-        return;
-      }
 
       // Endereço
       if (!formData.cep || formData.cep.replace(/\D/g, '').length !== 8) {
         addToast("Informe seu CEP.", 'warning');
         return;
       }
-      if (!formData.address.trim()) {
-        addToast("Informe seu endereço.", 'warning');
-        return;
-      }
-      if (!formData.number.trim()) {
-        addToast("Informe o número da residência.", 'warning');
-        return;
-      }
-
-      // Dados profissionais
-      if (!formData.income.trim()) {
-        addToast("Informe sua renda mensal.", 'warning');
-        return;
-      }
 
       // Específico por perfil
-      if (profileType === 'AUTONOMO' && !formData.cnpj) {
-        addToast("Informe seu CNPJ.", 'warning');
-        return;
+      if (profileType === 'CLT') {
+        if (!formData.income.trim()) {
+          addToast("Informe sua renda mensal.", 'warning');
+          return;
+        }
       }
+
+      if (profileType === 'AUTONOMO') {
+        if (!formData.cnpj) {
+          addToast("Informe seu CPF ou CNPJ do negócio.", 'warning');
+          return;
+        }
+        if (!formData.businessAddress.trim()) {
+          addToast("Informe o endereço do seu comércio.", 'warning');
+          return;
+        }
+      }
+
+      if (profileType === 'MOTO') {
+        if (!formData.income.trim()) {
+          addToast("Informe sua renda mensal.", 'warning');
+          return;
+        }
+      }
+
+      // LIMPA_NOME não precisa de renda/cnpj
     }
 
-    // STEP 5: Documentos - TODOS OBRIGATÓRIOS SEM EXCEÇÃO
-    if (currentStep === 5) {
+    // STEP DOCUMENTOS - Dinâmico (Step 5 para CLT/AUTONOMO, Step 4 para MOTO/LIMPA_NOME, Step 6 para GARANTIA)
+    let docsStep = 5;
+    if (profileType === 'MOTO' || profileType === 'LIMPA_NOME') docsStep = 4;
+    if (profileType === 'GARANTIA') docsStep = 6;
+    if (currentStep === docsStep) {
       // Selfie obrigatória
       if (!formData.selfie) {
         addToast("Tire a selfie segurando o documento.", 'warning');
@@ -488,8 +586,11 @@ export const Wizard: React.FC = () => {
       }
     }
 
-    // STEP 6: Banco - TODOS OBRIGATÓRIOS
-    if (currentStep === 6) {
+    // STEP BANCO - Apenas CLT (6), AUTONOMO (6) e GARANTIA (7) precisam
+    const needsBankStep = profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'GARANTIA';
+    let bankStep = 6;
+    if (profileType === 'GARANTIA') bankStep = 7;
+    if (needsBankStep && currentStep === bankStep) {
       if (!formData.bankName.trim()) {
         addToast("Informe o nome do banco.", 'warning');
         return;
@@ -504,7 +605,9 @@ export const Wizard: React.FC = () => {
       }
     }
 
-    if (currentStep < 7) setCurrentStep(c => c + 1);
+    // Avançar para próximo step - usando tamanho dinâmico
+    const maxStep = steps.length;
+    if (currentStep < maxStep) setCurrentStep(c => c + 1);
   };
 
   const handleBack = () => { if (currentStep > 1) setCurrentStep(c => c - 1); };
@@ -776,46 +879,35 @@ export const Wizard: React.FC = () => {
 
         <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
 
-          {/* STEP 1: Perfil (NOVO) */}
+          {/* STEP 1: Perfil (NOVO MULTI SISTEMA) */}
           {currentStep === 1 && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold">Qual o seu perfil?</h2>
+                <h2 className="text-2xl font-bold">Qual serviço você precisa?</h2>
                 <p className="text-zinc-400 text-sm mt-2">Selecione a opção que melhor se encaixa.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button
-                  onClick={() => setProfileType('CLT')}
-                  className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${profileType === 'CLT' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-800 bg-black hover:border-zinc-600'}`}
-                >
-                  <Briefcase size={32} className={profileType === 'CLT' ? 'text-[#D4AF37]' : 'text-zinc-500'} />
-                  <span className="font-bold">CLT / Assalariado</span>
-                </button>
-
-                <button
-                  onClick={() => setProfileType('AUTONOMO')}
-                  className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${profileType === 'AUTONOMO' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-800 bg-black hover:border-zinc-600'}`}
-                >
-                  <Store size={32} className={profileType === 'AUTONOMO' ? 'text-[#D4AF37]' : 'text-zinc-500'} />
-                  <span className="font-bold">Autônomo / Comércio</span>
-                </button>
-
-                <button
-                  onClick={() => setProfileType('MOTO')}
-                  className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${profileType === 'MOTO' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-800 bg-black hover:border-zinc-600'}`}
-                >
-                  <Bike size={32} className={profileType === 'MOTO' ? 'text-[#D4AF37]' : 'text-zinc-500'} />
-                  <span className="font-bold">Financiamento Moto</span>
-                </button>
-
-                <button
-                  onClick={() => setProfileType('GARANTIA_VEICULO')}
-                  className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-4 transition-all ${profileType === 'GARANTIA_VEICULO' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-800 bg-black hover:border-zinc-600'}`}
-                >
-                  <Car size={32} className={profileType === 'GARANTIA_VEICULO' ? 'text-[#D4AF37]' : 'text-zinc-500'} />
-                  <span className="font-bold">Empréstimo c/ Veículo</span>
-                </button>
+                {profileOptions.map((option) => {
+                  const Icon = option.icon;
+                  const isSelected = profileType === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => setProfileType(option.id as ProfileType)}
+                      className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all ${isSelected
+                        ? 'border-[#D4AF37] bg-[#D4AF37]/10 scale-[1.02]'
+                        : 'border-zinc-800 bg-black hover:border-zinc-600'
+                        }`}
+                    >
+                      <Icon size={36} className={isSelected ? 'text-[#D4AF37]' : option.color} />
+                      <span className="font-bold text-lg">{option.label}</span>
+                      <p className={`text-xs ${isSelected ? 'text-[#D4AF37]' : 'text-zinc-500'}`}>
+                        {option.description}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Pergunta sobre cliente recorrente - aparece após selecionar perfil */}
@@ -1015,60 +1107,266 @@ export const Wizard: React.FC = () => {
             </div>
           )}
 
-          {/* STEP 3: Termos */}
-          {currentStep === 3 && (
+          {/* STEP 3 (para CLT/AUTONOMO) ou STEP 2 (para MOTO/LIMPA_NOME): Termos */}
+          {((profileType === 'CLT' || profileType === 'AUTONOMO') && currentStep === 3) ||
+            ((profileType === 'MOTO' || profileType === 'LIMPA_NOME') && currentStep === 2) ? (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center mb-4">
                 <Shield size={48} className="mx-auto text-[#D4AF37] mb-3" />
-                <h2 className="text-xl font-bold">Termos e Condições</h2>
+                <h2 className="text-xl font-bold">
+                  {profileType === 'CLT' && 'Termos do Empréstimo Pessoal'}
+                  {profileType === 'AUTONOMO' && 'Termos - Capital de Giro'}
+                  {profileType === 'MOTO' && 'Termos - Financiamento de Moto'}
+                  {profileType === 'LIMPA_NOME' && 'Termos - Serviço Limpa Nome'}
+                </h2>
               </div>
 
-              {/* Taxas REAIS do banco */}
-              <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-3">
-                <h3 className="font-bold text-red-400 text-sm uppercase flex items-center gap-2">
-                  <AlertCircle size={16} /> Transparência Total
-                </h3>
-
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="bg-black/30 p-3 rounded-lg">
-                    <p className="text-zinc-500 text-xs">Juros ao Mês</p>
-                    <p className="text-white font-bold text-lg">{settings.interestRateMonthly}%</p>
+              {/* TERMOS CLT - Empréstimo Pessoal */}
+              {profileType === 'CLT' && (
+                <>
+                  <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-3">
+                    <h3 className="font-bold text-red-400 text-sm uppercase flex items-center gap-2">
+                      <AlertCircle size={16} /> Condições Financeiras
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="bg-black/30 p-3 rounded-lg">
+                        <p className="text-zinc-500 text-xs">Juros ao Mês</p>
+                        <p className="text-white font-bold text-lg">{settings?.interestRateMonthly || 30}%</p>
+                      </div>
+                      <div className="bg-black/30 p-3 rounded-lg">
+                        <p className="text-zinc-500 text-xs">Aprovação</p>
+                        <p className="text-white font-bold text-lg">Em até 72h</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="bg-black/30 p-3 rounded-lg">
-                    <p className="text-zinc-500 text-xs">Aprovação</p>
-                    <p className="text-white font-bold text-lg">Em até 72h</p>
-                  </div>
-                </div>
-              </div>
 
-              <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-3">
-                <h3 className="font-bold text-[#D4AF37] text-sm uppercase flex items-center gap-2">
-                  <FileCheck size={16} /> O que vamos precisar:
-                </h3>
-                {/* Lista dinâmica baseada no Perfil */}
-                {(profileType === 'CLT' ? ['RG ou CNH', 'Comprovante Residência', 'Holerite/Extrato'] :
-                  profileType === 'AUTONOMO' ? ['CNPJ e RG/CNH', 'Comp. Endereço (Res+Com)', 'Vídeo do Local'] :
-                    profileType === 'MOTO' ? ['CNH A', 'Comprovante Residência', 'Entrada de R$ 2.000'] :
-                      ['Dados do Veículo', 'Fotos e Vídeos', 'CNH', 'Documentão em dia']
-                ).map((doc, idx) => (
-                  <div key={idx} className="flex items-start gap-3 py-2 border-b border-zinc-900 last:border-0">
-                    <CheckCircle2 size={16} className="text-green-500 mt-0.5 shrink-0" />
-                    <span className="text-sm text-zinc-300">{doc}</span>
+                  <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-3">
+                    <h3 className="font-bold text-[#D4AF37] text-sm uppercase">O que vamos precisar:</h3>
+                    {['RG ou CNH', 'Comprovante de Residência', 'Holerite ou Extrato Bancário', 'Selfie com Documento', 'Fotos e Vídeo da Residência'].map((doc, idx) => (
+                      <div key={idx} className="flex items-start gap-3 py-2 border-b border-zinc-900 last:border-0">
+                        <CheckCircle2 size={16} className="text-green-500 mt-0.5 shrink-0" />
+                        <span className="text-sm text-zinc-300">{doc}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              <label className="flex items-start gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer hover:border-[#D4AF37]">
-                <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-[#D4AF37] w-6 h-6" />
-                <div>
-                  <span className="text-white font-bold">Estou ciente e de acordo</span>
-                  <p className="text-xs text-zinc-400 mt-1">
-                    Declaro que estou ciente que o empréstimo possui <strong className="text-red-400">juros de {settings.interestRateMonthly || 30}% ao mês</strong> e aceito as taxas e condições informadas.
-                  </p>
-                </div>
-              </label>
+                  <label className="flex items-start gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer hover:border-[#D4AF37]">
+                    <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-[#D4AF37] w-6 h-6" />
+                    <div>
+                      <span className="text-white font-bold">Estou ciente e de acordo</span>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        Declaro que estou ciente que o empréstimo possui <strong className="text-red-400">juros de {settings?.interestRateMonthly || 30}% ao mês</strong> e aceito as taxas e condições informadas.
+                      </p>
+                    </div>
+                  </label>
+                </>
+              )}
+
+              {/* TERMOS AUTÔNOMO - Capital de Giro com Diárias */}
+              {profileType === 'AUTONOMO' && (
+                <>
+                  <div className="bg-green-900/20 border border-green-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-green-400 mb-3">💰 CONDIÇÕES DO EMPRÉSTIMO</h3>
+                    <ul className="text-sm text-zinc-300 space-y-2">
+                      <li>• <strong>Finalidade:</strong> Capital de giro para comércio</li>
+                      <li>• <strong>Modalidade:</strong> Pagamento diário</li>
+                      <li>• <strong>Parcelas:</strong> 30 (trinta) diárias</li>
+                      <li>• <strong>Juros:</strong> 30% ao mês</li>
+                      <li>• <strong>Dias de cobrança:</strong> Segunda a Sábado (feriados inclusos)</li>
+                      <li>• <strong className="text-yellow-400">Domingos:</strong> Não possuem cobrança de parcela</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-red-400 mb-3">🚨 MULTA E JUROS POR ATRASO</h3>
+                    <ul className="text-sm text-zinc-300 space-y-2">
+                      <li>• Multa de <strong className="text-red-400">R$ 20,00 por dia</strong> de atraso (cumulativo)</li>
+                      <li>• A contagem ocorre em dias corridos (inclusive domingos e feriados)</li>
+                      <li>• O domingo não conta como parcela, mas conta para juros e multa se houver inadimplência</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-3">
+                    <h3 className="font-bold text-[#D4AF37] text-sm uppercase">O que vamos precisar:</h3>
+                    {['CNPJ e RG/CNH', 'Comprovante de Endereço Comercial', 'Vídeo do Estabelecimento', 'Análise do Comércio', 'Selfie com Documento'].map((doc, idx) => (
+                      <div key={idx} className="flex items-start gap-3 py-2 border-b border-zinc-900 last:border-0">
+                        <CheckCircle2 size={16} className="text-green-500 mt-0.5 shrink-0" />
+                        <span className="text-sm text-zinc-300">{doc}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <label className="flex items-start gap-4 p-4 bg-red-900/30 border-2 border-red-500 rounded-xl cursor-pointer">
+                    <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-red-500 w-6 h-6" />
+                    <div>
+                      <span className="text-white font-bold">☑️ Declaro que li e compreendi</span>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        As condições do Empréstimo para Comerciante (Capital de Giro), incluindo análise do comércio, pagamento em <strong>30 diárias</strong>, juros de <strong className="text-red-400">30% ao mês</strong>, cobrança de segunda a sábado (feriados inclusos), inexistência de parcela aos domingos, e que em caso de inadimplência o domingo será contado para juros e multa de <strong className="text-red-400">R$ 20,00 por dia</strong> de atraso, de forma cumulativa.
+                      </p>
+                    </div>
+                  </label>
+                </>
+              )}
+
+              {/* TERMOS MOTO - Financiamento Próprio */}
+              {profileType === 'MOTO' && (
+                <>
+                  <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-yellow-400 mb-3">💰 CONDIÇÕES FINANCEIRAS</h3>
+                    <ul className="text-sm text-zinc-300 space-y-2">
+                      <li>• <strong className="text-yellow-400">Entrada obrigatória:</strong> R$ 2.000,00 (não reembolsável)</li>
+                      <li>• <strong>Parcelamento:</strong> 36 parcelas mensais de R$ 611,00</li>
+                      <li>• <strong>Seguro obrigatório:</strong> R$ 150,00/mês</li>
+                      <li>• <strong className="text-green-400">Valor mensal total:</strong> R$ 761,00</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-red-400 mb-3">🚨 BUSCA E APREENSÃO</h3>
+                    <ul className="text-sm text-zinc-300 space-y-2">
+                      <li>• A moto <strong>permanece em nome da empresa</strong> até quitação total</li>
+                      <li>• Atraso autoriza <strong className="text-red-400">busca e apreensão imediata</strong>, sem aviso prévio</li>
+                      <li>• Em caso de apreensão, <strong>todos os valores pagos serão perdidos</strong></li>
+                      <li>• Toda manutenção é de responsabilidade do cliente</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-3">
+                    <h3 className="font-bold text-[#D4AF37] text-sm uppercase">O que vamos precisar:</h3>
+                    {['CNH categoria A', 'Comprovante de Residência', 'Foto da Casa', 'Selfie com Documento', 'Comprovante de Renda'].map((doc, idx) => (
+                      <div key={idx} className="flex items-start gap-3 py-2 border-b border-zinc-900 last:border-0">
+                        <CheckCircle2 size={16} className="text-green-500 mt-0.5 shrink-0" />
+                        <span className="text-sm text-zinc-300">{doc}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <label className="flex items-start gap-4 p-4 bg-red-900/30 border-2 border-red-500 rounded-xl cursor-pointer">
+                    <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-red-500 w-6 h-6" />
+                    <div>
+                      <span className="text-white font-bold">☑️ Declaro que li e compreendi</span>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        Todas as condições do financiamento próprio de motocicleta, incluindo a entrada de <strong>R$ 2.000,00</strong>, as <strong>36 parcelas mensais de R$ 611,00</strong>, o seguro obrigatório de <strong>R$ 150,00 mensais</strong>, e estou ciente das penalidades, da possibilidade de <strong className="text-red-400">busca e apreensão</strong> e da transferência do veículo somente após a quitação total.
+                      </p>
+                    </div>
+                  </label>
+                </>
+              )}
+
+              {/* TERMOS GARANTIA - Empréstimo com Bem */}
+              {profileType === 'GARANTIA' && (
+                <>
+                  <div className="bg-orange-900/20 border border-orange-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-orange-400 mb-3">📌 REGRA FUNDAMENTAL</h3>
+                    <ul className="text-sm text-zinc-300 space-y-2">
+                      <li>• Garantia deve valer <strong className="text-orange-400">NO MÍNIMO O DOBRO</strong> do valor solicitado</li>
+                      <li>• Solicita R$ 2.000 → Garantia mínima de <strong>R$ 4.000</strong></li>
+                      <li>• Solicita R$ 5.000 → Garantia mínima de <strong>R$ 10.000</strong></li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-red-900/30 border-2 border-red-500 rounded-xl p-4">
+                    <h3 className="font-bold text-red-400 mb-3 text-lg">🚨 POSSE DO BEM (PONTO MAIS IMPORTANTE)</h3>
+                    <div className="bg-black/40 p-3 rounded-lg mb-3">
+                      <p className="text-white font-bold text-center">⚠️ TODA GARANTIA FICA EM POSSE DA EMPRESA DURANTE TODO O CONTRATO</p>
+                    </div>
+                    <ul className="text-sm text-zinc-300 space-y-2">
+                      <li>❌ Não existe empréstimo onde o cliente continua usando o bem</li>
+                      <li>❌ Não existe "transferir no documento e continuar com o veículo"</li>
+                      <li>✅ O bem será <strong>entregue fisicamente</strong> à empresa até quitação total</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4">
+                    <h3 className="font-bold text-white mb-3">🚗 Garantias Aceitas</h3>
+                    <div className="grid grid-cols-2 gap-2 text-sm text-zinc-300">
+                      <div>
+                        <p className="font-bold text-yellow-400">Veículos:</p>
+                        <ul className="ml-2">
+                          <li>• Carro</li>
+                          <li>• Moto</li>
+                          <li>• Jet ski</li>
+                          <li>• Carro elétrico</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="font-bold text-blue-400">Eletrônicos:</p>
+                        <ul className="ml-2">
+                          <li>• Celular</li>
+                          <li>• Notebook</li>
+                          <li>• Tablet</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-black border border-zinc-800 rounded-xl p-4">
+                    <h3 className="font-bold text-[#D4AF37] mb-3">💰 Condições Financeiras</h3>
+                    <ul className="text-sm text-zinc-300 space-y-1">
+                      <li>• Juros: <strong className="text-white">30% ao mês</strong></li>
+                      <li>• Multa inadimplência: <strong className="text-red-400">7% sobre valor emprestado</strong></li>
+                      <li>• Multa diária: <strong className="text-red-400">R$ 20,00 por dia</strong> (cumulativo)</li>
+                    </ul>
+                  </div>
+
+                  <label className="flex items-start gap-4 p-4 bg-orange-900/30 border-2 border-orange-500 rounded-xl cursor-pointer">
+                    <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-orange-500 w-6 h-6" />
+                    <div>
+                      <span className="text-white font-bold">☑️ Declaro que li e compreendi</span>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        Que no Empréstimo com Garantia, todo bem ficará <strong>obrigatoriamente em posse física da empresa</strong> durante todo o contrato; que a garantia deve valer <strong>no mínimo o dobro</strong> do valor solicitado; que veículos serão transferidos para nome da empresa; que os juros são de <strong className="text-red-400">30%</strong>, multa de 7% e R$ 20,00/dia de atraso; e que em caso de inadimplência, a garantia será usada como pagamento.
+                      </p>
+                    </div>
+                  </label>
+                </>
+              )}
+
+              {/* TERMOS LIMPA NOME - Serviço */}
+              {profileType === 'LIMPA_NOME' && (
+                <>
+                  <div className="bg-purple-900/20 border border-purple-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-purple-400 mb-3">🛡️ SOBRE O SERVIÇO</h3>
+                    <ul className="text-sm text-zinc-300 space-y-2">
+                      <li>• Análise e contestação administrativa de negativação</li>
+                      <li>• Atuação junto a: <strong>Serasa, SPC Brasil, Boa Vista, IEPTB</strong></li>
+                      <li>• Processo pode durar <strong>até 12 meses</strong></li>
+                      <li>• Assinatura do Termo de Autorização e Representação</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-red-400 mb-3">⚠️ ESCLARECIMENTOS IMPORTANTES</h3>
+                    <ul className="text-sm text-zinc-300 space-y-2">
+                      <li>• A empresa <strong className="text-red-400">NÃO paga dívidas</strong> nem quita valores</li>
+                      <li>• A dívida <strong>continua existindo</strong> junto ao credor original</li>
+                      <li>• Atuamos sobre a <strong>forma de exposição</strong> da dívida</li>
+                      <li>• Não garantimos score específico ou aprovação de crédito</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-green-900/20 border border-green-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-green-400 mb-3">🛡️ SOBRE A BLINDAGEM</h3>
+                    <ul className="text-sm text-zinc-300 space-y-2">
+                      <li>• Desde que <strong>não haja atraso ou novas dívidas</strong></li>
+                      <li>• O CPF pode ficar <strong>sem exposição pública</strong> da negativação</li>
+                      <li>• Score pode <strong>melhorar progressivamente</strong></li>
+                      <li>• Qualquer inadimplência pode fazer a restrição <strong className="text-red-400">retornar imediatamente</strong></li>
+                    </ul>
+                  </div>
+
+                  <label className="flex items-start gap-4 p-4 bg-purple-900/30 border-2 border-purple-500 rounded-xl cursor-pointer">
+                    <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-purple-500 w-6 h-6" />
+                    <div>
+                      <span className="text-white font-bold">☑️ Declaro que li e compreendi</span>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        Que o serviço <strong>não paga dívidas</strong>, que a dívida continua existindo, que o processo pode durar até <strong>12 meses</strong>, podendo manter a negativação sem exposição pública enquanto não houver atraso, e que qualquer inadimplência pode fazer a restrição <strong className="text-red-400">retornar imediatamente</strong>.
+                      </p>
+                    </div>
+                  </label>
+                </>
+              )}
             </div>
-          )}
+          ) : null}
 
           {/* STEP 4: Dados */}
           {currentStep === 4 && (
