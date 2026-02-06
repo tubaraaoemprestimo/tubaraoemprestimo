@@ -829,7 +829,8 @@ export const Wizard: React.FC = () => {
       autoNotificationService.onLoanRequested(
         formData.email,
         getAmount(),
-        formData.name
+        formData.name,
+        profileType
       ).catch(() => { });
 
       setLoading(false);

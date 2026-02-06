@@ -100,7 +100,7 @@ export const NotificationCenter: React.FC = () => {
 
             {/* Dropdown */}
             {isOpen && (
-                <div className="absolute left-0 top-full mt-2 w-[380px] sm:w-[420px] lg:w-[480px] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="fixed inset-x-0 top-14 mx-2 sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:mx-0 w-auto sm:w-[420px] lg:w-[480px] max-h-[80vh] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in slide-in-from-top-2 duration-200 flex flex-col">
                     {/* Header */}
                     <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950">
                         <h3 className="font-bold text-white flex items-center gap-2">
@@ -122,7 +122,7 @@ export const NotificationCenter: React.FC = () => {
                     </div>
 
                     {/* Notifications List */}
-                    <div className="max-h-[500px] overflow-y-auto">
+                    <div className="flex-1 overflow-y-auto">
                         {notifications.length === 0 ? (
                             <div className="p-8 text-center">
                                 <Bell size={40} className="mx-auto text-zinc-700 mb-3" />

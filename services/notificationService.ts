@@ -212,11 +212,14 @@ export const notificationService = {
         });
     },
 
-    notifyNewRequest: async (clientName: string, amount: number) => {
+    notifyNewRequest: async (clientName: string, amount: number, profileType?: string) => {
+        const isLimpaNome = profileType === 'LIMPA_NOME';
         return notificationService.create({
             type: 'info',
-            title: '📝 Nova Solicitação',
-            message: `${clientName} solicitou um empréstimo de R$ ${amount.toLocaleString()}.`,
+            title: isLimpaNome ? '📝 Nova Solicitação - Limpa Nome' : '📝 Nova Solicitação',
+            message: isLimpaNome
+                ? `${clientName} solicitou o serviço Limpa Nome.`
+                : `${clientName} solicitou um empréstimo de R$ ${amount.toLocaleString()}.`,
             customerEmail: null // Para admin
         });
     },

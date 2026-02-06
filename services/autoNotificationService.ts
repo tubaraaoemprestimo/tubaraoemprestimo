@@ -110,15 +110,18 @@ export const autoNotificationService = {
     // ============================================
 
     // Solicitação recebida
-    onLoanRequested: async (customerEmail: string, amount: number, clientName?: string): Promise<void> => {
+    onLoanRequested: async (customerEmail: string, amount: number, clientName?: string, profileType?: string): Promise<void> => {
         const customer = await getCustomerData(customerEmail);
+        const isLimpaNome = profileType === 'LIMPA_NOME';
         const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
         // Notificação no banco
         await autoNotificationService.createNotification(
             customerEmail,
             'Solicitação Recebida ✓',
-            `Recebemos sua solicitação de R$ ${formattedAmount}. Estamos analisando seus dados.`,
+            isLimpaNome
+                ? `Recebemos sua solicitação do serviço Limpa Nome. Estamos analisando seus dados.`
+                : `Recebemos sua solicitação de R$ ${formattedAmount}. Estamos analisando seus dados.`,
             'INFO',
             '/client/contracts'
         );
@@ -127,12 +130,19 @@ export const autoNotificationService = {
         if (customer.phone) {
             whatsappService.sendMessage(
                 customer.phone,
-                `📝 *SOLICITAÇÃO RECEBIDA!*\n\n` +
-                `Olá ${customer.name.split(' ')[0]}!\n\n` +
-                `Recebemos sua solicitação de empréstimo no valor de *R$ ${formattedAmount}*.\n\n` +
-                `⏳ Nossa equipe está analisando e em breve você receberá uma resposta.\n\n` +
-                `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
-                `_Tubarão Empréstimos 🦈_`
+                isLimpaNome
+                    ? `📝 *SOLICITAÇÃO RECEBIDA!*\n\n` +
+                      `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                      `Recebemos sua solicitação do serviço *Limpa Nome*.\n\n` +
+                      `⏳ Nossa equipe está analisando e em breve você receberá uma resposta.\n\n` +
+                      `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                      `_Tubarão Empréstimos 🦈_`
+                    : `📝 *SOLICITAÇÃO RECEBIDA!*\n\n` +
+                      `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                      `Recebemos sua solicitação de empréstimo no valor de *R$ ${formattedAmount}*.\n\n` +
+                      `⏳ Nossa equipe está analisando e em breve você receberá uma resposta.\n\n` +
+                      `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                      `_Tubarão Empréstimos 🦈_`
             ).catch(console.error);
         }
 
@@ -140,15 +150,19 @@ export const autoNotificationService = {
         firebasePushService.sendPush({
             to: customerEmail,
             title: '📝 Solicitação Recebida',
-            body: `Recebemos sua solicitação de R$ ${formattedAmount}`,
+            body: isLimpaNome
+                ? `Recebemos sua solicitação do serviço Limpa Nome`
+                : `Recebemos sua solicitação de R$ ${formattedAmount}`,
             link: '/client/contracts'
         }).catch(() => { });
 
         // Push para admin
         firebasePushService.sendPush({
             to: 'admin',
-            title: '📝 Nova Solicitação',
-            body: `${clientName || customer.name} solicitou R$ ${formattedAmount}`,
+            title: isLimpaNome ? '📝 Nova Solicitação - Limpa Nome' : '📝 Nova Solicitação',
+            body: isLimpaNome
+                ? `${clientName || customer.name} solicitou o serviço Limpa Nome`
+                : `${clientName || customer.name} solicitou R$ ${formattedAmount}`,
             link: '/admin/requests'
         }).catch(() => { });
     },

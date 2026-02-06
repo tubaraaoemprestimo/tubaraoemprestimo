@@ -738,6 +738,9 @@ export const supabaseService = {
             installments: r.installments,
             status: r.status as LoanStatus,
             date: r.created_at,
+            profileType: r.profile_type || undefined,
+            limpaNomeContractSigned: r.limpa_nome_contract_signed || false,
+            limpaNomeContractDate: r.limpa_nome_contract_date || undefined,
             references: {
                 fatherPhone: r.father_phone || '',
                 motherPhone: r.mother_phone || '',
@@ -754,12 +757,13 @@ export const supabaseService = {
                 videoHouseUrl: r.video_house_url,
                 videoVehicleUrl: r.video_vehicle_url
             },
-            supplementalInfo: r.supplemental_description ? {
+            supplementalInfo: r.supplemental_requested_at ? {
                 requestedAt: r.supplemental_requested_at,
                 description: r.supplemental_description,
                 docUrl: r.supplemental_doc_url,
                 uploadedAt: r.supplemental_uploaded_at
             } : undefined,
+            supplementalDescription: r.supplemental_description || undefined,
             signatureUrl: r.signature_url
         }));
     },

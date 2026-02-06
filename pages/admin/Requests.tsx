@@ -221,7 +221,12 @@ export const Requests: React.FC = () => {
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="p-4 font-bold text-[#D4AF37]">R$ {req.amount?.toLocaleString() || '0'}</td>
+                                        <td className="p-4 font-bold text-[#D4AF37]">
+                                            {(req as any).profileType === 'LIMPA_NOME'
+                                                ? <span className="text-purple-400">Serviço</span>
+                                                : `R$ ${req.amount?.toLocaleString() || '0'}`
+                                            }
+                                        </td>
 
                                         <td className="p-4">
                                             <span className={`px-2 py-1 rounded-full text-xs font-bold ${req.status === LoanStatus.APPROVED ? 'bg-green-900/30 text-green-400' :
@@ -264,7 +269,7 @@ export const Requests: React.FC = () => {
                         <div className="flex justify-between items-center p-6 border-b border-zinc-800 bg-zinc-950">
                             <div>
                                 <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                                    Análise de Crédito
+                                    {(selectedRequest as any).profileType === 'LIMPA_NOME' ? 'Análise de Serviço' : 'Análise de Crédito'}
                                     <span className={`text-xs px-2 py-1 rounded-full border ${selectedRequest.status === LoanStatus.APPROVED ? 'bg-green-900/30 text-green-500 border-green-800' :
                                         selectedRequest.status === LoanStatus.REJECTED ? 'bg-red-900/30 text-red-500 border-red-800' :
                                             selectedRequest.status === LoanStatus.WAITING_DOCS ? 'bg-blue-900/30 text-blue-500 border-blue-800' :
@@ -274,10 +279,12 @@ export const Requests: React.FC = () => {
                                         {selectedRequest.status === 'RETURNING_PENDING' ? '🔄 CLIENTE ANTIGO' : selectedRequest.status}
                                     </span>
                                 </h2>
-                                <p className="text-zinc-400 text-sm mt-1">ID: {selectedRequest.id} • {selectedRequest.email}</p>
+                                <p className="text-zinc-400 text-sm mt-1 flex items-center gap-2">
+                                    ID: {selectedRequest.id} • {selectedRequest.email} {getProfileBadge((selectedRequest as any).profileType)}
+                                </p>
                             </div>
                             <div className="flex items-center gap-2">
-                                {!isEditing && (selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === 'RETURNING_PENDING') && (
+                                {!isEditing && (selectedRequest as any).profileType !== 'LIMPA_NOME' && (selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === 'RETURNING_PENDING') && (
                                     <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>
                                         ✏️ Editar Valores
                                     </Button>
@@ -318,33 +325,41 @@ export const Requests: React.FC = () => {
                                 <InfoBox label="Cliente" value={selectedRequest.clientName} />
                                 <InfoBox label="CPF" value={selectedRequest.cpf} />
 
-                                {isEditing ? (
-                                    <div className="p-4 rounded-xl border bg-zinc-800 border-[#D4AF37]">
-                                        <p className="text-xs text-[#D4AF37] mb-1 uppercase tracking-wide">Valor (R$)</p>
-                                        <input
-                                            type="number"
-                                            value={editAmount}
-                                            onChange={e => setEditAmount(Number(e.target.value))}
-                                            className="w-full bg-black border border-zinc-700 rounded p-2 text-white font-bold text-lg"
-                                        />
-                                    </div>
+                                {(selectedRequest as any).profileType === 'LIMPA_NOME' ? (
+                                    <>
+                                        <InfoBox label="Serviço" value="Limpa Nome" highlight />
+                                        <InfoBox label="Contrato Assinado" value={(selectedRequest as any).limpaNomeContractSigned ? '✅ Sim' : '❌ Não'} />
+                                    </>
                                 ) : (
-                                    <InfoBox label="Valor Solicitado" value={`R$ ${selectedRequest.amount.toLocaleString()}`} highlight />
-                                )}
+                                    <>
+                                        {isEditing ? (
+                                            <div className="p-4 rounded-xl border bg-zinc-800 border-[#D4AF37]">
+                                                <p className="text-xs text-[#D4AF37] mb-1 uppercase tracking-wide">Valor (R$)</p>
+                                                <input
+                                                    type="number"
+                                                    value={editAmount}
+                                                    onChange={e => setEditAmount(Number(e.target.value))}
+                                                    className="w-full bg-black border border-zinc-700 rounded p-2 text-white font-bold text-lg"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <InfoBox label="Valor Solicitado" value={`R$ ${selectedRequest.amount.toLocaleString()}`} highlight />
+                                        )}
 
-                                {/* Parcelas - Só aparecem no modo edição */}
-                                {isEditing && (
-                                    <div className="p-4 rounded-xl border bg-zinc-800 border-[#D4AF37]">
-                                        <p className="text-xs text-[#D4AF37] mb-1 uppercase tracking-wide">Parcelas (opcional)</p>
-                                        <input
-                                            type="number"
-                                            value={editInstallments}
-                                            onChange={e => setEditInstallments(Number(e.target.value))}
-                                            className="w-full bg-black border border-zinc-700 rounded p-2 text-white font-bold text-lg"
-                                            placeholder="Ex: 4"
-                                        />
-                                        <p className="text-xs text-zinc-500 mt-1">Deixe 0 se não quiser propor parcelamento</p>
-                                    </div>
+                                        {isEditing && (
+                                            <div className="p-4 rounded-xl border bg-zinc-800 border-[#D4AF37]">
+                                                <p className="text-xs text-[#D4AF37] mb-1 uppercase tracking-wide">Parcelas (opcional)</p>
+                                                <input
+                                                    type="number"
+                                                    value={editInstallments}
+                                                    onChange={e => setEditInstallments(Number(e.target.value))}
+                                                    className="w-full bg-black border border-zinc-700 rounded p-2 text-white font-bold text-lg"
+                                                    placeholder="Ex: 4"
+                                                />
+                                                <p className="text-xs text-zinc-500 mt-1">Deixe 0 se não quiser propor parcelamento</p>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </div>
 
@@ -375,8 +390,8 @@ export const Requests: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* References Section */}
-                            {selectedRequest.references && (
+                            {/* References Section - hide for LIMPA_NOME */}
+                            {(selectedRequest as any).profileType !== 'LIMPA_NOME' && selectedRequest.references && (
                                 <div className="bg-zinc-950 border border-zinc-800 p-4 rounded-xl">
                                     <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
                                         <Users size={16} /> Referências Pessoais
@@ -407,8 +422,8 @@ export const Requests: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Video Gallery */}
-                            <div className="space-y-4">
+                            {/* Video Gallery - hide for LIMPA_NOME */}
+                            {(selectedRequest as any).profileType !== 'LIMPA_NOME' && <div className="space-y-4">
                                 <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4 flex items-center gap-2">
                                     <Video size={16} /> Validação por Vídeo
                                 </h3>
@@ -426,10 +441,10 @@ export const Requests: React.FC = () => {
                                         <div className="text-zinc-500 italic text-sm p-4">Nenhum vídeo anexado.</div>
                                     )}
                                 </div>
-                            </div>
+                            </div>}
 
-                            {/* Document Gallery */}
-                            <div className="space-y-6">
+                            {/* Document Gallery - hide for LIMPA_NOME */}
+                            {(selectedRequest as any).profileType !== 'LIMPA_NOME' && <div className="space-y-6">
 
                                 {/* Personal Documents */}
                                 <div>
@@ -599,14 +614,17 @@ export const Requests: React.FC = () => {
                                     return null;
                                 })()}
 
-                            </div>
+                            </div>}
                         </div>
 
                         {/* Actions Footer */}
                         {(selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === LoanStatus.WAITING_DOCS || selectedRequest.status === 'RETURNING_PENDING') && (
                             <div className="p-6 border-t border-zinc-800 bg-zinc-950 flex flex-col md:flex-row justify-between items-center gap-4">
                                 <span className="text-xs text-zinc-500 text-center md:text-left">
-                                    Se aprovar agora, o saldo será liberado na carteira.
+                                    {(selectedRequest as any).profileType === 'LIMPA_NOME'
+                                        ? 'Ao aprovar, o serviço Limpa Nome será iniciado para este cliente.'
+                                        : 'Se aprovar agora, o saldo será liberado na carteira.'
+                                    }
                                 </span>
                                 <div className="flex gap-4 w-full md:w-auto">
                                     {/* Request Doc Button */}
@@ -618,7 +636,7 @@ export const Requests: React.FC = () => {
                                         <X size={18} className="mr-2" /> REPROVAR
                                     </Button>
                                     <Button variant="gold" className="flex-1 md:flex-initial bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]" onClick={() => handleApprove(selectedRequest.id)} isLoading={processing === selectedRequest.id}>
-                                        <Check size={18} className="mr-2" /> APROVAR EMPRÉSTIMO
+                                        <Check size={18} className="mr-2" /> {(selectedRequest as any).profileType === 'LIMPA_NOME' ? 'APROVAR SERVIÇO' : 'APROVAR EMPRÉSTIMO'}
                                     </Button>
                                 </div>
                             </div>
