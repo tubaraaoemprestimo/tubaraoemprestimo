@@ -2,22 +2,31 @@
 
 export const SERVICE_TERMS = {
     CLT: {
-        title: 'Termos do Empréstimo Pessoal',
+        title: 'Termos do Empréstimo para CLT',
         color: 'blue',
-        conditions: [
-            'Juros de 30% ao mês',
-            'Aprovação em até 72 horas',
-            'Valor depositado via PIX',
-            'Pagamento mensal',
+        requirements: [
+            'Ter registro ativo em carteira (CLT)',
+            'Possuir mínimo de 3 meses no emprego atual',
+            'Ter renda compatível com o valor solicitado',
         ],
         documents: [
-            'RG ou CNH',
-            'Comprovante de Residência',
-            'Holerite ou Extrato Bancário',
-            'Selfie com Documento',
-            'Fotos e Vídeo da Residência',
+            'Carteira de Trabalho Digital em PDF (arquivo original exportado)',
+            'Documento com foto (RG ou CNH)',
+            'Selfie segurando o documento',
+            'Comprovante de residência',
         ],
-        checkboxText: `Declaro que estou ciente que o empréstimo possui juros de 30% ao mês e aceito as taxas e condições informadas.`,
+        conditions: [
+            'Juros: 30% ao mês',
+            'Multa inadimplência: 7% sobre valor emprestado',
+            'Multa diária: R$ 20,00 por dia de atraso (cumulativo)',
+            'Aprovação não é automática, depende de análise',
+            'Documento inválido resulta em reprovação',
+        ],
+        alerts: [
+            'NÃO aceitamos: carteira impressa, fotografada ou print de tela',
+            'Apenas ARQUIVO PDF da Carteira de Trabalho Digital é aceito',
+        ],
+        checkboxText: `Declaro que li e compreendi as condições do Empréstimo para CLT, que é obrigatório possuir no mínimo 3 meses de registro ativo, que devo enviar a Carteira de Trabalho Digital em ARQUIVO PDF (não sendo aceitos prints, fotos ou documentos impressos), que o valor do empréstimo varia conforme salário e perfil do cliente, que os juros são de 30%, que em caso de atraso haverá multa de 7% sobre o valor emprestado mais R$ 20,00 por dia de atraso de forma acumulativa, e que a liberação depende de análise.`,
     },
 
     AUTONOMO: {

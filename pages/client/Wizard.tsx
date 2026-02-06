@@ -1107,55 +1107,101 @@ export const Wizard: React.FC = () => {
             </div>
           )}
 
-          {/* STEP 3 (para CLT/AUTONOMO) ou STEP 2 (para MOTO/LIMPA_NOME): Termos */}
-          {((profileType === 'CLT' || profileType === 'AUTONOMO') && currentStep === 3) ||
+          {/* STEP 3 (para CLT/AUTONOMO/GARANTIA) ou STEP 2 (para MOTO/LIMPA_NOME): Termos */}
+          {((profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'GARANTIA') && currentStep === 3) ||
             ((profileType === 'MOTO' || profileType === 'LIMPA_NOME') && currentStep === 2) ? (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center mb-4">
                 <Shield size={48} className="mx-auto text-[#D4AF37] mb-3" />
                 <h2 className="text-xl font-bold">
-                  {profileType === 'CLT' && 'Termos do Empréstimo Pessoal'}
+                  {profileType === 'CLT' && 'Termos do Empréstimo CLT'}
                   {profileType === 'AUTONOMO' && 'Termos - Capital de Giro'}
                   {profileType === 'MOTO' && 'Termos - Financiamento de Moto'}
+                  {profileType === 'GARANTIA' && 'Termos - Empréstimo com Garantia'}
                   {profileType === 'LIMPA_NOME' && 'Termos - Serviço Limpa Nome'}
                 </h2>
               </div>
 
-              {/* TERMOS CLT - Empréstimo Pessoal */}
+              {/* TERMOS CLT - Empréstimo para CLT */}
               {profileType === 'CLT' && (
                 <>
-                  <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-3">
-                    <h3 className="font-bold text-red-400 text-sm uppercase flex items-center gap-2">
-                      <AlertCircle size={16} /> Condições Financeiras
-                    </h3>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div className="bg-black/30 p-3 rounded-lg">
-                        <p className="text-zinc-500 text-xs">Juros ao Mês</p>
-                        <p className="text-white font-bold text-lg">{settings?.interestRateMonthly || 30}%</p>
-                      </div>
-                      <div className="bg-black/30 p-3 rounded-lg">
-                        <p className="text-zinc-500 text-xs">Aprovação</p>
-                        <p className="text-white font-bold text-lg">Em até 72h</p>
-                      </div>
+                  <div className="bg-blue-900/20 border border-blue-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-blue-400 mb-3">💼 EMPRÉSTIMO PARA CLT</h3>
+                    <p className="text-sm text-zinc-300">
+                      Destinado a pessoas com registro ativo em carteira, que possuam renda comprovada e vínculo empregatício mínimo para análise de crédito.
+                    </p>
+                  </div>
+
+                  <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4">
+                    <h3 className="font-bold text-white mb-3">👤 QUEM PODE SOLICITAR</h3>
+                    <ul className="text-sm text-zinc-300 space-y-2">
+                      <li>• Ter <strong className="text-white">registro ativo em carteira (CLT)</strong></li>
+                      <li>• Possuir <strong className="text-yellow-400">mínimo de 3 meses</strong> no emprego atual</li>
+                      <li>• Ter renda compatível com o valor solicitado</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-orange-900/20 border border-orange-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-orange-400 mb-3">📄 DOCUMENTOS OBRIGATÓRIOS</h3>
+                    <ul className="text-sm text-zinc-300 space-y-2">
+                      <li>• <strong className="text-white">Carteira de Trabalho Digital em PDF</strong> (arquivo original exportado)</li>
+                      <li>• Documento com foto (RG ou CNH)</li>
+                      <li>• Selfie segurando o documento</li>
+                      <li>• Comprovante de residência</li>
+                    </ul>
+                    <div className="mt-3 p-2 bg-red-900/30 border border-red-700 rounded-lg">
+                      <p className="text-xs text-red-400">
+                        ⚠️ <strong>NÃO</strong> aceitamos: carteira impressa, fotografada ou print de tela. Apenas <strong>ARQUIVO PDF</strong> da Carteira de Trabalho Digital.
+                      </p>
                     </div>
                   </div>
 
-                  <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-3">
-                    <h3 className="font-bold text-[#D4AF37] text-sm uppercase">O que vamos precisar:</h3>
-                    {['RG ou CNH', 'Comprovante de Residência', 'Holerite ou Extrato Bancário', 'Selfie com Documento', 'Fotos e Vídeo da Residência'].map((doc, idx) => (
-                      <div key={idx} className="flex items-start gap-3 py-2 border-b border-zinc-900 last:border-0">
-                        <CheckCircle2 size={16} className="text-green-500 mt-0.5 shrink-0" />
-                        <span className="text-sm text-zinc-300">{doc}</span>
-                      </div>
-                    ))}
+                  <div className="bg-black border border-zinc-800 rounded-xl p-4">
+                    <h3 className="font-bold text-[#D4AF37] mb-3">📌 COMO O VALOR É DEFINIDO</h3>
+                    <p className="text-sm text-zinc-300 mb-2">
+                      O valor não é fixo e será definido após análise, considerando:
+                    </p>
+                    <ul className="text-sm text-zinc-400 space-y-1 ml-2">
+                      <li>• Salário registrado</li>
+                      <li>• Tempo de empresa</li>
+                      <li>• Histórico do cliente</li>
+                      <li>• Se é cliente novo ou recorrente</li>
+                    </ul>
                   </div>
 
-                  <label className="flex items-start gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer hover:border-[#D4AF37]">
-                    <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-[#D4AF37] w-6 h-6" />
+                  <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-red-400 mb-3">💰 CONDIÇÕES E MULTAS</h3>
+                    <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                      <div className="bg-black/30 p-3 rounded-lg">
+                        <p className="text-zinc-500 text-xs">Juros ao Mês</p>
+                        <p className="text-white font-bold text-lg">30%</p>
+                      </div>
+                      <div className="bg-black/30 p-3 rounded-lg">
+                        <p className="text-zinc-500 text-xs">Multa Inadimplência</p>
+                        <p className="text-red-400 font-bold text-lg">7%</p>
+                      </div>
+                    </div>
+                    <ul className="text-sm text-zinc-300 space-y-1">
+                      <li>• Multa diária: <strong className="text-red-400">R$ 20,00</strong> por dia de atraso (cumulativo)</li>
+                      <li>• Atraso caracteriza inadimplência imediata</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-yellow-400 mb-3">⚠️ INFORMAÇÕES IMPORTANTES</h3>
+                    <ul className="text-sm text-zinc-300 space-y-1">
+                      <li>• A aprovação <strong>não é automática</strong></li>
+                      <li>• Documento inválido resulta em <strong>reprovação</strong></li>
+                      <li>• Informações falsas implicam cancelamento</li>
+                    </ul>
+                  </div>
+
+                  <label className="flex items-start gap-4 p-4 bg-blue-900/30 border-2 border-blue-500 rounded-xl cursor-pointer">
+                    <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-blue-500 w-6 h-6" />
                     <div>
-                      <span className="text-white font-bold">Estou ciente e de acordo</span>
+                      <span className="text-white font-bold">☑️ Declaro que li e compreendi</span>
                       <p className="text-xs text-zinc-400 mt-1">
-                        Declaro que estou ciente que o empréstimo possui <strong className="text-red-400">juros de {settings?.interestRateMonthly || 30}% ao mês</strong> e aceito as taxas e condições informadas.
+                        Que é obrigatório possuir <strong>mínimo 3 meses de registro ativo</strong>, que devo enviar a Carteira de Trabalho Digital em <strong>ARQUIVO PDF</strong> (não sendo aceitos prints, fotos ou documentos impressos), que o valor varia conforme análise, que os juros são de <strong className="text-red-400">30%</strong>, que em caso de atraso haverá multa de <strong className="text-red-400">7%</strong> sobre o valor mais <strong className="text-red-400">R$ 20,00/dia</strong> de forma cumulativa, e que a liberação depende de análise.
                       </p>
                     </div>
                   </label>
