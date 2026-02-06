@@ -17,6 +17,7 @@ export interface LoanEmailData {
   clientEmail: string;
   amount: number;
   installments?: number;
+  profileType?: string;
   status?: string;
   message?: string;
   dueDate?: string;
@@ -538,6 +539,105 @@ const emailTemplates = {
   }),
 
   // ==========================================
+  // ADMIN: Nova Solicitação LIMPA NOME
+  // ==========================================
+  adminLimpaNomeRequest: (data: LoanEmailData) => ({
+    subject: `🔔 Nova Solicitação LIMPA NOME - ${data.clientName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head><style>${baseStyles}</style></head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">🦈 TUBARÃO EMPRÉSTIMOS</div>
+            <p style="color: #fff; margin-top: 10px;">Nova Solicitação - Limpa Nome</p>
+          </div>
+          <div class="content">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <span class="badge" style="background: #E8D5F5; color: #6B21A8;">🔒 SERVIÇO LIMPA NOME</span>
+            </div>
+            <div class="info-box">
+              <div class="label">Cliente</div>
+              <div class="value">${data.clientName}</div>
+            </div>
+            <div class="info-box">
+              <div class="label">Email</div>
+              <div class="value">${data.clientEmail}</div>
+            </div>
+            <div class="info-box" style="border-left-color: #7C3AED;">
+              <div class="label">Serviço</div>
+              <div class="value" style="color: #7C3AED;">Contestação Administrativa de Negativação</div>
+            </div>
+
+            <div style="text-align: center;">
+              <a href="https://tubaraoemprestimo.com.br/#/admin/requests" class="button">Ver Solicitação</a>
+            </div>
+          </div>
+          <div class="footer">
+            <p>Este é um email automático do sistema Tubarão Empréstimos.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  }),
+
+  // ==========================================
+  // CLIENTE: Solicitação LIMPA NOME Recebida
+  // ==========================================
+  clientLimpaNomeReceived: (data: LoanEmailData) => ({
+    subject: `✅ Recebemos sua Solicitação - Limpa Nome - Tubarão Empréstimos`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head><style>${baseStyles}</style></head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">🦈 TUBARÃO EMPRÉSTIMOS</div>
+          </div>
+          <div class="content">
+            <h2>Olá, ${data.clientName}! 👋</h2>
+            <p>Recebemos sua solicitação do serviço <strong>Limpa Nome</strong> e ela está em análise.</p>
+
+            <div class="info-box" style="border-left-color: #7C3AED;">
+              <div class="label">Serviço Solicitado</div>
+              <div class="value" style="color: #7C3AED;">Limpa Nome</div>
+              <p style="color: #888; font-size: 13px; margin-top: 5px;">Contestação administrativa de negativação</p>
+            </div>
+
+            <div style="text-align: center; margin: 25px 0;">
+              <span class="badge badge-info">⏳ EM ANÁLISE</span>
+            </div>
+
+            <h3>Próximos Passos:</h3>
+            <div class="steps">
+              <div class="step">
+                <div class="step-number">1</div>
+                <span>Nossa equipe analisará seus dados e contrato assinado</span>
+              </div>
+              <div class="step">
+                <div class="step-number">2</div>
+                <span>Você receberá a confirmação de início do processo</span>
+              </div>
+              <div class="step">
+                <div class="step-number">3</div>
+                <span>Acompanhe o andamento pelo painel do cliente</span>
+              </div>
+            </div>
+          </div>
+          <div class="footer">
+            <p>Dúvidas? Responda este email ou entre em contato via WhatsApp.</p>
+            <p>© Tubarão Empréstimos - Todos os direitos reservados</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  }),
+
+  // ==========================================
   // ADMIN: Novo Pagamento Recebido
   // ==========================================
   adminPaymentReceived: (data: LoanEmailData) => ({
@@ -688,13 +788,21 @@ export const emailService = {
   async notifyNewRequest(data: LoanEmailData): Promise<void> {
     const adminEmail = await this.getAdminEmail();
 
-    // Email para Admin
-    const adminTemplate = emailTemplates.adminNewRequest(data);
-    await this.sendEmail({ to: adminEmail, ...adminTemplate });
+    if (data.profileType === 'LIMPA_NOME') {
+      // Templates específicos para Limpa Nome
+      const adminTemplate = emailTemplates.adminLimpaNomeRequest(data);
+      await this.sendEmail({ to: adminEmail, ...adminTemplate });
 
-    // Email para Cliente
-    const clientTemplate = emailTemplates.clientRequestReceived(data);
-    await this.sendEmail({ to: data.clientEmail, ...clientTemplate });
+      const clientTemplate = emailTemplates.clientLimpaNomeReceived(data);
+      await this.sendEmail({ to: data.clientEmail, ...clientTemplate });
+    } else {
+      // Templates padrão para empréstimos
+      const adminTemplate = emailTemplates.adminNewRequest(data);
+      await this.sendEmail({ to: adminEmail, ...adminTemplate });
+
+      const clientTemplate = emailTemplates.clientRequestReceived(data);
+      await this.sendEmail({ to: data.clientEmail, ...clientTemplate });
+    }
   },
 
   async notifyApproved(data: LoanEmailData): Promise<void> {

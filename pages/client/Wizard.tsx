@@ -821,6 +821,7 @@ export const Wizard: React.FC = () => {
         clientEmail: formData.email,
         amount: getAmount(),
         installments: settings.defaultInstallments,
+        profileType,
       }).catch(() => { });
 
       // 📱 Enviar WhatsApp e Notificação automática (silencioso)
