@@ -699,7 +699,20 @@ const VideoCard = ({ title, url }: { title: string, url: string }) => (
     <div className="space-y-2 group">
         <p className="text-xs text-zinc-400 pl-1">{title}</p>
         <div className="rounded-xl border border-zinc-800 bg-black overflow-hidden relative aspect-video">
-            <video src={url} controls className="w-full h-full object-contain" />
+            <video
+                src={url}
+                controls
+                playsInline
+                preload="metadata"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                    const target = e.target as HTMLVideoElement;
+                    target.style.display = 'none';
+                    if (target.parentElement) {
+                        target.parentElement.innerHTML = `<div class="w-full h-full flex items-center justify-center text-zinc-500 text-sm flex-col gap-2"><span>Vídeo indisponível</span><a href="${url}" target="_blank" class="text-[#D4AF37] text-xs underline">Abrir em nova aba</a></div>`;
+                    }
+                }}
+            />
         </div>
     </div>
 );

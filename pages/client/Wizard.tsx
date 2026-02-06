@@ -658,6 +658,19 @@ export const Wizard: React.FC = () => {
     }
   };
 
+  // Função para converter blob: URL em File
+  const blobURLtoFile = async (blobUrl: string, filename: string): Promise<File | null> => {
+    try {
+      const response = await fetch(blobUrl);
+      const blob = await response.blob();
+      const mimeType = blob.type || 'video/webm';
+      return new File([blob], filename, { type: mimeType });
+    } catch (err) {
+      console.error('Falha ao converter blob URL para file:', err);
+      return null;
+    }
+  };
+
   // Função para upload de arquivo para Supabase Storage
   const uploadToStorage = async (dataUrl: string, folder: string, index: number = 0): Promise<string> => {
     // Se já for uma URL do Supabase, retornar diretamente
@@ -667,21 +680,42 @@ export const Wizard: React.FC = () => {
 
     try {
       const timestamp = Date.now();
-      const extension = dataUrl.includes('image/png') ? 'png' : dataUrl.includes('image/jpeg') ? 'jpg' : 'jpg';
-      const fileName = `${folder}_${timestamp}_${index}.${extension}`;
-      const filePath = `loan_documents/${formData.cpf.replace(/\D/g, '')}/${fileName}`;
+      let file: File | null = null;
+      let extension = 'jpg';
 
-      const file = dataURLtoFile(dataUrl, fileName);
-      if (!file) {
-        console.error('Falha ao converter dataURL para file');
-        return dataUrl; // Fallback para URL original
+      // Tratar blob: URLs (vídeos gravados ou selecionados da galeria)
+      if (dataUrl.startsWith('blob:')) {
+        const blobFile = await blobURLtoFile(dataUrl, `${folder}_${timestamp}_${index}`);
+        if (blobFile) {
+          file = blobFile;
+          // Determinar extensão pelo mime type do blob
+          const mime = blobFile.type;
+          if (mime.includes('video/webm')) extension = 'webm';
+          else if (mime.includes('video/mp4')) extension = 'mp4';
+          else if (mime.includes('video/')) extension = 'webm';
+          else if (mime.includes('image/png')) extension = 'png';
+          else if (mime.includes('image/jpeg')) extension = 'jpg';
+          // Renomear com extensão correta
+          file = new File([blobFile], `${folder}_${timestamp}_${index}.${extension}`, { type: mime });
+        }
+      } else {
+        // Tratar data: URLs (base64 - imagens/selfie/assinatura)
+        extension = dataUrl.includes('image/png') ? 'png' : dataUrl.includes('image/jpeg') ? 'jpg' : 'jpg';
+        const fileName = `${folder}_${timestamp}_${index}.${extension}`;
+        file = dataURLtoFile(dataUrl, fileName);
       }
 
+      if (!file) {
+        console.error('Falha ao converter URL para file');
+        return dataUrl;
+      }
+
+      const filePath = `loan_documents/${formData.cpf.replace(/\D/g, '')}/${file.name}`;
       const uploadedUrl = await supabaseService.uploadFile('documents', filePath, file);
       return uploadedUrl || dataUrl;
     } catch (error) {
       console.error('Erro no upload:', error);
-      return dataUrl; // Fallback para URL original
+      return dataUrl;
     }
   };
 
