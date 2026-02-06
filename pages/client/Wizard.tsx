@@ -18,6 +18,7 @@ import { emailService } from '../../services/emailService';
 import { autoNotificationService } from '../../services/autoNotificationService';
 import { useToast } from '../../components/Toast';
 import { InstallPwaButton } from '../../components/InstallPwaButton';
+import { SERVICE_TERMS } from '../../constants/serviceTerms';
 
 // Tipos de garantia (para CLT com valores altos)
 const guaranteeTypes = [
@@ -433,9 +434,18 @@ export const Wizard: React.FC = () => {
         addToast("Informe seu nome completo.", 'warning');
         return;
       }
-      if (!formData.cpf || formData.cpf.replace(/\D/g, '').length !== 11) {
-        addToast("Informe um CPF válido.", 'warning');
-        return;
+      if (profileType === 'LIMPA_NOME') {
+        // LIMPA_NOME aceita CPF (11 dígitos) ou CNPJ (14 dígitos)
+        const cpfCnpjDigits = formData.cpf.replace(/\D/g, '');
+        if (!cpfCnpjDigits || (cpfCnpjDigits.length !== 11 && cpfCnpjDigits.length !== 14)) {
+          addToast("Informe um CPF ou CNPJ válido.", 'warning');
+          return;
+        }
+      } else {
+        if (!formData.cpf || formData.cpf.replace(/\D/g, '').length !== 11) {
+          addToast("Informe um CPF válido.", 'warning');
+          return;
+        }
       }
       if (!formData.phone || formData.phone.replace(/\D/g, '').length < 10) {
         addToast("Informe seu WhatsApp.", 'warning');
@@ -446,10 +456,18 @@ export const Wizard: React.FC = () => {
         return;
       }
 
-      // Endereço
-      if (!formData.cep || formData.cep.replace(/\D/g, '').length !== 8) {
-        addToast("Informe seu CEP.", 'warning');
-        return;
+      // LIMPA_NOME: validar data de nascimento, sem endereço
+      if (profileType === 'LIMPA_NOME') {
+        if (!formData.birthDate) {
+          addToast("Informe sua data de nascimento.", 'warning');
+          return;
+        }
+      } else {
+        // Endereço obrigatório para outros perfis
+        if (!formData.cep || formData.cep.replace(/\D/g, '').length !== 8) {
+          addToast("Informe seu CEP.", 'warning');
+          return;
+        }
       }
 
       // Específico por perfil
@@ -477,8 +495,6 @@ export const Wizard: React.FC = () => {
           return;
         }
       }
-
-      // LIMPA_NOME não precisa de renda/cnpj
     }
 
     // STEP DOCUMENTOS - Dinâmico (Step 5 para CLT/AUTONOMO, Step 4 para MOTO, Step 6 para GARANTIA) - LIMPA_NOME não tem docs
@@ -1466,41 +1482,54 @@ export const Wizard: React.FC = () => {
               <div className="space-y-5 animate-in slide-in-from-right">
                 <h2 className="text-xl font-bold">Seus Dados Pessoais</h2>
 
-                <div className="space-y-4">
-                  <Input label="Nome Completo" name="name" value={formData.name} onChange={handleChange} placeholder="Como no documento" />
-                  <Input label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00" error={errors.cpf} />
-                  <Input label="WhatsApp Principal" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
-                  <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} />
-                  <Input label="Instagram" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="@seu_usuario" />
-                </div>
-
-                {/* Dados Específicos por Perfil */}
-                {profileType === 'AUTONOMO' && (
-                  <div className="pt-4 border-t border-zinc-800 space-y-4">
-                    <h3 className="text-sm font-bold text-[#D4AF37]">Dados do Negócio</h3>
-                    <Input label="CNPJ" name="cnpj" value={formData.cnpj} onChange={handleChange} placeholder="00.000.000/0000-00" />
-                    <Input label="Endereço Comercial" name="businessAddress" value={formData.businessAddress} onChange={handleChange} />
-                    <Input label="Renda Mensal Média" name="income" value={formData.income} onChange={handleChange} placeholder="0,00" />
+                {/* LIMPA_NOME: Formulário simplificado - apenas dados essenciais */}
+                {profileType === 'LIMPA_NOME' ? (
+                  <div className="space-y-4">
+                    <Input label="Nome Completo" name="name" value={formData.name} onChange={handleChange} placeholder="Como no documento" />
+                    <Input label="Telefone" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
+                    <Input label="CPF ou CNPJ" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00 ou 00.000.000/0000-00" error={errors.cpf} />
+                    <Input label="Data de Nascimento" type="date" name="birthDate" value={formData.birthDate} onChange={handleChange} />
+                    <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="seu@email.com" />
                   </div>
-                )}
-
-                {(profileType === 'MOTO' || profileType === 'GARANTIA_VEICULO' || profileType === 'CLT') && (
-                  <div className="pt-4 border-t border-zinc-800 space-y-4">
-                    <h3 className="text-sm font-bold text-[#D4AF37]">Dados Profissionais</h3>
-                    <Input label="Profissão" name="occupation" value={formData.occupation} onChange={handleChange} />
-                    <div className="grid grid-cols-2 gap-4">
-                      <Input label="Renda Mensal" name="income" value={formData.income} onChange={handleChange} />
-                      <Input label="Dia Pagamento" name="workTime" value={formData.workTime} onChange={handleChange} placeholder="Dia 05" />
+                ) : (
+                  <>
+                    <div className="space-y-4">
+                      <Input label="Nome Completo" name="name" value={formData.name} onChange={handleChange} placeholder="Como no documento" />
+                      <Input label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00" error={errors.cpf} />
+                      <Input label="WhatsApp Principal" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
+                      <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} />
+                      <Input label="Instagram" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="@seu_usuario" />
                     </div>
-                  </div>
-                )}
 
-                <div className="pt-4 border-t border-zinc-800 space-y-4">
-                  <h3 className="text-sm font-bold text-[#D4AF37]">Endereço Residencial</h3>
-                  <Input label="CEP" name="cep" value={formData.cep} onChange={handleChange} placeholder="00000-000" />
-                  <Input label="Endereço" name="address" value={formData.address} readOnly className="opacity-60" />
-                  <Input label="Número" name="number" value={formData.number} onChange={handleChange} placeholder="123" />
-                </div>
+                    {/* Dados Específicos por Perfil */}
+                    {profileType === 'AUTONOMO' && (
+                      <div className="pt-4 border-t border-zinc-800 space-y-4">
+                        <h3 className="text-sm font-bold text-[#D4AF37]">Dados do Negócio</h3>
+                        <Input label="CNPJ" name="cnpj" value={formData.cnpj} onChange={handleChange} placeholder="00.000.000/0000-00" />
+                        <Input label="Endereço Comercial" name="businessAddress" value={formData.businessAddress} onChange={handleChange} />
+                        <Input label="Renda Mensal Média" name="income" value={formData.income} onChange={handleChange} placeholder="0,00" />
+                      </div>
+                    )}
+
+                    {(profileType === 'MOTO' || profileType === 'GARANTIA_VEICULO' || profileType === 'CLT') && (
+                      <div className="pt-4 border-t border-zinc-800 space-y-4">
+                        <h3 className="text-sm font-bold text-[#D4AF37]">Dados Profissionais</h3>
+                        <Input label="Profissão" name="occupation" value={formData.occupation} onChange={handleChange} />
+                        <div className="grid grid-cols-2 gap-4">
+                          <Input label="Renda Mensal" name="income" value={formData.income} onChange={handleChange} />
+                          <Input label="Dia Pagamento" name="workTime" value={formData.workTime} onChange={handleChange} placeholder="Dia 05" />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-4 border-t border-zinc-800 space-y-4">
+                      <h3 className="text-sm font-bold text-[#D4AF37]">Endereço Residencial</h3>
+                      <Input label="CEP" name="cep" value={formData.cep} onChange={handleChange} placeholder="00000-000" />
+                      <Input label="Endereço" name="address" value={formData.address} readOnly className="opacity-60" />
+                      <Input label="Número" name="number" value={formData.number} onChange={handleChange} placeholder="123" />
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -1661,81 +1690,37 @@ export const Wizard: React.FC = () => {
                 <p className="text-zinc-400 text-sm mt-2">Leia e assine o contrato para prosseguir</p>
               </div>
 
-              {/* CONTRATO COMPLETO */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 max-h-[400px] overflow-y-auto">
-                <h3 className="font-bold text-purple-400 mb-4 text-center">TERMO DE AUTORIZAÇÃO E REPRESENTAÇÃO</h3>
+              {/* CONTRATO - TERMO DE AUTORIZAÇÃO E REPRESENTAÇÃO */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 max-h-[450px] overflow-y-auto">
+                <h3 className="font-bold text-purple-400 mb-4 text-center text-lg">TERMO DE AUTORIZAÇÃO E REPRESENTAÇÃO</h3>
 
-                <div className="text-sm text-zinc-300 space-y-4">
-                  <p>
-                    Eu, <strong className="text-white">{formData.name || '[NOME DO CLIENTE]'}</strong>,
-                    CPF <strong className="text-white">{formData.cpf || '[CPF]'}</strong>,
-                    declaro para os devidos fins que:
+                <div className="text-sm text-zinc-300 space-y-3 mb-4">
+                  <p><strong className="text-white">CPF OU CNPJ:</strong> {formData.cpf || '_______________'}</p>
+                </div>
+
+                <div className="text-sm text-zinc-300 space-y-4 whitespace-pre-line leading-relaxed">
+                  {SERVICE_TERMS.LIMPA_NOME.contractText}
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-zinc-700">
+                  <p className="text-sm text-zinc-300">
+                    <strong className="text-white">ASSINATURA DO CLIENTE:</strong> ___________________________________________
                   </p>
-
-                  <div className="space-y-2">
-                    <p className="font-bold text-white">1. OBJETO DO SERVIÇO</p>
-                    <p>Autorizo a empresa a atuar em meu nome para realizar análise e contestação administrativa de negativação junto aos órgãos Serasa, SPC Brasil, Boa Vista e Cartórios de Protesto (IEPTB).</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="font-bold text-white">2. CIÊNCIA SOBRE O SERVIÇO</p>
-                    <ul className="list-disc list-inside space-y-1 text-zinc-400">
-                      <li>O serviço NÃO envolve pagamento ou quitação de dívidas</li>
-                      <li>A dívida continua existindo junto ao credor original</li>
-                      <li>O processo pode durar até 12 (doze) meses</li>
-                      <li>Não há garantia de score específico ou aprovação de crédito</li>
-                    </ul>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="font-bold text-white">3. RESPONSABILIDADES DO CLIENTE</p>
-                    <ul className="list-disc list-inside space-y-1 text-zinc-400">
-                      <li>Manter em dia todas as obrigações financeiras durante o processo</li>
-                      <li>Não criar novas dívidas ou pendências no CPF</li>
-                      <li>Comunicar qualquer alteração cadastral</li>
-                    </ul>
-                  </div>
-
-                  <div className="space-y-2 bg-red-900/20 border border-red-700 rounded-lg p-3">
-                    <p className="font-bold text-red-400">4. ENCERRAMENTO AUTOMÁTICO</p>
-                    <p className="text-zinc-400">
-                      Qualquer atraso, inadimplência ou criação de novas dívidas poderá resultar no
-                      <strong className="text-red-400"> retorno imediato da exposição da dívida</strong> e
-                      encerramento automático do processo, sem direito a reembolso.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="font-bold text-white">5. DECLARAÇÃO FINAL</p>
-                    <p>
-                      Declaro ter lido e compreendido todos os termos acima, estando ciente de que o serviço
-                      atua apenas sobre a forma de exposição da dívida e não elimina a obrigação financeira existente.
-                    </p>
-                  </div>
-
-                  <div className="text-center text-zinc-500 text-xs mt-4 pt-4 border-t border-zinc-700">
+                  <div className="text-center text-zinc-500 text-xs mt-3">
                     <p>Data: {new Date().toLocaleDateString('pt-BR')}</p>
-                    <p className="mt-2">Assinatura Digital via Sistema</p>
                   </div>
                 </div>
               </div>
 
               {/* ASSINATURA DO CLIENTE - OBRIGATÓRIO */}
               <div className="space-y-3">
-                <h3 className="font-bold text-purple-400">✍️ ASSINATURA DO CLIENTE (OBRIGATÓRIO)</h3>
+                <h3 className="font-bold text-purple-400">ASSINATURA DO CLIENTE (OBRIGATÓRIO)</h3>
                 <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
                   <p className="text-xs text-red-400">
-                    <strong>⚠️ OBRIGATÓRIO:</strong> Assine no campo abaixo para confirmar sua adesão ao serviço. Sem assinatura, não será possível prosseguir.
+                    <strong>OBRIGATÓRIO:</strong> Assine no campo abaixo para confirmar sua adesão ao serviço. Sem assinatura, não será possível prosseguir.
                   </p>
                 </div>
                 <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
-              </div>
-
-              {/* Aviso sobre vinculação legal */}
-              <div className="bg-yellow-900/20 border border-yellow-700 rounded-xl p-3">
-                <p className="text-xs text-yellow-400 text-center">
-                  ⚠️ Este aceite tem validade legal e será vinculado ao seu CPF e dados cadastrais.
-                </p>
               </div>
             </div>
           )}
@@ -1782,28 +1767,50 @@ export const Wizard: React.FC = () => {
                   <h2 className="text-xl font-bold">Confirme sua Solicitação</h2>
                 </div>
 
-                <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-zinc-400">Tempo de Análise:</span><span className="font-bold text-[#D4AF37]">Até 72 Horas</span></div>
-                  <div className="flex justify-between"><span className="text-zinc-400">Valor Solicitado:</span><span className="font-bold">R$ {getAmount().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                  <div className="flex justify-between"><span className="text-zinc-400">Perfil:</span><span className="font-bold">{profileType}</span></div>
-                  <div className="flex justify-between"><span className="text-zinc-400">Juros Mensais:</span><span className="font-bold text-[#D4AF37]">{settings.interestRateMonthly}% ao mês</span></div>
-                </div>
+                {profileType === 'LIMPA_NOME' ? (
+                  <>
+                    {/* Resumo simplificado para Limpa Nome */}
+                    <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-3 text-sm">
+                      <div className="flex justify-between"><span className="text-zinc-400">Serviço:</span><span className="font-bold text-purple-400">Limpa Nome</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Nome:</span><span className="font-bold">{formData.name}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">CPF/CNPJ:</span><span className="font-bold">{formData.cpf}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Telefone:</span><span className="font-bold">{formData.phone}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Email:</span><span className="font-bold">{formData.email}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Contrato:</span><span className="font-bold text-green-400">Assinado</span></div>
+                    </div>
 
-                {/* TERMO FINAL */}
-                <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-2">
-                  <h3 className="font-bold text-red-400 text-xs uppercase">TERMO DE COMPROMISSO (OBRIGATÓRIO)</h3>
-                  <p className="text-xs text-zinc-400">Ao assinar, declaro que as informações são verdadeiras e autorizo a emissão de CCB (Cédula de Crédito Bancário).</p>
-                </div>
+                    <div className="bg-purple-900/20 border border-purple-600/30 rounded-xl p-4">
+                      <p className="text-sm text-zinc-300 text-center">
+                        Ao confirmar, sua solicitação será enviada para análise. Você receberá um retorno em breve.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-2 text-sm">
+                      <div className="flex justify-between"><span className="text-zinc-400">Tempo de Análise:</span><span className="font-bold text-[#D4AF37]">Até 72 Horas</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Valor Solicitado:</span><span className="font-bold">R$ {getAmount().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Perfil:</span><span className="font-bold">{profileType}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Juros Mensais:</span><span className="font-bold text-[#D4AF37]">{settings.interestRateMonthly}% ao mês</span></div>
+                    </div>
 
-                <div className="space-y-2">
-                  <h3 className="font-bold text-[#D4AF37]">✍️ Sua Assinatura (OBRIGATÓRIO)</h3>
-                  <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
-                    <p className="text-xs text-red-400">
-                      <strong>⚠️ OBRIGATÓRIO:</strong> Assine no campo abaixo para confirmar sua solicitação. Sem assinatura, não será possível enviar.
-                    </p>
-                  </div>
-                  <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
-                </div>
+                    {/* TERMO FINAL */}
+                    <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-2">
+                      <h3 className="font-bold text-red-400 text-xs uppercase">TERMO DE COMPROMISSO (OBRIGATÓRIO)</h3>
+                      <p className="text-xs text-zinc-400">Ao assinar, declaro que as informações são verdadeiras e autorizo a emissão de CCB (Cédula de Crédito Bancário).</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="font-bold text-[#D4AF37]">Sua Assinatura (OBRIGATÓRIO)</h3>
+                      <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                        <p className="text-xs text-red-400">
+                          <strong>OBRIGATÓRIO:</strong> Assine no campo abaixo para confirmar sua solicitação. Sem assinatura, não será possível enviar.
+                        </p>
+                      </div>
+                      <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
+                    </div>
+                  </>
+                )}
               </div>
             )}
         </div>
