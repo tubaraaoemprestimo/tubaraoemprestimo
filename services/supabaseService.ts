@@ -816,8 +816,12 @@ export const supabaseService = {
             cpf: data.cpf,
             email: data.email,
             phone: data.phone || '',
+            birth_date: data.birthDate || null,
+            // Tipo de perfil/serviço
+            profile_type: data.profileType || 'CLT',
+            service_type: data.profileType === 'LIMPA_NOME' ? 'SERVICO' : data.profileType === 'MOTO' ? 'FINANCIAMENTO' : 'EMPRESTIMO',
             // CORREÇÃO CRÍTICA: Usar o valor solicitado, não a renda * 3
-            amount: Number(data.amount) || 1000,
+            amount: Number(data.amount) || (data.profileType === 'LIMPA_NOME' ? 0 : 1000),
             installments: data.installments || 4, // Default ou o enviado
             status: 'PENDING',
             father_phone: data.fatherPhone,
@@ -833,6 +837,9 @@ export const supabaseService = {
             video_house_url: typeof data.videoHouse === 'string' ? data.videoHouse : '',
             video_vehicle_url: typeof data.videoVehicle === 'string' ? data.videoVehicle : '',
             signature_url: typeof data.signature === 'string' ? data.signature : '',
+            // Limpa Nome
+            limpa_nome_contract_signed: data.limpaNomeContractSigned || false,
+            limpa_nome_contract_date: data.limpaNomeContractSigned ? new Date().toISOString() : null,
             // Cliente recorrente e novos campos
             is_returning_client: data.isReturningClient || false,
             returning_client_note: data.returningClientNote || '',

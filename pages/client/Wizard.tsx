@@ -779,6 +779,7 @@ export const Wizard: React.FC = () => {
       const success = await supabaseService.submitRequest({
         ...uploadedData,
         occupation: finalOccupation,
+        profileType,
         // Para Moto, usar CNH como documento principal se disponível
         idCardFront: (profileType === 'MOTO' && cnhUrls.length > 0) ? cnhUrls : idCardFrontUrls,
         idCardBack: idCardBackUrls,
