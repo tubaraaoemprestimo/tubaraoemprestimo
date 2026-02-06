@@ -481,11 +481,12 @@ export const Wizard: React.FC = () => {
       // LIMPA_NOME não precisa de renda/cnpj
     }
 
-    // STEP DOCUMENTOS - Dinâmico (Step 5 para CLT/AUTONOMO, Step 4 para MOTO/LIMPA_NOME, Step 6 para GARANTIA)
+    // STEP DOCUMENTOS - Dinâmico (Step 5 para CLT/AUTONOMO, Step 4 para MOTO, Step 6 para GARANTIA) - LIMPA_NOME não tem docs
     let docsStep = 5;
-    if (profileType === 'MOTO' || profileType === 'LIMPA_NOME') docsStep = 4;
+    if (profileType === 'MOTO') docsStep = 4;
     if (profileType === 'GARANTIA') docsStep = 6;
-    if (currentStep === docsStep) {
+    // LIMPA_NOME pula validação de documentos (não tem esse step)
+    if (profileType !== 'LIMPA_NOME' && currentStep === docsStep) {
       // Selfie obrigatória
       if (!formData.selfie) {
         addToast("Tire a selfie segurando o documento.", 'warning');
@@ -1503,9 +1504,9 @@ export const Wizard: React.FC = () => {
               </div>
             )}
 
-          {/* STEP DOCUMENTOS - Dinâmico (Step 5 para CLT/AUTONOMO, Step 4 para MOTO/LIMPA_NOME, Step 6 para GARANTIA) */}
+          {/* STEP DOCUMENTOS - Dinâmico (Step 5 para CLT/AUTONOMO, Step 4 para MOTO, Step 6 para GARANTIA) - NÃO para LIMPA_NOME */}
           {((currentStep === 5 && (profileType === 'CLT' || profileType === 'AUTONOMO')) ||
-            (currentStep === 4 && (profileType === 'MOTO' || profileType === 'LIMPA_NOME')) ||
+            (currentStep === 4 && profileType === 'MOTO') ||
             (currentStep === 6 && profileType === 'GARANTIA')) && (
               <div className="space-y-6 animate-in slide-in-from-right">
                 <h2 className="text-xl font-bold">Documentação</h2>
