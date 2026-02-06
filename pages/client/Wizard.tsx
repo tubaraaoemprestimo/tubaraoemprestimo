@@ -1458,194 +1458,198 @@ export const Wizard: React.FC = () => {
             </div>
           ) : null}
 
-          {/* STEP 4: Dados */}
-          {currentStep === 4 && (
-            <div className="space-y-5 animate-in slide-in-from-right">
-              <h2 className="text-xl font-bold">Seus Dados Pessoais</h2>
+          {/* STEP DADOS - Dinâmico (Step 4 para CLT/AUTONOMO, Step 3 para MOTO/LIMPA_NOME, Step 5 para GARANTIA) */}
+          {((currentStep === 4 && (profileType === 'CLT' || profileType === 'AUTONOMO')) ||
+            (currentStep === 3 && (profileType === 'MOTO' || profileType === 'LIMPA_NOME')) ||
+            (currentStep === 5 && profileType === 'GARANTIA')) && (
+              <div className="space-y-5 animate-in slide-in-from-right">
+                <h2 className="text-xl font-bold">Seus Dados Pessoais</h2>
 
-              <div className="space-y-4">
-                <Input label="Nome Completo" name="name" value={formData.name} onChange={handleChange} placeholder="Como no documento" />
-                <Input label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00" error={errors.cpf} />
-                <Input label="WhatsApp Principal" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
-                <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} />
-                <Input label="Instagram" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="@seu_usuario" />
-              </div>
+                <div className="space-y-4">
+                  <Input label="Nome Completo" name="name" value={formData.name} onChange={handleChange} placeholder="Como no documento" />
+                  <Input label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00" error={errors.cpf} />
+                  <Input label="WhatsApp Principal" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
+                  <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} />
+                  <Input label="Instagram" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="@seu_usuario" />
+                </div>
 
-              {/* Dados Específicos por Perfil */}
-              {profileType === 'AUTONOMO' && (
+                {/* Dados Específicos por Perfil */}
+                {profileType === 'AUTONOMO' && (
+                  <div className="pt-4 border-t border-zinc-800 space-y-4">
+                    <h3 className="text-sm font-bold text-[#D4AF37]">Dados do Negócio</h3>
+                    <Input label="CNPJ" name="cnpj" value={formData.cnpj} onChange={handleChange} placeholder="00.000.000/0000-00" />
+                    <Input label="Endereço Comercial" name="businessAddress" value={formData.businessAddress} onChange={handleChange} />
+                    <Input label="Renda Mensal Média" name="income" value={formData.income} onChange={handleChange} placeholder="0,00" />
+                  </div>
+                )}
+
+                {(profileType === 'MOTO' || profileType === 'GARANTIA_VEICULO' || profileType === 'CLT') && (
+                  <div className="pt-4 border-t border-zinc-800 space-y-4">
+                    <h3 className="text-sm font-bold text-[#D4AF37]">Dados Profissionais</h3>
+                    <Input label="Profissão" name="occupation" value={formData.occupation} onChange={handleChange} />
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input label="Renda Mensal" name="income" value={formData.income} onChange={handleChange} />
+                      <Input label="Dia Pagamento" name="workTime" value={formData.workTime} onChange={handleChange} placeholder="Dia 05" />
+                    </div>
+                  </div>
+                )}
+
                 <div className="pt-4 border-t border-zinc-800 space-y-4">
-                  <h3 className="text-sm font-bold text-[#D4AF37]">Dados do Negócio</h3>
-                  <Input label="CNPJ" name="cnpj" value={formData.cnpj} onChange={handleChange} placeholder="00.000.000/0000-00" />
-                  <Input label="Endereço Comercial" name="businessAddress" value={formData.businessAddress} onChange={handleChange} />
-                  <Input label="Renda Mensal Média" name="income" value={formData.income} onChange={handleChange} placeholder="0,00" />
+                  <h3 className="text-sm font-bold text-[#D4AF37]">Endereço Residencial</h3>
+                  <Input label="CEP" name="cep" value={formData.cep} onChange={handleChange} placeholder="00000-000" />
+                  <Input label="Endereço" name="address" value={formData.address} readOnly className="opacity-60" />
+                  <Input label="Número" name="number" value={formData.number} onChange={handleChange} placeholder="123" />
                 </div>
-              )}
-
-              {(profileType === 'MOTO' || profileType === 'GARANTIA_VEICULO' || profileType === 'CLT') && (
-                <div className="pt-4 border-t border-zinc-800 space-y-4">
-                  <h3 className="text-sm font-bold text-[#D4AF37]">Dados Profissionais</h3>
-                  <Input label="Profissão" name="occupation" value={formData.occupation} onChange={handleChange} />
-                  <div className="grid grid-cols-2 gap-4">
-                    <Input label="Renda Mensal" name="income" value={formData.income} onChange={handleChange} />
-                    <Input label="Dia Pagamento" name="workTime" value={formData.workTime} onChange={handleChange} placeholder="Dia 05" />
-                  </div>
-                </div>
-              )}
-
-              <div className="pt-4 border-t border-zinc-800 space-y-4">
-                <h3 className="text-sm font-bold text-[#D4AF37]">Endereço Residencial</h3>
-                <Input label="CEP" name="cep" value={formData.cep} onChange={handleChange} placeholder="00000-000" />
-                <Input label="Endereço" name="address" value={formData.address} readOnly className="opacity-60" />
-                <Input label="Número" name="number" value={formData.number} onChange={handleChange} placeholder="123" />
               </div>
-            </div>
-          )}
+            )}
 
-          {/* STEP 5: Documentos */}
-          {currentStep === 5 && (
-            <div className="space-y-6 animate-in slide-in-from-right">
-              <h2 className="text-xl font-bold">Documentação</h2>
-              <p className="text-zinc-400 text-sm">Envie fotos legíveis para agilizar a aprovação.</p>
+          {/* STEP DOCUMENTOS - Dinâmico (Step 5 para CLT/AUTONOMO, Step 4 para MOTO/LIMPA_NOME, Step 6 para GARANTIA) */}
+          {((currentStep === 5 && (profileType === 'CLT' || profileType === 'AUTONOMO')) ||
+            (currentStep === 4 && (profileType === 'MOTO' || profileType === 'LIMPA_NOME')) ||
+            (currentStep === 6 && profileType === 'GARANTIA')) && (
+              <div className="space-y-6 animate-in slide-in-from-right">
+                <h2 className="text-xl font-bold">Documentação</h2>
+                <p className="text-zinc-400 text-sm">Envie fotos legíveis para agilizar a aprovação.</p>
 
-              {/* Obrigatórios para todos */}
-              <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                <Camera label="Selfie Segurando Documento" onCapture={(img) => setFormData({ ...formData, selfie: img })} />
-              </div>
-
-              {renderUploadArea('idCardFront', 'RG ou CNH (Frente)', formData.idCardFront)}
-              {renderUploadArea('idCardBack', 'RG ou CNH (Verso)', formData.idCardBack)}
-
-              {/* Comprovante de Endereço - OBRIGATÓRIO */}
-              <div className="space-y-2">
-                {renderUploadArea('proofAddress', 'Comprovante de Endereço - Água ou Luz (OBRIGATÓRIO)', formData.proofAddress)}
-                <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
-                  <p className="text-xs text-red-400">
-                    <strong>⚠️ OBRIGATÓRIO:</strong> Envie também um boleto (banco, cartão, etc.) <strong>em seu nome</strong> para confirmar o endereço.
-                  </p>
-                </div>
-                {renderUploadArea('billInName', 'Boleto em Seu Nome (OBRIGATÓRIO)', formData.billInName)}
-              </div>
-
-              {/* CNH - Obrigatório para MOTO, AUTONOMO e GARANTIA_VEICULO */}
-              {(profileType === 'MOTO' || profileType === 'AUTONOMO' || profileType === 'GARANTIA_VEICULO') && (
-                <div className="space-y-6 border-t border-zinc-800 pt-6">
-                  <h3 className="font-bold text-[#D4AF37]">📄 Habilitação (OBRIGATÓRIO)</h3>
-                  {renderUploadArea('cnh', 'Foto da CNH - Frente e Verso (OBRIGATÓRIO)', formData.cnh || [])}
-                </div>
-              )}
-
-              {profileType === 'GARANTIA_VEICULO' && (
-                <div className="space-y-6 border-t border-zinc-800 pt-6">
-                  <h3 className="font-bold text-[#D4AF37]">🚗 Dados do Veículo (OBRIGATÓRIO)</h3>
-                  {renderUploadArea('vehicleCRLV', 'Documento do Carro - CRLV (OBRIGATÓRIO)', formData.vehicleCRLV)}
-                  {renderUploadArea('vehicleFront', 'Fotos do Veículo - Frente, Lateral, Traseira (OBRIGATÓRIO)', formData.vehicleFront)}
-                </div>
-              )}
-
-              {profileType === 'AUTONOMO' && (
-                <div className="space-y-6 border-t border-zinc-800 pt-6">
-                  <h3 className="font-bold text-[#D4AF37]">💼 Comprovantes do Negócio (OBRIGATÓRIO)</h3>
-                  <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                    <VideoUpload label="🎥 Vídeo do Estabelecimento (OBRIGATÓRIO)" subtitle="Mostre seu local de trabalho"
-                      videoUrl={formData.videoHouse} onUpload={(url) => setFormData({ ...formData, videoHouse: url })}
-                      onRemove={() => setFormData({ ...formData, videoHouse: '' })} />
-                  </div>
-                </div>
-              )}
-
-              {/* Carteira de Trabalho para CLT - APENAS PDF - OBRIGATÓRIO */}
-              {profileType === 'CLT' && (
-                <div className="space-y-4 border-t border-zinc-800 pt-6">
-                  <h3 className="font-bold text-[#D4AF37]">📋 Comprovante de Vínculo Empregatício (OBRIGATÓRIO)</h3>
-                  <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-4">
-                    <p className="text-sm text-blue-400 mb-2">
-                      <strong>📄 Carteira de Trabalho Digital (PDF)</strong>
-                    </p>
-                    <p className="text-xs text-zinc-400">
-                      Exporte sua Carteira de Trabalho Digital pelo app oficial do governo:
-                    </p>
-                    <ol className="text-xs text-zinc-500 mt-2 space-y-1 list-decimal list-inside">
-                      <li>Abra o app "Carteira de Trabalho Digital"</li>
-                      <li>Vá em "Contratos de Trabalho"</li>
-                      <li>Clique em "Exportar PDF"</li>
-                      <li>Envie o arquivo aqui</li>
-                    </ol>
-                  </div>
-                  {renderUploadArea('workCard', 'Carteira de Trabalho - PDF (OBRIGATÓRIO)', formData.workCard)}
-                  <p className="text-xs text-red-400">❌ Não aceitamos foto da carteira física. Apenas PDF do app oficial.</p>
-                </div>
-              )}
-
-              {/* VÍDEO E FOTOS DA RESIDÊNCIA - OBRIGATÓRIO PARA TODOS */}
-              <div className="space-y-4 border-t border-zinc-800 pt-6">
-                <h3 className="font-bold text-[#D4AF37] flex items-center gap-2">
-                  <Home size={18} /> 🏠 Comprovação de Residência (OBRIGATÓRIO)
-                </h3>
-                <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
-                  <p className="text-xs text-red-400">
-                    <strong>⚠️ OBRIGATÓRIO:</strong> Envie fotos da fachada da sua casa e grave um vídeo mostrando a residência (de fora e de dentro).
-                  </p>
-                </div>
-
-                {renderUploadArea('housePhotos', 'Fotos da Fachada/Frente da Casa (OBRIGATÓRIO)', formData.housePhotos)}
-
+                {/* Obrigatórios para todos */}
                 <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                  <VideoUpload
-                    label="🎥 Vídeo da sua Residência (OBRIGATÓRIO)"
-                    subtitle="Mostre a fachada e entre na casa rapidamente"
-                    videoUrl={formData.videoHouse}
-                    onUpload={(url) => setFormData({ ...formData, videoHouse: url })}
-                    onRemove={() => setFormData({ ...formData, videoHouse: '' })}
-                  />
+                  <Camera label="Selfie Segurando Documento" onCapture={(img) => setFormData({ ...formData, selfie: img })} />
                 </div>
-              </div>
 
-              {/* VÍDEO DA GARANTIA - OBRIGATÓRIO se tiver garantia */}
-              {needsGuarantee && (
+                {renderUploadArea('idCardFront', 'RG ou CNH (Frente)', formData.idCardFront)}
+                {renderUploadArea('idCardBack', 'RG ou CNH (Verso)', formData.idCardBack)}
+
+                {/* Comprovante de Endereço - OBRIGATÓRIO */}
+                <div className="space-y-2">
+                  {renderUploadArea('proofAddress', 'Comprovante de Endereço - Água ou Luz (OBRIGATÓRIO)', formData.proofAddress)}
+                  <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                    <p className="text-xs text-red-400">
+                      <strong>⚠️ OBRIGATÓRIO:</strong> Envie também um boleto (banco, cartão, etc.) <strong>em seu nome</strong> para confirmar o endereço.
+                    </p>
+                  </div>
+                  {renderUploadArea('billInName', 'Boleto em Seu Nome (OBRIGATÓRIO)', formData.billInName)}
+                </div>
+
+                {/* CNH - Obrigatório para MOTO, AUTONOMO e GARANTIA_VEICULO */}
+                {(profileType === 'MOTO' || profileType === 'AUTONOMO' || profileType === 'GARANTIA_VEICULO') && (
+                  <div className="space-y-6 border-t border-zinc-800 pt-6">
+                    <h3 className="font-bold text-[#D4AF37]">📄 Habilitação (OBRIGATÓRIO)</h3>
+                    {renderUploadArea('cnh', 'Foto da CNH - Frente e Verso (OBRIGATÓRIO)', formData.cnh || [])}
+                  </div>
+                )}
+
+                {profileType === 'GARANTIA_VEICULO' && (
+                  <div className="space-y-6 border-t border-zinc-800 pt-6">
+                    <h3 className="font-bold text-[#D4AF37]">🚗 Dados do Veículo (OBRIGATÓRIO)</h3>
+                    {renderUploadArea('vehicleCRLV', 'Documento do Carro - CRLV (OBRIGATÓRIO)', formData.vehicleCRLV)}
+                    {renderUploadArea('vehicleFront', 'Fotos do Veículo - Frente, Lateral, Traseira (OBRIGATÓRIO)', formData.vehicleFront)}
+                  </div>
+                )}
+
+                {profileType === 'AUTONOMO' && (
+                  <div className="space-y-6 border-t border-zinc-800 pt-6">
+                    <h3 className="font-bold text-[#D4AF37]">💼 Comprovantes do Negócio (OBRIGATÓRIO)</h3>
+                    <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                      <VideoUpload label="🎥 Vídeo do Estabelecimento (OBRIGATÓRIO)" subtitle="Mostre seu local de trabalho"
+                        videoUrl={formData.videoHouse} onUpload={(url) => setFormData({ ...formData, videoHouse: url })}
+                        onRemove={() => setFormData({ ...formData, videoHouse: '' })} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Carteira de Trabalho para CLT - APENAS PDF - OBRIGATÓRIO */}
+                {profileType === 'CLT' && (
+                  <div className="space-y-4 border-t border-zinc-800 pt-6">
+                    <h3 className="font-bold text-[#D4AF37]">📋 Comprovante de Vínculo Empregatício (OBRIGATÓRIO)</h3>
+                    <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-4">
+                      <p className="text-sm text-blue-400 mb-2">
+                        <strong>📄 Carteira de Trabalho Digital (PDF)</strong>
+                      </p>
+                      <p className="text-xs text-zinc-400">
+                        Exporte sua Carteira de Trabalho Digital pelo app oficial do governo:
+                      </p>
+                      <ol className="text-xs text-zinc-500 mt-2 space-y-1 list-decimal list-inside">
+                        <li>Abra o app "Carteira de Trabalho Digital"</li>
+                        <li>Vá em "Contratos de Trabalho"</li>
+                        <li>Clique em "Exportar PDF"</li>
+                        <li>Envie o arquivo aqui</li>
+                      </ol>
+                    </div>
+                    {renderUploadArea('workCard', 'Carteira de Trabalho - PDF (OBRIGATÓRIO)', formData.workCard)}
+                    <p className="text-xs text-red-400">❌ Não aceitamos foto da carteira física. Apenas PDF do app oficial.</p>
+                  </div>
+                )}
+
+                {/* VÍDEO E FOTOS DA RESIDÊNCIA - OBRIGATÓRIO PARA TODOS */}
                 <div className="space-y-4 border-t border-zinc-800 pt-6">
                   <h3 className="font-bold text-[#D4AF37] flex items-center gap-2">
-                    <Shield size={18} /> 🔒 Vídeo do Bem em Garantia (OBRIGATÓRIO)
+                    <Home size={18} /> 🏠 Comprovação de Residência (OBRIGATÓRIO)
                   </h3>
                   <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
                     <p className="text-xs text-red-400">
-                      <strong>⚠️ OBRIGATÓRIO:</strong> Grave um vídeo mostrando o bem que será usado como garantia (carro, moto, celular, etc). Mostre todos os lados e detalhes.
+                      <strong>⚠️ OBRIGATÓRIO:</strong> Envie fotos da fachada da sua casa e grave um vídeo mostrando a residência (de fora e de dentro).
                     </p>
                   </div>
 
-                  {renderUploadArea('guaranteePhotos', 'Fotos do Bem em Garantia (OBRIGATÓRIO)', guarantee.photos)}
+                  {renderUploadArea('housePhotos', 'Fotos da Fachada/Frente da Casa (OBRIGATÓRIO)', formData.housePhotos)}
 
                   <div className="bg-black p-4 rounded-xl border border-zinc-800">
                     <VideoUpload
-                      label="🎥 Vídeo do Bem em Garantia (OBRIGATÓRIO)"
-                      subtitle="Mostre o bem por completo, frente, lateral, traseira"
-                      videoUrl={guarantee.video}
-                      onUpload={(url) => setGuarantee({ ...guarantee, video: url })}
-                      onRemove={() => setGuarantee({ ...guarantee, video: '' })}
+                      label="🎥 Vídeo da sua Residência (OBRIGATÓRIO)"
+                      subtitle="Mostre a fachada e entre na casa rapidamente"
+                      videoUrl={formData.videoHouse}
+                      onUpload={(url) => setFormData({ ...formData, videoHouse: url })}
+                      onRemove={() => setFormData({ ...formData, videoHouse: '' })}
                     />
                   </div>
                 </div>
-              )}
 
-              {/* Vídeo de confirmação com declaração de juros - OBRIGATÓRIO */}
-              <div className="space-y-4 border-t border-zinc-800 pt-6">
-                <h3 className="font-bold text-[#D4AF37]">🎬 Vídeo de Aceite (OBRIGATÓRIO)</h3>
-                <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
-                  <p className="text-xs text-red-400">
-                    <strong>⚠️ OBRIGATÓRIO:</strong> Grave um vídeo dizendo seu nome e confirmando que aceita os juros de {settings?.interestRateMonthly || 30}% ao mês.
-                  </p>
-                </div>
-                <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                  <VideoUpload
-                    label="🎥 Vídeo de Aceite (OBRIGATÓRIO)"
-                    subtitle={`Diga seu nome e: "Estou ciente do empréstimo e dos juros de ${settings?.interestRateMonthly || 30}%"`}
-                    videoUrl={formData.videoSelfie}
-                    onUpload={(url) => setFormData({ ...formData, videoSelfie: url })}
-                    onRemove={() => setFormData({ ...formData, videoSelfie: '' })}
-                  />
+                {/* VÍDEO DA GARANTIA - OBRIGATÓRIO se tiver garantia */}
+                {needsGuarantee && (
+                  <div className="space-y-4 border-t border-zinc-800 pt-6">
+                    <h3 className="font-bold text-[#D4AF37] flex items-center gap-2">
+                      <Shield size={18} /> 🔒 Vídeo do Bem em Garantia (OBRIGATÓRIO)
+                    </h3>
+                    <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                      <p className="text-xs text-red-400">
+                        <strong>⚠️ OBRIGATÓRIO:</strong> Grave um vídeo mostrando o bem que será usado como garantia (carro, moto, celular, etc). Mostre todos os lados e detalhes.
+                      </p>
+                    </div>
+
+                    {renderUploadArea('guaranteePhotos', 'Fotos do Bem em Garantia (OBRIGATÓRIO)', guarantee.photos)}
+
+                    <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                      <VideoUpload
+                        label="🎥 Vídeo do Bem em Garantia (OBRIGATÓRIO)"
+                        subtitle="Mostre o bem por completo, frente, lateral, traseira"
+                        videoUrl={guarantee.video}
+                        onUpload={(url) => setGuarantee({ ...guarantee, video: url })}
+                        onRemove={() => setGuarantee({ ...guarantee, video: '' })}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Vídeo de confirmação com declaração de juros - OBRIGATÓRIO */}
+                <div className="space-y-4 border-t border-zinc-800 pt-6">
+                  <h3 className="font-bold text-[#D4AF37]">🎬 Vídeo de Aceite (OBRIGATÓRIO)</h3>
+                  <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                    <p className="text-xs text-red-400">
+                      <strong>⚠️ OBRIGATÓRIO:</strong> Grave um vídeo dizendo seu nome e confirmando que aceita os juros de {settings?.interestRateMonthly || 30}% ao mês.
+                    </p>
+                  </div>
+                  <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                    <VideoUpload
+                      label="🎥 Vídeo de Aceite (OBRIGATÓRIO)"
+                      subtitle={`Diga seu nome e: "Estou ciente do empréstimo e dos juros de ${settings?.interestRateMonthly || 30}%"`}
+                      videoUrl={formData.videoSelfie}
+                      onUpload={(url) => setFormData({ ...formData, videoSelfie: url })}
+                      onRemove={() => setFormData({ ...formData, videoSelfie: '' })}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* STEP 5: Contrato/Assinatura - APENAS LIMPA_NOME */}
           {currentStep === 5 && profileType === 'LIMPA_NOME' && (
@@ -1744,80 +1748,85 @@ export const Wizard: React.FC = () => {
             </div>
           )}
 
-          {/* STEP 6: Banco - APENAS CLT, AUTONOMO e GARANTIA (não MOTO nem LIMPA_NOME) */}
-          {currentStep === 6 && (
-            <div className="space-y-6 animate-in slide-in-from-right">
-              <div className="text-center">
-                <Landmark size={48} className="mx-auto text-[#D4AF37] mb-3" />
-                <h2 className="text-xl font-bold">Onde depositamos o dinheiro?</h2>
-              </div>
+          {/* STEP BANCO - Apenas CLT (6), AUTONOMO (6) e GARANTIA (7) precisam de conta bancária */}
+          {((currentStep === 6 && (profileType === 'CLT' || profileType === 'AUTONOMO')) ||
+            (currentStep === 7 && profileType === 'GARANTIA')) && (
+              <div className="space-y-6 animate-in slide-in-from-right">
+                <div className="text-center">
+                  <Landmark size={48} className="mx-auto text-[#D4AF37] mb-3" />
+                  <h2 className="text-xl font-bold">Onde depositamos o dinheiro?</h2>
+                </div>
 
-              {/* AVISO IMPORTANTE DE TITULARIDADE */}
-              <div className="bg-red-900/30 border-2 border-red-500 rounded-xl p-4">
-                <p className="text-sm text-red-400 font-bold flex items-start gap-2">
-                  <AlertCircle size={20} className="shrink-0 mt-0.5" />
-                  <span>
-                    ⚠️ ATENÇÃO: A conta bancária <strong className="text-white">DEVE SER DO MESMO TITULAR</strong> que está solicitando o empréstimo. Não depositamos em contas de terceiros.
-                  </span>
-                </p>
-              </div>
-
-              <Input label="Banco (OBRIGATÓRIO)" name="bankName" value={formData.bankName} onChange={handleChange} placeholder="Ex: Nubank" />
-              <div className="grid grid-cols-4 gap-2">
-                {[{ v: 'cpf', l: 'CPF' }, { v: 'phone', l: 'Celular' }, { v: 'email', l: 'Email' }, { v: 'random', l: 'Aleatória' }].map(o => (
-                  <button key={o.v} type="button" onClick={() => setFormData({ ...formData, pixKeyType: o.v })}
-                    className={`p-2 rounded-lg border text-sm ${formData.pixKeyType === o.v ? 'border-[#D4AF37] text-[#D4AF37]' : 'border-zinc-700 text-zinc-400'}`}>{o.l}</button>
-                ))}
-              </div>
-              <Input label="Chave PIX (OBRIGATÓRIO)" name="pixKey" value={formData.pixKey} onChange={handleChange} placeholder="Sua chave" />
-              <Input label="Nome do Titular da Conta (OBRIGATÓRIO)" name="accountHolderName" value={formData.accountHolderName} onChange={handleChange} placeholder="Seu nome completo" />
-            </div>
-          )}
-
-          {/* STEP 7: Confirmar */}
-          {currentStep === 7 && (
-            <div className="space-y-6 animate-in slide-in-from-right">
-              <div className="text-center">
-                <CheckCircle2 size={48} className="mx-auto text-green-500 mb-3" />
-                <h2 className="text-xl font-bold">Confirme sua Solicitação</h2>
-              </div>
-
-              <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-zinc-400">Tempo de Análise:</span><span className="font-bold text-[#D4AF37]">Até 72 Horas</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Valor Solicitado:</span><span className="font-bold">R$ {getAmount().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Perfil:</span><span className="font-bold">{profileType}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Juros Mensais:</span><span className="font-bold text-[#D4AF37]">{settings.interestRateMonthly}% ao mês</span></div>
-              </div>
-
-              {/* TERMO FINAL */}
-              <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-2">
-                <h3 className="font-bold text-red-400 text-xs uppercase">TERMO DE COMPROMISSO (OBRIGATÓRIO)</h3>
-                <p className="text-xs text-zinc-400">Ao assinar, declaro que as informações são verdadeiras e autorizo a emissão de CCB (Cédula de Crédito Bancário).</p>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-bold text-[#D4AF37]">✍️ Sua Assinatura (OBRIGATÓRIO)</h3>
-                <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
-                  <p className="text-xs text-red-400">
-                    <strong>⚠️ OBRIGATÓRIO:</strong> Assine no campo abaixo para confirmar sua solicitação. Sem assinatura, não será possível enviar.
+                {/* AVISO IMPORTANTE DE TITULARIDADE */}
+                <div className="bg-red-900/30 border-2 border-red-500 rounded-xl p-4">
+                  <p className="text-sm text-red-400 font-bold flex items-start gap-2">
+                    <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                    <span>
+                      ⚠️ ATENÇÃO: A conta bancária <strong className="text-white">DEVE SER DO MESMO TITULAR</strong> que está solicitando o empréstimo. Não depositamos em contas de terceiros.
+                    </span>
                   </p>
                 </div>
-                <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
+
+                <Input label="Banco (OBRIGATÓRIO)" name="bankName" value={formData.bankName} onChange={handleChange} placeholder="Ex: Nubank" />
+                <div className="grid grid-cols-4 gap-2">
+                  {[{ v: 'cpf', l: 'CPF' }, { v: 'phone', l: 'Celular' }, { v: 'email', l: 'Email' }, { v: 'random', l: 'Aleatória' }].map(o => (
+                    <button key={o.v} type="button" onClick={() => setFormData({ ...formData, pixKeyType: o.v })}
+                      className={`p-2 rounded-lg border text-sm ${formData.pixKeyType === o.v ? 'border-[#D4AF37] text-[#D4AF37]' : 'border-zinc-700 text-zinc-400'}`}>{o.l}</button>
+                  ))}
+                </div>
+                <Input label="Chave PIX (OBRIGATÓRIO)" name="pixKey" value={formData.pixKey} onChange={handleChange} placeholder="Sua chave" />
+                <Input label="Nome do Titular da Conta (OBRIGATÓRIO)" name="accountHolderName" value={formData.accountHolderName} onChange={handleChange} placeholder="Seu nome completo" />
               </div>
-            </div>
-          )}
+            )}
+
+
+          {/* STEP CONFIRMAR - Último step de cada perfil */}
+          {((currentStep === 7 && (profileType === 'CLT' || profileType === 'AUTONOMO')) ||
+            (currentStep === 5 && profileType === 'MOTO') ||
+            (currentStep === 6 && profileType === 'LIMPA_NOME') ||
+            (currentStep === 8 && profileType === 'GARANTIA')) && (
+              <div className="space-y-6 animate-in slide-in-from-right">
+                <div className="text-center">
+                  <CheckCircle2 size={48} className="mx-auto text-green-500 mb-3" />
+                  <h2 className="text-xl font-bold">Confirme sua Solicitação</h2>
+                </div>
+
+                <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-2 text-sm">
+                  <div className="flex justify-between"><span className="text-zinc-400">Tempo de Análise:</span><span className="font-bold text-[#D4AF37]">Até 72 Horas</span></div>
+                  <div className="flex justify-between"><span className="text-zinc-400">Valor Solicitado:</span><span className="font-bold">R$ {getAmount().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between"><span className="text-zinc-400">Perfil:</span><span className="font-bold">{profileType}</span></div>
+                  <div className="flex justify-between"><span className="text-zinc-400">Juros Mensais:</span><span className="font-bold text-[#D4AF37]">{settings.interestRateMonthly}% ao mês</span></div>
+                </div>
+
+                {/* TERMO FINAL */}
+                <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-2">
+                  <h3 className="font-bold text-red-400 text-xs uppercase">TERMO DE COMPROMISSO (OBRIGATÓRIO)</h3>
+                  <p className="text-xs text-zinc-400">Ao assinar, declaro que as informações são verdadeiras e autorizo a emissão de CCB (Cédula de Crédito Bancário).</p>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="font-bold text-[#D4AF37]">✍️ Sua Assinatura (OBRIGATÓRIO)</h3>
+                  <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                    <p className="text-xs text-red-400">
+                      <strong>⚠️ OBRIGATÓRIO:</strong> Assine no campo abaixo para confirmar sua solicitação. Sem assinatura, não será possível enviar.
+                    </p>
+                  </div>
+                  <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
+                </div>
+              </div>
+            )}
         </div>
 
         {/* Buttons */}
         <div className="fixed bottom-0 left-0 w-full p-4 bg-black/90 border-t border-zinc-900 flex gap-4 z-40 backdrop-blur-md">
           {currentStep > 1 && <Button onClick={handleBack} variant="secondary" className="flex-1">Voltar</Button>}
-          {currentStep < 7 ? (
+          {currentStep < steps.length ? (
             <Button onClick={handleNext} className="flex-1 font-bold text-lg">
               {currentStep === 1 ? 'Começar Simulação' : 'Continuar'}
             </Button>
           ) : (
             <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading} disabled={!formData.signature}>
-              SOLICITAR MEU EMPRÉSTIMO
+              {profileType === 'LIMPA_NOME' ? 'SOLICITAR SERVIÇO' : 'SOLICITAR MEU EMPRÉSTIMO'}
             </Button>
           )}
         </div>
