@@ -78,14 +78,14 @@ const profileOptions = [
 
 // Steps dinâmicos baseados no perfil
 const getStepsForProfile = (profile: ProfileType) => {
+  // LIMPA_NOME é um SERVIÇO simples - não precisa de documentos
   if (profile === 'LIMPA_NOME') {
     return [
       { id: 1, title: 'Serviço', icon: Users },
       { id: 2, title: 'Termos', icon: Shield },
       { id: 3, title: 'Dados', icon: User },
-      { id: 4, title: 'Documentos', icon: FileText },
-      { id: 5, title: 'Contrato', icon: FileSignature },
-      { id: 6, title: 'Confirmar', icon: CheckCircle2 },
+      { id: 4, title: 'Contrato', icon: FileSignature },
+      { id: 5, title: 'Confirmar', icon: CheckCircle2 },
     ];
   }
   if (profile === 'MOTO') {
@@ -588,9 +588,9 @@ export const Wizard: React.FC = () => {
       }
     }
 
-    // STEP 5: Contrato - APENAS LIMPA_NOME
-    if (profileType === 'LIMPA_NOME' && currentStep === 5) {
-      if (!formData.limpaNomeContractSigned) {
+    // STEP 4: Contrato - APENAS LIMPA_NOME (precisa de assinatura)
+    if (profileType === 'LIMPA_NOME' && currentStep === 4) {
+      if (!formData.signature) {
         addToast("Você precisa assinar o Termo de Autorização para continuar.", 'warning');
         return;
       }
@@ -1651,8 +1651,8 @@ export const Wizard: React.FC = () => {
               </div>
             )}
 
-          {/* STEP 5: Contrato/Assinatura - APENAS LIMPA_NOME */}
-          {currentStep === 5 && profileType === 'LIMPA_NOME' && (
+          {/* STEP 4: Contrato/Assinatura - APENAS LIMPA_NOME */}
+          {currentStep === 4 && profileType === 'LIMPA_NOME' && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center">
                 <FileSignature size={48} className="mx-auto text-purple-400 mb-3" />
@@ -1719,24 +1719,15 @@ export const Wizard: React.FC = () => {
                 </div>
               </div>
 
-              {/* ASSINATURA DIGITAL */}
-              <div className="bg-purple-900/20 border-2 border-purple-500 rounded-xl p-4">
-                <label className="flex items-start gap-4 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.limpaNomeContractSigned || false}
-                    onChange={(e) => setFormData({ ...formData, limpaNomeContractSigned: e.target.checked })}
-                    className="mt-1 accent-purple-500 w-6 h-6"
-                  />
-                  <div>
-                    <span className="text-white font-bold">✍️ Assino digitalmente este Termo</span>
-                    <p className="text-xs text-zinc-400 mt-1">
-                      Declaro que li, compreendi e concordo integralmente com todos os termos do
-                      <strong> Termo de Autorização e Representação</strong>, autorizando a empresa a
-                      me representar junto aos órgãos de proteção ao crédito.
-                    </p>
-                  </div>
-                </label>
+              {/* ASSINATURA DO CLIENTE - OBRIGATÓRIO */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-purple-400">✍️ ASSINATURA DO CLIENTE (OBRIGATÓRIO)</h3>
+                <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                  <p className="text-xs text-red-400">
+                    <strong>⚠️ OBRIGATÓRIO:</strong> Assine no campo abaixo para confirmar sua adesão ao serviço. Sem assinatura, não será possível prosseguir.
+                  </p>
+                </div>
+                <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
               </div>
 
               {/* Aviso sobre vinculação legal */}
@@ -1782,8 +1773,7 @@ export const Wizard: React.FC = () => {
 
           {/* STEP CONFIRMAR - Último step de cada perfil */}
           {((currentStep === 7 && (profileType === 'CLT' || profileType === 'AUTONOMO')) ||
-            (currentStep === 5 && profileType === 'MOTO') ||
-            (currentStep === 6 && profileType === 'LIMPA_NOME') ||
+            (currentStep === 5 && (profileType === 'MOTO' || profileType === 'LIMPA_NOME')) ||
             (currentStep === 8 && profileType === 'GARANTIA')) && (
               <div className="space-y-6 animate-in slide-in-from-right">
                 <div className="text-center">
