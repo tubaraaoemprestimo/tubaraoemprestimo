@@ -70,7 +70,7 @@ const profileOptions = [
     id: 'LIMPA_NOME',
     label: 'Limpa Nome',
     icon: CreditCard,
-    description: 'Limpe seu CPF em até 12 meses',
+    description: 'Contestação administrativa de negativação',
     color: 'text-purple-400',
     adminColor: 'bg-purple-500'
   },
@@ -201,6 +201,8 @@ export const Wizard: React.FC = () => {
     accountHolderName: '',
     accountHolderCpf: '',
     signature: '',
+    // Limpa Nome
+    limpaNomeContractSigned: false,
   });
 
   // Carregar configurações REAIS do banco e registrar visita (antifraude)
@@ -586,6 +588,14 @@ export const Wizard: React.FC = () => {
       }
     }
 
+    // STEP 5: Contrato - APENAS LIMPA_NOME
+    if (profileType === 'LIMPA_NOME' && currentStep === 5) {
+      if (!formData.limpaNomeContractSigned) {
+        addToast("Você precisa assinar o Termo de Autorização para continuar.", 'warning');
+        return;
+      }
+    }
+
     // STEP BANCO - Apenas CLT (6), AUTONOMO (6) e GARANTIA (7) precisam
     const needsBankStep = profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'GARANTIA';
     let bankStep = 6;
@@ -962,8 +972,8 @@ export const Wizard: React.FC = () => {
             </div>
           )}
 
-          {/* STEP 2: Valores */}
-          {currentStep === 2 && (
+          {/* STEP 2: Valores - APENAS para CLT, AUTONOMO e GARANTIA */}
+          {currentStep === 2 && (profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'GARANTIA') && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center mb-6">
                 <div className="inline-flex items-center justify-center p-3 bg-[#D4AF37]/10 rounded-full mb-4">
@@ -1367,36 +1377,70 @@ export const Wizard: React.FC = () => {
                 </>
               )}
 
-              {/* TERMOS LIMPA NOME - Serviço */}
+              {/* TERMOS LIMPA NOME - Serviço de Contestação */}
               {profileType === 'LIMPA_NOME' && (
                 <>
                   <div className="bg-purple-900/20 border border-purple-600/30 rounded-xl p-4">
-                    <h3 className="font-bold text-purple-400 mb-3">🛡️ SOBRE O SERVIÇO</h3>
-                    <ul className="text-sm text-zinc-300 space-y-2">
-                      <li>• Análise e contestação administrativa de negativação</li>
-                      <li>• Atuação junto a: <strong>Serasa, SPC Brasil, Boa Vista, IEPTB</strong></li>
-                      <li>• Processo pode durar <strong>até 12 meses</strong></li>
-                      <li>• Assinatura do Termo de Autorização e Representação</li>
-                    </ul>
+                    <h3 className="font-bold text-purple-400 mb-3">🔒 SOBRE O SERVIÇO LIMPA NOME</h3>
+                    <p className="text-sm text-zinc-300 mb-3">
+                      Consiste em <strong>análise e contestação administrativa</strong> de negativação indevida junto aos órgãos:
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <span className="bg-black/30 px-3 py-1 rounded text-center">Serasa</span>
+                      <span className="bg-black/30 px-3 py-1 rounded text-center">SPC Brasil</span>
+                      <span className="bg-black/30 px-3 py-1 rounded text-center">Boa Vista</span>
+                      <span className="bg-black/30 px-3 py-1 rounded text-center">Cartórios (IEPTB)</span>
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-3">
+                      Atuação mediante assinatura do <strong>Termo de Autorização e Representação</strong>.
+                    </p>
                   </div>
 
-                  <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4">
-                    <h3 className="font-bold text-red-400 mb-3">⚠️ ESCLARECIMENTOS IMPORTANTES</h3>
+                  <div className="bg-red-900/30 border-2 border-red-500 rounded-xl p-4">
+                    <h3 className="font-bold text-red-400 mb-3 text-lg">⚠️ ESCLARECIMENTOS IMPORTANTES</h3>
                     <ul className="text-sm text-zinc-300 space-y-2">
-                      <li>• A empresa <strong className="text-red-400">NÃO paga dívidas</strong> nem quita valores</li>
-                      <li>• A dívida <strong>continua existindo</strong> junto ao credor original</li>
-                      <li>• Atuamos sobre a <strong>forma de exposição</strong> da dívida</li>
-                      <li>• Não garantimos score específico ou aprovação de crédito</li>
+                      <li>1. A empresa <strong className="text-red-400">NÃO paga dívidas</strong>, NÃO quita valores e NÃO negocia acordos</li>
+                      <li>2. A dívida <strong>continua existindo</strong> junto ao credor original</li>
+                      <li>3. O serviço atua sobre a <strong>forma de exposição</strong> da dívida</li>
                     </ul>
                   </div>
 
                   <div className="bg-green-900/20 border border-green-600/30 rounded-xl p-4">
-                    <h3 className="font-bold text-green-400 mb-3">🛡️ SOBRE A BLINDAGEM</h3>
-                    <ul className="text-sm text-zinc-300 space-y-2">
-                      <li>• Desde que <strong>não haja atraso ou novas dívidas</strong></li>
-                      <li>• O CPF pode ficar <strong>sem exposição pública</strong> da negativação</li>
-                      <li>• Score pode <strong>melhorar progressivamente</strong></li>
-                      <li>• Qualquer inadimplência pode fazer a restrição <strong className="text-red-400">retornar imediatamente</strong></li>
+                    <h3 className="font-bold text-green-400 mb-3">🛡️ SOBRE A BLINDAGEM DA NEGATIVAÇÃO</h3>
+                    <p className="text-sm text-zinc-300 mb-2">
+                      Desde que <strong>não haja atraso ou novas dívidas</strong>, o CPF pode:
+                    </p>
+                    <ul className="text-sm text-zinc-300 space-y-1 ml-2">
+                      <li>• Permanecer sem exposição pública até <strong className="text-green-400">12 meses</strong></li>
+                      <li>• Apresentar melhora progressiva de score</li>
+                      <li>• Ter acesso a crédito em empresas sem histórico negativo</li>
+                    </ul>
+                    <div className="mt-3 p-2 bg-yellow-900/30 border border-yellow-700 rounded-lg">
+                      <p className="text-xs text-yellow-400">
+                        ⚠️ A empresa não garante score específico ou aprovação de crédito
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-orange-900/20 border border-orange-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-orange-400 mb-3">💳 RESPONSABILIDADE DO CLIENTE</h3>
+                    <p className="text-sm text-zinc-300 mb-2">Durante o processo, qualquer:</p>
+                    <ul className="text-sm text-zinc-300 space-y-1 ml-2">
+                      <li>• Atraso ou não pagamento de obrigações</li>
+                      <li>• Descumprimento de acordos existentes</li>
+                      <li>• Criação de novas dívidas</li>
+                    </ul>
+                    <p className="text-sm text-red-400 mt-2">
+                      Pode resultar no <strong>retorno imediato</strong> da exposição da dívida.
+                    </p>
+                  </div>
+
+                  <div className="bg-black border border-zinc-800 rounded-xl p-4">
+                    <h3 className="font-bold text-white mb-3">🔍 VISUALIZAÇÃO DA DÍVIDA</h3>
+                    <ul className="text-sm text-zinc-400 space-y-1">
+                      <li>• A dívida permanece registrada internamente junto ao credor</li>
+                      <li>• Pode ser visualizada em consultas específicas pelo titular</li>
+                      <li>• O serviço não elimina a obrigação financeira existente</li>
                     </ul>
                   </div>
 
@@ -1603,7 +1647,104 @@ export const Wizard: React.FC = () => {
             </div>
           )}
 
-          {/* STEP 6: Banco */}
+          {/* STEP 5: Contrato/Assinatura - APENAS LIMPA_NOME */}
+          {currentStep === 5 && profileType === 'LIMPA_NOME' && (
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center">
+                <FileSignature size={48} className="mx-auto text-purple-400 mb-3" />
+                <h2 className="text-xl font-bold">Termo de Autorização e Representação</h2>
+                <p className="text-zinc-400 text-sm mt-2">Leia e assine o contrato para prosseguir</p>
+              </div>
+
+              {/* CONTRATO COMPLETO */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 max-h-[400px] overflow-y-auto">
+                <h3 className="font-bold text-purple-400 mb-4 text-center">TERMO DE AUTORIZAÇÃO E REPRESENTAÇÃO</h3>
+
+                <div className="text-sm text-zinc-300 space-y-4">
+                  <p>
+                    Eu, <strong className="text-white">{formData.name || '[NOME DO CLIENTE]'}</strong>,
+                    CPF <strong className="text-white">{formData.cpf || '[CPF]'}</strong>,
+                    declaro para os devidos fins que:
+                  </p>
+
+                  <div className="space-y-2">
+                    <p className="font-bold text-white">1. OBJETO DO SERVIÇO</p>
+                    <p>Autorizo a empresa a atuar em meu nome para realizar análise e contestação administrativa de negativação junto aos órgãos Serasa, SPC Brasil, Boa Vista e Cartórios de Protesto (IEPTB).</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="font-bold text-white">2. CIÊNCIA SOBRE O SERVIÇO</p>
+                    <ul className="list-disc list-inside space-y-1 text-zinc-400">
+                      <li>O serviço NÃO envolve pagamento ou quitação de dívidas</li>
+                      <li>A dívida continua existindo junto ao credor original</li>
+                      <li>O processo pode durar até 12 (doze) meses</li>
+                      <li>Não há garantia de score específico ou aprovação de crédito</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="font-bold text-white">3. RESPONSABILIDADES DO CLIENTE</p>
+                    <ul className="list-disc list-inside space-y-1 text-zinc-400">
+                      <li>Manter em dia todas as obrigações financeiras durante o processo</li>
+                      <li>Não criar novas dívidas ou pendências no CPF</li>
+                      <li>Comunicar qualquer alteração cadastral</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-2 bg-red-900/20 border border-red-700 rounded-lg p-3">
+                    <p className="font-bold text-red-400">4. ENCERRAMENTO AUTOMÁTICO</p>
+                    <p className="text-zinc-400">
+                      Qualquer atraso, inadimplência ou criação de novas dívidas poderá resultar no
+                      <strong className="text-red-400"> retorno imediato da exposição da dívida</strong> e
+                      encerramento automático do processo, sem direito a reembolso.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="font-bold text-white">5. DECLARAÇÃO FINAL</p>
+                    <p>
+                      Declaro ter lido e compreendido todos os termos acima, estando ciente de que o serviço
+                      atua apenas sobre a forma de exposição da dívida e não elimina a obrigação financeira existente.
+                    </p>
+                  </div>
+
+                  <div className="text-center text-zinc-500 text-xs mt-4 pt-4 border-t border-zinc-700">
+                    <p>Data: {new Date().toLocaleDateString('pt-BR')}</p>
+                    <p className="mt-2">Assinatura Digital via Sistema</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ASSINATURA DIGITAL */}
+              <div className="bg-purple-900/20 border-2 border-purple-500 rounded-xl p-4">
+                <label className="flex items-start gap-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.limpaNomeContractSigned || false}
+                    onChange={(e) => setFormData({ ...formData, limpaNomeContractSigned: e.target.checked })}
+                    className="mt-1 accent-purple-500 w-6 h-6"
+                  />
+                  <div>
+                    <span className="text-white font-bold">✍️ Assino digitalmente este Termo</span>
+                    <p className="text-xs text-zinc-400 mt-1">
+                      Declaro que li, compreendi e concordo integralmente com todos os termos do
+                      <strong> Termo de Autorização e Representação</strong>, autorizando a empresa a
+                      me representar junto aos órgãos de proteção ao crédito.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Aviso sobre vinculação legal */}
+              <div className="bg-yellow-900/20 border border-yellow-700 rounded-xl p-3">
+                <p className="text-xs text-yellow-400 text-center">
+                  ⚠️ Este aceite tem validade legal e será vinculado ao seu CPF e dados cadastrais.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6: Banco - APENAS CLT, AUTONOMO e GARANTIA (não MOTO nem LIMPA_NOME) */}
           {currentStep === 6 && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center">
