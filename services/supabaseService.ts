@@ -836,8 +836,22 @@ export const supabaseService = {
             // Cliente recorrente e novos campos
             is_returning_client: data.isReturningClient || false,
             returning_client_note: data.returningClientNote || '',
-            // Info extra concatenada para evitar erro de coluna inexistente
-            supplemental_description: `Profissão: ${data.occupation || 'N/A'} | Instagram: ${data.instagram || 'N/A'} | WorkCard: ${data.workCard?.length ? 'Enviado' : 'N/A'}`
+            // Info extra concatenada com novos campos
+            supplemental_description: JSON.stringify({
+                occupation: data.occupation || 'N/A',
+                instagram: data.instagram || 'N/A',
+                workCardSent: data.workCard?.length ? true : false,
+                housePhotos: serializeUrls(data.housePhotos),
+                billInName: serializeUrls(data.billInName),
+                location: data.location || null,
+                guarantee: data.guarantee ? {
+                    type: data.guarantee.type,
+                    description: data.guarantee.description,
+                    estimatedValue: data.guarantee.estimatedValue,
+                    photos: data.guarantee.photos,
+                    video: data.guarantee.video || ''
+                } : null
+            })
         });
 
 

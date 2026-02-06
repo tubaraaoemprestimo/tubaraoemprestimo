@@ -227,8 +227,8 @@ export const Login: React.FC = () => {
         </form>
 
         <div className="mt-8 text-center">
-          <p className="text-zinc-500 text-sm">
-            Não tem uma conta? <button onClick={() => navigate('/wizard')} className="text-gold hover:text-white transition-colors font-semibold">Cadastre-se</button>
+          <p className="text-zinc-400 text-base">
+            Não tem uma conta? <button onClick={() => navigate('/wizard')} className="text-[#FFD700] hover:text-[#FFF176] transition-colors font-bold text-lg underline underline-offset-4">Cadastre-se</button>
           </p>
         </div>
       </div>

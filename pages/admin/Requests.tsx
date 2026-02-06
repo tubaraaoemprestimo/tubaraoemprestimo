@@ -460,6 +460,116 @@ export const Requests: React.FC = () => {
                                         </div>
                                     </div>
                                 )}
+
+                                {/* SEÇÃO EXTRA: Localização e Dados Adicionais */}
+                                {(() => {
+                                    // Tentar parsear supplemental_description como JSON
+                                    let extraData: any = null;
+                                    try {
+                                        if (selectedRequest.supplementalDescription) {
+                                            extraData = JSON.parse(selectedRequest.supplementalDescription);
+                                        }
+                                    } catch {
+                                        // Se não for JSON, é formato antigo (string)
+                                    }
+
+                                    if (extraData && typeof extraData === 'object') {
+                                        return (
+                                            <div className="space-y-6">
+                                                {/* Localização em Tempo Real */}
+                                                {extraData.location && (
+                                                    <div className="bg-green-900/20 border border-green-600/40 p-4 rounded-xl">
+                                                        <h3 className="text-green-400 font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                            📍 Localização Capturada
+                                                        </h3>
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                <p className="text-xs text-zinc-500">Latitude</p>
+                                                                <p className="font-bold text-white">{extraData.location.latitude?.toFixed(6)}</p>
+                                                            </div>
+                                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                <p className="text-xs text-zinc-500">Longitude</p>
+                                                                <p className="font-bold text-white">{extraData.location.longitude?.toFixed(6)}</p>
+                                                            </div>
+                                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                <p className="text-xs text-zinc-500">Precisão</p>
+                                                                <p className="font-bold text-white">{extraData.location.accuracy?.toFixed(0)}m</p>
+                                                            </div>
+                                                        </div>
+                                                        <a
+                                                            href={`https://www.google.com/maps?q=${extraData.location.latitude},${extraData.location.longitude}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="mt-4 inline-block bg-green-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-700 transition"
+                                                        >
+                                                            🗺️ Ver no Google Maps
+                                                        </a>
+                                                    </div>
+                                                )}
+
+                                                {/* Fotos da Casa */}
+                                                {extraData.housePhotos && ensureArray(extraData.housePhotos).length > 0 && (
+                                                    <div>
+                                                        <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4">🏠 Fotos da Residência</h3>
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                            <DocCard
+                                                                title="Fachada da Casa"
+                                                                urls={ensureArray(extraData.housePhotos)}
+                                                                onView={() => setViewingImage({ urls: ensureArray(extraData.housePhotos), title: "Fotos da Residência" })}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Dados da Garantia */}
+                                                {extraData.guarantee && (
+                                                    <div className="bg-yellow-900/20 border border-yellow-600/40 p-4 rounded-xl">
+                                                        <h3 className="text-yellow-400 font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                            🔒 Garantia do Empréstimo
+                                                        </h3>
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                <p className="text-xs text-zinc-500">Tipo</p>
+                                                                <p className="font-bold text-white">{extraData.guarantee.type || 'N/A'}</p>
+                                                            </div>
+                                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                <p className="text-xs text-zinc-500">Descrição</p>
+                                                                <p className="font-bold text-white">{extraData.guarantee.description || 'N/A'}</p>
+                                                            </div>
+                                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                <p className="text-xs text-zinc-500">Valor Estimado</p>
+                                                                <p className="font-bold text-green-400">R$ {extraData.guarantee.estimatedValue || '0'}</p>
+                                                            </div>
+                                                        </div>
+                                                        {extraData.guarantee.video && (
+                                                            <VideoCard title="Vídeo da Garantia" url={extraData.guarantee.video} />
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Instagram e Profissão */}
+                                                {(extraData.instagram || extraData.occupation) && (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        {extraData.instagram && (
+                                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                <p className="text-xs text-zinc-500">📷 Instagram</p>
+                                                                <a href={`https://instagram.com/${extraData.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="font-bold text-pink-400 hover:underline">{extraData.instagram}</a>
+                                                            </div>
+                                                        )}
+                                                        {extraData.occupation && (
+                                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                <p className="text-xs text-zinc-500">💼 Profissão</p>
+                                                                <p className="font-bold text-white">{extraData.occupation}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+
                             </div>
                         </div>
 

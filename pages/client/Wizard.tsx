@@ -100,14 +100,20 @@ export const Wizard: React.FC = () => {
     proofAddress: [] as string[],
     proofIncome: [] as string[],
     workCard: [] as string[],
-    billInName: [] as string[],
+    billInName: [] as string[], // Boleto com nome do cliente
     bankStatement: [] as string[],
     // Moto / Veículo
     cnh: [] as string[],
     vehicleCRLV: [] as string[],
     vehicleFront: [] as string[],
+    // Vídeos
     videoSelfie: '',
-    videoHouse: '', // ou video estabelecimento se autonomo
+    videoHouse: '', // Vídeo mostrando a residência
+    // Fotos da casa/fachada
+    housePhotos: [] as string[],
+    // Localização em tempo real
+    location: null as { latitude: number; longitude: number; accuracy: number } | null,
+    // Banco
     bankName: '',
     pixKey: '',
     pixKeyType: 'cpf',
@@ -378,46 +384,122 @@ export const Wizard: React.FC = () => {
       }
     }
 
-    // STEP 5: Documentos - TODOS OBRIGATÓRIOS
+    // STEP 5: Documentos - TODOS OBRIGATÓRIOS SEM EXCEÇÃO
     if (currentStep === 5) {
+      // Selfie obrigatória
       if (!formData.selfie) {
         addToast("Tire a selfie segurando o documento.", 'warning');
         return;
       }
+
+      // RG/CNH Frente obrigatório
       if (formData.idCardFront.length === 0) {
         addToast("Envie a frente do RG ou CNH.", 'warning');
         return;
       }
+
+      // RG/CNH Verso obrigatório
       if (formData.idCardBack.length === 0) {
         addToast("Envie o verso do RG ou CNH.", 'warning');
         return;
       }
+
+      // Comprovante de endereço obrigatório
       if (formData.proofAddress.length === 0) {
-        addToast("Envie o comprovante de residência.", 'warning');
+        addToast("Envie o comprovante de residência (água ou luz).", 'warning');
         return;
       }
 
-      // Específico por perfil
-      if (profileType === 'MOTO' && formData.cnh.length === 0) {
+      // Boleto em nome do cliente obrigatório
+      if (formData.billInName.length === 0) {
+        addToast("Envie um boleto em seu nome para confirmar endereço.", 'warning');
+        return;
+      }
+
+      // CNH para todos que não são CLT puro
+      if ((profileType === 'MOTO' || profileType === 'AUTONOMO' || profileType === 'GARANTIA_VEICULO') && formData.cnh.length === 0) {
         addToast("Envie sua CNH.", 'warning');
         return;
       }
+
+      // Carteira de Trabalho para CLT
       if (profileType === 'CLT' && formData.workCard.length === 0) {
-        addToast("Envie sua Carteira de Trabalho.", 'warning');
+        addToast("Envie sua Carteira de Trabalho (PDF do app oficial).", 'warning');
         return;
       }
 
-      // Vídeo obrigatório
-      if (!formData.videoSelfie) {
-        addToast("Grave o vídeo de confirmação.", 'warning');
+      // Fotos do veículo para Garantia Veículo
+      if (profileType === 'GARANTIA_VEICULO') {
+        if (formData.vehicleCRLV.length === 0) {
+          addToast("Envie o documento do veículo (CRLV).", 'warning');
+          return;
+        }
+        if (formData.vehicleFront.length === 0) {
+          addToast("Envie fotos do veículo.", 'warning');
+          return;
+        }
+      }
+
+      // Fotos da casa obrigatórias para TODOS
+      if (formData.housePhotos.length === 0) {
+        addToast("Envie fotos da fachada da sua casa.", 'warning');
         return;
+      }
+
+      // Vídeo da casa obrigatório para TODOS
+      if (!formData.videoHouse) {
+        addToast("Grave o vídeo mostrando sua residência.", 'warning');
+        return;
+      }
+
+      // Vídeo de aceite obrigatório para TODOS
+      if (!formData.videoSelfie) {
+        addToast("Grave o vídeo de confirmação dizendo que aceita os juros.", 'warning');
+        return;
+      }
+
+      // Se tem garantia, vídeo e fotos da garantia são obrigatórios
+      if (needsGuarantee) {
+        if (guarantee.photos.length === 0) {
+          addToast("Envie fotos do bem em garantia.", 'warning');
+          return;
+        }
+        if (!guarantee.video) {
+          addToast("Grave o vídeo mostrando o bem em garantia.", 'warning');
+          return;
+        }
+      }
+
+      // Capturar localização em tempo real - OBRIGATÓRIO
+      addToast("Capturando sua localização...", 'info');
+      try {
+        const locationData = await antifraudService.requestLocation();
+        if (locationData) {
+          setFormData(prev => ({ ...prev, location: locationData }));
+          addToast("Localização capturada com sucesso!", 'success');
+        } else {
+          addToast("Permita o acesso à localização para continuar.", 'error');
+          return; // NÃO permite avançar sem localização
+        }
+      } catch (e) {
+        console.log('Location capture failed', e);
+        addToast("Permita o acesso à localização para continuar.", 'error');
+        return; // NÃO permite avançar sem localização
       }
     }
 
-    // STEP 6: Banco
+    // STEP 6: Banco - TODOS OBRIGATÓRIOS
     if (currentStep === 6) {
-      if (!formData.bankName || !formData.pixKey || !formData.accountHolderName) {
-        addToast("Preencha dados bancários.", 'warning');
+      if (!formData.bankName.trim()) {
+        addToast("Informe o nome do banco.", 'warning');
+        return;
+      }
+      if (!formData.pixKey.trim()) {
+        addToast("Informe sua chave PIX.", 'warning');
+        return;
+      }
+      if (!formData.accountHolderName.trim()) {
+        addToast("Informe o nome do titular da conta.", 'warning');
         return;
       }
     }
@@ -503,7 +585,11 @@ export const Wizard: React.FC = () => {
         signatureUrl,
         videoSelfieUrl,
         videoHouseUrl,
-        guaranteePhotos
+        guaranteePhotos,
+        // Novos campos
+        housePhotosUrls,
+        billInNameUrls,
+        guaranteeVideoUrl
       ] = await Promise.all([
         formData.selfie ? uploadToStorage(formData.selfie, 'selfie') : Promise.resolve(''),
         uploadMultiple(formData.idCardFront, 'id_front'),
@@ -516,7 +602,11 @@ export const Wizard: React.FC = () => {
         formData.signature ? uploadToStorage(formData.signature, 'signature') : Promise.resolve(''),
         formData.videoSelfie ? uploadToStorage(formData.videoSelfie, 'video_selfie') : Promise.resolve(''),
         formData.videoHouse ? uploadToStorage(formData.videoHouse, 'video_house') : Promise.resolve(''),
-        needsGuarantee && guarantee.photos.length > 0 ? uploadMultiple(guarantee.photos, 'guarantee') : Promise.resolve([])
+        needsGuarantee && guarantee.photos.length > 0 ? uploadMultiple(guarantee.photos, 'guarantee') : Promise.resolve([]),
+        // Novos campos
+        uploadMultiple(formData.housePhotos, 'house_photos'),
+        uploadMultiple(formData.billInName, 'bill_in_name'),
+        needsGuarantee && guarantee.video ? uploadToStorage(guarantee.video, 'guarantee_video') : Promise.resolve('')
       ]);
 
       // Atualizar dados com URLs do Storage
@@ -533,10 +623,12 @@ export const Wizard: React.FC = () => {
         signature: signatureUrl,
         videoSelfie: videoSelfieUrl,
         videoHouse: videoHouseUrl,
+        housePhotos: housePhotosUrls,
+        billInName: billInNameUrls,
       };
 
       // Atualizar garantia se houver
-      const uploadedGuarantee = needsGuarantee ? { ...guarantee, photos: guaranteePhotos } : null;
+      const uploadedGuarantee = needsGuarantee ? { ...guarantee, photos: guaranteePhotos, video: guaranteeVideoUrl } : null;
 
       // Registrar evento de submissão (antifraude)
       const riskData = await antifraudService.logRiskEvent('form_submit', undefined, {
@@ -969,8 +1061,10 @@ export const Wizard: React.FC = () => {
               <label className="flex items-start gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer hover:border-[#D4AF37]">
                 <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-[#D4AF37] w-6 h-6" />
                 <div>
-                  <span className="text-white font-bold">Aceito avançar com a simulação</span>
-                  <p className="text-xs text-zinc-500 mt-1">Concordo com a consulta dos meus dados nos órgãos de proteção ao crédito.</p>
+                  <span className="text-white font-bold">Estou ciente e de acordo</span>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    Declaro que estou ciente que o empréstimo possui <strong className="text-red-400">juros de {settings.interestRateMonthly || 30}% ao mês</strong> e aceito as taxas e condições informadas.
+                  </p>
                 </div>
               </label>
             </div>
@@ -1033,48 +1127,134 @@ export const Wizard: React.FC = () => {
               {renderUploadArea('idCardFront', 'RG ou CNH (Frente)', formData.idCardFront)}
               {renderUploadArea('idCardBack', 'RG ou CNH (Verso)', formData.idCardBack)}
 
-              {/* Específicos */}
-              {profileType === 'MOTO' && (
+              {/* Comprovante de Endereço - OBRIGATÓRIO */}
+              <div className="space-y-2">
+                {renderUploadArea('proofAddress', 'Comprovante de Endereço - Água ou Luz (OBRIGATÓRIO)', formData.proofAddress)}
+                <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                  <p className="text-xs text-red-400">
+                    <strong>⚠️ OBRIGATÓRIO:</strong> Envie também um boleto (banco, cartão, etc.) <strong>em seu nome</strong> para confirmar o endereço.
+                  </p>
+                </div>
+                {renderUploadArea('billInName', 'Boleto em Seu Nome (OBRIGATÓRIO)', formData.billInName)}
+              </div>
+
+              {/* CNH - Obrigatório para MOTO, AUTONOMO e GARANTIA_VEICULO */}
+              {(profileType === 'MOTO' || profileType === 'AUTONOMO' || profileType === 'GARANTIA_VEICULO') && (
                 <div className="space-y-6 border-t border-zinc-800 pt-6">
-                  <h3 className="font-bold text-[#D4AF37]">Habilitação</h3>
-                  {renderUploadArea('cnh', 'Foto da CNH (Obrigatório)', formData.cnh || [])}
+                  <h3 className="font-bold text-[#D4AF37]">📄 Habilitação (OBRIGATÓRIO)</h3>
+                  {renderUploadArea('cnh', 'Foto da CNH - Frente e Verso (OBRIGATÓRIO)', formData.cnh || [])}
                 </div>
               )}
 
               {profileType === 'GARANTIA_VEICULO' && (
                 <div className="space-y-6 border-t border-zinc-800 pt-6">
-                  <h3 className="font-bold text-[#D4AF37]">Dados do Veículo</h3>
-                  {renderUploadArea('vehicleCRLV', 'Documento do Carro (CRLV)', formData.vehicleCRLV)}
-                  {renderUploadArea('vehicleFront', 'Fotos do Veículo', formData.vehicleFront)}
+                  <h3 className="font-bold text-[#D4AF37]">🚗 Dados do Veículo (OBRIGATÓRIO)</h3>
+                  {renderUploadArea('vehicleCRLV', 'Documento do Carro - CRLV (OBRIGATÓRIO)', formData.vehicleCRLV)}
+                  {renderUploadArea('vehicleFront', 'Fotos do Veículo - Frente, Lateral, Traseira (OBRIGATÓRIO)', formData.vehicleFront)}
                 </div>
               )}
 
               {profileType === 'AUTONOMO' && (
                 <div className="space-y-6 border-t border-zinc-800 pt-6">
-                  <h3 className="font-bold text-[#D4AF37]">Comprovantes do Negócio</h3>
+                  <h3 className="font-bold text-[#D4AF37]">💼 Comprovantes do Negócio (OBRIGATÓRIO)</h3>
                   <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                    <VideoUpload label="Vídeo do Estabelecimento" subtitle="Mostre seu local de trabalho"
+                    <VideoUpload label="🎥 Vídeo do Estabelecimento (OBRIGATÓRIO)" subtitle="Mostre seu local de trabalho"
                       videoUrl={formData.videoHouse} onUpload={(url) => setFormData({ ...formData, videoHouse: url })}
                       onRemove={() => setFormData({ ...formData, videoHouse: '' })} />
                   </div>
                 </div>
               )}
 
-              {renderUploadArea('proofAddress', 'Comprovante de Endereço', formData.proofAddress)}
-
-              {/* Carteira de Trabalho para CLT */}
+              {/* Carteira de Trabalho para CLT - APENAS PDF - OBRIGATÓRIO */}
               {profileType === 'CLT' && (
-                <div className="space-y-6 border-t border-zinc-800 pt-6">
-                  <h3 className="font-bold text-[#D4AF37]">Comprovante de Vínculo</h3>
-                  {renderUploadArea('workCard', 'Carteira de Trabalho (Páginas de identificação e contrato atual)', formData.workCard)}
+                <div className="space-y-4 border-t border-zinc-800 pt-6">
+                  <h3 className="font-bold text-[#D4AF37]">📋 Comprovante de Vínculo Empregatício (OBRIGATÓRIO)</h3>
+                  <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-4">
+                    <p className="text-sm text-blue-400 mb-2">
+                      <strong>📄 Carteira de Trabalho Digital (PDF)</strong>
+                    </p>
+                    <p className="text-xs text-zinc-400">
+                      Exporte sua Carteira de Trabalho Digital pelo app oficial do governo:
+                    </p>
+                    <ol className="text-xs text-zinc-500 mt-2 space-y-1 list-decimal list-inside">
+                      <li>Abra o app "Carteira de Trabalho Digital"</li>
+                      <li>Vá em "Contratos de Trabalho"</li>
+                      <li>Clique em "Exportar PDF"</li>
+                      <li>Envie o arquivo aqui</li>
+                    </ol>
+                  </div>
+                  {renderUploadArea('workCard', 'Carteira de Trabalho - PDF (OBRIGATÓRIO)', formData.workCard)}
+                  <p className="text-xs text-red-400">❌ Não aceitamos foto da carteira física. Apenas PDF do app oficial.</p>
                 </div>
               )}
 
-              {/* Video de confirmação sempre bom */}
-              <div className="bg-black p-4 rounded-xl border border-zinc-800 mt-6">
-                <VideoUpload label="Vídeo de Aceite" subtitle={`Diga seu nome e: "Confirmo o pedido de empréstimo"`}
-                  videoUrl={formData.videoSelfie} onUpload={(url) => setFormData({ ...formData, videoSelfie: url })}
-                  onRemove={() => setFormData({ ...formData, videoSelfie: '' })} />
+              {/* VÍDEO E FOTOS DA RESIDÊNCIA - OBRIGATÓRIO PARA TODOS */}
+              <div className="space-y-4 border-t border-zinc-800 pt-6">
+                <h3 className="font-bold text-[#D4AF37] flex items-center gap-2">
+                  <Home size={18} /> 🏠 Comprovação de Residência (OBRIGATÓRIO)
+                </h3>
+                <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                  <p className="text-xs text-red-400">
+                    <strong>⚠️ OBRIGATÓRIO:</strong> Envie fotos da fachada da sua casa e grave um vídeo mostrando a residência (de fora e de dentro).
+                  </p>
+                </div>
+
+                {renderUploadArea('housePhotos', 'Fotos da Fachada/Frente da Casa (OBRIGATÓRIO)', formData.housePhotos)}
+
+                <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                  <VideoUpload
+                    label="🎥 Vídeo da sua Residência (OBRIGATÓRIO)"
+                    subtitle="Mostre a fachada e entre na casa rapidamente"
+                    videoUrl={formData.videoHouse}
+                    onUpload={(url) => setFormData({ ...formData, videoHouse: url })}
+                    onRemove={() => setFormData({ ...formData, videoHouse: '' })}
+                  />
+                </div>
+              </div>
+
+              {/* VÍDEO DA GARANTIA - OBRIGATÓRIO se tiver garantia */}
+              {needsGuarantee && (
+                <div className="space-y-4 border-t border-zinc-800 pt-6">
+                  <h3 className="font-bold text-[#D4AF37] flex items-center gap-2">
+                    <Shield size={18} /> 🔒 Vídeo do Bem em Garantia (OBRIGATÓRIO)
+                  </h3>
+                  <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                    <p className="text-xs text-red-400">
+                      <strong>⚠️ OBRIGATÓRIO:</strong> Grave um vídeo mostrando o bem que será usado como garantia (carro, moto, celular, etc). Mostre todos os lados e detalhes.
+                    </p>
+                  </div>
+
+                  {renderUploadArea('guaranteePhotos', 'Fotos do Bem em Garantia (OBRIGATÓRIO)', guarantee.photos)}
+
+                  <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                    <VideoUpload
+                      label="🎥 Vídeo do Bem em Garantia (OBRIGATÓRIO)"
+                      subtitle="Mostre o bem por completo, frente, lateral, traseira"
+                      videoUrl={guarantee.video}
+                      onUpload={(url) => setGuarantee({ ...guarantee, video: url })}
+                      onRemove={() => setGuarantee({ ...guarantee, video: '' })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Vídeo de confirmação com declaração de juros - OBRIGATÓRIO */}
+              <div className="space-y-4 border-t border-zinc-800 pt-6">
+                <h3 className="font-bold text-[#D4AF37]">🎬 Vídeo de Aceite (OBRIGATÓRIO)</h3>
+                <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                  <p className="text-xs text-red-400">
+                    <strong>⚠️ OBRIGATÓRIO:</strong> Grave um vídeo dizendo seu nome e confirmando que aceita os juros de {settings?.interestRateMonthly || 30}% ao mês.
+                  </p>
+                </div>
+                <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                  <VideoUpload
+                    label="🎥 Vídeo de Aceite (OBRIGATÓRIO)"
+                    subtitle={`Diga seu nome e: "Estou ciente do empréstimo e dos juros de ${settings?.interestRateMonthly || 30}%"`}
+                    videoUrl={formData.videoSelfie}
+                    onUpload={(url) => setFormData({ ...formData, videoSelfie: url })}
+                    onRemove={() => setFormData({ ...formData, videoSelfie: '' })}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -1086,15 +1266,26 @@ export const Wizard: React.FC = () => {
                 <Landmark size={48} className="mx-auto text-[#D4AF37] mb-3" />
                 <h2 className="text-xl font-bold">Onde depositamos o dinheiro?</h2>
               </div>
-              <Input label="Banco" name="bankName" value={formData.bankName} onChange={handleChange} placeholder="Ex: Nubank" />
+
+              {/* AVISO IMPORTANTE DE TITULARIDADE */}
+              <div className="bg-red-900/30 border-2 border-red-500 rounded-xl p-4">
+                <p className="text-sm text-red-400 font-bold flex items-start gap-2">
+                  <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                  <span>
+                    ⚠️ ATENÇÃO: A conta bancária <strong className="text-white">DEVE SER DO MESMO TITULAR</strong> que está solicitando o empréstimo. Não depositamos em contas de terceiros.
+                  </span>
+                </p>
+              </div>
+
+              <Input label="Banco (OBRIGATÓRIO)" name="bankName" value={formData.bankName} onChange={handleChange} placeholder="Ex: Nubank" />
               <div className="grid grid-cols-4 gap-2">
                 {[{ v: 'cpf', l: 'CPF' }, { v: 'phone', l: 'Celular' }, { v: 'email', l: 'Email' }, { v: 'random', l: 'Aleatória' }].map(o => (
                   <button key={o.v} type="button" onClick={() => setFormData({ ...formData, pixKeyType: o.v })}
                     className={`p-2 rounded-lg border text-sm ${formData.pixKeyType === o.v ? 'border-[#D4AF37] text-[#D4AF37]' : 'border-zinc-700 text-zinc-400'}`}>{o.l}</button>
                 ))}
               </div>
-              <Input label="Chave PIX" name="pixKey" value={formData.pixKey} onChange={handleChange} placeholder="Sua chave" />
-              <Input label="Nome Titular" name="accountHolderName" value={formData.accountHolderName} onChange={handleChange} placeholder="Nome no banco" />
+              <Input label="Chave PIX (OBRIGATÓRIO)" name="pixKey" value={formData.pixKey} onChange={handleChange} placeholder="Sua chave" />
+              <Input label="Nome do Titular da Conta (OBRIGATÓRIO)" name="accountHolderName" value={formData.accountHolderName} onChange={handleChange} placeholder="Seu nome completo" />
             </div>
           )}
 
@@ -1115,12 +1306,17 @@ export const Wizard: React.FC = () => {
 
               {/* TERMO FINAL */}
               <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-2">
-                <h3 className="font-bold text-red-400 text-xs uppercase">TERMO DE COMPROMISSO</h3>
+                <h3 className="font-bold text-red-400 text-xs uppercase">TERMO DE COMPROMISSO (OBRIGATÓRIO)</h3>
                 <p className="text-xs text-zinc-400">Ao assinar, declaro que as informações são verdadeiras e autorizo a emissão de CCB (Cédula de Crédito Bancário).</p>
               </div>
 
-              <div>
-                <h3 className="font-bold mb-3">Sua Assinatura</h3>
+              <div className="space-y-2">
+                <h3 className="font-bold text-[#D4AF37]">✍️ Sua Assinatura (OBRIGATÓRIO)</h3>
+                <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                  <p className="text-xs text-red-400">
+                    <strong>⚠️ OBRIGATÓRIO:</strong> Assine no campo abaixo para confirmar sua solicitação. Sem assinatura, não será possível enviar.
+                  </p>
+                </div>
                 <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
               </div>
             </div>
@@ -1136,7 +1332,7 @@ export const Wizard: React.FC = () => {
             </Button>
           ) : (
             <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading} disabled={!formData.signature}>
-              SOLICITAR MEU FINANCIAMENTO
+              SOLICITAR MEU EMPRÉSTIMO
             </Button>
           )}
         </div>
