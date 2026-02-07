@@ -133,13 +133,28 @@ export const notificationService = {
         const user = getCurrentUser();
         if (!user) return;
 
-        let query = supabase.from('notifications').update({ read: true });
+        try {
+            if (user.role === 'ADMIN') {
+                // Admin marca TODAS as notificações como lidas
+                const { error } = await supabase
+                    .from('notifications')
+                    .update({ read: true })
+                    .eq('read', false); // Atualiza apenas as não lidas
 
-        if (user.role !== 'ADMIN') {
-            query = query.or(`customer_email.eq.${user.email},customer_email.is.null`);
+                if (error) console.error('Erro ao marcar todas como lidas:', error);
+            } else {
+                // Cliente marca apenas suas notificações
+                const { error } = await supabase
+                    .from('notifications')
+                    .update({ read: true })
+                    .or(`customer_email.eq.${user.email},customer_email.is.null`)
+                    .eq('read', false);
+
+                if (error) console.error('Erro ao marcar como lidas:', error);
+            }
+        } catch (e) {
+            console.error('Exceção ao marcar notificações:', e);
         }
-
-        await query;
     },
 
     // 🗑️ Deletar notificação
@@ -152,10 +167,35 @@ export const notificationService = {
         const user = getCurrentUser();
         if (!user) return;
 
-        if (user.role === 'ADMIN') {
-            await supabase.from('notifications').delete().neq('id', '');
-        } else {
-            await supabase.from('notifications').delete().eq('customer_email', user.email);
+        try {
+            if (user.role === 'ADMIN') {
+                // Admin deleta todas as notificações
+                // Primeiro busca os IDs para deletar
+                const { data: notifications } = await supabase
+                    .from('notifications')
+                    .select('id')
+                    .limit(1000);
+
+                if (notifications && notifications.length > 0) {
+                    const ids = notifications.map(n => n.id);
+                    const { error } = await supabase
+                        .from('notifications')
+                        .delete()
+                        .in('id', ids);
+
+                    if (error) console.error('Erro ao limpar notificações:', error);
+                }
+            } else {
+                // Cliente deleta apenas suas notificações
+                const { error } = await supabase
+                    .from('notifications')
+                    .delete()
+                    .eq('customer_email', user.email);
+
+                if (error) console.error('Erro ao limpar notificações:', error);
+            }
+        } catch (e) {
+            console.error('Exceção ao limpar notificações:', e);
         }
     },
 

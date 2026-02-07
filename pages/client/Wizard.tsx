@@ -734,11 +734,36 @@ export const Wizard: React.FC = () => {
       }
 
       const filePath = `loan_documents/${formData.cpf.replace(/\D/g, '')}/${file.name}`;
-      const uploadedUrl = await supabaseService.uploadFile('documents', filePath, file);
-      return uploadedUrl || dataUrl;
+
+      // Tentar upload com retry
+      let uploadedUrl: string | null = null;
+      let retries = 3;
+
+      while (retries > 0 && !uploadedUrl) {
+        uploadedUrl = await supabaseService.uploadFile('documents', filePath, file);
+        if (!uploadedUrl) {
+          retries--;
+          if (retries > 0) {
+            console.log(`Retry upload ${3 - retries}/3 para ${folder}...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+      }
+
+      if (!uploadedUrl) {
+        console.error(`❌ Falha no upload após 3 tentativas: ${folder}`);
+        // Se for vídeo, alertar o usuário
+        if (folder.includes('video')) {
+          console.error('CRÍTICO: Vídeo não foi enviado para o storage!');
+        }
+        return ''; // Retornar vazio ao invés de blob: para não salvar URLs inválidas
+      }
+
+      console.log(`✅ Upload concluído: ${folder} -> ${uploadedUrl}`);
+      return uploadedUrl;
     } catch (error) {
       console.error('Erro no upload:', error);
-      return dataUrl;
+      return ''; // Retornar vazio ao invés de blob: URL local
     }
   };
 

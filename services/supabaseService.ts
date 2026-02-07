@@ -2063,6 +2063,8 @@ export const supabaseService = {
     // ============================================
     uploadFile: async (bucket: string, path: string, file: File): Promise<string | null> => {
         try {
+            console.log(`📤 Iniciando upload: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB) -> ${bucket}/${path}`);
+
             const { data, error } = await supabase.storage
                 .from(bucket)
                 .upload(path, file, {
@@ -2070,15 +2072,19 @@ export const supabaseService = {
                     upsert: true
                 });
 
-            if (error) throw error;
+            if (error) {
+                console.error(`❌ Erro no upload de ${file.name}:`, error.message);
+                throw error;
+            }
 
             const { data: urlData } = supabase.storage
                 .from(bucket)
                 .getPublicUrl(data.path);
 
+            console.log(`✅ Upload concluído: ${urlData.publicUrl}`);
             return urlData.publicUrl;
-        } catch (error) {
-            console.error('Upload error:', error);
+        } catch (error: any) {
+            console.error('❌ Upload error:', error?.message || error);
             return null;
         }
     },
