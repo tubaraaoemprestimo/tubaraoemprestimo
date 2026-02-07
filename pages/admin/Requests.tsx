@@ -14,11 +14,21 @@ import { useToast } from '../../components/Toast';
 const PROFILE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
     CLT: { bg: 'bg-gray-600', text: 'text-white', label: 'CLT' },
     AUTONOMO: { bg: 'bg-green-600', text: 'text-white', label: 'Comércio' },
-    MOTO: { bg: 'bg-yellow-500', text: 'text-black', label: 'Moto' },
-    GARANTIA: { bg: 'bg-orange-500', text: 'text-white', label: '🔒 Garantia' },
+    MOTO: { bg: 'bg-blue-600', text: 'text-white', label: 'Fin. Moto' },
+    GARANTIA: { bg: 'bg-yellow-500', text: 'text-black', label: 'Garantia' },
     LIMPA_NOME: { bg: 'bg-purple-600', text: 'text-white', label: 'Limpa Nome' },
-    GARANTIA_VEICULO: { bg: 'bg-orange-500', text: 'text-white', label: '🚗 Veículo' },
+    GARANTIA_VEICULO: { bg: 'bg-yellow-500', text: 'text-black', label: 'Garantia' },
 };
+
+// Guias por tipo de serviço
+const PROFILE_TABS = [
+    { id: 'ALL', label: 'Todos', bg: 'bg-zinc-200', text: 'text-black', border: 'border-zinc-300', profileTypes: [] as string[] },
+    { id: 'CLT', label: 'CLT', bg: 'bg-gray-600', text: 'text-white', border: 'border-gray-600', profileTypes: ['CLT'] },
+    { id: 'AUTONOMO', label: 'Comércio', bg: 'bg-green-600', text: 'text-white', border: 'border-green-600', profileTypes: ['AUTONOMO'] },
+    { id: 'MOTO', label: 'Fin. Moto', bg: 'bg-blue-600', text: 'text-white', border: 'border-blue-600', profileTypes: ['MOTO'] },
+    { id: 'GARANTIA', label: 'Garantia', bg: 'bg-yellow-500', text: 'text-black', border: 'border-yellow-500', profileTypes: ['GARANTIA', 'GARANTIA_VEICULO'] },
+    { id: 'LIMPA_NOME', label: 'Limpa Nome', bg: 'bg-purple-600', text: 'text-white', border: 'border-purple-600', profileTypes: ['LIMPA_NOME'] },
+];
 
 const getProfileBadge = (profileType: string | undefined) => {
     const config = PROFILE_COLORS[profileType || ''] || { bg: 'bg-zinc-700', text: 'text-white', label: profileType || 'N/A' };
@@ -47,6 +57,7 @@ export const Requests: React.FC = () => {
 
     // Filters
     const [filterStatus, setFilterStatus] = useState<string>('ALL');
+    const [filterProfile, setFilterProfile] = useState<string>('ALL');
 
     useEffect(() => {
         loadRequests();
@@ -158,9 +169,29 @@ export const Requests: React.FC = () => {
         document.body.removeChild(link);
     };
 
-    const filteredRequests = requests.filter(req =>
-        filterStatus === 'ALL' ? true : req.status === filterStatus
-    );
+    const filteredRequests = requests.filter(req => {
+        // Filtro por tipo de serviço
+        if (filterProfile !== 'ALL') {
+            const tab = PROFILE_TABS.find(t => t.id === filterProfile);
+            if (tab && tab.profileTypes.length > 0) {
+                if (!tab.profileTypes.includes(req.profileType || '')) return false;
+            }
+        }
+        // Filtro por status
+        if (filterStatus !== 'ALL' && req.status !== filterStatus) return false;
+        return true;
+    });
+
+    const getTabCount = (tabId: string): number => {
+        if (tabId === 'ALL') return requests.filter(r => filterStatus === 'ALL' || r.status === filterStatus).length;
+        const tab = PROFILE_TABS.find(t => t.id === tabId);
+        if (!tab) return 0;
+        return requests.filter(r => {
+            if (!tab.profileTypes.includes(r.profileType || '')) return false;
+            if (filterStatus !== 'ALL' && r.status !== filterStatus) return false;
+            return true;
+        }).length;
+    };
 
     return (
         <div className="p-4 md:p-8 bg-black min-h-screen text-white">
@@ -171,22 +202,51 @@ export const Requests: React.FC = () => {
                 </Button>
             </div>
 
-            {/* Filters */}
-            <div className="flex flex-wrap gap-2 mb-6">
-                {['ALL', LoanStatus.RETURNING_PENDING, LoanStatus.PENDING, LoanStatus.WAITING_DOCS, LoanStatus.APPROVED, LoanStatus.REJECTED].map((status) => (
-                    <button
-                        key={status}
-                        onClick={() => setFilterStatus(status)}
-                        className={`px-4 py-2 rounded-full text-xs font-bold transition-colors border ${filterStatus === status
-                            ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
-                            : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'
+            {/* Guias por Tipo de Serviço */}
+            <div className="flex flex-wrap gap-2 mb-4">
+                {PROFILE_TABS.map((tab) => {
+                    const count = getTabCount(tab.id);
+                    const isActive = filterProfile === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setFilterProfile(tab.id)}
+                            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-2 border-2 ${
+                                isActive
+                                    ? `${tab.bg} ${tab.text} ${tab.border} shadow-lg scale-[1.02]`
+                                    : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600 hover:text-white'
                             }`}
-                    >
-                        {status === 'ALL' ? 'Todos' :
-                            status === LoanStatus.RETURNING_PENDING ? '🔄 Cliente Antigo' :
-                                status === LoanStatus.WAITING_DOCS ? 'Aguardando Doc.' : status}
-                    </button>
-                ))}
+                        >
+                            {tab.label}
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                isActive ? 'bg-black/20' : 'bg-zinc-800 text-zinc-500'
+                            }`}>
+                                {count}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Filtros por Status */}
+            <div className="mb-6">
+                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2 font-medium">Status:</p>
+                <div className="flex flex-wrap gap-2">
+                    {['ALL', LoanStatus.RETURNING_PENDING, LoanStatus.PENDING, LoanStatus.WAITING_DOCS, LoanStatus.APPROVED, LoanStatus.REJECTED].map((status) => (
+                        <button
+                            key={status}
+                            onClick={() => setFilterStatus(status)}
+                            className={`px-4 py-2 rounded-full text-xs font-bold transition-colors border ${filterStatus === status
+                                ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
+                                : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'
+                                }`}
+                        >
+                            {status === 'ALL' ? 'Todos' :
+                                status === LoanStatus.RETURNING_PENDING ? '🔄 Cliente Antigo' :
+                                    status === LoanStatus.WAITING_DOCS ? 'Aguardando Doc.' : status}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
@@ -207,23 +267,31 @@ export const Requests: React.FC = () => {
                                 <tr><td colSpan={7} className="p-8 text-center text-zinc-500">Nenhuma solicitação encontrada com este filtro.</td></tr>
                             ) : (
                                 filteredRequests.map((req) => (
-                                    <tr key={req.id} className={`hover:bg-zinc-800/50 transition-colors ${(req as any).profileType === 'GARANTIA' ? 'border-l-4 border-l-orange-500' : ''}`}>
+                                    <tr key={req.id} className={`hover:bg-zinc-800/50 transition-colors ${
+                                            (req.profileType === 'GARANTIA' || req.profileType === 'GARANTIA_VEICULO') ? 'border-l-4 border-l-yellow-500' :
+                                            req.profileType === 'MOTO' ? 'border-l-4 border-l-blue-500' :
+                                            req.profileType === 'LIMPA_NOME' ? 'border-l-4 border-l-purple-500' :
+                                            req.profileType === 'AUTONOMO' ? 'border-l-4 border-l-green-500' :
+                                            req.profileType === 'CLT' ? 'border-l-4 border-l-gray-500' : ''
+                                        }`}>
                                         <td className="p-4">
                                             <div className="font-medium text-white">{req.clientName}</div>
                                             <div className="text-xs text-zinc-500">{req.cpf}</div>
                                         </td>
                                         <td className="p-4">
-                                            {getProfileBadge((req as any).profileType)}
-                                            {(req as any).profileType === 'GARANTIA' && (
+                                            {getProfileBadge(req.profileType)}
+                                            {(req.profileType === 'GARANTIA' || req.profileType === 'GARANTIA_VEICULO') && (
                                                 <div className="mt-1">
-                                                    <AlertTriangle size={12} className="inline text-orange-400" />
-                                                    <span className="text-xs text-orange-400 ml-1">Conferir docs</span>
+                                                    <AlertTriangle size={12} className="inline text-yellow-400" />
+                                                    <span className="text-xs text-yellow-400 ml-1">Conferir docs</span>
                                                 </div>
                                             )}
                                         </td>
                                         <td className="p-4 font-bold text-[#D4AF37]">
-                                            {(req as any).profileType === 'LIMPA_NOME'
+                                            {req.profileType === 'LIMPA_NOME'
                                                 ? <span className="text-purple-400">Serviço</span>
+                                                : req.profileType === 'MOTO'
+                                                ? <span className="text-blue-400">Financiamento</span>
                                                 : `R$ ${req.amount?.toLocaleString() || '0'}`
                                             }
                                         </td>
@@ -269,7 +337,10 @@ export const Requests: React.FC = () => {
                         <div className="flex justify-between items-center p-6 border-b border-zinc-800 bg-zinc-950">
                             <div>
                                 <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                                    {(selectedRequest as any).profileType === 'LIMPA_NOME' ? 'Análise de Serviço' : 'Análise de Crédito'}
+                                    {selectedRequest.profileType === 'LIMPA_NOME' ? 'Análise de Serviço' :
+                                     selectedRequest.profileType === 'MOTO' ? 'Financiamento de Moto' :
+                                     (selectedRequest.profileType === 'GARANTIA' || selectedRequest.profileType === 'GARANTIA_VEICULO') ? 'Análise de Garantia' :
+                                     'Análise de Crédito'}
                                     <span className={`text-xs px-2 py-1 rounded-full border ${selectedRequest.status === LoanStatus.APPROVED ? 'bg-green-900/30 text-green-500 border-green-800' :
                                         selectedRequest.status === LoanStatus.REJECTED ? 'bg-red-900/30 text-red-500 border-red-800' :
                                             selectedRequest.status === LoanStatus.WAITING_DOCS ? 'bg-blue-900/30 text-blue-500 border-blue-800' :
@@ -280,11 +351,11 @@ export const Requests: React.FC = () => {
                                     </span>
                                 </h2>
                                 <p className="text-zinc-400 text-sm mt-1 flex items-center gap-2">
-                                    ID: {selectedRequest.id} • {selectedRequest.email} {getProfileBadge((selectedRequest as any).profileType)}
+                                    ID: {selectedRequest.id} • {selectedRequest.email} {getProfileBadge(selectedRequest.profileType)}
                                 </p>
                             </div>
                             <div className="flex items-center gap-2">
-                                {!isEditing && (selectedRequest as any).profileType !== 'LIMPA_NOME' && (selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === 'RETURNING_PENDING') && (
+                                {!isEditing && selectedRequest.profileType !== 'LIMPA_NOME' && selectedRequest.profileType !== 'MOTO' && (selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === 'RETURNING_PENDING') && (
                                     <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>
                                         ✏️ Editar Valores
                                     </Button>
@@ -325,10 +396,17 @@ export const Requests: React.FC = () => {
                                 <InfoBox label="Cliente" value={selectedRequest.clientName} />
                                 <InfoBox label="CPF" value={selectedRequest.cpf} />
 
-                                {(selectedRequest as any).profileType === 'LIMPA_NOME' ? (
+                                {selectedRequest.profileType === 'LIMPA_NOME' ? (
                                     <>
                                         <InfoBox label="Serviço" value="Limpa Nome" highlight />
-                                        <InfoBox label="Contrato Assinado" value={(selectedRequest as any).limpaNomeContractSigned ? '✅ Sim' : '❌ Não'} />
+                                        <InfoBox label="Contrato Assinado" value={selectedRequest.limpaNomeContractSigned ? '✅ Sim' : '❌ Não'} />
+                                    </>
+                                ) : selectedRequest.profileType === 'MOTO' ? (
+                                    <>
+                                        <InfoBox label="Produto" value="Pop 110i 2026" highlight />
+                                        <InfoBox label="Entrada" value="R$ 2.000,00" />
+                                        <InfoBox label="Parcelas" value="36x R$ 611,00" />
+                                        <InfoBox label="Mensal Total" value="R$ 761,00 (+ seguro)" />
                                     </>
                                 ) : (
                                     <>
@@ -391,7 +469,7 @@ export const Requests: React.FC = () => {
                             )}
 
                             {/* References Section - hide for LIMPA_NOME */}
-                            {(selectedRequest as any).profileType !== 'LIMPA_NOME' && selectedRequest.references && (
+                            {selectedRequest.profileType !== 'LIMPA_NOME' && selectedRequest.references && (
                                 <div className="bg-zinc-950 border border-zinc-800 p-4 rounded-xl">
                                     <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
                                         <Users size={16} /> Referências Pessoais
@@ -423,7 +501,7 @@ export const Requests: React.FC = () => {
                             )}
 
                             {/* Video Gallery - hide for LIMPA_NOME */}
-                            {(selectedRequest as any).profileType !== 'LIMPA_NOME' && <div className="space-y-4">
+                            {selectedRequest.profileType !== 'LIMPA_NOME' && <div className="space-y-4">
                                 <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4 flex items-center gap-2">
                                     <Video size={16} /> Validação por Vídeo
                                 </h3>
@@ -444,7 +522,7 @@ export const Requests: React.FC = () => {
                             </div>}
 
                             {/* Document Gallery - hide for LIMPA_NOME */}
-                            {(selectedRequest as any).profileType !== 'LIMPA_NOME' && <div className="space-y-6">
+                            {selectedRequest.profileType !== 'LIMPA_NOME' && <div className="space-y-6">
 
                                 {/* Personal Documents */}
                                 <div>
@@ -621,8 +699,12 @@ export const Requests: React.FC = () => {
                         {(selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === LoanStatus.WAITING_DOCS || selectedRequest.status === 'RETURNING_PENDING') && (
                             <div className="p-6 border-t border-zinc-800 bg-zinc-950 flex flex-col md:flex-row justify-between items-center gap-4">
                                 <span className="text-xs text-zinc-500 text-center md:text-left">
-                                    {(selectedRequest as any).profileType === 'LIMPA_NOME'
+                                    {selectedRequest.profileType === 'LIMPA_NOME'
                                         ? 'Ao aprovar, o serviço Limpa Nome será iniciado para este cliente.'
+                                        : selectedRequest.profileType === 'MOTO'
+                                        ? 'Ao aprovar, o financiamento da moto será confirmado. Verifique entrada e documentos.'
+                                        : (selectedRequest.profileType === 'GARANTIA' || selectedRequest.profileType === 'GARANTIA_VEICULO')
+                                        ? 'Ao aprovar, o empréstimo com garantia será liberado. Verifique os documentos.'
                                         : 'Se aprovar agora, o saldo será liberado na carteira.'
                                     }
                                 </span>
@@ -636,7 +718,8 @@ export const Requests: React.FC = () => {
                                         <X size={18} className="mr-2" /> REPROVAR
                                     </Button>
                                     <Button variant="gold" className="flex-1 md:flex-initial bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]" onClick={() => handleApprove(selectedRequest.id)} isLoading={processing === selectedRequest.id}>
-                                        <Check size={18} className="mr-2" /> {(selectedRequest as any).profileType === 'LIMPA_NOME' ? 'APROVAR SERVIÇO' : 'APROVAR EMPRÉSTIMO'}
+                                        <Check size={18} className="mr-2" /> {selectedRequest.profileType === 'LIMPA_NOME' ? 'APROVAR SERVIÇO' :
+                                        selectedRequest.profileType === 'MOTO' ? 'APROVAR FINANCIAMENTO' : 'APROVAR EMPRÉSTIMO'}
                                     </Button>
                                 </div>
                             </div>

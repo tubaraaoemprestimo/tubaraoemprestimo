@@ -94,8 +94,9 @@ const getStepsForProfile = (profile: ProfileType) => {
       { id: 1, title: 'Serviço', icon: Users },
       { id: 2, title: 'Termos', icon: Shield },
       { id: 3, title: 'Dados', icon: User },
-      { id: 4, title: 'Documentos', icon: FileText },
-      { id: 5, title: 'Confirmar', icon: CheckCircle2 },
+      { id: 4, title: 'Produto', icon: Car },
+      { id: 5, title: 'Documentos', icon: FileText },
+      { id: 6, title: 'Confirmar', icon: CheckCircle2 },
     ];
   }
   if (profile === 'GARANTIA') {
@@ -204,6 +205,8 @@ export const Wizard: React.FC = () => {
     signature: '',
     // Limpa Nome
     limpaNomeContractSigned: false,
+    // Moto - Cor selecionada
+    motoColor: '',
   });
 
   // Carregar configurações REAIS do banco e registrar visita (antifraude)
@@ -497,9 +500,17 @@ export const Wizard: React.FC = () => {
       }
     }
 
-    // STEP DOCUMENTOS - Dinâmico (Step 5 para CLT/AUTONOMO, Step 4 para MOTO, Step 6 para GARANTIA) - LIMPA_NOME não tem docs
+    // STEP PRODUTO (Seleção de cor) - MOTO step 4
+    if (profileType === 'MOTO' && currentStep === 4) {
+      if (!formData.motoColor) {
+        addToast("Selecione a cor da sua moto.", 'warning');
+        return;
+      }
+    }
+
+    // STEP DOCUMENTOS - Dinâmico (Step 5 para CLT/AUTONOMO e MOTO, Step 6 para GARANTIA) - LIMPA_NOME não tem docs
     let docsStep = 5;
-    if (profileType === 'MOTO') docsStep = 4;
+    if (profileType === 'MOTO') docsStep = 5;
     if (profileType === 'GARANTIA') docsStep = 6;
     // LIMPA_NOME pula validação de documentos (não tem esse step)
     if (profileType !== 'LIMPA_NOME' && currentStep === docsStep) {
@@ -527,13 +538,13 @@ export const Wizard: React.FC = () => {
         return;
       }
 
-      // Boleto em nome do cliente obrigatório
-      if (formData.billInName.length === 0) {
+      // Boleto em nome do cliente obrigatório (não para MOTO)
+      if (profileType !== 'MOTO' && formData.billInName.length === 0) {
         addToast("Envie um boleto em seu nome para confirmar endereço.", 'warning');
         return;
       }
 
-      // CNH para todos que não são CLT puro
+      // CNH para MOTO, AUTONOMO e GARANTIA_VEICULO
       if ((profileType === 'MOTO' || profileType === 'AUTONOMO' || profileType === 'GARANTIA_VEICULO') && formData.cnh.length === 0) {
         addToast("Envie sua CNH.", 'warning');
         return;
@@ -557,20 +568,20 @@ export const Wizard: React.FC = () => {
         }
       }
 
-      // Fotos da casa obrigatórias para TODOS
+      // Fotos da casa obrigatórias (para MOTO apenas fachada)
       if (formData.housePhotos.length === 0) {
         addToast("Envie fotos da fachada da sua casa.", 'warning');
         return;
       }
 
-      // Vídeo da casa obrigatório para TODOS
-      if (!formData.videoHouse) {
+      // Vídeo da casa obrigatório (não para MOTO)
+      if (profileType !== 'MOTO' && !formData.videoHouse) {
         addToast("Grave o vídeo mostrando sua residência.", 'warning');
         return;
       }
 
-      // Vídeo de aceite obrigatório para TODOS
-      if (!formData.videoSelfie) {
+      // Vídeo de aceite obrigatório para empréstimos (NÃO para financiamento MOTO)
+      if (profileType !== 'MOTO' && !formData.videoSelfie) {
         addToast("Grave o vídeo de confirmação dizendo que aceita os juros.", 'warning');
         return;
       }
@@ -1343,7 +1354,7 @@ export const Wizard: React.FC = () => {
 
                   <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-3">
                     <h3 className="font-bold text-[#D4AF37] text-sm uppercase">O que vamos precisar:</h3>
-                    {['CNH categoria A', 'Comprovante de Residência', 'Foto da Casa', 'Selfie com Documento', 'Comprovante de Renda'].map((doc, idx) => (
+                    {['CNH Válida (categoria A)', 'Comprovante de Endereço (água/luz)', 'Foto da Fachada da Casa', 'Selfie do Cliente'].map((doc, idx) => (
                       <div key={idx} className="flex items-start gap-3 py-2 border-b border-zinc-900 last:border-0">
                         <CheckCircle2 size={16} className="text-green-500 mt-0.5 shrink-0" />
                         <span className="text-sm text-zinc-300">{doc}</span>
@@ -1351,12 +1362,20 @@ export const Wizard: React.FC = () => {
                     ))}
                   </div>
 
+                  <div className="bg-blue-900/20 border border-blue-600/30 rounded-xl p-4">
+                    <h3 className="font-bold text-blue-400 mb-3">📋 TRANSFERÊNCIA</h3>
+                    <ul className="text-sm text-zinc-300 space-y-2">
+                      <li>• A moto só será transferida para o nome do cliente <strong className="text-blue-400">após a quitação da 36ª parcela</strong></li>
+                      <li>• Até lá, a moto permanece registrada em nome da empresa</li>
+                    </ul>
+                  </div>
+
                   <label className="flex items-start gap-4 p-4 bg-red-900/30 border-2 border-red-500 rounded-xl cursor-pointer">
                     <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-red-500 w-6 h-6" />
                     <div>
                       <span className="text-white font-bold">☑️ Declaro que li e compreendi</span>
                       <p className="text-xs text-zinc-400 mt-1">
-                        Todas as condições do financiamento próprio de motocicleta, incluindo a entrada de <strong>R$ 2.000,00</strong>, as <strong>36 parcelas mensais de R$ 611,00</strong>, o seguro obrigatório de <strong>R$ 150,00 mensais</strong>, e estou ciente das penalidades, da possibilidade de <strong className="text-red-400">busca e apreensão</strong> e da transferência do veículo somente após a quitação total.
+                        Todas as condições do financiamento próprio de motocicleta, incluindo a entrada obrigatória de <strong>R$ 2.000,00</strong>, o parcelamento em <strong>36x de R$ 611,00</strong> + seguro de <strong>R$ 150,00</strong> (total mensal: <strong>R$ 761,00</strong>), a cláusula de <strong className="text-red-400">busca e apreensão imediata</strong> em caso de atraso superior ao contrato com <strong className="text-red-400">perda total dos valores pagos</strong>, e que a transferência do veículo somente ocorrerá após a quitação da 36ª parcela.
                       </p>
                     </div>
                   </label>
@@ -1570,9 +1589,56 @@ export const Wizard: React.FC = () => {
               </div>
             )}
 
-          {/* STEP DOCUMENTOS - Dinâmico (Step 5 para CLT/AUTONOMO, Step 4 para MOTO, Step 6 para GARANTIA) - NÃO para LIMPA_NOME */}
-          {((currentStep === 5 && (profileType === 'CLT' || profileType === 'AUTONOMO')) ||
-            (currentStep === 4 && profileType === 'MOTO') ||
+          {/* STEP PRODUTO - Seleção de Cor da Moto (Step 4 MOTO) */}
+          {currentStep === 4 && profileType === 'MOTO' && (
+              <div className="space-y-6 animate-in slide-in-from-right">
+                <div className="text-center">
+                  <Car size={48} className="mx-auto text-blue-400 mb-3" />
+                  <h2 className="text-xl font-bold">Escolha sua Honda Pop 110i 2026</h2>
+                  <p className="text-zinc-400 text-sm mt-2">Selecione a cor da sua moto</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { id: 'vermelho', label: 'Vermelho', color: 'bg-red-600', border: 'border-red-500' },
+                    { id: 'preto', label: 'Preto', color: 'bg-zinc-800', border: 'border-zinc-500' },
+                    { id: 'branco', label: 'Branco', color: 'bg-white', border: 'border-gray-300', textColor: 'text-black' },
+                    { id: 'azul', label: 'Azul', color: 'bg-blue-600', border: 'border-blue-500' },
+                    { id: 'prata', label: 'Prata / Cinza', color: 'bg-gray-400', border: 'border-gray-500', textColor: 'text-black' },
+                  ].map((cor) => (
+                    <button
+                      key={cor.id}
+                      onClick={() => setFormData({ ...formData, motoColor: cor.id })}
+                      className={`relative p-5 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-3 ${
+                        formData.motoColor === cor.id
+                          ? `${cor.border} ring-2 ring-offset-2 ring-offset-black ring-[#D4AF37] scale-[1.02] shadow-lg`
+                          : 'border-zinc-700 hover:border-zinc-500'
+                      }`}
+                    >
+                      <div className={`w-16 h-16 rounded-full ${cor.color} ${cor.border} border-2 shadow-inner`}></div>
+                      <span className={`text-sm font-bold ${cor.textColor || 'text-white'}`}>{cor.label}</span>
+                      {formData.motoColor === cor.id && (
+                        <div className="absolute top-2 right-2 bg-[#D4AF37] text-black rounded-full p-1">
+                          <CheckCircle2 size={16} />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {formData.motoColor && (
+                  <div className="bg-blue-900/20 border border-blue-600/30 rounded-xl p-4 text-center">
+                    <p className="text-blue-400 font-bold">Honda Pop 110i 2026 - {
+                      { vermelho: 'Vermelho', preto: 'Preto', branco: 'Branco', azul: 'Azul', prata: 'Prata / Cinza' }[formData.motoColor] || formData.motoColor
+                    }</p>
+                    <p className="text-zinc-400 text-xs mt-1">Entrada: R$ 2.000,00 + 36x R$ 611,00</p>
+                  </div>
+                )}
+              </div>
+          )}
+
+          {/* STEP DOCUMENTOS - Dinâmico (Step 5 para CLT/AUTONOMO/MOTO, Step 6 para GARANTIA) - NÃO para LIMPA_NOME */}
+          {((currentStep === 5 && (profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'MOTO')) ||
             (currentStep === 6 && profileType === 'GARANTIA')) && (
               <div className="space-y-6 animate-in slide-in-from-right">
                 <h2 className="text-xl font-bold">Documentação</h2>
@@ -1589,12 +1655,17 @@ export const Wizard: React.FC = () => {
                 {/* Comprovante de Endereço - OBRIGATÓRIO */}
                 <div className="space-y-2">
                   {renderUploadArea('proofAddress', 'Comprovante de Endereço - Água ou Luz (OBRIGATÓRIO)', formData.proofAddress)}
+                  {/* Boleto em nome - não exigido para MOTO */}
+                  {profileType !== 'MOTO' && (
+                  <>
                   <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
                     <p className="text-xs text-red-400">
                       <strong>⚠️ OBRIGATÓRIO:</strong> Envie também um boleto (banco, cartão, etc.) <strong>em seu nome</strong> para confirmar o endereço.
                     </p>
                   </div>
                   {renderUploadArea('billInName', 'Boleto em Seu Nome (OBRIGATÓRIO)', formData.billInName)}
+                  </>
+                  )}
                 </div>
 
                 {/* CNH - Obrigatório para MOTO, AUTONOMO e GARANTIA_VEICULO */}
@@ -1647,19 +1718,24 @@ export const Wizard: React.FC = () => {
                   </div>
                 )}
 
-                {/* VÍDEO E FOTOS DA RESIDÊNCIA - OBRIGATÓRIO PARA TODOS */}
+                {/* VÍDEO E FOTOS DA RESIDÊNCIA - OBRIGATÓRIO */}
                 <div className="space-y-4 border-t border-zinc-800 pt-6">
                   <h3 className="font-bold text-[#D4AF37] flex items-center gap-2">
-                    <Home size={18} /> 🏠 Comprovação de Residência (OBRIGATÓRIO)
+                    <Home size={18} /> 🏠 {profileType === 'MOTO' ? 'Foto da Fachada (OBRIGATÓRIO)' : 'Comprovação de Residência (OBRIGATÓRIO)'}
                   </h3>
                   <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
                     <p className="text-xs text-red-400">
-                      <strong>⚠️ OBRIGATÓRIO:</strong> Envie fotos da fachada da sua casa e grave um vídeo mostrando a residência (de fora e de dentro).
+                      <strong>⚠️ OBRIGATÓRIO:</strong> {profileType === 'MOTO'
+                        ? 'Envie fotos da fachada da sua casa.'
+                        : 'Envie fotos da fachada da sua casa e grave um vídeo mostrando a residência (de fora e de dentro).'
+                      }
                     </p>
                   </div>
 
                   {renderUploadArea('housePhotos', 'Fotos da Fachada/Frente da Casa (OBRIGATÓRIO)', formData.housePhotos)}
 
+                  {/* Vídeo da residência - não obrigatório para MOTO */}
+                  {profileType !== 'MOTO' && (
                   <div className="bg-black p-4 rounded-xl border border-zinc-800">
                     <VideoUpload
                       label="🎥 Vídeo da sua Residência (OBRIGATÓRIO)"
@@ -1669,6 +1745,7 @@ export const Wizard: React.FC = () => {
                       onRemove={() => setFormData({ ...formData, videoHouse: '' })}
                     />
                   </div>
+                  )}
                 </div>
 
                 {/* VÍDEO DA GARANTIA - OBRIGATÓRIO se tiver garantia */}
@@ -1697,7 +1774,8 @@ export const Wizard: React.FC = () => {
                   </div>
                 )}
 
-                {/* Vídeo de confirmação com declaração de juros - OBRIGATÓRIO */}
+                {/* Vídeo de confirmação com declaração de juros - OBRIGATÓRIO (não para MOTO) */}
+                {profileType !== 'MOTO' && (
                 <div className="space-y-4 border-t border-zinc-800 pt-6">
                   <h3 className="font-bold text-[#D4AF37]">🎬 Vídeo de Aceite (OBRIGATÓRIO)</h3>
                   <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
@@ -1715,6 +1793,7 @@ export const Wizard: React.FC = () => {
                     />
                   </div>
                 </div>
+                )}
               </div>
             )}
 
@@ -1796,7 +1875,8 @@ export const Wizard: React.FC = () => {
 
           {/* STEP CONFIRMAR - Último step de cada perfil */}
           {((currentStep === 7 && (profileType === 'CLT' || profileType === 'AUTONOMO')) ||
-            (currentStep === 5 && (profileType === 'MOTO' || profileType === 'LIMPA_NOME')) ||
+            (currentStep === 6 && profileType === 'MOTO') ||
+            (currentStep === 5 && profileType === 'LIMPA_NOME') ||
             (currentStep === 8 && profileType === 'GARANTIA')) && (
               <div className="space-y-6 animate-in slide-in-from-right">
                 <div className="text-center">
@@ -1820,6 +1900,34 @@ export const Wizard: React.FC = () => {
                       <p className="text-sm text-zinc-300 text-center">
                         Ao confirmar, sua solicitação será enviada para análise. Você receberá um retorno em breve.
                       </p>
+                    </div>
+                  </>
+                ) : profileType === 'MOTO' ? (
+                  <>
+                    {/* Resumo para Financiamento Moto */}
+                    <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-3 text-sm">
+                      <div className="flex justify-between"><span className="text-zinc-400">Produto:</span><span className="font-bold text-blue-400">Honda Pop 110i 2026</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Cor:</span><span className="font-bold capitalize">{formData.motoColor}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Entrada:</span><span className="font-bold">R$ 2.000,00</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Parcelas:</span><span className="font-bold">36x R$ 611,00</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Seguro:</span><span className="font-bold">R$ 150,00/mês</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Mensal Total:</span><span className="font-bold text-[#D4AF37]">R$ 761,00</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Nome:</span><span className="font-bold">{formData.name}</span></div>
+                    </div>
+
+                    <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-2">
+                      <h3 className="font-bold text-red-400 text-xs uppercase">TERMO DE FINANCIAMENTO (OBRIGATÓRIO)</h3>
+                      <p className="text-xs text-zinc-400">Ao assinar, declaro que li e concordo com todas as condições do financiamento próprio, incluindo busca e apreensão em caso de inadimplência e transferência somente após a 36ª parcela.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="font-bold text-[#D4AF37]">Sua Assinatura (OBRIGATÓRIO)</h3>
+                      <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                        <p className="text-xs text-red-400">
+                          <strong>OBRIGATÓRIO:</strong> Assine no campo abaixo para confirmar seu financiamento.
+                        </p>
+                      </div>
+                      <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
                     </div>
                   </>
                 ) : (
@@ -1861,7 +1969,8 @@ export const Wizard: React.FC = () => {
             </Button>
           ) : (
             <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading} disabled={!formData.signature}>
-              {profileType === 'LIMPA_NOME' ? 'SOLICITAR SERVIÇO' : 'SOLICITAR MEU EMPRÉSTIMO'}
+              {profileType === 'LIMPA_NOME' ? 'SOLICITAR SERVIÇO' :
+               profileType === 'MOTO' ? 'SOLICITAR FINANCIAMENTO' : 'SOLICITAR MEU EMPRÉSTIMO'}
             </Button>
           )}
         </div>

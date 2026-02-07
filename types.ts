@@ -46,7 +46,7 @@ export interface LoanRequest {
   date: string;
 
   // Tipo de Perfil/Serviço - Multi Sistema
-  profileType?: 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA' | 'LIMPA_NOME';
+  profileType?: 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA' | 'LIMPA_NOME' | 'GARANTIA_VEICULO';
 
   // Campos GARANTIA
   guaranteeType?: 'veiculo' | 'eletronico';
