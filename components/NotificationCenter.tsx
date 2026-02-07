@@ -110,7 +110,13 @@ export const NotificationCenter: React.FC = () => {
                         <div className="flex items-center gap-2">
                             {unreadCount > 0 && (
                                 <button
-                                    onClick={() => notificationService.markAllAsRead()}
+                                    onClick={async () => {
+                                        await notificationService.markAllAsRead();
+                                        // Recarregar lista após marcar todas como lidas
+                                        const updated = await notificationService.getAll();
+                                        setNotifications(updated);
+                                        setUnreadCount(0);
+                                    }}
                                     className="text-xs text-zinc-400 hover:text-[#D4AF37] flex items-center gap-1 transition-colors"
                                     title="Marcar todas como lidas"
                                 >
@@ -156,9 +162,13 @@ export const NotificationCenter: React.FC = () => {
                                             </div>
                                         </div>
                                         <button
-                                            onClick={(e) => {
+                                            onClick={async (e) => {
                                                 e.stopPropagation();
-                                                notificationService.delete(notification.id);
+                                                await notificationService.delete(notification.id);
+                                                // Recarregar lista após deletar
+                                                const updated = await notificationService.getAll();
+                                                setNotifications(updated);
+                                                setUnreadCount(updated.filter(n => !n.read).length);
                                             }}
                                             className="p-1.5 text-zinc-600 hover:text-red-500 hover:bg-red-900/20 transition-colors rounded-lg"
                                             title="Remover"
@@ -175,7 +185,12 @@ export const NotificationCenter: React.FC = () => {
                     {notifications.length > 0 && (
                         <div className="p-3 border-t border-zinc-800 bg-zinc-950 flex justify-between items-center">
                             <button
-                                onClick={() => notificationService.clearAll()}
+                                onClick={async () => {
+                                    await notificationService.clearAll();
+                                    // Limpar lista localmente
+                                    setNotifications([]);
+                                    setUnreadCount(0);
+                                }}
                                 className="text-xs text-zinc-500 hover:text-red-500 flex items-center gap-1 transition-colors"
                             >
                                 <Trash2 size={12} />

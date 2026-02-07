@@ -459,6 +459,12 @@ export const Wizard: React.FC = () => {
         return;
       }
 
+      // Instagram obrigatório para todos os perfis exceto LIMPA_NOME
+      if (profileType !== 'LIMPA_NOME' && !formData.instagram.trim()) {
+        addToast("Informe seu Instagram.", 'warning');
+        return;
+      }
+
       // LIMPA_NOME: validar data de nascimento, sem endereço
       if (profileType === 'LIMPA_NOME') {
         if (!formData.birthDate) {
@@ -541,6 +547,12 @@ export const Wizard: React.FC = () => {
       // Boleto em nome do cliente obrigatório (não para MOTO)
       if (profileType !== 'MOTO' && formData.billInName.length === 0) {
         addToast("Envie um boleto em seu nome para confirmar endereço.", 'warning');
+        return;
+      }
+
+      // Comprovante de Renda obrigatório
+      if (formData.proofIncome.length === 0) {
+        addToast("Envie o comprovante de renda (extrato, holerite ou pró-labore).", 'warning');
         return;
       }
 
@@ -1300,10 +1312,10 @@ export const Wizard: React.FC = () => {
                     <ul className="text-sm text-zinc-300 space-y-2">
                       <li>• <strong>Finalidade:</strong> Capital de giro para comércio</li>
                       <li>• <strong>Modalidade:</strong> Pagamento diário</li>
-                      <li>• <strong>Parcelas:</strong> 30 (trinta) diárias</li>
+                      <li>• <strong>Prazo:</strong> 30 (trinta) diárias</li>
                       <li>• <strong>Juros:</strong> 30% ao mês</li>
                       <li>• <strong>Dias de cobrança:</strong> Segunda a Sábado (feriados inclusos)</li>
-                      <li>• <strong className="text-yellow-400">Domingos:</strong> Não possuem cobrança de parcela</li>
+                      <li>• <strong className="text-yellow-400">Domingos:</strong> Sem cobrança diária</li>
                     </ul>
                   </div>
 
@@ -1312,7 +1324,7 @@ export const Wizard: React.FC = () => {
                     <ul className="text-sm text-zinc-300 space-y-2">
                       <li>• Multa de <strong className="text-red-400">R$ 20,00 por dia</strong> de atraso (cumulativo)</li>
                       <li>• A contagem ocorre em dias corridos (inclusive domingos e feriados)</li>
-                      <li>• O domingo não conta como parcela, mas conta para juros e multa se houver inadimplência</li>
+                      <li>• O domingo não possui cobrança diária, mas conta para juros e multa se houver inadimplência</li>
                     </ul>
                   </div>
 
@@ -1331,7 +1343,7 @@ export const Wizard: React.FC = () => {
                     <div>
                       <span className="text-white font-bold">☑️ Declaro que li e compreendi</span>
                       <p className="text-xs text-zinc-400 mt-1">
-                        As condições do Empréstimo para Comerciante (Capital de Giro), incluindo análise do comércio, pagamento em <strong>30 diárias</strong>, juros de <strong className="text-red-400">30% ao mês</strong>, cobrança de segunda a sábado (feriados inclusos), inexistência de parcela aos domingos, e que em caso de inadimplência o domingo será contado para juros e multa de <strong className="text-red-400">R$ 20,00 por dia</strong> de atraso, de forma cumulativa.
+                        As condições do Empréstimo para Comerciante (Capital de Giro), incluindo análise do comércio, pagamento em <strong>30 diárias</strong>, juros de <strong className="text-red-400">30% ao mês</strong>, cobrança de segunda a sábado (feriados inclusos), sem cobrança aos domingos, e que em caso de inadimplência o domingo será contado para juros e multa de <strong className="text-red-400">R$ 20,00 por dia</strong> de atraso, de forma cumulativa.
                       </p>
                     </div>
                   </label>
@@ -1563,7 +1575,7 @@ export const Wizard: React.FC = () => {
                       <Input label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00" error={errors.cpf} />
                       <Input label="WhatsApp Principal" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
                       <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} />
-                      <Input label="Instagram" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="@seu_usuario" />
+                      <Input label="Instagram" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="@seu_usuario" required />
                     </div>
 
                     {/* Dados Específicos por Perfil */}
@@ -1600,50 +1612,49 @@ export const Wizard: React.FC = () => {
 
           {/* STEP PRODUTO - Seleção de Cor da Moto (Step 4 MOTO) */}
           {currentStep === 4 && profileType === 'MOTO' && (
-              <div className="space-y-6 animate-in slide-in-from-right">
-                <div className="text-center">
-                  <Car size={48} className="mx-auto text-blue-400 mb-3" />
-                  <h2 className="text-xl font-bold">Escolha sua Honda Pop 110i 2026</h2>
-                  <p className="text-zinc-400 text-sm mt-2">Selecione a cor da sua moto</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { id: 'vermelho', label: 'Vermelho', color: 'bg-red-600', border: 'border-red-500' },
-                    { id: 'preto', label: 'Preto', color: 'bg-zinc-800', border: 'border-zinc-500' },
-                    { id: 'branco', label: 'Branco', color: 'bg-white', border: 'border-gray-300', textColor: 'text-black' },
-                    { id: 'azul', label: 'Azul', color: 'bg-blue-600', border: 'border-blue-500' },
-                    { id: 'prata', label: 'Prata / Cinza', color: 'bg-gray-400', border: 'border-gray-500', textColor: 'text-black' },
-                  ].map((cor) => (
-                    <button
-                      key={cor.id}
-                      onClick={() => setFormData({ ...formData, motoColor: cor.id })}
-                      className={`relative p-5 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-3 ${
-                        formData.motoColor === cor.id
-                          ? `${cor.border} ring-2 ring-offset-2 ring-offset-black ring-[#D4AF37] scale-[1.02] shadow-lg`
-                          : 'border-zinc-700 hover:border-zinc-500'
-                      }`}
-                    >
-                      <div className={`w-16 h-16 rounded-full ${cor.color} ${cor.border} border-2 shadow-inner`}></div>
-                      <span className={`text-sm font-bold ${cor.textColor || 'text-white'}`}>{cor.label}</span>
-                      {formData.motoColor === cor.id && (
-                        <div className="absolute top-2 right-2 bg-[#D4AF37] text-black rounded-full p-1">
-                          <CheckCircle2 size={16} />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-
-                {formData.motoColor && (
-                  <div className="bg-blue-900/20 border border-blue-600/30 rounded-xl p-4 text-center">
-                    <p className="text-blue-400 font-bold">Honda Pop 110i 2026 - {
-                      { vermelho: 'Vermelho', preto: 'Preto', branco: 'Branco', azul: 'Azul', prata: 'Prata / Cinza' }[formData.motoColor] || formData.motoColor
-                    }</p>
-                    <p className="text-zinc-400 text-xs mt-1">Entrada: R$ 2.000,00 + 36x R$ 611,00</p>
-                  </div>
-                )}
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center">
+                <Car size={48} className="mx-auto text-blue-400 mb-3" />
+                <h2 className="text-xl font-bold">Escolha sua Honda Pop 110i 2026</h2>
+                <p className="text-zinc-400 text-sm mt-2">Selecione a cor da sua moto</p>
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { id: 'vermelho', label: 'Vermelho', color: 'bg-red-600', border: 'border-red-500' },
+                  { id: 'preto', label: 'Preto', color: 'bg-zinc-800', border: 'border-zinc-500' },
+                  { id: 'branco', label: 'Branco', color: 'bg-white', border: 'border-gray-300', textColor: 'text-black' },
+                  { id: 'azul', label: 'Azul', color: 'bg-blue-600', border: 'border-blue-500' },
+                  { id: 'prata', label: 'Prata / Cinza', color: 'bg-gray-400', border: 'border-gray-500', textColor: 'text-black' },
+                ].map((cor) => (
+                  <button
+                    key={cor.id}
+                    onClick={() => setFormData({ ...formData, motoColor: cor.id })}
+                    className={`relative p-5 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-3 ${formData.motoColor === cor.id
+                      ? `${cor.border} ring-2 ring-offset-2 ring-offset-black ring-[#D4AF37] scale-[1.02] shadow-lg`
+                      : 'border-zinc-700 hover:border-zinc-500'
+                      }`}
+                  >
+                    <div className={`w-16 h-16 rounded-full ${cor.color} ${cor.border} border-2 shadow-inner`}></div>
+                    <span className={`text-sm font-bold ${cor.textColor || 'text-white'}`}>{cor.label}</span>
+                    {formData.motoColor === cor.id && (
+                      <div className="absolute top-2 right-2 bg-[#D4AF37] text-black rounded-full p-1">
+                        <CheckCircle2 size={16} />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {formData.motoColor && (
+                <div className="bg-blue-900/20 border border-blue-600/30 rounded-xl p-4 text-center">
+                  <p className="text-blue-400 font-bold">Honda Pop 110i 2026 - {
+                    { vermelho: 'Vermelho', preto: 'Preto', branco: 'Branco', azul: 'Azul', prata: 'Prata / Cinza' }[formData.motoColor] || formData.motoColor
+                  }</p>
+                  <p className="text-zinc-400 text-xs mt-1">Entrada: R$ 2.000,00 + 36x R$ 611,00</p>
+                </div>
+              )}
+            </div>
           )}
 
           {/* STEP DOCUMENTOS - Dinâmico (Step 5 para CLT/AUTONOMO/MOTO, Step 6 para GARANTIA) - NÃO para LIMPA_NOME */}
@@ -1666,15 +1677,26 @@ export const Wizard: React.FC = () => {
                   {renderUploadArea('proofAddress', 'Comprovante de Endereço - Água ou Luz (OBRIGATÓRIO)', formData.proofAddress)}
                   {/* Boleto em nome - não exigido para MOTO */}
                   {profileType !== 'MOTO' && (
-                  <>
-                  <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
-                    <p className="text-xs text-red-400">
-                      <strong>⚠️ OBRIGATÓRIO:</strong> Envie também um boleto (banco, cartão, etc.) <strong>em seu nome</strong> para confirmar o endereço.
+                    <>
+                      <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                        <p className="text-xs text-red-400">
+                          <strong>⚠️ OBRIGATÓRIO:</strong> Envie também um boleto (banco, cartão, etc.) <strong>em seu nome</strong> para confirmar o endereço.
+                        </p>
+                      </div>
+                      {renderUploadArea('billInName', 'Boleto em Seu Nome (OBRIGATÓRIO)', formData.billInName)}
+                    </>
+                  )}
+                </div>
+
+                {/* Comprovante de Renda - OBRIGATÓRIO */}
+                <div className="space-y-2 border-t border-zinc-800 pt-6">
+                  <h3 className="font-bold text-[#D4AF37]">💰 Comprovante de Renda (OBRIGATÓRIO)</h3>
+                  <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-3">
+                    <p className="text-xs text-blue-400">
+                      <strong>📄 Aceitos:</strong> Extrato bancário, holerite, declaração de faturamento, pró-labore, ou comprovante de recebimento de PIX/transferências.
                     </p>
                   </div>
-                  {renderUploadArea('billInName', 'Boleto em Seu Nome (OBRIGATÓRIO)', formData.billInName)}
-                  </>
-                  )}
+                  {renderUploadArea('proofIncome', 'Comprovante de Renda (OBRIGATÓRIO)', formData.proofIncome)}
                 </div>
 
                 {/* CNH - Obrigatório para MOTO, AUTONOMO e GARANTIA_VEICULO */}
@@ -1745,15 +1767,15 @@ export const Wizard: React.FC = () => {
 
                   {/* Vídeo da residência - não obrigatório para MOTO */}
                   {profileType !== 'MOTO' && (
-                  <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                    <VideoUpload
-                      label="🎥 Vídeo da sua Residência (OBRIGATÓRIO)"
-                      subtitle="Mostre a fachada e entre na casa rapidamente"
-                      videoUrl={formData.videoHouse}
-                      onUpload={(url) => setFormData({ ...formData, videoHouse: url })}
-                      onRemove={() => setFormData({ ...formData, videoHouse: '' })}
-                    />
-                  </div>
+                    <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                      <VideoUpload
+                        label="🎥 Vídeo da sua Residência (OBRIGATÓRIO)"
+                        subtitle="Mostre a fachada e entre na casa rapidamente"
+                        videoUrl={formData.videoHouse}
+                        onUpload={(url) => setFormData({ ...formData, videoHouse: url })}
+                        onRemove={() => setFormData({ ...formData, videoHouse: '' })}
+                      />
+                    </div>
                   )}
                 </div>
 
@@ -1785,23 +1807,23 @@ export const Wizard: React.FC = () => {
 
                 {/* Vídeo de confirmação com declaração de juros - OBRIGATÓRIO (não para MOTO) */}
                 {profileType !== 'MOTO' && (
-                <div className="space-y-4 border-t border-zinc-800 pt-6">
-                  <h3 className="font-bold text-[#D4AF37]">🎬 Vídeo de Aceite (OBRIGATÓRIO)</h3>
-                  <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
-                    <p className="text-xs text-red-400">
-                      <strong>⚠️ OBRIGATÓRIO:</strong> Grave um vídeo dizendo seu nome e confirmando que aceita os juros de {settings?.interestRateMonthly || 30}% ao mês.
-                    </p>
+                  <div className="space-y-4 border-t border-zinc-800 pt-6">
+                    <h3 className="font-bold text-[#D4AF37]">🎬 Vídeo de Aceite (OBRIGATÓRIO)</h3>
+                    <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                      <p className="text-xs text-red-400">
+                        <strong>⚠️ OBRIGATÓRIO:</strong> Grave um vídeo dizendo seu nome e confirmando que aceita os juros de {settings?.interestRateMonthly || 30}% ao mês.
+                      </p>
+                    </div>
+                    <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                      <VideoUpload
+                        label="🎥 Vídeo de Aceite (OBRIGATÓRIO)"
+                        subtitle={`Diga seu nome e: "Estou ciente do empréstimo e dos juros de ${settings?.interestRateMonthly || 30}%"`}
+                        videoUrl={formData.videoSelfie}
+                        onUpload={(url) => setFormData({ ...formData, videoSelfie: url })}
+                        onRemove={() => setFormData({ ...formData, videoSelfie: '' })}
+                      />
+                    </div>
                   </div>
-                  <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                    <VideoUpload
-                      label="🎥 Vídeo de Aceite (OBRIGATÓRIO)"
-                      subtitle={`Diga seu nome e: "Estou ciente do empréstimo e dos juros de ${settings?.interestRateMonthly || 30}%"`}
-                      videoUrl={formData.videoSelfie}
-                      onUpload={(url) => setFormData({ ...formData, videoSelfie: url })}
-                      onRemove={() => setFormData({ ...formData, videoSelfie: '' })}
-                    />
-                  </div>
-                </div>
                 )}
               </div>
             )}
@@ -1979,7 +2001,7 @@ export const Wizard: React.FC = () => {
           ) : (
             <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading} disabled={!formData.signature}>
               {profileType === 'LIMPA_NOME' ? 'SOLICITAR SERVIÇO' :
-               profileType === 'MOTO' ? 'SOLICITAR FINANCIAMENTO' : 'SOLICITAR MEU EMPRÉSTIMO'}
+                profileType === 'MOTO' ? 'SOLICITAR FINANCIAMENTO' : 'SOLICITAR MEU EMPRÉSTIMO'}
             </Button>
           )}
         </div>
@@ -1988,9 +2010,11 @@ export const Wizard: React.FC = () => {
   );
 };
 
-const Input = ({ label, error, className = "", ...props }: any) => (
+const Input = ({ label, error, className = "", required, ...props }: any) => (
   <div>
-    <label className="block text-xs text-zinc-400 mb-1.5 ml-1">{label}</label>
+    <label className="block text-xs text-zinc-400 mb-1.5 ml-1">
+      {label}{required && <span className="text-red-500 ml-1">*</span>}
+    </label>
     <input className={`w-full bg-black border rounded-lg p-3 text-white text-sm focus:border-[#D4AF37] outline-none ${error ? 'border-red-900' : 'border-zinc-700'} ${className}`} {...props} />
     {error && <p className="text-xs text-red-500 mt-1 ml-1">{error}</p>}
   </div>

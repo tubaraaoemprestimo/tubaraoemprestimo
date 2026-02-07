@@ -35,10 +35,10 @@ export const SERVICE_TERMS = {
         conditions: [
             'Finalidade: Capital de giro para comércio',
             'Modalidade: Pagamento diário',
-            'Parcelas: 30 (trinta) diárias',
+            'Prazo: 30 (trinta) diárias',
             'Juros: 30% ao mês',
             'Dias de cobrança: Segunda a Sábado (feriados inclusos)',
-            'Domingos: Não possuem cobrança de parcela',
+            'Domingos: Não possuem cobrança diária',
             'Multa por atraso: R$ 20,00 por dia (cumulativo)',
         ],
         documents: [
@@ -48,7 +48,7 @@ export const SERVICE_TERMS = {
             'Análise do Comércio',
             'Selfie com Documento',
         ],
-        checkboxText: `Declaro que li e compreendi as condições do Empréstimo para Comerciante (Capital de Giro), incluindo análise do comércio para definição do valor, pagamento em 30 diárias, juros de 30% ao mês, cobrança de segunda a sábado (feriados inclusos), inexistência de parcela aos domingos, e que em caso de inadimplência o domingo será contado para juros e multa de R$ 20,00 por dia de atraso, de forma cumulativa.`,
+        checkboxText: `Declaro que li e compreendi as condições do Empréstimo para Comerciante (Capital de Giro), incluindo análise do comércio para definição do valor, pagamento em 30 diárias, juros de 30% ao mês, cobrança de segunda a sábado (feriados inclusos), sem cobrança aos domingos, e que em caso de inadimplência o domingo será contado para juros e multa de R$ 20,00 por dia de atraso, de forma cumulativa.`,
     },
 
     MOTO: {

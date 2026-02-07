@@ -211,16 +211,14 @@ export const Requests: React.FC = () => {
                         <button
                             key={tab.id}
                             onClick={() => setFilterProfile(tab.id)}
-                            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-2 border-2 ${
-                                isActive
+                            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-2 border-2 ${isActive
                                     ? `${tab.bg} ${tab.text} ${tab.border} shadow-lg scale-[1.02]`
                                     : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600 hover:text-white'
-                            }`}
+                                }`}
                         >
                             {tab.label}
-                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                isActive ? 'bg-black/20' : 'bg-zinc-800 text-zinc-500'
-                            }`}>
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isActive ? 'bg-black/20' : 'bg-zinc-800 text-zinc-500'
+                                }`}>
                                 {count}
                             </span>
                         </button>
@@ -267,12 +265,11 @@ export const Requests: React.FC = () => {
                                 <tr><td colSpan={7} className="p-8 text-center text-zinc-500">Nenhuma solicitação encontrada com este filtro.</td></tr>
                             ) : (
                                 filteredRequests.map((req) => (
-                                    <tr key={req.id} className={`hover:bg-zinc-800/50 transition-colors ${
-                                            (req.profileType === 'GARANTIA' || req.profileType === 'GARANTIA_VEICULO') ? 'border-l-4 border-l-yellow-500' :
+                                    <tr key={req.id} className={`hover:bg-zinc-800/50 transition-colors ${(req.profileType === 'GARANTIA' || req.profileType === 'GARANTIA_VEICULO') ? 'border-l-4 border-l-yellow-500' :
                                             req.profileType === 'MOTO' ? 'border-l-4 border-l-blue-500' :
-                                            req.profileType === 'LIMPA_NOME' ? 'border-l-4 border-l-purple-500' :
-                                            req.profileType === 'AUTONOMO' ? 'border-l-4 border-l-green-500' :
-                                            req.profileType === 'CLT' ? 'border-l-4 border-l-gray-500' : ''
+                                                req.profileType === 'LIMPA_NOME' ? 'border-l-4 border-l-purple-500' :
+                                                    req.profileType === 'AUTONOMO' ? 'border-l-4 border-l-green-500' :
+                                                        req.profileType === 'CLT' ? 'border-l-4 border-l-gray-500' : ''
                                         }`}>
                                         <td className="p-4">
                                             <div className="font-medium text-white">{req.clientName}</div>
@@ -291,8 +288,8 @@ export const Requests: React.FC = () => {
                                             {req.profileType === 'LIMPA_NOME'
                                                 ? <span className="text-purple-400">Serviço</span>
                                                 : req.profileType === 'MOTO'
-                                                ? <span className="text-blue-400">Financiamento</span>
-                                                : `R$ ${req.amount?.toLocaleString() || '0'}`
+                                                    ? <span className="text-blue-400">Financiamento</span>
+                                                    : `R$ ${req.amount?.toLocaleString() || '0'}`
                                             }
                                         </td>
 
@@ -338,9 +335,9 @@ export const Requests: React.FC = () => {
                             <div>
                                 <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                                     {selectedRequest.profileType === 'LIMPA_NOME' ? 'Análise de Serviço' :
-                                     selectedRequest.profileType === 'MOTO' ? 'Financiamento de Moto' :
-                                     (selectedRequest.profileType === 'GARANTIA' || selectedRequest.profileType === 'GARANTIA_VEICULO') ? 'Análise de Garantia' :
-                                     'Análise de Crédito'}
+                                        selectedRequest.profileType === 'MOTO' ? 'Financiamento de Moto' :
+                                            (selectedRequest.profileType === 'GARANTIA' || selectedRequest.profileType === 'GARANTIA_VEICULO') ? 'Análise de Garantia' :
+                                                'Análise de Crédito'}
                                     <span className={`text-xs px-2 py-1 rounded-full border ${selectedRequest.status === LoanStatus.APPROVED ? 'bg-green-900/30 text-green-500 border-green-800' :
                                         selectedRequest.status === LoanStatus.REJECTED ? 'bg-red-900/30 text-red-500 border-red-800' :
                                             selectedRequest.status === LoanStatus.WAITING_DOCS ? 'bg-blue-900/30 text-blue-500 border-blue-800' :
@@ -702,10 +699,10 @@ export const Requests: React.FC = () => {
                                     {selectedRequest.profileType === 'LIMPA_NOME'
                                         ? 'Ao aprovar, o serviço Limpa Nome será iniciado para este cliente.'
                                         : selectedRequest.profileType === 'MOTO'
-                                        ? 'Ao aprovar, o financiamento da moto será confirmado. Verifique entrada e documentos.'
-                                        : (selectedRequest.profileType === 'GARANTIA' || selectedRequest.profileType === 'GARANTIA_VEICULO')
-                                        ? 'Ao aprovar, o empréstimo com garantia será liberado. Verifique os documentos.'
-                                        : 'Se aprovar agora, o saldo será liberado na carteira.'
+                                            ? 'Ao aprovar, o financiamento da moto será confirmado. Verifique entrada e documentos.'
+                                            : (selectedRequest.profileType === 'GARANTIA' || selectedRequest.profileType === 'GARANTIA_VEICULO')
+                                                ? 'Ao aprovar, o empréstimo com garantia será liberado. Verifique os documentos.'
+                                                : 'Se aprovar agora, o saldo será liberado na carteira.'
                                     }
                                 </span>
                                 <div className="flex gap-4 w-full md:w-auto">
@@ -719,7 +716,7 @@ export const Requests: React.FC = () => {
                                     </Button>
                                     <Button variant="gold" className="flex-1 md:flex-initial bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]" onClick={() => handleApprove(selectedRequest.id)} isLoading={processing === selectedRequest.id}>
                                         <Check size={18} className="mr-2" /> {selectedRequest.profileType === 'LIMPA_NOME' ? 'APROVAR SERVIÇO' :
-                                        selectedRequest.profileType === 'MOTO' ? 'APROVAR FINANCIAMENTO' : 'APROVAR EMPRÉSTIMO'}
+                                            selectedRequest.profileType === 'MOTO' ? 'APROVAR FINANCIAMENTO' : 'APROVAR EMPRÉSTIMO'}
                                     </Button>
                                 </div>
                             </div>
@@ -778,27 +775,62 @@ const InfoBox = ({ label, value, highlight }: any) => (
     </div>
 );
 
-const VideoCard = ({ title, url }: { title: string, url: string }) => (
-    <div className="space-y-2 group">
-        <p className="text-xs text-zinc-400 pl-1">{title}</p>
-        <div className="rounded-xl border border-zinc-800 bg-black overflow-hidden relative aspect-video">
-            <video
-                src={url}
-                controls
-                playsInline
-                preload="metadata"
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                    const target = e.target as HTMLVideoElement;
-                    target.style.display = 'none';
-                    if (target.parentElement) {
-                        target.parentElement.innerHTML = `<div class="w-full h-full flex items-center justify-center text-zinc-500 text-sm flex-col gap-2"><span>Vídeo indisponível</span><a href="${url}" target="_blank" class="text-[#D4AF37] text-xs underline">Abrir em nova aba</a></div>`;
-                    }
-                }}
-            />
+const VideoCard = ({ title, url }: { title: string, url: string }) => {
+    const [hasError, setHasError] = React.useState(false);
+
+    // Se houver erro no vídeo, mostrar opção de abrir em nova aba
+    if (hasError) {
+        return (
+            <div className="space-y-2 group">
+                <p className="text-xs text-zinc-400 pl-1">{title}</p>
+                <div className="rounded-xl border border-zinc-800 bg-black overflow-hidden relative aspect-video flex items-center justify-center flex-col gap-3 p-4">
+                    <span className="text-zinc-500 text-sm text-center">Vídeo não carregou no navegador</span>
+                    <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-[#D4AF37] text-black px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#B5942F] transition-colors flex items-center gap-2"
+                    >
+                        📺 Abrir Vídeo
+                    </a>
+                    <p className="text-[10px] text-zinc-600 text-center">
+                        Dica: Se estiver no celular, faça download do vídeo para visualizar
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-2 group">
+            <p className="text-xs text-zinc-400 pl-1">{title}</p>
+            <div className="rounded-xl border border-zinc-800 bg-black overflow-hidden relative aspect-video">
+                <video
+                    src={url}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    crossOrigin="anonymous"
+                    className="w-full h-full object-contain"
+                    onError={() => setHasError(true)}
+                >
+                    <source src={url} type="video/mp4" />
+                    <source src={url} type="video/webm" />
+                    Seu navegador não suporta vídeos.
+                </video>
+            </div>
+            {/* Link direto para baixar/abrir */}
+            <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-[#D4AF37] hover:underline flex items-center gap-1"
+            >
+                📥 Baixar / Abrir em nova aba
+            </a>
         </div>
-    </div>
-);
+    );
+};
 
 const DocCard = ({ title, urls, isSignature, onView }: { title: string, urls: string[], isSignature?: boolean, onView: () => void }) => (
     <div className="space-y-2 group">
