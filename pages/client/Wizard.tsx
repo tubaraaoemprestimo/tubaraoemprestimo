@@ -506,10 +506,29 @@ export const Wizard: React.FC = () => {
       }
     }
 
-    // STEP PRODUTO (Seleção de cor) - MOTO step 4
-    if (profileType === 'MOTO' && currentStep === 4) {
-      if (!formData.motoColor) {
-        addToast("Selecione a cor da sua moto.", 'warning');
+    // STEP PRODUTO (Info da Moto) - MOTO step 4 - não precisa validação, é apenas informativo
+
+    // STEP GARANTIA - Dados do Bem (Step 4 para GARANTIA)
+    if (profileType === 'GARANTIA' && currentStep === 4) {
+      if (!guarantee.type) {
+        addToast("Selecione o tipo de garantia.", 'warning');
+        return;
+      }
+      if (!guarantee.description.trim()) {
+        addToast("Descreva o bem (marca, modelo, ano).", 'warning');
+        return;
+      }
+      if (!guarantee.estimatedValue.trim()) {
+        addToast("Informe o valor estimado do bem.", 'warning');
+        return;
+      }
+      if (guarantee.photos.length === 0) {
+        addToast("Envie fotos do bem em garantia.", 'warning');
+        return;
+      }
+      // Veículos precisam de CRLV
+      if ((guarantee.type === 'carro' || guarantee.type === 'moto' || guarantee.type === 'jetski' || guarantee.type === 'outro') && formData.vehicleCRLV.length === 0) {
+        addToast("Envie o documento do veículo (CRLV).", 'warning');
         return;
       }
     }
@@ -1635,49 +1654,161 @@ export const Wizard: React.FC = () => {
               </div>
             )}
 
-          {/* STEP PRODUTO - Seleção de Cor da Moto (Step 4 MOTO) */}
+          {/* STEP PRODUTO - Informação da Moto (Step 4 MOTO) */}
           {currentStep === 4 && profileType === 'MOTO' && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center">
                 <Car size={48} className="mx-auto text-blue-400 mb-3" />
-                <h2 className="text-xl font-bold">Escolha sua Honda Pop 110i 2026</h2>
-                <p className="text-zinc-400 text-sm mt-2">Selecione a cor da sua moto</p>
+                <h2 className="text-xl font-bold">Honda Pop 110i 2026</h2>
+                <p className="text-zinc-400 text-sm mt-2">Financiamento próprio Tubarão</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { id: 'preto', label: 'Preto', color: 'bg-zinc-800', border: 'border-zinc-500' },
-                  { id: 'branca-vermelha', label: 'Branca c/ Vermelha', color: 'bg-gradient-to-r from-white to-red-600', border: 'border-red-400' },
-                ].map((cor) => (
-                  <button
-                    key={cor.id}
-                    onClick={() => setFormData({ ...formData, motoColor: cor.id })}
-                    className={`relative p-5 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-3 ${formData.motoColor === cor.id
-                      ? `${cor.border} ring-2 ring-offset-2 ring-offset-black ring-[#D4AF37] scale-[1.02] shadow-lg`
-                      : 'border-zinc-700 hover:border-zinc-500'
-                      }`}
-                  >
-                    <div className={`w-16 h-16 rounded-full ${cor.color} ${cor.border} border-2 shadow-inner`}></div>
-                    <span className={`text-sm font-bold text-white`}>{cor.label}</span>
-                    {formData.motoColor === cor.id && (
-                      <div className="absolute top-2 right-2 bg-[#D4AF37] text-black rounded-full p-1">
-                        <CheckCircle2 size={16} />
-                      </div>
-                    )}
-                  </button>
-                ))}
+              <div className="bg-blue-900/20 border border-blue-600/30 rounded-xl p-6 text-center">
+                <p className="text-blue-400 font-bold text-lg mb-2">🏍️ Honda Pop 110i 2026</p>
+                <p className="text-zinc-300 text-sm mb-4">Cor conforme disponibilidade de estoque</p>
+                <div className="bg-black/30 rounded-lg p-4">
+                  <p className="text-[#D4AF37] font-bold">Entrada: R$ 2.000,00</p>
+                  <p className="text-white font-bold text-lg mt-1">36x R$ 611,00 + Seguro R$ 150,00</p>
+                  <p className="text-zinc-400 text-xs mt-2">Total mensal: R$ 761,00</p>
+                </div>
               </div>
 
-              {formData.motoColor && (
-                <div className="bg-blue-900/20 border border-blue-600/30 rounded-xl p-4 text-center">
-                  <p className="text-blue-400 font-bold">Honda Pop 110i 2026 - {
-                    { preto: 'Preto', 'branca-vermelha': 'Branca c/ Vermelha' }[formData.motoColor] || formData.motoColor
-                  }</p>
-                  <p className="text-zinc-400 text-xs mt-1">Entrada: R$ 2.000,00 + 36x R$ 611,00</p>
+              <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4">
+                <h3 className="font-bold text-white mb-2">📋 Informações Importantes</h3>
+                <ul className="text-sm text-zinc-300 space-y-2">
+                  <li>• A moto será entregue ZERADA, 0km</li>
+                  <li>• Cor será definida conforme disponibilidade no estoque</li>
+                  <li>• Transferência somente após quitação da 36ª parcela</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* STEP GARANTIA - Dados do Bem (Step 4 para GARANTIA) */}
+          {currentStep === 4 && profileType === 'GARANTIA' && (
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center">
+                <Car size={48} className="mx-auto text-orange-400 mb-3" />
+                <h2 className="text-xl font-bold">Dados da Garantia</h2>
+                <p className="text-zinc-400 text-sm mt-2">Informe detalhes do bem que ficará em garantia</p>
+              </div>
+
+              {/* Lembrete importante */}
+              <div className="bg-red-900/30 border border-red-500 rounded-xl p-4">
+                <p className="text-red-400 text-sm font-bold text-center">
+                  ⚠️ LEMBRETE: O bem será ENTREGUE FISICAMENTE e ficará em posse da empresa até quitação total
+                </p>
+              </div>
+
+              {/* Tipo de Garantia */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-[#D4AF37]">Selecione o tipo de garantia:</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'carro', label: 'Carro', icon: Car, color: 'text-yellow-400' },
+                    { id: 'moto', label: 'Moto', icon: Car, color: 'text-blue-400' },
+                    { id: 'celular', label: 'Celular', icon: Smartphone, color: 'text-green-400' },
+                    { id: 'notebook', label: 'Notebook/Tablet', icon: Tv, color: 'text-purple-400' },
+                    { id: 'jetski', label: 'Jet Ski', icon: Car, color: 'text-cyan-400' },
+                    { id: 'outro', label: 'Outro Veículo', icon: Package, color: 'text-gray-400' },
+                  ].map((tipo) => (
+                    <button
+                      key={tipo.id}
+                      onClick={() => setGuarantee({ ...guarantee, type: tipo.id })}
+                      className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${guarantee.type === tipo.id
+                        ? 'border-[#D4AF37] bg-[#D4AF37]/10 ring-2 ring-[#D4AF37]'
+                        : 'border-zinc-700 hover:border-zinc-500'
+                        }`}
+                    >
+                      <tipo.icon size={28} className={tipo.color} />
+                      <span className="text-sm font-bold">{tipo.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Descrição do Bem */}
+              {guarantee.type && (
+                <div className="space-y-4 border-t border-zinc-800 pt-4">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-bold text-[#D4AF37]">
+                      Descreva o bem (marca, modelo, ano):
+                    </label>
+                    <textarea
+                      value={guarantee.description}
+                      onChange={(e) => setGuarantee({ ...guarantee, description: e.target.value })}
+                      placeholder={
+                        guarantee.type === 'carro' ? 'Ex: Honda Civic 2020 Preto' :
+                          guarantee.type === 'moto' ? 'Ex: Honda CG 160 2022' :
+                            guarantee.type === 'celular' ? 'Ex: iPhone 14 Pro 256GB' :
+                              guarantee.type === 'notebook' ? 'Ex: MacBook Air M2 2023' :
+                                'Descreva marca, modelo e ano'
+                      }
+                      className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-[#D4AF37] outline-none min-h-[80px]"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm font-bold text-[#D4AF37]">
+                      Valor Estimado do Bem (R$):
+                    </label>
+                    <input
+                      type="text"
+                      value={guarantee.estimatedValue}
+                      onChange={(e) => setGuarantee({ ...guarantee, estimatedValue: e.target.value })}
+                      placeholder="Ex: 15.000,00"
+                      className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-[#D4AF37] outline-none"
+                    />
+                    <p className="text-xs text-zinc-500">
+                      Lembre-se: o valor deve ser NO MÍNIMO O DOBRO do empréstimo (R$ {(getAmount() * 2).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                    </p>
+                  </div>
+
+                  {/* Condição do bem */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-bold text-[#D4AF37]">
+                      Condição do Bem:
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['Ótimo', 'Bom', 'Regular'].map((cond) => (
+                        <button
+                          key={cond}
+                          onClick={() => setGuarantee({ ...guarantee, condition: cond })}
+                          className={`p-3 rounded-lg border text-sm font-bold transition-all ${guarantee.condition === cond
+                            ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]'
+                            : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                            }`}
+                        >
+                          {cond}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Fotos do Bem */}
+                  <div className="space-y-2">
+                    <h3 className="font-bold text-[#D4AF37]">📷 Fotos do Bem (OBRIGATÓRIO)</h3>
+                    <p className="text-xs text-zinc-500">
+                      {guarantee.type === 'carro' || guarantee.type === 'moto' || guarantee.type === 'jetski'
+                        ? 'Envie fotos: frente, lateral, traseira, interior e documento (CRLV)'
+                        : 'Envie fotos de todos os ângulos mostrando a condição do aparelho'}
+                    </p>
+                    {renderUploadArea('photos', 'Fotos do Bem em Garantia', guarantee.photos, true)}
+                  </div>
+
+                  {/* Documento do veículo (CRLV) */}
+                  {(guarantee.type === 'carro' || guarantee.type === 'moto' || guarantee.type === 'jetski' || guarantee.type === 'outro') && (
+                    <div className="space-y-2 border-t border-zinc-800 pt-4">
+                      <h3 className="font-bold text-[#D4AF37]">📄 Documento do Veículo (CRLV)</h3>
+                      <p className="text-xs text-zinc-500">O veículo deve estar quitado e sem débitos.</p>
+                      {renderUploadArea('vehicleCRLV', 'CRLV do Veículo', formData.vehicleCRLV)}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
+
 
           {/* STEP DOCUMENTOS - Dinâmico (Step 5 para CLT/AUTONOMO/MOTO, Step 6 para GARANTIA) - NÃO para LIMPA_NOME */}
           {((currentStep === 5 && (profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'MOTO')) ||
