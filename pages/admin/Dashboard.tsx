@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { DollarSign, Users, AlertTriangle, TrendingUp, Check, X, Maximize, Layers, Activity, BarChart3, LayoutGrid } from 'lucide-react';
+import { DollarSign, Users, AlertTriangle, TrendingUp, Check, X, Maximize, Layers, Activity, BarChart3, LayoutGrid, Clock } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { supabaseService } from '../../services/supabaseService';
 import { whatsappService } from '../../services/whatsappService';
@@ -11,51 +11,147 @@ import { useToast } from '../../components/Toast';
 import { ImageViewer } from '../../components/ImageViewer';
 import { AdvancedKPIs } from '../../components/AdvancedKPIs';
 
-// Dados de gráfico serão carregados dinamicamente
-const emptyChartData = [
-  { name: 'Jan', amt: 0 },
-  { name: 'Fev', amt: 0 },
-  { name: 'Mar', amt: 0 },
-  { name: 'Abr', amt: 0 },
-  { name: 'Mai', amt: 0 },
-  { name: 'Jun', amt: 0 },
-  { name: 'Jul', amt: 0 },
-];
+const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 export const Dashboard: React.FC = () => {
   const { addToast } = useToast();
-  const [requests, setRequests] = useState<LoanRequest[]>([]);
+  const [allRequests, setAllRequests] = useState<LoanRequest[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<LoanRequest | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
   const [viewingImage, setViewingImage] = useState<{ urls: string[]; title: string } | null>(null);
   const [viewMode, setViewMode] = useState<'standard' | 'advanced'>('advanced');
+  const [settings, setSettings] = useState<{ monthlyInterestRate: number }>({ monthlyInterestRate: 5 });
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
-    const allRequests = await supabaseService.getRequests();
-    // Filter only Pending for the dashboard
-    setRequests(allRequests.filter(r => r.status === LoanStatus.PENDING));
+    const [reqs, sett] = await Promise.all([
+      supabaseService.getRequests(),
+      supabaseService.getSettings(),
+    ]);
+    setAllRequests(reqs);
+    setSettings(sett);
   };
+
+  // Derived data
+  const pendingRequests = useMemo(() =>
+    allRequests.filter(r => r.status === LoanStatus.PENDING),
+    [allRequests]
+  );
+
+  const approvedRequests = useMemo(() =>
+    allRequests.filter(r => r.status === LoanStatus.APPROVED || r.status === LoanStatus.PAID),
+    [allRequests]
+  );
+
+  const defaultedRequests = useMemo(() =>
+    allRequests.filter(r => r.status === LoanStatus.DEFAULTED),
+    [allRequests]
+  );
+
+  // KPIs
+  const totalLent = useMemo(() =>
+    approvedRequests.reduce((sum, r) => sum + r.amount, 0),
+    [approvedRequests]
+  );
+
+  const activeClients = useMemo(() => {
+    const cpfs = new Set(approvedRequests.map(r => r.cpf));
+    return cpfs.size;
+  }, [approvedRequests]);
+
+  const defaultRate = useMemo(() => {
+    const totalFinalized = approvedRequests.length + defaultedRequests.length;
+    if (totalFinalized === 0) return 0;
+    return Math.round((defaultedRequests.length / totalFinalized) * 100);
+  }, [approvedRequests, defaultedRequests]);
+
+  const projectedRevenue = useMemo(() => {
+    return Math.round(totalLent * (settings.monthlyInterestRate / 100));
+  }, [totalLent, settings.monthlyInterestRate]);
+
+  // Chart data - group by month
+  const loanVolumeData = useMemo(() => {
+    const now = new Date();
+    const months: { name: string; amt: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const total = approvedRequests
+        .filter(r => {
+          const rd = new Date(r.date);
+          return `${rd.getFullYear()}-${String(rd.getMonth() + 1).padStart(2, '0')}` === monthKey;
+        })
+        .reduce((sum, r) => sum + r.amount, 0);
+      months.push({ name: MONTH_NAMES[d.getMonth()], amt: total });
+    }
+    return months;
+  }, [approvedRequests]);
+
+  const newClientsData = useMemo(() => {
+    const now = new Date();
+    const months: { name: string; amt: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const cpfs = new Set(
+        allRequests
+          .filter(r => {
+            const rd = new Date(r.date);
+            return `${rd.getFullYear()}-${String(rd.getMonth() + 1).padStart(2, '0')}` === monthKey;
+          })
+          .map(r => r.cpf)
+      );
+      months.push({ name: MONTH_NAMES[d.getMonth()], amt: cpfs.size });
+    }
+    return months;
+  }, [allRequests]);
+
+  // Activity feed - last 10 requests of any status
+  const recentActivity = useMemo(() => {
+    return allRequests.slice(0, 10).map(r => {
+      let type: 'success' | 'warning' | 'info' = 'info';
+      let title = '';
+      if (r.status === LoanStatus.APPROVED || r.status === LoanStatus.PAID) {
+        type = 'success';
+        title = 'Aprovado';
+      } else if (r.status === LoanStatus.REJECTED) {
+        type = 'warning';
+        title = 'Reprovado';
+      } else if (r.status === LoanStatus.DEFAULTED) {
+        type = 'warning';
+        title = 'Inadimplente';
+      } else {
+        type = 'info';
+        title = 'Nova solicitação';
+      }
+      const dateObj = new Date(r.date);
+      const now = new Date();
+      const diffMs = now.getTime() - dateObj.getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      let timeAgo = '';
+      if (diffHours < 1) timeAgo = 'Agora';
+      else if (diffHours < 24) timeAgo = `${diffHours}h atrás`;
+      else timeAgo = `${diffDays}d atrás`;
+
+      return { id: r.id, title, desc: `${r.clientName} - R$ ${r.amount.toLocaleString()}`, time: timeAgo, type };
+    });
+  }, [allRequests]);
 
   const handleApprove = async (id: string) => {
     setProcessing(id);
     await supabaseService.approveLoan(id);
 
-    // Automated WhatsApp Trigger
-    const req = requests.find(r => r.id === id);
+    const req = allRequests.find(r => r.id === id);
     if (req && req.phone) {
       const msg = `Olá ${req.clientName.split(' ')[0]}! Parabéns 🦈\n\nSeu empréstimo de *R$ ${req.amount.toLocaleString()}* foi APROVADO!\n\nO valor já está disponível em sua carteira digital. Acesse o app para conferir.`;
-
-      // Fire and forget - don't block UI if whatsapp fails
       whatsappService.sendMessage(req.phone, msg).then(success => {
         if (success) console.log("Auto message sent");
       });
-
-      // Create notification
-      notificationService.notifyLoanApproved(req.clientName, req.amount);
+      notificationService.notifyLoanApproved(req.email, req.clientName, req.amount);
     }
 
     setProcessing(null);
@@ -66,12 +162,11 @@ export const Dashboard: React.FC = () => {
 
   const handleReject = async (id: string) => {
     setProcessing(id);
-    const req = requests.find(r => r.id === id);
+    const req = allRequests.find(r => r.id === id);
     await supabaseService.rejectLoan(id);
 
-    // Create notification
     if (req) {
-      notificationService.notifyLoanRejected(req.clientName);
+      notificationService.notifyLoanRejected(req.email, req.clientName);
     }
 
     setProcessing(null);
@@ -86,12 +181,38 @@ export const Dashboard: React.FC = () => {
     return [src];
   };
 
+  // Trend calculation helpers
+  const getCurrentMonthTotal = (reqs: LoanRequest[]) => {
+    const now = new Date();
+    return reqs.filter(r => {
+      const d = new Date(r.date);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }).reduce((s, r) => s + r.amount, 0);
+  };
+
+  const getLastMonthTotal = (reqs: LoanRequest[]) => {
+    const now = new Date();
+    const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    return reqs.filter(r => {
+      const d = new Date(r.date);
+      return d.getMonth() === lastMonth && d.getFullYear() === lastYear;
+    }).reduce((s, r) => s + r.amount, 0);
+  };
+
+  const trendPercent = (current: number, previous: number): string => {
+    if (previous === 0) return current > 0 ? '+100%' : '0%';
+    const pct = Math.round(((current - previous) / previous) * 100);
+    return pct >= 0 ? `+${pct}%` : `${pct}%`;
+  };
+
+  const lentTrend = trendPercent(getCurrentMonthTotal(approvedRequests), getLastMonthTotal(approvedRequests));
+
   return (
     <div className="p-4 md:p-8 bg-black min-h-screen text-white">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <h1 className="text-3xl font-bold text-[#D4AF37]">Visão Geral</h1>
         <div className="flex items-center gap-3">
-          {/* View Mode Toggle */}
           <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-lg p-1">
             <button
               onClick={() => setViewMode('standard')}
@@ -118,56 +239,65 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Advanced KPIs View */}
       {viewMode === 'advanced' ? (
         <AdvancedKPIs />
       ) : (
         <>
-          {/* Layout Grid with Sidebar */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-
-            {/* Main Content Area */}
             <div className="lg:col-span-3 space-y-8">
-              {/* KPI Cards - Dados zerados até haver dados reais */}
+              {/* KPI Cards - Dados reais */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                <KPICard title="Total Emprestado" value={0} prefix="R$" icon={DollarSign} trend="0%" />
-                <KPICard title="Clientes Ativos" value={0} icon={Users} trend="0%" />
-                <KPICard title="Inadimplência" value={0} suffix="%" icon={AlertTriangle} trend="0%" isBad={false} />
-                <KPICard title="Receita Projetada" value={0} prefix="R$" icon={TrendingUp} trend="0%" />
+                <KPICard title="Total Emprestado" value={totalLent} prefix="R$" icon={DollarSign} trend={lentTrend} />
+                <KPICard title="Clientes Ativos" value={activeClients} icon={Users} trend={`${pendingRequests.length} pendentes`} />
+                <KPICard title="Inadimplência" value={defaultRate} suffix="%" icon={AlertTriangle} trend={`${defaultedRequests.length} casos`} isBad={defaultRate > 10} />
+                <KPICard title="Receita Projetada" value={projectedRevenue} prefix="R$" icon={TrendingUp} trend={`${settings.monthlyInterestRate}% a.m.`} />
               </div>
 
-              {/* Pending Loans Table (Approval Interface) */}
+              {/* Pending Loans Table */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
                 <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
                   <AlertTriangle className="text-[#D4AF37]" /> Solicitações Pendentes
+                  {pendingRequests.length > 0 && (
+                    <span className="text-xs bg-red-900/40 text-red-400 px-2 py-1 rounded-full ml-2">{pendingRequests.length}</span>
+                  )}
                 </h2>
 
                 <div className="overflow-x-auto -mx-6 md:mx-0 px-6 md:px-0">
-                  <table className="w-full text-left min-w-[600px]">
+                  <table className="w-full text-left min-w-[500px]">
                     <thead className="bg-zinc-950 text-zinc-400 text-sm uppercase tracking-wider">
                       <tr>
                         <th className="p-4 rounded-tl-xl">Cliente</th>
                         <th className="p-4">Valor</th>
-                        <th className="p-4">Parcelas</th>
+                        <th className="p-4">Tipo</th>
                         <th className="p-4">Data</th>
                         <th className="p-4 rounded-tr-xl text-right">Ação</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-800 text-sm">
-                      {requests.length === 0 ? (
+                      {pendingRequests.length === 0 ? (
                         <tr>
                           <td colSpan={5} className="p-8 text-center text-zinc-500">Nenhuma solicitação pendente no momento.</td>
                         </tr>
                       ) : (
-                        requests.map((req) => (
+                        pendingRequests.map((req) => (
                           <tr key={req.id} className="hover:bg-zinc-800/50 transition-colors">
                             <td className="p-4 font-medium">
                               <div className="text-white">{req.clientName}</div>
                               <div className="text-xs text-zinc-500">{req.cpf}</div>
                             </td>
                             <td className="p-4 text-[#D4AF37] font-bold">R$ {req.amount.toLocaleString()}</td>
-                            <td className="p-4">{req.installments}x</td>
-                            <td className="p-4 text-zinc-400">{new Date(req.date).toLocaleDateString()}</td>
+                            <td className="p-4">
+                              <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                                req.profileType === 'GARANTIA' ? 'bg-purple-900/30 text-purple-400' :
+                                req.profileType === 'MOTO' ? 'bg-blue-900/30 text-blue-400' :
+                                req.profileType === 'AUTONOMO' ? 'bg-orange-900/30 text-orange-400' :
+                                req.profileType === 'LIMPA_NOME' ? 'bg-cyan-900/30 text-cyan-400' :
+                                'bg-zinc-800 text-zinc-300'
+                              }`}>
+                                {req.profileType || 'CLT'}
+                              </span>
+                            </td>
+                            <td className="p-4 text-zinc-400">{new Date(req.date).toLocaleDateString('pt-BR')}</td>
                             <td className="p-4 text-right">
                               <Button size="sm" onClick={() => setSelectedRequest(req)}>
                                 Revisar
@@ -181,17 +311,20 @@ export const Dashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Existing Charts */}
+              {/* Charts */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl">
                   <h3 className="text-lg font-semibold mb-6">Volume de Empréstimos</h3>
                   <div className="h-[250px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={emptyChartData}>
+                      <BarChart data={loanVolumeData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                         <XAxis dataKey="name" stroke="#666" axisLine={false} tickLine={false} />
-                        <YAxis stroke="#666" axisLine={false} tickLine={false} />
-                        <Tooltip contentStyle={{ backgroundColor: '#000', borderColor: '#333' }} />
+                        <YAxis stroke="#666" axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#000', borderColor: '#333', borderRadius: '8px' }}
+                          formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Volume']}
+                        />
                         <Bar dataKey="amt" fill="#D4AF37" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -202,11 +335,14 @@ export const Dashboard: React.FC = () => {
                   <h3 className="text-lg font-semibold mb-6">Novos Clientes</h3>
                   <div className="h-[250px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={emptyChartData}>
+                      <LineChart data={newClientsData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                         <XAxis dataKey="name" stroke="#666" axisLine={false} tickLine={false} />
-                        <YAxis stroke="#666" axisLine={false} tickLine={false} />
-                        <Tooltip contentStyle={{ backgroundColor: '#000', borderColor: '#333' }} />
+                        <YAxis stroke="#666" axisLine={false} tickLine={false} allowDecimals={false} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#000', borderColor: '#333', borderRadius: '8px' }}
+                          formatter={(value: number) => [value, 'Clientes']}
+                        />
                         <Line type="monotone" dataKey="amt" stroke="#D4AF37" strokeWidth={2} dot={{ fill: '#D4AF37' }} />
                       </LineChart>
                     </ResponsiveContainer>
@@ -215,7 +351,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Sidebar - Real-time Activity Feed */}
+            {/* Sidebar - Activity Feed */}
             <div className="lg:col-span-1">
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 h-full">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
@@ -223,14 +359,18 @@ export const Dashboard: React.FC = () => {
                 </h3>
 
                 <div className="space-y-6 relative">
-                  {/* Timeline line */}
                   <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-zinc-800"></div>
 
-                  {/* Sem atividades - dados virão do banco */}
-                  <div className="text-center py-8 text-zinc-500">
-                    <Activity size={32} className="mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Nenhuma atividade recente</p>
-                  </div>
+                  {recentActivity.length === 0 ? (
+                    <div className="text-center py-8 text-zinc-500">
+                      <Activity size={32} className="mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Nenhuma atividade recente</p>
+                    </div>
+                  ) : (
+                    recentActivity.map((act) => (
+                      <ActivityItem key={act.id} title={act.title} desc={act.desc} time={act.time} type={act.type} />
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -240,7 +380,6 @@ export const Dashboard: React.FC = () => {
           {selectedRequest && (
             <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-0 md:p-4">
               <div className="bg-zinc-900 border border-zinc-800 md:rounded-2xl w-full max-w-5xl h-full md:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
-                {/* Modal Header */}
                 <div className="flex justify-between items-center p-6 border-b border-zinc-800 bg-zinc-950">
                   <div>
                     <h2 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -254,17 +393,14 @@ export const Dashboard: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Modal Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                  {/* Client Info Grid */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <InfoBox label="Cliente" value={selectedRequest.clientName} />
                     <InfoBox label="CPF" value={selectedRequest.cpf} />
                     <InfoBox label="Valor Solicitado" value={`R$ ${selectedRequest.amount.toLocaleString()}`} highlight />
-                    <InfoBox label="Parcelas" value={`${selectedRequest.installments}x`} />
+                    <InfoBox label="Tipo" value={selectedRequest.profileType || 'CLT'} />
                   </div>
 
-                  {/* Documents Gallery */}
                   <div className="space-y-4">
                     <h3 className="text-[#D4AF37] font-bold text-lg border-b border-zinc-800 pb-2">Documentação Enviada</h3>
 
@@ -302,7 +438,6 @@ export const Dashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Modal Actions */}
                 <div className="p-6 border-t border-zinc-800 bg-zinc-950 flex flex-col md:flex-row justify-between items-center gap-4">
                   <span className="text-xs text-zinc-500 text-center md:text-left">
                     Aprovar liberará o saldo imediatamente na carteira do usuário.
@@ -320,7 +455,6 @@ export const Dashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Full Screen Image Viewer */}
           {viewingImage && (
             <ImageViewer
               urls={viewingImage.urls}
@@ -336,11 +470,11 @@ export const Dashboard: React.FC = () => {
 
 // --- Local Components ---
 
-// Animated KPI Card
 const KPICard = ({ title, value, prefix = "", suffix = "", icon: Icon, trend, isBad }: any) => {
   const [displayValue, setDisplayValue] = useState(0);
 
   useEffect(() => {
+    if (value === 0) { setDisplayValue(0); return; }
     let start = 0;
     const duration = 2000;
     const increment = value / (duration / 16);
@@ -362,30 +496,31 @@ const KPICard = ({ title, value, prefix = "", suffix = "", icon: Icon, trend, is
         <div className="p-3 bg-black rounded-lg border border-zinc-800 text-[#D4AF37]">
           <Icon size={24} />
         </div>
-        <span className={`text-xs font-bold px-2 py-1 rounded-full ${(trend.includes('-') && !isBad) || (!trend.includes('-') && isBad === undefined)
-          ? 'bg-green-900/30 text-green-400'
-          : 'bg-red-900/30 text-red-400'
-          }`}>
+        <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+          isBad ? 'bg-red-900/30 text-red-400' : 'bg-green-900/30 text-green-400'
+        }`}>
           {trend}
         </span>
       </div>
       <div className="text-zinc-400 text-sm mb-1">{title}</div>
       <div className="text-2xl font-bold text-white">
-        {prefix} {displayValue.toLocaleString()} {suffix}
+        {prefix} {displayValue.toLocaleString('pt-BR')} {suffix}
       </div>
     </div>
   );
 };
 
 const ActivityItem = ({ title, desc, time, type }: any) => {
-  const color = type === 'success' ? 'bg-green-500' : type === 'warning' ? 'bg-red-500' : 'bg-blue-500';
+  const color = type === 'success' ? 'bg-green-500' : type === 'warning' ? 'bg-red-500' : 'bg-[#D4AF37]';
   return (
     <div className="relative pl-8">
       <div className={`absolute left-0 top-1.5 w-6 h-6 rounded-full border-4 border-zinc-900 ${color}`}></div>
       <div>
         <h4 className="text-white text-sm font-bold">{title}</h4>
         <p className="text-zinc-400 text-xs">{desc}</p>
-        <span className="text-zinc-600 text-[10px] uppercase tracking-wide">{time}</span>
+        <span className="text-zinc-600 text-[10px] uppercase tracking-wide flex items-center gap-1 mt-1">
+          <Clock size={9} /> {time}
+        </span>
       </div>
     </div>
   );
@@ -408,7 +543,6 @@ const DocCard = ({ title, urls, isSignature, onView }: { title: string, urls: st
         <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">Pendente</div>
       )}
 
-      {/* Multi-page badge */}
       {urls.length > 1 && (
         <div className="absolute top-2 right-2 bg-black/70 border border-zinc-700 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
           <Layers size={10} className="text-[#D4AF37]" /> +{urls.length - 1}
