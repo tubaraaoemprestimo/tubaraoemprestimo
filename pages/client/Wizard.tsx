@@ -189,6 +189,7 @@ export const Wizard: React.FC = () => {
     cnh: [] as string[],
     vehicleCRLV: [] as string[],
     vehicleFront: [] as string[],
+    proofPurchase: [] as string[], // Nota fiscal para eletrônicos
     // Vídeos
     videoSelfie: '',
     videoHouse: '', // Vídeo mostrando a residência
@@ -529,6 +530,11 @@ export const Wizard: React.FC = () => {
       // Veículos precisam de CRLV
       if ((guarantee.type === 'carro' || guarantee.type === 'moto' || guarantee.type === 'jetski' || guarantee.type === 'outro') && formData.vehicleCRLV.length === 0) {
         addToast("Envie o documento do veículo (CRLV).", 'warning');
+        return;
+      }
+      // Eletrônicos precisam de Nota Fiscal
+      if ((guarantee.type === 'celular' || guarantee.type === 'notebook') && formData.proofPurchase.length === 0) {
+        addToast("Envie a Nota Fiscal do aparelho.", 'warning');
         return;
       }
     }
@@ -1796,12 +1802,21 @@ export const Wizard: React.FC = () => {
                     {renderUploadArea('photos', 'Fotos do Bem em Garantia', guarantee.photos, true)}
                   </div>
 
-                  {/* Documento do veículo (CRLV) */}
+                  {/* Documento do veículo (CRLV) - apenas para veículos */}
                   {(guarantee.type === 'carro' || guarantee.type === 'moto' || guarantee.type === 'jetski' || guarantee.type === 'outro') && (
                     <div className="space-y-2 border-t border-zinc-800 pt-4">
                       <h3 className="font-bold text-[#D4AF37]">📄 Documento do Veículo (CRLV)</h3>
                       <p className="text-xs text-zinc-500">O veículo deve estar quitado e sem débitos.</p>
                       {renderUploadArea('vehicleCRLV', 'CRLV do Veículo', formData.vehicleCRLV)}
+                    </div>
+                  )}
+
+                  {/* Nota Fiscal - para eletrônicos (OBRIGATÓRIO) */}
+                  {(guarantee.type === 'celular' || guarantee.type === 'notebook') && (
+                    <div className="space-y-2 border-t border-zinc-800 pt-4">
+                      <h3 className="font-bold text-[#D4AF37]">📄 Nota Fiscal do Aparelho (OBRIGATÓRIO)</h3>
+                      <p className="text-xs text-zinc-500">Envie a nota fiscal ou comprovante de compra do aparelho.</p>
+                      {renderUploadArea('proofPurchase', 'Nota Fiscal ou Comprovante de Compra', formData.proofPurchase)}
                     </div>
                   )}
                 </div>
