@@ -1646,11 +1646,8 @@ export const Wizard: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { id: 'vermelho', label: 'Vermelho', color: 'bg-red-600', border: 'border-red-500' },
                   { id: 'preto', label: 'Preto', color: 'bg-zinc-800', border: 'border-zinc-500' },
-                  { id: 'branco', label: 'Branco', color: 'bg-white', border: 'border-gray-300', textColor: 'text-black' },
-                  { id: 'azul', label: 'Azul', color: 'bg-blue-600', border: 'border-blue-500' },
-                  { id: 'prata', label: 'Prata / Cinza', color: 'bg-gray-400', border: 'border-gray-500', textColor: 'text-black' },
+                  { id: 'branca-vermelha', label: 'Branca c/ Vermelha', color: 'bg-gradient-to-r from-white to-red-600', border: 'border-red-400' },
                 ].map((cor) => (
                   <button
                     key={cor.id}
@@ -1661,7 +1658,7 @@ export const Wizard: React.FC = () => {
                       }`}
                   >
                     <div className={`w-16 h-16 rounded-full ${cor.color} ${cor.border} border-2 shadow-inner`}></div>
-                    <span className={`text-sm font-bold ${cor.textColor || 'text-white'}`}>{cor.label}</span>
+                    <span className={`text-sm font-bold text-white`}>{cor.label}</span>
                     {formData.motoColor === cor.id && (
                       <div className="absolute top-2 right-2 bg-[#D4AF37] text-black rounded-full p-1">
                         <CheckCircle2 size={16} />
@@ -1674,7 +1671,7 @@ export const Wizard: React.FC = () => {
               {formData.motoColor && (
                 <div className="bg-blue-900/20 border border-blue-600/30 rounded-xl p-4 text-center">
                   <p className="text-blue-400 font-bold">Honda Pop 110i 2026 - {
-                    { vermelho: 'Vermelho', preto: 'Preto', branco: 'Branco', azul: 'Azul', prata: 'Prata / Cinza' }[formData.motoColor] || formData.motoColor
+                    { preto: 'Preto', 'branca-vermelha': 'Branca c/ Vermelha' }[formData.motoColor] || formData.motoColor
                   }</p>
                   <p className="text-zinc-400 text-xs mt-1">Entrada: R$ 2.000,00 + 36x R$ 611,00</p>
                 </div>
