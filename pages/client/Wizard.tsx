@@ -408,26 +408,6 @@ export const Wizard: React.FC = () => {
       return;
     }
 
-    // STEP 4 para GARANTIA: Dados da garantia (veículo/eletrônico)
-    if (profileType === 'GARANTIA' && currentStep === 4) {
-      if (!guarantee.type) {
-        addToast("Selecione o tipo de garantia.", 'warning');
-        return;
-      }
-      if (!guarantee.description.trim()) {
-        addToast("Descreva o bem (marca, modelo, ano).", 'warning');
-        return;
-      }
-      if (guarantee.photos.length === 0) {
-        addToast("Envie fotos do bem em garantia.", 'warning');
-        return;
-      }
-      if (formData.vehicleCRLV.length === 0 && formData.proofAddress.length === 0) {
-        addToast("Envie o documento do bem (CRLV ou Nota Fiscal).", 'warning');
-        return;
-      }
-    }
-
     // STEP DADOS - Dinâmico (Step 4 para CLT/AUTONOMO, Step 3 para MOTO/LIMPA_NOME, Step 5 para GARANTIA)
     let dataStep = 4;
     if (profileType === 'MOTO' || profileType === 'LIMPA_NOME') dataStep = 3;
