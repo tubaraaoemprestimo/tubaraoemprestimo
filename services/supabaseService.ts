@@ -769,109 +769,185 @@ export const supabaseService = {
     },
 
     submitRequest: async (data: any) => {
-        // First, find or create customer
-        let { data: existingCustomer } = await supabase
-            .from('customers')
-            .select('id')
-            .eq('cpf', data.cpf)
-            .single();
-
-        let customerId = existingCustomer?.id;
-
-        if (!customerId) {
-            const { data: newCustomer, error: customerError } = await supabase
+        try {
+            // First, find or create customer
+            // Buscar por CPF primeiro
+            let { data: existingCustomer } = await supabase
                 .from('customers')
-                .insert({
-                    name: data.name,
-                    cpf: data.cpf,
-                    email: data.email,
-                    phone: data.phone || '',
-                    status: 'ACTIVE',
-                    internal_score: 500,
-                    total_debt: 0,
-                    active_loans_count: 0
-                })
                 .select('id')
+                .eq('cpf', data.cpf)
                 .single();
 
-            if (customerError) {
-                console.error('Error creating customer:', customerError);
-                return false;
+            let customerId = existingCustomer?.id;
+
+            // Se não achou por CPF, tentar por email (evita duplicatas)
+            if (!customerId && data.email) {
+                const { data: customerByEmail } = await supabase
+                    .from('customers')
+                    .select('id')
+                    .eq('email', data.email)
+                    .single();
+                customerId = customerByEmail?.id;
             }
-            customerId = newCustomer.id;
 
-            // 🎉 Novo cliente! Enviar boas-vindas
-            autoNotificationService.onWelcome(data.email, data.name, data.phone).catch(console.error);
-        }
+            if (!customerId) {
+                const { data: newCustomer, error: customerError } = await supabase
+                    .from('customers')
+                    .insert({
+                        name: data.name,
+                        cpf: data.cpf,
+                        email: data.email,
+                        phone: data.phone || '',
+                        status: 'ACTIVE',
+                        internal_score: 500,
+                        total_debt: 0,
+                        active_loans_count: 0
+                    })
+                    .select('id')
+                    .single();
 
-        // Create loan request
-        // Helper para serializar arrays de URLs
-        const serializeUrls = (urls: string | string[]): string => {
-            if (!urls) return '';
-            if (Array.isArray(urls)) {
-                return urls.length > 0 ? JSON.stringify(urls) : '';
+                if (customerError) {
+                    console.error('❌ Error creating customer:', customerError);
+                    // Tentar buscar novamente (pode ter sido criado por outro request simultâneo)
+                    const { data: retryCustomer } = await supabase
+                        .from('customers')
+                        .select('id')
+                        .or(`cpf.eq.${data.cpf},email.eq.${data.email}`)
+                        .limit(1)
+                        .single();
+
+                    if (retryCustomer?.id) {
+                        customerId = retryCustomer.id;
+                    } else {
+                        return false;
+                    }
+                } else {
+                    customerId = newCustomer.id;
+                    // 🎉 Novo cliente! Enviar boas-vindas
+                    autoNotificationService.onWelcome(data.email, data.name, data.phone).catch(console.error);
+                }
             }
-            return urls;
-        };
 
-        const { error: requestError } = await supabase.from('loan_requests').insert({
-            customer_id: customerId,
-            client_name: data.name,
-            cpf: data.cpf,
-            email: data.email,
-            phone: data.phone || '',
-            birth_date: data.birthDate || null,
-            // Tipo de perfil/serviço
-            profile_type: data.profileType || 'CLT',
-            service_type: data.profileType === 'LIMPA_NOME' ? 'SERVICO' : data.profileType === 'MOTO' ? 'FINANCIAMENTO' : 'EMPRESTIMO',
-            // CORREÇÃO CRÍTICA: Usar o valor solicitado, não a renda * 3
-            amount: Number(data.amount) || (data.profileType === 'LIMPA_NOME' ? 0 : 1000),
-            installments: data.installments || 4, // Default ou o enviado
-            status: 'PENDING',
-            father_phone: data.fatherPhone,
-            mother_phone: data.motherPhone,
-            spouse_phone: data.spousePhone,
-            selfie_url: typeof data.selfie === 'string' ? data.selfie : '',
-            id_card_url: serializeUrls(data.idCardFront),
-            id_card_back_url: serializeUrls(data.idCardBack),
-            proof_of_address_url: serializeUrls(data.proofAddress),
-            proof_income_url: serializeUrls(data.proofIncome),
-            vehicle_url: serializeUrls(data.vehicleFront),
-            video_selfie_url: typeof data.videoSelfie === 'string' ? data.videoSelfie : '',
-            video_house_url: typeof data.videoHouse === 'string' ? data.videoHouse : '',
-            video_vehicle_url: typeof data.videoVehicle === 'string' ? data.videoVehicle : '',
-            signature_url: typeof data.signature === 'string' ? data.signature : '',
-            // Limpa Nome
-            limpa_nome_contract_signed: data.limpaNomeContractSigned || false,
-            limpa_nome_contract_date: data.limpaNomeContractSigned ? new Date().toISOString() : null,
-            // Cliente recorrente e novos campos
-            is_returning_client: data.isReturningClient || false,
-            returning_client_note: data.returningClientNote || '',
-            // Info extra concatenada com novos campos
-            supplemental_description: JSON.stringify({
-                occupation: data.occupation || 'N/A',
-                instagram: data.instagram || 'N/A',
-                workCardSent: data.workCard?.length ? true : false,
-                housePhotos: serializeUrls(data.housePhotos),
-                billInName: serializeUrls(data.billInName),
-                location: data.location || null,
-                guarantee: data.guarantee ? {
-                    type: data.guarantee.type,
-                    description: data.guarantee.description,
-                    estimatedValue: data.guarantee.estimatedValue,
-                    photos: data.guarantee.photos,
-                    video: data.guarantee.video || ''
-                } : null
-            })
-        });
+            // Create loan request
+            // Helper para serializar arrays de URLs
+            const serializeUrls = (urls: string | string[]): string => {
+                if (!urls) return '';
+                if (Array.isArray(urls)) {
+                    return urls.length > 0 ? JSON.stringify(urls) : '';
+                }
+                return urls;
+            };
 
+            // Montar dados do request
+            // Campos BASE (garantidos no schema original)
+            const baseData: any = {
+                customer_id: customerId,
+                client_name: data.name,
+                cpf: data.cpf,
+                email: data.email,
+                phone: data.phone || '',
+                amount: Number(data.amount) || (data.profileType === 'LIMPA_NOME' ? 0 : 1000),
+                installments: data.installments || 4,
+                status: 'PENDING',
+                father_phone: data.fatherPhone || null,
+                mother_phone: data.motherPhone || null,
+                spouse_phone: data.spousePhone || null,
+                selfie_url: typeof data.selfie === 'string' ? data.selfie : '',
+                id_card_url: serializeUrls(data.idCardFront),
+                id_card_back_url: serializeUrls(data.idCardBack),
+                proof_of_address_url: serializeUrls(data.proofAddress),
+                proof_income_url: serializeUrls(data.proofIncome),
+                vehicle_url: serializeUrls(data.vehicleFront),
+                video_selfie_url: typeof data.videoSelfie === 'string' ? data.videoSelfie : '',
+                video_house_url: typeof data.videoHouse === 'string' ? data.videoHouse : '',
+                video_vehicle_url: typeof data.videoVehicle === 'string' ? data.videoVehicle : '',
+                signature_url: typeof data.signature === 'string' ? data.signature : '',
+                // supplemental_description sempre existe (TEXT no schema base)
+                supplemental_description: JSON.stringify({
+                    occupation: data.occupation || 'N/A',
+                    instagram: data.instagram || 'N/A',
+                    workCardSent: data.workCard?.length ? true : false,
+                    housePhotos: serializeUrls(data.housePhotos),
+                    billInName: serializeUrls(data.billInName),
+                    location: data.location || null,
+                    guarantee: data.guarantee ? {
+                        type: data.guarantee.type,
+                        description: data.guarantee.description,
+                        estimatedValue: data.guarantee.estimatedValue,
+                        photos: data.guarantee.photos,
+                        video: data.guarantee.video || ''
+                    } : null,
+                    motoColor: data.motoColor || null,
+                    // Guardar dados extras no JSON como fallback seguro
+                    isReturningClient: data.isReturningClient || false,
+                    returningClientNote: data.returningClientNote || '',
+                    limpaNomeContractSigned: data.limpaNomeContractSigned || false,
+                    birthDate: data.birthDate || null
+                })
+            };
 
-        if (requestError) {
-            console.error('Error creating request:', requestError);
+            // Campos ESTENDIDOS (adicionados por migrações - podem não existir)
+            const extendedFields: Record<string, any> = {
+                profile_type: data.profileType || 'CLT',
+                service_type: data.profileType === 'LIMPA_NOME' ? 'SERVICO' : data.profileType === 'MOTO' ? 'FINANCIAMENTO' : 'EMPRESTIMO',
+                birth_date: data.birthDate || null,
+                limpa_nome_contract_signed: data.limpaNomeContractSigned || false,
+                limpa_nome_contract_date: data.limpaNomeContractSigned ? new Date().toISOString() : null,
+                is_returning_client: data.isReturningClient || false,
+                returning_client_note: data.returningClientNote || '',
+            };
+
+            console.log('📤 Enviando request para DB:', { profileType: data.profileType, amount: baseData.amount, customerId });
+
+            // Tentativa 1: com TODOS os campos (base + estendidos)
+            const fullData = { ...baseData, ...extendedFields };
+            let { error: requestError } = await supabase.from('loan_requests').insert(fullData);
+
+            if (!requestError) {
+                console.log('✅ Request criado com sucesso (todos os campos)!');
+                return true;
+            }
+
+            console.error('❌ Erro com todos os campos:', requestError.message || requestError);
+
+            // Tentativa 2: remover colunas que o erro indica como inexistentes
+            // PostgREST retorna erro com nome da coluna que não existe
+            const errorMsg = requestError.message || '';
+            if (errorMsg.includes('does not exist') || requestError.code === 'PGRST204' || requestError.code === '42703') {
+                // Remover progressivamente campos estendidos e tentar novamente
+                const fieldsToTry = Object.keys(extendedFields);
+                let currentData = { ...fullData };
+
+                for (const field of fieldsToTry) {
+                    if (errorMsg.includes(field)) {
+                        console.log(`⚠️ Removendo campo inexistente: ${field}`);
+                        delete currentData[field];
+                    }
+                }
+
+                const retry1 = await supabase.from('loan_requests').insert(currentData);
+                if (!retry1.error) {
+                    console.log('✅ Request criado com sucesso (após remover campos)!');
+                    return true;
+                }
+                console.error('❌ Erro na segunda tentativa:', retry1.error.message || retry1.error);
+            }
+
+            // Tentativa 3: FALLBACK - usar APENAS campos base (schema original)
+            console.log('⚠️ Tentando com apenas campos base...');
+            const retry2 = await supabase.from('loan_requests').insert(baseData);
+
+            if (!retry2.error) {
+                console.log('✅ Request criado com sucesso (apenas campos base)!');
+                return true;
+            }
+
+            console.error('❌ Erro mesmo com campos base:', retry2.error.message || retry2.error);
+            return false;
+        } catch (err) {
+            console.error('❌ Exceção em submitRequest:', err);
             return false;
         }
-
-        return true;
     },
 
     // Submeter solicitação de cliente antigo (formulário simplificado)

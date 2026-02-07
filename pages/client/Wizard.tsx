@@ -817,7 +817,11 @@ export const Wizard: React.FC = () => {
       }
 
       // Submeter o pedido
-      // Submeter o pedido
+      // Marcar contrato como assinado para LIMPA_NOME
+      if (profileType === 'LIMPA_NOME') {
+        uploadedData.limpaNomeContractSigned = true;
+      }
+
       // Concatenar Perfil e CNPJ na profissão para visualização no admin
       const finalOccupation = `[${profileType}] ${uploadedData.occupation || ''} ${uploadedData.cnpj ? '- CNPJ: ' + uploadedData.cnpj : ''}`;
 
@@ -881,9 +885,14 @@ export const Wizard: React.FC = () => {
       setLoading(false);
       addToast("Solicitação enviada!", 'success');
       navigate('/client/dashboard');
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Erro ao enviar solicitação:', error);
+      console.error('❌ Detalhes:', error?.message || error);
       setLoading(false);
-      addToast("Erro ao enviar. Tente novamente.", 'error');
+      const msg = error?.message === 'Falha ao submeter'
+        ? 'Erro ao enviar. Verifique seus dados e tente novamente.'
+        : 'Erro ao enviar. Tente novamente.';
+      addToast(msg, 'error');
     }
   };
 
