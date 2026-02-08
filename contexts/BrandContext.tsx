@@ -11,6 +11,9 @@ interface BrandContextType {
 
 const BrandContext = createContext<BrandContextType | undefined>(undefined);
 
+// Export for direct useContext usage
+export { BrandContext };
+
 export const BrandProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<BrandSettings>({
     systemName: 'Tubarão Empréstimo',

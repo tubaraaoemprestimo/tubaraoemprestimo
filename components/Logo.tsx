@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useBrand } from '../contexts/BrandContext';
+import React, { useState, useEffect, useContext } from 'react';
+import { BrandContext } from '../contexts/BrandContext';
 
 interface LogoProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   showText?: boolean;
@@ -7,16 +7,18 @@ interface LogoProps extends React.ImgHTMLAttributes<HTMLImageElement> {
 }
 
 export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '', showText, ...props }) => {
-  const { settings } = useBrand();
+  // Use context safely without throwing error
+  const brandContext = useContext(BrandContext);
+  const settings = brandContext?.settings || { logoUrl: null };
   const [imageSrc, setImageSrc] = useState<string>('');
   const [imageLoaded, setImageLoaded] = useState(false);
   const heightMap = { sm: "30px", md: "50px", lg: "80px", xl: "120px" };
-  
+
   useEffect(() => {
     // Define a logo a ser usada
     const customLogo = settings.logoUrl && settings.logoUrl.trim() !== "";
     const logoPath = customLogo ? settings.logoUrl : "/Logo.png";
-    
+
     // Testa se a imagem existe antes de definir
     const img = new Image();
     img.onload = () => {
@@ -49,9 +51,9 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '', showTex
   }
 
   return (
-    <img 
-      src={imageSrc} 
-      alt="Logo" 
+    <img
+      src={imageSrc}
+      alt="Logo"
       className={`object-contain ${className}`}
       style={{ height: heightMap[size as keyof typeof heightMap] }}
       {...props}
