@@ -3,7 +3,7 @@ import { BrandContext } from '../contexts/BrandContext';
 
 interface LogoProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   showText?: boolean;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 }
 
 export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '', showText, ...props }) => {
@@ -12,7 +12,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '', showTex
   const settings = brandContext?.settings || { logoUrl: null };
   const [imageSrc, setImageSrc] = useState<string>('');
   const [imageLoaded, setImageLoaded] = useState(false);
-  const heightMap = { sm: "30px", md: "50px", lg: "80px", xl: "120px" };
+  const heightMap = { xs: "24px", sm: "30px", md: "50px", lg: "80px", xl: "120px" };
 
   useEffect(() => {
     // Define a logo a ser usada
