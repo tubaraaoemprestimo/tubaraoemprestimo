@@ -42,6 +42,7 @@ import { AntiFraudMonitor } from './pages/admin/AntiFraudMonitor';
 import { ImportContacts } from './pages/admin/ImportContacts';
 import { DataSearch } from './pages/admin/DataSearch';
 import { PaymentsPage } from './pages/admin/Payments';
+import { FinanceHub } from './pages/admin/FinanceHub';
 
 // Pages - Public
 import { DemoSimulator } from './pages/public/DemoSimulator';
@@ -102,9 +103,8 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
         {/* Financeiro */}
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Financeiro</p>
+        <Link to="/admin/finance-hub" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/finance-hub')}`}><Receipt size={18} /> Central Financeira <span className="ml-auto text-[10px] bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-1.5 py-0.5 rounded-full font-bold">🎮</span></Link>
         <Link to="/admin/finance" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/finance')}`}><DollarSign size={18} /> Fluxo de Caixa</Link>
-        <Link to="/admin/payments" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/payments')}`}><Receipt size={18} /> Pagamentos <span className="ml-auto text-[10px] bg-green-600 text-white px-1.5 py-0.5 rounded-full font-bold">NEW</span></Link>
-        <Link to="/admin/receipts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/receipts')}`}><Receipt size={18} /> Comprovantes</Link>
         <Link to="/admin/agenda" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/agenda')}`}><Calendar size={18} /> Agenda</Link>
         <Link to="/admin/score" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/score')}`}><Star size={18} /> Score & Renegociação</Link>
         <Link to="/admin/documents" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/documents')}`}><FileCheck size={18} /> Documentos</Link>
@@ -370,6 +370,7 @@ export default function App() {
             <Route path="/admin/openfinance" element={<AdminLayout><OpenFinancePage /></AdminLayout>} />
             <Route path="/admin/receipts" element={<AdminLayout><PaymentReceipts /></AdminLayout>} />
             <Route path="/admin/payments" element={<AdminLayout><PaymentsPage /></AdminLayout>} />
+            <Route path="/admin/finance-hub" element={<AdminLayout><FinanceHub /></AdminLayout>} />
             <Route path="/admin/referrals" element={<AdminLayout><Referrals /></AdminLayout>} />
             <Route path="/admin/chatbot" element={<AdminLayout><AIChatbot /></AdminLayout>} />
             <Route path="/admin/status" element={<AdminLayout><StatusScheduler /></AdminLayout>} />

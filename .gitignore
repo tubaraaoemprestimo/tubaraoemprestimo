@@ -31,3 +31,8 @@ dist-ssr
 
 # Supabase
 .supabase
+
+# AI Skills
+.agent/skills
+.claude/skills
+.cursor/skills
