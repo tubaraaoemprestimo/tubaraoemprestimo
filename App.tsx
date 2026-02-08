@@ -56,7 +56,7 @@ import {
 } from 'lucide-react';
 import { Logo } from './components/Logo';
 import { supabaseService } from './services/supabaseService';
-import { BrandProvider, useBrand } from './contexts/BrandContext';
+import { BrandProvider } from './contexts/BrandContext';
 import { firebasePushService } from './services/firebasePushService';
 import { themeService } from './services/themeService';
 
@@ -264,7 +264,6 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; showBottomNav?: boolean }> = ({ children, showNav = true, showBottomNav = false }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { brand } = useBrand();
 
   const isActive = (path: string) =>
     location.pathname === path
@@ -351,16 +350,10 @@ function App() {
 
   useEffect(() => {
     // Try to initialize push notifications
-    firebasePushService.initPush().catch(console.error);
+    firebasePushService.init().catch(console.error);
 
-    // Check for stored theme preference
-    const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null;
-    if (storedTheme) {
-      themeService.setTheme(storedTheme);
-    } else {
-      // Apply system preference by default
-      themeService.setTheme('system');
-    }
+    // Initialize theme service
+    themeService.init().catch(console.error);
   }, []);
 
   useEffect(() => {
