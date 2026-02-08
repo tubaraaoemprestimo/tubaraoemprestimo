@@ -40,8 +40,8 @@ export const PaymentsPage: React.FC = () => {
             supabaseService.getRequests()
         ]);
         setPayments(paymentsData);
-        // Filtrar apenas aprovados para associar pagamentos
-        setRequests(requestsData.filter(r => r.status === 'APPROVED'));
+        // Carregar todas as solicitações para o select
+        setRequests(requestsData);
         setLoading(false);
     };
 
@@ -233,9 +233,9 @@ export const PaymentsPage: React.FC = () => {
                                         </td>
                                         <td className="p-4">
                                             <span className={`px-2 py-1 rounded text-xs font-bold ${payment.payment_type === 'JUROS' ? 'bg-yellow-900/30 text-yellow-400' :
-                                                    payment.payment_type === 'PARCELA' ? 'bg-blue-900/30 text-blue-400' :
-                                                        payment.payment_type === 'TOTAL' ? 'bg-green-900/30 text-green-400' :
-                                                            'bg-red-900/30 text-red-400'
+                                                payment.payment_type === 'PARCELA' ? 'bg-blue-900/30 text-blue-400' :
+                                                    payment.payment_type === 'TOTAL' ? 'bg-green-900/30 text-green-400' :
+                                                        'bg-red-900/30 text-red-400'
                                                 }`}>
                                                 {payment.payment_type}
                                             </span>
@@ -305,8 +305,8 @@ export const PaymentsPage: React.FC = () => {
             {/* Modal de Novo Pagamento */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl animate-in zoom-in duration-200">
-                        <div className="flex justify-between items-center mb-6">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in duration-200">
+                        <div className="sticky top-0 bg-zinc-900 p-6 pb-4 border-b border-zinc-800 flex justify-between items-center">
                             <h3 className="text-xl font-bold text-white flex items-center gap-2">
                                 <DollarSign className="text-[#D4AF37]" /> Registrar Pagamento
                             </h3>
@@ -315,7 +315,7 @@ export const PaymentsPage: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="p-6 space-y-4">
                             {/* Cliente */}
                             <div>
                                 <label className="block text-sm font-bold text-zinc-400 mb-1">Cliente / Solicitação *</label>
@@ -342,8 +342,8 @@ export const PaymentsPage: React.FC = () => {
                                             key={type}
                                             onClick={() => setPaymentType(type)}
                                             className={`p-2 rounded-lg text-sm font-bold transition-all ${paymentType === type
-                                                    ? 'bg-[#D4AF37] text-black'
-                                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                                ? 'bg-[#D4AF37] text-black'
+                                                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                                                 }`}
                                         >
                                             {type}
