@@ -19,35 +19,25 @@ import { Dashboard } from './pages/admin/Dashboard';
 import { Requests } from './pages/admin/Requests';
 import { Settings } from './pages/admin/Settings';
 import { Customers } from './pages/admin/Customers';
-import { Interactions } from './pages/admin/Interactions';
-import { Users as UsersPage } from './pages/admin/Users';
-import { Marketing } from './pages/admin/Marketing';
-import { Reports } from './pages/admin/Reports';
-
-// Pages - Admin Extended (New Features)
-import { AgendaPage } from './pages/admin/Agenda';
-import { BlacklistPage } from './pages/admin/Blacklist';
-import { AuditPage } from './pages/admin/Audit';
-import { FinancePage } from './pages/admin/Finance';
-import { MessagesPage } from './pages/admin/Messages';
-import { DocumentsPage } from './pages/admin/Documents';
-import { ScorePage } from './pages/admin/Score';
-import { GeolocationPage } from './pages/admin/Geolocation';
-import { OpenFinancePage } from './pages/admin/OpenFinance';
-import { PaymentReceipts } from './pages/admin/PaymentReceipts';
-import { Referrals } from './pages/admin/Referrals';
-import { AIChatbot } from './pages/admin/AIChatbot';
-import { StatusScheduler } from './pages/admin/StatusScheduler';
-import { AntiFraudMonitor } from './pages/admin/AntiFraudMonitor';
 import { ImportContacts } from './pages/admin/ImportContacts';
 import { DataSearch } from './pages/admin/DataSearch';
-import { PaymentsPage } from './pages/admin/Payments';
+
+// Pages - Admin Extended (Hubs Unificados)
 import { FinanceHub } from './pages/admin/FinanceHub';
+import { CommunicationHub } from './pages/admin/CommunicationHub';
+import { SecurityHub } from './pages/admin/SecurityHub';
+import { AIHub } from './pages/admin/AIHub';
+import { AnalyticsHub } from './pages/admin/AnalyticsHub';
+
+// Pages - Admin (mantidas para rotas legadas)
+import { FinancePage } from './pages/admin/Finance';
+import { AgendaPage } from './pages/admin/Agenda';
+import { DocumentsPage } from './pages/admin/Documents';
+import { ScorePage } from './pages/admin/Score';
 
 // Pages - Public
 import { DemoSimulator } from './pages/public/DemoSimulator';
 import { LandingPage } from './pages/public/LandingPage';
-
 
 // Components
 import { Chatbot } from './components/Chatbot';
@@ -69,6 +59,59 @@ import { supabaseService } from './services/supabaseService';
 import { BrandProvider, useBrand } from './contexts/BrandContext';
 import { firebasePushService } from './services/firebasePushService';
 import { themeService } from './services/themeService';
+
+// --- Expandable Menu Item ---
+interface ExpandableMenuProps {
+  icon: React.ReactNode;
+  label: string;
+  badge?: string;
+  items: { to: string; label: string; icon?: React.ReactNode }[];
+  isActive: (path: string) => string;
+  onItemClick: () => void;
+}
+
+const ExpandableMenu: React.FC<ExpandableMenuProps> = ({ icon, label, badge, items, isActive, onItemClick }) => {
+  const location = useLocation();
+  const [isOpen, setIsOpen] = useState(() => items.some(item => location.pathname === item.to));
+
+  const isAnyItemActive = items.some(item => location.pathname === item.to);
+
+  return (
+    <div>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-all ${isAnyItemActive ? 'text-[#D4AF37] bg-zinc-800' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+          }`}
+      >
+        <div className="flex items-center gap-3">
+          {icon}
+          <span>{label}</span>
+          {badge && (
+            <span className="text-[10px] bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-1.5 py-0.5 rounded-full font-bold">
+              {badge}
+            </span>
+          )}
+        </div>
+        <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        <div className="ml-4 mt-1 space-y-0.5 border-l border-zinc-800 pl-4">
+          {items.map(item => (
+            <Link
+              key={item.to}
+              to={item.to}
+              onClick={onItemClick}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${isActive(item.to)}`}
+            >
+              {item.icon || <ChevronRight size={14} />}
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // --- Layouts ---
 
@@ -98,41 +141,85 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin')}`}><LayoutDashboard size={18} /> Dashboard</Link>
         <Link to="/admin/requests" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/requests')}`}><FileText size={18} /> Solicitações</Link>
         <Link to="/admin/customers" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/customers')}`}><Users size={18} /> Clientes</Link>
-        <Link to="/admin/import-contacts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/import-contacts')}`}><Upload size={18} /> Importar Contatos <span className="ml-auto text-[10px] bg-green-600 text-white px-1.5 py-0.5 rounded-full font-bold">NEW</span></Link>
+        <Link to="/admin/import-contacts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/import-contacts')}`}><Upload size={18} /> Importar Contatos</Link>
         <Link to="/admin/data-search" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/data-search')}`}><Search size={18} /> Investigação</Link>
 
         {/* Financeiro */}
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Financeiro</p>
-        <Link to="/admin/finance-hub" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/finance-hub')}`}><Receipt size={18} /> Central Financeira <span className="ml-auto text-[10px] bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-1.5 py-0.5 rounded-full font-bold">🎮</span></Link>
-        <Link to="/admin/finance" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/finance')}`}><DollarSign size={18} /> Fluxo de Caixa</Link>
-        <Link to="/admin/agenda" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/agenda')}`}><Calendar size={18} /> Agenda</Link>
-        <Link to="/admin/score" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/score')}`}><Star size={18} /> Score & Renegociação</Link>
-        <Link to="/admin/documents" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/documents')}`}><FileCheck size={18} /> Documentos</Link>
+        <ExpandableMenu
+          icon={<Receipt size={18} />}
+          label="Central Financeira"
+          badge="🎮"
+          isActive={isActive}
+          onItemClick={() => setIsMobileMenuOpen(false)}
+          items={[
+            { to: '/admin/finance-hub', label: 'Visão Geral', icon: <PieChart size={14} /> },
+            { to: '/admin/finance', label: 'Fluxo de Caixa', icon: <DollarSign size={14} /> },
+            { to: '/admin/agenda', label: 'Agenda', icon: <Calendar size={14} /> },
+            { to: '/admin/score', label: 'Score & Renegociação', icon: <Star size={14} /> },
+            { to: '/admin/documents', label: 'Documentos', icon: <FileCheck size={14} /> },
+          ]}
+        />
 
         {/* Comunicação */}
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Comunicação</p>
-        <Link to="/admin/messages" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/messages')}`}><MessageSquare size={18} /> Mensagens</Link>
-        <Link to="/admin/marketing" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/marketing')}`}><Megaphone size={18} /> Marketing</Link>
-        <Link to="/admin/status" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/status')}`}><Camera size={18} /> Status WhatsApp</Link>
-        <Link to="/admin/referrals" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/referrals')}`}><Gift size={18} /> Indique e Ganhe</Link>
+        <ExpandableMenu
+          icon={<Megaphone size={18} />}
+          label="Central de Comunicação"
+          isActive={isActive}
+          onItemClick={() => setIsMobileMenuOpen(false)}
+          items={[
+            { to: '/admin/communication-hub', label: 'Visão Geral', icon: <PieChart size={14} /> },
+            { to: '/admin/communication-hub?tab=templates', label: 'Templates', icon: <MessageSquare size={14} /> },
+            { to: '/admin/communication-hub?tab=campaigns', label: 'Campanhas', icon: <Megaphone size={14} /> },
+            { to: '/admin/communication-hub?tab=status', label: 'Status WhatsApp', icon: <Camera size={14} /> },
+            { to: '/admin/communication-hub?tab=referrals', label: 'Indicações', icon: <Gift size={14} /> },
+          ]}
+        />
 
         {/* Análises */}
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Análises</p>
-        <Link to="/admin/reports" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/reports')}`}><BarChart3 size={18} /> Relatórios</Link>
-        <Link to="/admin/audit" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/audit')}`}><FileText size={18} /> Auditoria</Link>
-        <Link to="/admin/geolocation" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/geolocation')}`}><MapPin size={18} /> Geolocalização</Link>
-        <Link to="/admin/openfinance" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/openfinance')}`}><Landmark size={18} /> Open Finance</Link>
+        <ExpandableMenu
+          icon={<BarChart3 size={18} />}
+          label="Central de Análises"
+          isActive={isActive}
+          onItemClick={() => setIsMobileMenuOpen(false)}
+          items={[
+            { to: '/admin/analytics-hub', label: 'Relatórios', icon: <BarChart3 size={14} /> },
+            { to: '/admin/analytics-hub?tab=audit', label: 'Auditoria', icon: <FileText size={14} /> },
+            { to: '/admin/analytics-hub?tab=geo', label: 'Geolocalização', icon: <MapPin size={14} /> },
+            { to: '/admin/analytics-hub?tab=openfinance', label: 'Open Finance', icon: <Landmark size={14} /> },
+          ]}
+        />
 
         {/* Segurança */}
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Segurança</p>
-        <Link to="/admin/antifraud" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/antifraud')}`}><Shield size={18} /> Antifraude</Link>
-        <Link to="/admin/blacklist" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/blacklist')}`}><Ban size={18} /> Blacklist</Link>
-        <Link to="/admin/users" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/users')}`}><UserCog size={18} /> Acessos</Link>
+        <ExpandableMenu
+          icon={<Shield size={18} />}
+          label="Central de Segurança"
+          isActive={isActive}
+          onItemClick={() => setIsMobileMenuOpen(false)}
+          items={[
+            { to: '/admin/security-hub', label: 'Antifraude', icon: <Shield size={14} /> },
+            { to: '/admin/security-hub?tab=blacklist', label: 'Blacklist', icon: <Ban size={14} /> },
+            { to: '/admin/security-hub?tab=users', label: 'Acessos', icon: <UserCog size={14} /> },
+          ]}
+        />
 
         {/* Sistema */}
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Sistema</p>
-        <Link to="/admin/chatbot" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/chatbot')}`}><Bot size={18} /> Chatbot IA</Link>
-        <Link to="/admin/interactions" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/interactions')}`}><Bot size={18} /> IA Logs</Link>
+        <ExpandableMenu
+          icon={<Bot size={18} />}
+          label="Central de IA"
+          isActive={isActive}
+          onItemClick={() => setIsMobileMenuOpen(false)}
+          items={[
+            { to: '/admin/ai-hub', label: 'Configurar', icon: <SettingsIcon size={14} /> },
+            { to: '/admin/ai-hub?tab=conversations', label: 'Conversas', icon: <MessageSquare size={14} /> },
+            { to: '/admin/ai-hub?tab=logs', label: 'Logs', icon: <FileText size={14} /> },
+            { to: '/admin/ai-hub?tab=test', label: 'Testar', icon: <Bot size={14} /> },
+          ]}
+        />
         <Link to="/admin/settings" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/settings')}`}><SettingsIcon size={18} /> Configurações</Link>
       </nav>
       <div className="p-4 border-t border-zinc-800 shrink-0">
@@ -143,35 +230,31 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <div className="flex h-screen bg-black text-white overflow-hidden font-sans">
-      {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 w-full z-50 bg-zinc-950 border-b border-zinc-800 p-4 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <Logo size="sm" />
-        </div>
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-64 bg-zinc-950 border-r border-zinc-800 flex-col shrink-0">
+        <NavContent />
+      </aside>
+
+      {/* Mobile Header & Menu */}
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-40 p-4 flex justify-between items-center">
+        <Logo size="xs" />
         <div className="flex items-center gap-2">
           <NotificationCenter />
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-zinc-400 hover:text-white">
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-zinc-400 hover:text-white">
             {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
       </div>
 
-      {/* Desktop Sidebar */}
-      <aside className="w-64 border-r border-zinc-800 bg-zinc-950 hidden md:flex flex-col">
-        <NavContent />
-      </aside>
-
-      {/* Mobile Sidebar (Drawer) */}
+      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-black/80 md:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
-          <aside className="w-64 h-full bg-zinc-950 border-r border-zinc-800 flex flex-col pt-16 animate-in slide-in-from-left duration-200" onClick={e => e.stopPropagation()}>
-            <NavContent />
-          </aside>
+        <div className="md:hidden fixed inset-0 z-30 bg-black/90 backdrop-blur-sm pt-16 flex flex-col">
+          <NavContent />
         </div>
       )}
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto relative bg-black pt-16 md:pt-0">
+      <main className="flex-1 overflow-y-auto pt-16 md:pt-0">
         {children}
       </main>
     </div>
@@ -179,142 +262,114 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; showBottomNav?: boolean }> = ({ children, showNav = true, showBottomNav = false }) => {
-  const user = supabaseService.auth.getUser();
   const location = useLocation();
-  const navigate = useNavigate();
-  const [isClientMenuOpen, setIsClientMenuOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { brand } = useBrand();
 
-  const isDemoMode = location.pathname.includes('/demo');
-  const isPublicRoute = ['/login', '/wizard', '/demo'].includes(location.pathname);
-
-  const isActive = (path: string) => location.pathname === path ? 'text-[#D4AF37] bg-zinc-800' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
-
-  if (!isPublicRoute && !isDemoMode && (!user || user.role !== 'CLIENT')) {
-    return <Navigate to="/login" replace />;
-  }
+  const isActive = (path: string) =>
+    location.pathname === path
+      ? 'text-[#D4AF37] bg-zinc-800 font-bold'
+      : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
 
   const ClientNavContent = () => (
     <>
-      <div className="p-6 border-b border-zinc-800 flex justify-center shrink-0">
+      <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
         <Logo size="sm" />
       </div>
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {user && (
-          <>
-            <Link to="/client/dashboard" onClick={() => setIsClientMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/dashboard')}`}>
-              <LayoutDashboard size={20} /> Início
-            </Link>
-            <Link to="/client/contracts" onClick={() => setIsClientMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/contracts')}`}>
-              <FileText size={20} /> Meus Contratos
-            </Link>
-            <Link to="/client/documents" onClick={() => setIsClientMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/documents')}`}>
-              <FileCheck size={20} /> Meus Documentos
-            </Link>
-            <Link to="/client/statement" onClick={() => setIsClientMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/statement')}`}>
-              <PieChart size={20} /> Extrato
-            </Link>
-            <Link to="/client/profile" onClick={() => setIsClientMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/profile')}`}>
-              <UserIcon size={20} /> Meu Perfil
-            </Link>
-          </>
-        )}
-        {!user && (
-          <Link to="/login" onClick={() => setIsClientMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/login')}`}>
-            <LogOut size={20} /> Entrar
-          </Link>
-        )}
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <Link to="/client/dashboard" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/dashboard')}`}>
+          <HomeIcon size={20} /> Início
+        </Link>
+        <Link to="/client/contracts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/contracts')}`}>
+          <FileText size={20} /> Meus Contratos
+        </Link>
+        <Link to="/client/statement" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/statement')}`}>
+          <PieChart size={20} /> Extrato
+        </Link>
+        <Link to="/client/documents" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/documents')}`}>
+          <FileCheck size={20} /> Documentos
+        </Link>
+        <Link to="/client/profile" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/profile')}`}>
+          <UserIcon size={20} /> Meu Perfil
+        </Link>
+        <Link to="/client/help" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/help')}`}>
+          <MessageSquare size={20} /> Ajuda
+        </Link>
       </nav>
-      {user && (
-        <div className="p-4 border-t border-zinc-800 shrink-0">
-          <Link to="/login" className="flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-900/10 rounded-lg transition-all">
-            <LogOut size={20} /> Sair
-          </Link>
-        </div>
-      )}
+      <div className="p-4 border-t border-zinc-800">
+        <Link to="/login" className="flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-900/10 rounded-lg transition-all">
+          <LogOut size={20} /> Sair
+        </Link>
+      </div>
     </>
   );
 
   return (
-    <div className="bg-black min-h-screen text-white font-sans selection:bg-[#FF0000] selection:text-white pb-safe">
-      {/* Mobile Sidebar (Drawer) for Client */}
-      {isClientMenuOpen && (
-        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm" onClick={() => setIsClientMenuOpen(false)}>
-          <aside className="w-64 h-full bg-zinc-950 border-r border-zinc-800 flex flex-col animate-in slide-in-from-left duration-200" onClick={e => e.stopPropagation()}>
+    <div className="flex flex-col min-h-screen bg-black text-white font-sans">
+      {/* Header para mobile ou sidebar para desktop */}
+      {showNav && (
+        <>
+          {/* Desktop Sidebar */}
+          <aside className="hidden md:flex w-64 fixed inset-y-0 left-0 bg-zinc-950 border-r border-zinc-800 flex-col z-40">
             <ClientNavContent />
           </aside>
-        </div>
-      )}
 
-      {showNav && (
-        <nav className="fixed top-0 w-full z-40 bg-black/80 backdrop-blur-md border-b border-zinc-800">
-          <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {/* Hamburger Menu Trigger */}
-              <button onClick={() => setIsClientMenuOpen(true)} className="md:hidden text-zinc-400 hover:text-white p-1">
-                <Menu size={24} />
-              </button>
-              <Link to={user ? "/client/dashboard" : "/login"}><Logo size="sm" /></Link>
+          {/* Mobile Header */}
+          <header className="md:hidden fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-40 p-4 flex justify-between items-center">
+            <Logo size="xs" />
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-zinc-400 hover:text-white">
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </header>
+
+          {/* Mobile Menu Overlay */}
+          {isMobileMenuOpen && (
+            <div className="md:hidden fixed inset-0 z-30 bg-black/90 backdrop-blur-sm pt-16 flex flex-col">
+              <ClientNavContent />
             </div>
-
-            <div className="flex items-center gap-4">
-              {user ? (
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-zinc-400 hidden md:block">Olá, {user.name.split(' ')[0]}</span>
-                  <Link to="/client/profile" className="w-8 h-8 rounded-full bg-[#D4AF37] flex items-center justify-center text-black font-bold text-xs">{user.name.substring(0, 2).toUpperCase()}</Link>
-                </div>
-              ) : (
-                <>
-                  <Link to="/login" className="text-sm font-semibold text-zinc-400 hover:text-white transition-colors hidden md:block">Entrar</Link>
-                  <Link to="/wizard" className="bg-[#FF0000] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-600 transition-colors shadow-lg shadow-red-900/20">Simular</Link>
-                </>
-              )}
-            </div>
-          </div>
-        </nav>
+          )}
+        </>
       )}
+      {/* Main Content */}
+      <main className={`flex-1 ${showNav ? 'md:ml-64' : ''} ${showNav ? 'pt-16 md:pt-0' : ''} ${showBottomNav ? 'pb-20' : ''}`}>
+        {children}
+      </main>
 
-      <div className={`${showNav ? 'pt-16' : ''} ${showBottomNav ? 'pb-24' : 'pb-8'}`}>{children}</div>
+      {/* Bottom Navigation for mobile */}
       {showBottomNav && <BottomNav />}
+
+      {/* Chatbot only visible in client area */}
       <Chatbot />
     </div>
   );
 };
 
-export default function App() {
+// --- App ---
+
+function App() {
   const [showSplash, setShowSplash] = useState(true);
 
-  // Initialize Firebase Push and Theme on app load
   useEffect(() => {
-    if (!showSplash) {
-      // Inicializar tema imediatamente
-      themeService.init().then(() => {
-        console.log('[App] Theme initialized');
-      });
+    // Try to initialize push notifications
+    firebasePushService.initPush().catch(console.error);
 
-      firebasePushService.init().then(() => {
-        console.log('[App] Firebase Push initialized');
-
-        // Listen for foreground messages
-        firebasePushService.onForegroundMessage((payload) => {
-          console.log('[App] Foreground push received:', payload);
-          // Show local notification or toast
-          if (payload.notification) {
-            new Notification(payload.notification.title || 'Tubarão Empréstimos', {
-              body: payload.notification.body,
-              icon: '/Logo.png'
-            });
-          }
-        });
-      });
+    // Check for stored theme preference
+    const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null;
+    if (storedTheme) {
+      themeService.setTheme(storedTheme);
+    } else {
+      // Apply system preference by default
+      themeService.setTheme('system');
     }
-  }, [showSplash]);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   if (showSplash) {
-    return (
-      <BrandProvider>
-        <SplashScreen onFinish={() => setShowSplash(false)} />
-      </BrandProvider>
-    );
+    return <SplashScreen />;
   }
 
   return (
@@ -338,7 +393,6 @@ export default function App() {
             <Route path="/client/wizard" element={<ClientLayout><Wizard /></ClientLayout>} />
 
             {/* Client Protected */}
-            {/* Set showNav={false} for Dashboard to avoid double headers */}
             <Route path="/client/dashboard" element={<ClientLayout showNav={false} showBottomNav={true}><ClientDashboard /></ClientLayout>} />
             <Route path="/client/contracts" element={<ClientLayout showNav={true} showBottomNav={true}><Contracts /></ClientLayout>} />
             <Route path="/client/profile" element={<ClientLayout showNav={true} showBottomNav={true}><Profile /></ClientLayout>} />
@@ -352,32 +406,25 @@ export default function App() {
             <Route path="/admin/customers" element={<AdminLayout><Customers /></AdminLayout>} />
             <Route path="/admin/import-contacts" element={<AdminLayout><ImportContacts /></AdminLayout>} />
             <Route path="/admin/data-search" element={<AdminLayout><DataSearch /></AdminLayout>} />
-            <Route path="/admin/reports" element={<AdminLayout><Reports /></AdminLayout>} />
-            <Route path="/admin/marketing" element={<AdminLayout><Marketing /></AdminLayout>} />
-            <Route path="/admin/users" element={<AdminLayout><UsersPage /></AdminLayout>} />
-            <Route path="/admin/interactions" element={<AdminLayout><Interactions /></AdminLayout>} />
             <Route path="/admin/settings" element={<AdminLayout><Settings /></AdminLayout>} />
 
-            {/* Admin Protected - Extended Features */}
-            <Route path="/admin/agenda" element={<AdminLayout><AgendaPage /></AdminLayout>} />
-            <Route path="/admin/blacklist" element={<AdminLayout><BlacklistPage /></AdminLayout>} />
-            <Route path="/admin/audit" element={<AdminLayout><AuditPage /></AdminLayout>} />
-            <Route path="/admin/finance" element={<AdminLayout><FinancePage /></AdminLayout>} />
-            <Route path="/admin/messages" element={<AdminLayout><MessagesPage /></AdminLayout>} />
-            <Route path="/admin/documents" element={<AdminLayout><DocumentsPage /></AdminLayout>} />
-            <Route path="/admin/score" element={<AdminLayout><ScorePage /></AdminLayout>} />
-            <Route path="/admin/geolocation" element={<AdminLayout><GeolocationPage /></AdminLayout>} />
-            <Route path="/admin/openfinance" element={<AdminLayout><OpenFinancePage /></AdminLayout>} />
-            <Route path="/admin/receipts" element={<AdminLayout><PaymentReceipts /></AdminLayout>} />
-            <Route path="/admin/payments" element={<AdminLayout><PaymentsPage /></AdminLayout>} />
+            {/* Admin Protected - Hubs Unificados */}
             <Route path="/admin/finance-hub" element={<AdminLayout><FinanceHub /></AdminLayout>} />
-            <Route path="/admin/referrals" element={<AdminLayout><Referrals /></AdminLayout>} />
-            <Route path="/admin/chatbot" element={<AdminLayout><AIChatbot /></AdminLayout>} />
-            <Route path="/admin/status" element={<AdminLayout><StatusScheduler /></AdminLayout>} />
-            <Route path="/admin/antifraud" element={<AdminLayout><AntiFraudMonitor /></AdminLayout>} />
+            <Route path="/admin/communication-hub" element={<AdminLayout><CommunicationHub /></AdminLayout>} />
+            <Route path="/admin/security-hub" element={<AdminLayout><SecurityHub /></AdminLayout>} />
+            <Route path="/admin/ai-hub" element={<AdminLayout><AIHub /></AdminLayout>} />
+            <Route path="/admin/analytics-hub" element={<AdminLayout><AnalyticsHub /></AdminLayout>} />
+
+            {/* Admin Protected - Páginas legadas (ainda acessíveis) */}
+            <Route path="/admin/finance" element={<AdminLayout><FinancePage /></AdminLayout>} />
+            <Route path="/admin/agenda" element={<AdminLayout><AgendaPage /></AdminLayout>} />
+            <Route path="/admin/score" element={<AdminLayout><ScorePage /></AdminLayout>} />
+            <Route path="/admin/documents" element={<AdminLayout><DocumentsPage /></AdminLayout>} />
           </Routes>
         </Router>
       </ToastProvider>
     </BrandProvider>
   );
 }
+
+export default App;
