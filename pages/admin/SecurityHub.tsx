@@ -5,17 +5,19 @@ import {
     Shield, Ban, UserCog, AlertTriangle, Search, Filter,
     RefreshCw, Download, Eye, Trash2, Plus, ToggleLeft, ToggleRight,
     CheckCircle, XCircle, Clock, MapPin, Smartphone, Monitor,
-    Globe, Fingerprint, User, Key, X, Save, Edit2, Phone, Mail
+    Globe, Fingerprint, User, Key, X, Save, Edit2, Phone, Mail,
+    Lock, Unlock, Bell, Settings, AlertCircle
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { supabase } from '../../services/supabaseClient';
 import { supabaseService } from '../../services/supabaseService';
 import { blacklistService } from '../../services/adminService';
+import { deviceSecurityService, TrustedDevice, SecurityBlock, SecurityAlert } from '../../services/deviceSecurityService';
 import { useToast } from '../../components/Toast';
 import { BlacklistEntry, UserAccess, UserRole } from '../../types';
 import { AntiFraudMonitor } from './AntiFraudMonitor';
 
-type TabType = 'antifraud' | 'blacklist' | 'users';
+type TabType = 'antifraud' | 'blacklist' | 'users' | 'devices';
 
 interface RiskLog {
     id: string;
@@ -61,10 +63,16 @@ export const SecurityHub: React.FC = () => {
     // Search
     const [searchTerm, setSearchTerm] = useState('');
 
+    // Devices & Blocks
+    const [securityBlocks, setSecurityBlocks] = useState<SecurityBlock[]>([]);
+    const [securityAlerts, setSecurityAlerts] = useState<SecurityAlert[]>([]);
+    const [trustedDevices, setTrustedDevices] = useState<TrustedDevice[]>([]);
+    const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
     // Read tab from URL on mount and when URL changes
     useEffect(() => {
         const tabParam = searchParams.get('tab');
-        if (tabParam === 'blacklist' || tabParam === 'users' || tabParam === 'antifraud') {
+        if (tabParam === 'blacklist' || tabParam === 'users' || tabParam === 'antifraud' || tabParam === 'devices') {
             setActiveTab(tabParam);
         }
     }, [searchParams]);
@@ -91,6 +99,12 @@ export const SecurityHub: React.FC = () => {
             // Users
             const usersData = await supabaseService.getUsers();
             setUsers(usersData);
+
+            // Security Blocks & Alerts
+            const blocks = await deviceSecurityService.getPendingBlocks();
+            setSecurityBlocks(blocks);
+            const alerts = await deviceSecurityService.getRecentAlerts(50);
+            setSecurityAlerts(alerts);
         } catch (error) {
             console.error('Error loading data:', error);
         }
@@ -220,9 +234,47 @@ export const SecurityHub: React.FC = () => {
 
     const tabs = [
         { id: 'antifraud', label: 'Antifraude', icon: <Shield size={18} />, badge: stats.highRiskCount },
+        { id: 'devices', label: 'Dispositivos', icon: <Smartphone size={18} />, badge: securityBlocks.length },
         { id: 'blacklist', label: 'Blacklist', icon: <Ban size={18} />, badge: stats.blacklistActive },
         { id: 'users', label: 'Acessos', icon: <UserCog size={18} />, badge: stats.totalUsers },
     ] as const;
+
+    // Device management handlers
+    const handleUnblockUser = async (block: SecurityBlock) => {
+        try {
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            await deviceSecurityService.resolveBlock(block.id, currentUser.name || 'Admin', 'Liberado pelo admin');
+            addToast('Usuário desbloqueado com sucesso!', 'success');
+            loadAllData();
+        } catch (error) {
+            addToast('Erro ao desbloquear usuário', 'error');
+        }
+    };
+
+    const handleLoadUserDevices = async (userId: string) => {
+        const devices = await deviceSecurityService.getUserDevices(userId);
+        setTrustedDevices(devices);
+        setSelectedUserId(userId);
+    };
+
+    const handleRemoveDevice = async (deviceId: string) => {
+        if (!confirm('Remover este dispositivo da lista de confiáveis?')) return;
+        await deviceSecurityService.removeDevice(deviceId);
+        addToast('Dispositivo removido', 'success');
+        if (selectedUserId) handleLoadUserDevices(selectedUserId);
+    };
+
+    const handleResetUserDevices = async (userId: string) => {
+        if (!confirm('Remover TODOS os dispositivos deste usuário? Ele precisará fazer login novamente.')) return;
+        await deviceSecurityService.resetUserDevices(userId);
+        addToast('Dispositivos resetados. Próximo login registrará novo dispositivo.', 'success');
+        loadAllData();
+    };
+
+    const handleMarkAlertRead = async (alertId: string) => {
+        await deviceSecurityService.markAlertRead(alertId);
+        setSecurityAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_read: true } : a));
+    };
 
     return (
         <div className="p-4 md:p-8 bg-black min-h-screen text-white pb-32">
@@ -436,6 +488,240 @@ export const SecurityHub: React.FC = () => {
                                 <p>Nenhum usuário cadastrado</p>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Devices Tab - Bloqueios e Dispositivos */}
+            {activeTab === 'devices' && (
+                <div className="space-y-6">
+                    {/* Estatísticas */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-gradient-to-br from-red-500/20 to-red-900/10 border border-red-500/30 rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Lock size={16} className="text-red-400" />
+                                <span className="text-zinc-400 text-sm">Bloqueios Pendentes</span>
+                            </div>
+                            <p className="text-2xl font-bold text-red-400">{securityBlocks.length}</p>
+                        </div>
+                        <div className="bg-gradient-to-br from-yellow-500/20 to-yellow-900/10 border border-yellow-500/30 rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Bell size={16} className="text-yellow-400" />
+                                <span className="text-zinc-400 text-sm">Alertas Não Lidos</span>
+                            </div>
+                            <p className="text-2xl font-bold text-yellow-400">{securityAlerts.filter(a => !a.is_read).length}</p>
+                        </div>
+                        <div className="bg-gradient-to-br from-blue-500/20 to-blue-900/10 border border-blue-500/30 rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Smartphone size={16} className="text-blue-400" />
+                                <span className="text-zinc-400 text-sm">Total Alertas</span>
+                            </div>
+                            <p className="text-2xl font-bold text-blue-400">{securityAlerts.length}</p>
+                        </div>
+                        <div className="bg-gradient-to-br from-green-500/20 to-green-900/10 border border-green-500/30 rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-1">
+                                <CheckCircle size={16} className="text-green-400" />
+                                <span className="text-zinc-400 text-sm">Dispositivos Listados</span>
+                            </div>
+                            <p className="text-2xl font-bold text-green-400">{trustedDevices.length}</p>
+                        </div>
+                    </div>
+
+                    {/* Bloqueios Pendentes */}
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+                        <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+                            <h3 className="text-white font-bold flex items-center gap-2">
+                                <Lock size={18} className="text-red-400" />
+                                Bloqueios Pendentes ({securityBlocks.length})
+                            </h3>
+                        </div>
+                        {securityBlocks.length === 0 ? (
+                            <div className="p-8 text-center text-zinc-500">
+                                <Unlock size={48} className="mx-auto mb-4 opacity-50" />
+                                <p>Nenhum bloqueio pendente</p>
+                                <p className="text-sm mt-1">Todos os acessos estão liberados</p>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-zinc-800">
+                                {securityBlocks.map(block => (
+                                    <div key={block.id} className="p-4 hover:bg-zinc-800/30">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="px-2 py-1 bg-red-900/30 text-red-400 rounded text-xs font-bold">
+                                                        {block.block_type.replace('_', ' ').toUpperCase()}
+                                                    </span>
+                                                    <span className="text-zinc-500 text-xs">
+                                                        {new Date(block.created_at).toLocaleString('pt-BR')}
+                                                    </span>
+                                                </div>
+                                                <p className="text-white font-medium">{block.block_reason}</p>
+                                                <div className="flex items-center gap-4 mt-2 text-sm text-zinc-400">
+                                                    <span className="flex items-center gap-1">
+                                                        <Globe size={12} /> {block.ip_address || 'IP não capturado'}
+                                                    </span>
+                                                    {block.device_info?.model && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Smartphone size={12} /> {block.device_info.model}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="primary"
+                                                    onClick={() => handleUnblockUser(block)}
+                                                    className="flex items-center gap-1 text-sm"
+                                                >
+                                                    <Unlock size={14} /> Liberar
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Alertas de Segurança */}
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+                        <div className="p-4 border-b border-zinc-800">
+                            <h3 className="text-white font-bold flex items-center gap-2">
+                                <Bell size={18} className="text-yellow-400" />
+                                Alertas de Segurança
+                            </h3>
+                        </div>
+                        {securityAlerts.length === 0 ? (
+                            <div className="p-8 text-center text-zinc-500">
+                                <Bell size={48} className="mx-auto mb-4 opacity-50" />
+                                <p>Nenhum alerta registrado</p>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-zinc-800 max-h-[400px] overflow-y-auto">
+                                {securityAlerts.map(alert => (
+                                    <div
+                                        key={alert.id}
+                                        className={`p-4 hover:bg-zinc-800/30 ${!alert.is_read ? 'bg-yellow-900/10 border-l-4 border-yellow-500' : ''}`}
+                                    >
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${alert.severity === 'critical' ? 'bg-red-900/50 text-red-400' :
+                                                            alert.severity === 'high' ? 'bg-orange-900/50 text-orange-400' :
+                                                                alert.severity === 'medium' ? 'bg-yellow-900/50 text-yellow-400' :
+                                                                    'bg-blue-900/50 text-blue-400'
+                                                        }`}>
+                                                        {alert.severity.toUpperCase()}
+                                                    </span>
+                                                    <span className="text-zinc-500 text-xs">
+                                                        {new Date(alert.created_at).toLocaleString('pt-BR')}
+                                                    </span>
+                                                    {!alert.is_read && (
+                                                        <span className="px-1.5 py-0.5 bg-yellow-500 text-black rounded text-xs font-bold">NOVO</span>
+                                                    )}
+                                                </div>
+                                                <p className="text-white font-medium">{alert.title}</p>
+                                                <p className="text-zinc-400 text-sm mt-1">{alert.description}</p>
+                                                <div className="flex items-center gap-3 mt-2 text-xs text-zinc-500">
+                                                    <span>{alert.user_name}</span>
+                                                    <span>{alert.user_email}</span>
+                                                    {alert.ip_address && <span>IP: {alert.ip_address}</span>}
+                                                </div>
+                                            </div>
+                                            {!alert.is_read && (
+                                                <button
+                                                    onClick={() => handleMarkAlertRead(alert.id)}
+                                                    className="p-2 bg-zinc-800 rounded hover:bg-zinc-700 text-zinc-400"
+                                                    title="Marcar como lido"
+                                                >
+                                                    <CheckCircle size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Buscar Dispositivos de Usuário */}
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+                        <div className="p-4 border-b border-zinc-800">
+                            <h3 className="text-white font-bold flex items-center gap-2">
+                                <Smartphone size={18} className="text-blue-400" />
+                                Dispositivos por Usuário
+                            </h3>
+                        </div>
+                        <div className="p-4">
+                            <div className="flex gap-2 mb-4">
+                                <select
+                                    className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white"
+                                    value={selectedUserId || ''}
+                                    onChange={(e) => e.target.value && handleLoadUserDevices(e.target.value)}
+                                >
+                                    <option value="">Selecione um usuário...</option>
+                                    {users.filter(u => u.role === 'CLIENT').map(user => (
+                                        <option key={user.id} value={user.id}>{user.name} ({user.email})</option>
+                                    ))}
+                                </select>
+                                {selectedUserId && (
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => handleResetUserDevices(selectedUserId)}
+                                        className="text-red-400"
+                                    >
+                                        <Trash2 size={16} /> Resetar Todos
+                                    </Button>
+                                )}
+                            </div>
+
+                            {trustedDevices.length > 0 ? (
+                                <div className="space-y-3">
+                                    {trustedDevices.map(device => (
+                                        <div key={device.id} className="flex items-center justify-between p-3 bg-black rounded-lg border border-zinc-800">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${device.is_primary ? 'bg-[#D4AF37]/20' : 'bg-zinc-800'}`}>
+                                                    <Smartphone size={20} className={device.is_primary ? 'text-[#D4AF37]' : 'text-zinc-400'} />
+                                                </div>
+                                                <div>
+                                                    <p className="text-white font-medium flex items-center gap-2">
+                                                        {device.device_name}
+                                                        {device.is_primary && (
+                                                            <span className="px-1.5 py-0.5 bg-[#D4AF37]/20 text-[#D4AF37] rounded text-xs">PRINCIPAL</span>
+                                                        )}
+                                                        {device.is_verified && (
+                                                            <CheckCircle size={14} className="text-green-400" />
+                                                        )}
+                                                    </p>
+                                                    <p className="text-zinc-500 text-sm">
+                                                        {device.platform} • {device.browser} • {device.login_count} logins
+                                                    </p>
+                                                    <p className="text-zinc-600 text-xs">
+                                                        Último acesso: {new Date(device.last_seen_at).toLocaleString('pt-BR')} • IP: {device.last_ip}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => handleRemoveDevice(device.id)}
+                                                className="p-2 bg-red-900/30 text-red-400 rounded hover:bg-red-900/50"
+                                                title="Remover dispositivo"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : selectedUserId ? (
+                                <div className="text-center py-8 text-zinc-500">
+                                    <Smartphone size={32} className="mx-auto mb-2 opacity-50" />
+                                    <p>Nenhum dispositivo registrado</p>
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-zinc-500">
+                                    <p>Selecione um usuário para ver seus dispositivos</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
