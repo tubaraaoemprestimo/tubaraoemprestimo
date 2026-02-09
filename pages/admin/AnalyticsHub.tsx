@@ -86,7 +86,7 @@ export const AnalyticsHub: React.FC = () => {
         setLoading(true);
         try {
             // Audit logs
-            const logs = await auditService.getLogs();
+            const logs = await auditService.getAll();
             setAuditLogs(logs);
 
             // Customers
@@ -94,7 +94,7 @@ export const AnalyticsHub: React.FC = () => {
             setCustomers(customersData);
 
             // Customer locations
-            const locations = await locationTrackingService.getAllCustomerLocations();
+            const locations = await locationTrackingService.getAllLocations();
             setCustomerLocations(locations);
 
         } catch (error) {
@@ -119,7 +119,7 @@ export const AnalyticsHub: React.FC = () => {
 
     const handleClearLogs = async () => {
         if (!confirm('Limpar todos os logs?')) return;
-        await auditService.clearLogs();
+        await auditService.clear();
         addToast('Logs limpos', 'success');
         loadAllData();
     };
@@ -135,7 +135,7 @@ export const AnalyticsHub: React.FC = () => {
     };
 
     const getCustomerLocation = (email: string) => {
-        return customerLocations.find(l => l.email === email);
+        return customerLocations.find(l => l.customerEmail === email);
     };
 
     // Open Finance handlers
@@ -386,7 +386,7 @@ export const AnalyticsHub: React.FC = () => {
                                                 {location.city}, {location.state}
                                             </p>
                                             <p className="text-xs text-zinc-500">
-                                                Última atualização: {new Date(location.lastUpdated).toLocaleDateString('pt-BR')}
+                                                Última atualização: {location.updatedAt ? new Date(location.updatedAt).toLocaleDateString('pt-BR') : 'N/A'}
                                             </p>
                                             <div className="flex gap-2 mt-3">
                                                 <Button

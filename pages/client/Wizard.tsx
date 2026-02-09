@@ -1036,8 +1036,8 @@ export const Wizard: React.FC = () => {
                 })}
               </div>
 
-              {/* Pergunta sobre cliente recorrente - aparece após selecionar perfil */}
-              {profileType && (
+              {/* Pergunta sobre cliente recorrente - apenas CLT, AUTONOMO e GARANTIA */}
+              {profileType && profileType !== 'MOTO' && profileType !== 'LIMPA_NOME' && (
                 <div className="mt-6 p-5 bg-zinc-800/50 rounded-2xl border border-zinc-700 animate-in fade-in slide-in-from-bottom-2">
                   <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                     <Users size={18} className="text-[#D4AF37]" />
@@ -1635,6 +1635,22 @@ export const Wizard: React.FC = () => {
                       <Input label="Endereço" name="address" value={formData.address} readOnly className="opacity-60" />
                       <Input label="Número" name="number" value={formData.number} onChange={handleChange} placeholder="123" />
                     </div>
+
+                    {/* Referências / Pessoas Próximas */}
+                    {profileType !== 'LIMPA_NOME' && (
+                      <div className="pt-4 border-t border-zinc-800 space-y-4">
+                        <h3 className="text-sm font-bold text-[#D4AF37]">Referências (Pessoas Próximas)</h3>
+                        <p className="text-xs text-zinc-500">Informe 2 contatos de pessoas próximas para referência.</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <Input label="Nome da Referência 1" name="contactTrust1Name" value={formData.contactTrust1Name} onChange={handleChange} placeholder="Nome completo" />
+                          <Input label="WhatsApp Referência 1" name="contactTrust1" value={formData.contactTrust1} onChange={handleChange} placeholder="(99) 99999-9999" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <Input label="Nome da Referência 2" name="contactTrust2Name" value={formData.contactTrust2Name} onChange={handleChange} placeholder="Nome completo" />
+                          <Input label="WhatsApp Referência 2" name="contactTrust2" value={formData.contactTrust2} onChange={handleChange} placeholder="(99) 99999-9999" />
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

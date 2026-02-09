@@ -105,6 +105,7 @@ export interface LoanRequest {
   };
 
   signatureUrl?: string;
+  supplementalDescription?: string;
 }
 
 export interface DashboardStats {

@@ -2,7 +2,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Check, X, Eye, Maximize, Layers, Download, Filter, Video, Users, Phone, FileWarning, Send, AlertTriangle } from 'lucide-react';
+import { Check, X, Eye, Maximize, Layers, Download, Filter, Video, Users, Phone, FileWarning, Send, AlertTriangle, MapPin } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { supabaseService } from '../../services/supabaseService';
 import { emailService } from '../../services/emailService';
@@ -438,6 +438,39 @@ export const Requests: React.FC = () => {
                                 )}
                             </div>
 
+                            {/* Endereço do Cliente */}
+                            {(() => {
+                                let extraAddr: any = null;
+                                try {
+                                    if (selectedRequest.supplementalDescription) {
+                                        extraAddr = JSON.parse(selectedRequest.supplementalDescription);
+                                    }
+                                } catch { /* ignore */ }
+
+                                if (extraAddr && (extraAddr.address || extraAddr.cep)) {
+                                    return (
+                                        <div className="bg-zinc-950 border border-zinc-800 p-4 rounded-xl">
+                                            <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                <MapPin size={16} /> Endereço do Cliente
+                                            </h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div className="bg-black p-3 rounded-lg border border-zinc-800 md:col-span-2">
+                                                    <p className="text-xs text-zinc-500 uppercase">Endereço</p>
+                                                    <p className="font-bold text-white">
+                                                        {extraAddr.address || 'N/A'}{extraAddr.number ? `, ${extraAddr.number}` : ''}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                    <p className="text-xs text-zinc-500 uppercase">CEP</p>
+                                                    <p className="font-bold text-white">{extraAddr.cep || 'N/A'}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+
                             {/* Supplemental Docs Section (If Active or Completed) */}
                             {selectedRequest.supplementalInfo && (
                                 <div className="bg-blue-900/10 border border-blue-800/50 p-4 rounded-xl">
@@ -475,24 +508,26 @@ export const Requests: React.FC = () => {
                                         <div className="flex items-center gap-2 bg-black p-3 rounded-lg border border-zinc-800">
                                             <Phone size={16} className="text-zinc-500" />
                                             <div>
-                                                <p className="text-xs text-zinc-500 uppercase">Pai</p>
+                                                <p className="text-xs text-zinc-500 uppercase">Referência 1</p>
                                                 <p className="font-bold text-white">{selectedRequest.references.fatherPhone || 'N/A'}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 bg-black p-3 rounded-lg border border-zinc-800">
                                             <Phone size={16} className="text-zinc-500" />
                                             <div>
-                                                <p className="text-xs text-zinc-500 uppercase">Mãe</p>
+                                                <p className="text-xs text-zinc-500 uppercase">Referência 2</p>
                                                 <p className="font-bold text-white">{selectedRequest.references.motherPhone || 'N/A'}</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2 bg-black p-3 rounded-lg border border-zinc-800">
-                                            <Phone size={16} className="text-zinc-500" />
-                                            <div>
-                                                <p className="text-xs text-zinc-500 uppercase">Cônjuge</p>
-                                                <p className="font-bold text-white">{selectedRequest.references.spousePhone || 'N/A'}</p>
+                                        {selectedRequest.references.spousePhone && (
+                                            <div className="flex items-center gap-2 bg-black p-3 rounded-lg border border-zinc-800">
+                                                <Phone size={16} className="text-zinc-500" />
+                                                <div>
+                                                    <p className="text-xs text-zinc-500 uppercase">Referência 3</p>
+                                                    <p className="font-bold text-white">{selectedRequest.references.spousePhone}</p>
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             )}

@@ -13,6 +13,7 @@ import { supabaseService } from '../../services/supabaseService';
 import { blacklistService } from '../../services/adminService';
 import { useToast } from '../../components/Toast';
 import { BlacklistEntry, UserAccess, UserRole } from '../../types';
+import { AntiFraudMonitor } from './AntiFraudMonitor';
 
 type TabType = 'antifraud' | 'blacklist' | 'users';
 
@@ -84,11 +85,11 @@ export const SecurityHub: React.FC = () => {
             if (logsData) setRiskLogs(logsData);
 
             // Blacklist
-            const blacklistData = await blacklistService.getBlacklist();
+            const blacklistData = await blacklistService.getAll();
             setBlacklist(blacklistData);
 
             // Users
-            const usersData = await supabaseService.getUserAccess();
+            const usersData = await supabaseService.getUsers();
             setUsers(usersData);
         } catch (error) {
             console.error('Error loading data:', error);
@@ -133,7 +134,13 @@ export const SecurityHub: React.FC = () => {
             addToast('CPF inválido', 'error');
             return;
         }
-        await blacklistService.addToBlacklist(cleanCpf, newReason);
+        const currentUser = JSON.parse(localStorage.getItem('tubarao_user') || '{}');
+        await blacklistService.add({
+            cpf: cleanCpf,
+            reason: newReason,
+            name: 'Desconhecido',
+            addedBy: currentUser?.name || 'Admin'
+        });
         addToast('CPF adicionado à blacklist', 'success');
         setNewCpf('');
         setNewReason('');
@@ -143,13 +150,13 @@ export const SecurityHub: React.FC = () => {
 
     const handleRemoveFromBlacklist = async (id: string) => {
         if (!confirm('Remover da blacklist?')) return;
-        await blacklistService.removeFromBlacklist(id);
+        await blacklistService.remove(id);
         addToast('CPF removido', 'success');
         loadAllData();
     };
 
     const handleToggleBlacklist = async (id: string) => {
-        await blacklistService.toggleBlacklist(id);
+        await blacklistService.toggle(id);
         loadAllData();
     };
 
@@ -163,7 +170,7 @@ export const SecurityHub: React.FC = () => {
             addToast('Preencha todos os campos', 'warning');
             return;
         }
-        const created = await supabaseService.createUserAccess({
+        const created = await supabaseService.createUser({
             email: editingUser.email,
             name: editingUser.name,
             role: editingUser.role || 'OPERATOR',
@@ -180,17 +187,16 @@ export const SecurityHub: React.FC = () => {
 
     const handleDeleteUser = async (id: string) => {
         if (!confirm('Excluir usuário?')) return;
-        await supabaseService.deleteUserAccess(id);
+        await supabaseService.deleteUser(id);
         addToast('Usuário excluído', 'success');
         loadAllData();
     };
 
     const getRoleColor = (role: UserRole) => {
         switch (role) {
-            case 'ADMIN': return 'bg-purple-900/30 text-purple-400';
-            case 'MANAGER': return 'bg-blue-900/30 text-blue-400';
-            case 'OPERATOR': return 'bg-green-900/30 text-green-400';
-            case 'VIEWER': return 'bg-zinc-800 text-zinc-400';
+            case UserRole.ADMIN: return 'bg-purple-900/30 text-purple-400';
+            case UserRole.CLIENT: return 'bg-green-900/30 text-green-400';
+            default: return 'bg-zinc-800 text-zinc-400';
         }
     };
 
@@ -289,106 +295,9 @@ export const SecurityHub: React.FC = () => {
                 ))}
             </div>
 
-            {/* Antifraud Tab */}
+            {/* Antifraud Tab - Usando componente completo */}
             {activeTab === 'antifraud' && (
-                <div className="space-y-6">
-                    <div className="flex flex-wrap gap-4 items-center justify-between">
-                        <div className="flex gap-2">
-                            {(['all', 'high', 'medium', 'low'] as const).map(f => (
-                                <button
-                                    key={f}
-                                    onClick={() => setRiskFilter(f)}
-                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${riskFilter === f
-                                        ? f === 'high' ? 'bg-red-600 text-white' :
-                                            f === 'medium' ? 'bg-yellow-600 text-black' :
-                                                f === 'low' ? 'bg-green-600 text-white' : 'bg-[#D4AF37] text-black'
-                                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                                        }`}
-                                >
-                                    {f === 'all' ? 'Todos' : f === 'high' ? 'Alto' : f === 'medium' ? 'Médio' : 'Baixo'}
-                                </button>
-                            ))}
-                        </div>
-                        <div className="flex gap-2">
-                            <div className="relative">
-                                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar IP ou ação..."
-                                    value={searchTerm}
-                                    onChange={e => setSearchTerm(e.target.value)}
-                                    className="pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:border-[#D4AF37] outline-none"
-                                />
-                            </div>
-                            <Button variant="secondary" onClick={exportToCSV}>
-                                <Download size={18} /> CSV
-                            </Button>
-                        </div>
-                    </div>
-
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-zinc-950 border-b border-zinc-800">
-                                    <tr>
-                                        <th className="text-left p-4 text-zinc-400 text-sm">Data</th>
-                                        <th className="text-left p-4 text-zinc-400 text-sm">IP</th>
-                                        <th className="text-left p-4 text-zinc-400 text-sm">Dispositivo</th>
-                                        <th className="text-left p-4 text-zinc-400 text-sm">Ação</th>
-                                        <th className="text-left p-4 text-zinc-400 text-sm">Risco</th>
-                                        <th className="text-left p-4 text-zinc-400 text-sm">Fatores</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-zinc-800">
-                                    {filteredLogs.slice(0, 50).map(log => {
-                                        const risk = getRiskLevel(log.risk_score);
-                                        const device = parseUserAgent(log.user_agent);
-                                        return (
-                                            <tr key={log.id} className="hover:bg-zinc-800/30 cursor-pointer" onClick={() => setSelectedLog(log)}>
-                                                <td className="p-4 text-zinc-400 text-sm whitespace-nowrap">
-                                                    {new Date(log.created_at).toLocaleString('pt-BR')}
-                                                </td>
-                                                <td className="p-4">
-                                                    <span className="font-mono text-white">{log.ip}</span>
-                                                </td>
-                                                <td className="p-4">
-                                                    <div className="flex items-center gap-2">
-                                                        {device.isMobile ? <Smartphone size={14} className="text-blue-400" /> : <Monitor size={14} className="text-zinc-400" />}
-                                                        <span className="text-zinc-300 text-sm">{device.browser} / {device.os}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="p-4 text-white">{log.action}</td>
-                                                <td className="p-4">
-                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${risk.bgColor} ${risk.color}`}>
-                                                        {log.risk_score}% - {risk.level}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4">
-                                                    <div className="flex flex-wrap gap-1 max-w-xs">
-                                                        {log.risk_factors.slice(0, 2).map((f, i) => (
-                                                            <span key={i} className="px-1.5 py-0.5 bg-zinc-800 rounded text-xs text-zinc-400">{f}</span>
-                                                        ))}
-                                                        {log.risk_factors.length > 2 && (
-                                                            <span className="text-xs text-zinc-500">+{log.risk_factors.length - 2}</span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    {filteredLogs.length === 0 && (
-                                        <tr>
-                                            <td colSpan={6} className="p-8 text-center text-zinc-500">
-                                                <Shield size={48} className="mx-auto mb-4 opacity-50" />
-                                                <p>Nenhum log de risco encontrado</p>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                <AntiFraudMonitor />
             )}
 
             {/* Blacklist Tab */}
@@ -599,14 +508,12 @@ export const SecurityHub: React.FC = () => {
                             <div>
                                 <label className="block text-sm text-zinc-400 mb-1">Função</label>
                                 <select
-                                    value={editingUser?.role || 'OPERATOR'}
+                                    value={editingUser?.role || 'CLIENT'}
                                     onChange={e => setEditingUser(prev => ({ ...prev, role: e.target.value as UserRole }))}
                                     className={inputStyle}
                                 >
                                     <option value="ADMIN">Administrador</option>
-                                    <option value="MANAGER">Gerente</option>
-                                    <option value="OPERATOR">Operador</option>
-                                    <option value="VIEWER">Visualizador</option>
+                                    <option value="CLIENT">Cliente</option>
                                 </select>
                             </div>
                             {!editingUser?.id && (
@@ -639,40 +546,85 @@ export const SecurityHub: React.FC = () => {
                         <div className="p-6 space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-black p-3 rounded-lg">
-                                    <p className="text-xs text-zinc-500">IP</p>
-                                    <p className="font-mono text-white">{selectedLog.ip}</p>
+                                    <p className="text-xs text-zinc-500 mb-1 flex items-center gap-1"><Monitor size={12} /> IP</p>
+                                    <p className="font-mono text-white text-sm">{selectedLog.ip}</p>
                                 </div>
                                 <div className="bg-black p-3 rounded-lg">
-                                    <p className="text-xs text-zinc-500">Risco</p>
+                                    <p className="text-xs text-zinc-500 mb-1 flex items-center gap-1"><Shield size={12} /> Risco</p>
                                     <p className={`font-bold ${getRiskLevel(selectedLog.risk_score).color}`}>
                                         {selectedLog.risk_score}%
                                     </p>
                                 </div>
                             </div>
+
+                            {/* Device Info */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-black p-3 rounded-lg">
+                                    <p className="text-xs text-zinc-500 mb-1 flex items-center gap-1"><Smartphone size={12} /> Dispositivo</p>
+                                    <p className="text-white text-sm">
+                                        {selectedLog.platform || 'Desconhecido'}
+                                        <span className="text-zinc-500 text-xs block truncate" title={selectedLog.user_agent}>
+                                            ({(() => {
+                                                const ua = selectedLog.user_agent || '';
+                                                if (/Android/i.test(ua)) return 'Android';
+                                                if (/iPhone|iPad|iPod/i.test(ua)) return 'iOS';
+                                                if (/Windows/i.test(ua)) return 'Windows';
+                                                if (/Mac/i.test(ua)) return 'MacOS';
+                                                if (/Linux/i.test(ua)) return 'Linux';
+                                                return 'Outro';
+                                            })()})
+                                        </span>
+                                    </p>
+                                </div>
+                                <div className="bg-black p-3 rounded-lg">
+                                    <p className="text-xs text-zinc-500 mb-1 flex items-center gap-1"><Globe size={12} /> Navegador</p>
+                                    <p className="text-white text-sm">
+                                        {(() => {
+                                            const ua = selectedLog.user_agent || '';
+                                            if (/Chrome/i.test(ua)) return 'Chrome';
+                                            if (/Firefox/i.test(ua)) return 'Firefox';
+                                            if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) return 'Safari';
+                                            if (/Edge/i.test(ua)) return 'Edge';
+                                            return 'Outro';
+                                        })()}
+                                    </p>
+                                    <p className="text-zinc-600 text-xs">{selectedLog.screen_resolution || 'Resolução N/A'}</p>
+                                </div>
+                            </div>
+
                             <div className="bg-black p-3 rounded-lg">
                                 <p className="text-xs text-zinc-500 mb-2">Fatores de Risco</p>
                                 <div className="flex flex-wrap gap-2">
-                                    {selectedLog.risk_factors.map((f, i) => (
-                                        <span key={i} className="px-2 py-1 bg-red-900/30 text-red-400 rounded text-sm">{f}</span>
-                                    ))}
+                                    {selectedLog.risk_factors.length > 0 ? (
+                                        selectedLog.risk_factors.map((f, i) => (
+                                            <span key={i} className="px-2 py-1 bg-red-900/30 text-red-400 rounded text-sm">{f}</span>
+                                        ))
+                                    ) : (
+                                        <span className="text-zinc-600 text-sm italic">Nenhum fator detectado</span>
+                                    )}
                                 </div>
                             </div>
+
                             {selectedLog.latitude && selectedLog.longitude && (
                                 <div className="bg-black p-3 rounded-lg">
-                                    <p className="text-xs text-zinc-500 mb-2">Localização</p>
+                                    <p className="text-xs text-zinc-500 mb-2 flex items-center gap-1"><MapPin size={12} /> Localização</p>
                                     <a
                                         href={`https://www.google.com/maps?q=${selectedLog.latitude},${selectedLog.longitude}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-[#D4AF37] hover:underline flex items-center gap-1"
+                                        className="text-[#D4AF37] hover:underline flex items-center gap-1 text-sm bg-zinc-900 px-3 py-2 rounded-lg border border-zinc-800 w-fit"
                                     >
-                                        <MapPin size={14} /> Ver no mapa
+                                        <MapPin size={14} />
+                                        {selectedLog.latitude.toFixed(4)}, {selectedLog.longitude.toFixed(4)}
                                     </a>
                                 </div>
                             )}
-                            <div className="bg-black p-3 rounded-lg">
-                                <p className="text-xs text-zinc-500 mb-1">User Agent</p>
-                                <p className="text-zinc-400 text-xs font-mono break-all">{selectedLog.user_agent}</p>
+
+                            <div className="mt-4 pt-4 border-t border-zinc-800">
+                                <p className="text-xs text-zinc-500 mb-1">User Agent (Raw)</p>
+                                <div className="bg-zinc-900 p-2 rounded text-xs font-mono text-zinc-500 break-all max-h-20 overflow-y-auto">
+                                    {selectedLog.user_agent}
+                                </div>
                             </div>
                         </div>
                     </div>

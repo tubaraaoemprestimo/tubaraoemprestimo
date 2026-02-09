@@ -856,8 +856,8 @@ export const supabaseService = {
                 amount: Number(data.amount) || (data.profileType === 'LIMPA_NOME' ? 0 : 1000),
                 installments: data.installments || 4,
                 status: 'PENDING',
-                father_phone: data.fatherPhone || null,
-                mother_phone: data.motherPhone || null,
+                father_phone: data.contactTrust1 ? `${data.contactTrust1Name || 'Ref 1'}: ${data.contactTrust1}` : (data.fatherPhone || null),
+                mother_phone: data.contactTrust2 ? `${data.contactTrust2Name || 'Ref 2'}: ${data.contactTrust2}` : (data.motherPhone || null),
                 spouse_phone: data.spousePhone || null,
                 selfie_url: typeof data.selfie === 'string' ? data.selfie : '',
                 id_card_url: serializeUrls(data.idCardFront),
@@ -885,6 +885,10 @@ export const supabaseService = {
                         video: data.guarantee.video || ''
                     } : null,
                     motoColor: data.motoColor || null,
+                    // Endereço do cliente
+                    cep: data.cep || null,
+                    address: data.address || null,
+                    number: data.number || null,
                     // Guardar dados extras no JSON como fallback seguro
                     isReturningClient: data.isReturningClient || false,
                     returningClientNote: data.returningClientNote || '',
