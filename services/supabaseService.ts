@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { autoNotificationService } from './autoNotificationService';
+import { deviceSecurityService } from './deviceSecurityService';
 import { whatsappService } from './whatsappService';
 import { emailService } from './emailService';
 import {
@@ -151,10 +152,49 @@ export const supabaseService = {
                 const userRole = (userData?.role || 'CLIENT').toString().toUpperCase();
                 console.log('[Auth] Final role:', userRole);
 
+                const userId = userData?.id || authData.user.id;
+                const userName = userData?.name || authData.user.email?.split('@')[0] || 'Usuário';
+                const userEmail = authData.user.email || '';
+
+                // 🔒 VERIFICAÇÃO DE SEGURANÇA DE DISPOSITIVO
+                // Só aplica para clientes (não admins)
+                if (userRole === 'CLIENT') {
+                    try {
+                        console.log('[Auth] 🔒 Checking device security...');
+                        const deviceCheck = await deviceSecurityService.checkDevice(
+                            userId,
+                            userName,
+                            userEmail
+                        );
+
+                        if (!deviceCheck.allowed) {
+                            console.log('[Auth] ❌ Device blocked:', deviceCheck.blockReason);
+                            // Faz logout da sessão criada
+                            await supabase.auth.signOut();
+                            return {
+                                user: null,
+                                error: {
+                                    message: deviceCheck.blockReason || 'Dispositivo não autorizado. Entre em contato com o suporte.',
+                                    code: 'DEVICE_BLOCKED'
+                                }
+                            };
+                        }
+
+                        if (deviceCheck.isNewDevice) {
+                            console.log('[Auth] ⚠️ New device registered');
+                        }
+
+                        console.log('[Auth] ✅ Device check passed');
+                    } catch (deviceError) {
+                        console.error('[Auth] Device security check error:', deviceError);
+                        // Não bloqueia em caso de erro na verificação, apenas loga
+                    }
+                }
+
                 const user = {
-                    id: userData?.id || authData.user.id,
-                    name: userData?.name || authData.user.email?.split('@')[0] || 'Usuário',
-                    email: authData.user.email || '',
+                    id: userId,
+                    name: userName,
+                    email: userEmail,
                     role: userRole,
                     token: authData.session?.access_token || '',
                     avatarUrl: userData?.avatar_url || null
