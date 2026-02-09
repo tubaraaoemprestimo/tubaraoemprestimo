@@ -72,9 +72,12 @@ interface ExpandableMenuProps {
 
 const ExpandableMenu: React.FC<ExpandableMenuProps> = ({ icon, label, badge, items, isActive, onItemClick }) => {
   const location = useLocation();
-  const [isOpen, setIsOpen] = useState(() => items.some(item => location.pathname === item.to));
+  // Extract pathname from item.to (which may contain query params like ?tab=xxx)
+  const getPathname = (to: string) => to.split('?')[0];
+  const [isOpen, setIsOpen] = useState(() => items.some(item => location.pathname === getPathname(item.to)));
 
-  const isAnyItemActive = items.some(item => location.pathname === item.to);
+  const isAnyItemActive = items.some(item => location.pathname === getPathname(item.to));
+
 
   return (
     <div>
@@ -120,7 +123,13 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const isActive = (path: string) => location.pathname === path ? 'text-[#D4AF37] bg-zinc-800' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
+  // Compare full path including query params for expandable menu items
+  const isActive = (path: string) => {
+    const [targetPath, targetSearch] = path.split('?');
+    const isPathMatch = location.pathname === targetPath;
+    const isSearchMatch = targetSearch ? location.search === `?${targetSearch}` : !location.search;
+    return isPathMatch && isSearchMatch ? 'text-[#D4AF37] bg-zinc-800' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
+  };
   const user = supabaseService.auth.getUser();
 
   if (!user || user.role !== 'ADMIN') {

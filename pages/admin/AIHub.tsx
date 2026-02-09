@@ -1,5 +1,6 @@
 // 🤖 Central de IA - Chatbot e Logs Unificados
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     Bot, Save, MessageSquare, Settings2, Brain, Clock, TestTube,
     Send, History, User, Trash2, RefreshCw, Search, Phone, Calendar,
@@ -76,6 +77,7 @@ const inputStyle = "w-full bg-black border border-zinc-700 rounded-lg p-3 text-w
 
 export const AIHub: React.FC = () => {
     const { addToast } = useToast();
+    const [searchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState<TabType>('config');
     const [loading, setLoading] = useState(true);
 
@@ -96,6 +98,14 @@ export const AIHub: React.FC = () => {
     const [testMessage, setTestMessage] = useState('');
     const [testResponse, setTestResponse] = useState('');
     const [isTesting, setIsTesting] = useState(false);
+
+    // Read tab from URL on mount and when URL changes
+    useEffect(() => {
+        const tabParam = searchParams.get('tab');
+        if (tabParam === 'config' || tabParam === 'conversations' || tabParam === 'logs' || tabParam === 'test') {
+            setActiveTab(tabParam);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         loadAllData();

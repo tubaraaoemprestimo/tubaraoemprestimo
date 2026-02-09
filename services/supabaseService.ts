@@ -667,10 +667,17 @@ export const supabaseService = {
             }
 
             const settings: any = {};
+            // Campos que devem sempre permanecer como string (nunca converter para número)
+            const stringOnlyKeys = ['pixKey', 'pixKeyType', 'pixReceiverName', 'lateInterestDailyType', 'lateInterestMonthlyType', 'lateInterestYearlyType', 'lateFixedFeeType'];
             data.forEach(item => {
-                // Tentar parsear como número, senão manter como string
-                const numValue = parseFloat(item.value);
-                settings[item.key] = isNaN(numValue) ? item.value : numValue;
+                // Se é um campo que deve ser string, manter como string
+                if (stringOnlyKeys.includes(item.key)) {
+                    settings[item.key] = item.value;
+                } else {
+                    // Tentar parsear como número, senão manter como string
+                    const numValue = parseFloat(item.value);
+                    settings[item.key] = isNaN(numValue) ? item.value : numValue;
+                }
             });
 
             return {

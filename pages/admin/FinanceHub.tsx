@@ -1,5 +1,6 @@
 // 🎮 Finance Hub - Pagamentos, Comprovantes e Gamificação Unificados
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     DollarSign, Check, X, Upload, Calendar, Search, Eye, Trash2,
     CheckCircle2, Clock, AlertTriangle, Plus, Receipt, Image, FileText,
@@ -29,6 +30,7 @@ interface ClientRanking {
 
 export const FinanceHub: React.FC = () => {
     const { addToast } = useToast();
+    const [searchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState<TabType>('overview');
     const [loading, setLoading] = useState(true);
 
@@ -58,6 +60,14 @@ export const FinanceHub: React.FC = () => {
     const [selectedReceipt, setSelectedReceipt] = useState<PaymentReceipt | null>(null);
     const [rejectionReason, setRejectionReason] = useState('');
     const [processing, setProcessing] = useState<string | null>(null);
+
+    // Read tab from URL on mount and when URL changes
+    useEffect(() => {
+        const tabParam = searchParams.get('tab');
+        if (tabParam === 'overview' || tabParam === 'payments' || tabParam === 'receipts' || tabParam === 'ranking') {
+            setActiveTab(tabParam);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         loadAllData();

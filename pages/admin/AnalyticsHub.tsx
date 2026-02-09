@@ -1,5 +1,6 @@
 // 📊 Central de Análises - Relatórios, Auditoria, Geolocalização e Open Finance
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     BarChart3, FileText, MapPin, Landmark, Search, Filter,
     RefreshCw, Download, Eye, Trash2, Calendar, Clock,
@@ -44,6 +45,7 @@ const actionLabels: Record<string, string> = {
 
 export const AnalyticsHub: React.FC = () => {
     const { addToast } = useToast();
+    const [searchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState<TabType>('reports');
     const [loading, setLoading] = useState(true);
 
@@ -67,6 +69,14 @@ export const AnalyticsHub: React.FC = () => {
 
     // Search
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Read tab from URL on mount and when URL changes
+    useEffect(() => {
+        const tabParam = searchParams.get('tab');
+        if (tabParam === 'reports' || tabParam === 'audit' || tabParam === 'geo' || tabParam === 'openfinance') {
+            setActiveTab(tabParam);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         loadAllData();

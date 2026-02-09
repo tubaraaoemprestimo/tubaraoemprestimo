@@ -1,5 +1,6 @@
 // 🛡️ Central de Segurança - Antifraude, Blacklist e Acessos Unificados
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     Shield, Ban, UserCog, AlertTriangle, Search, Filter,
     RefreshCw, Download, Eye, Trash2, Plus, ToggleLeft, ToggleRight,
@@ -35,6 +36,7 @@ const inputStyle = "w-full bg-black border border-zinc-700 rounded-lg p-3 text-w
 
 export const SecurityHub: React.FC = () => {
     const { addToast } = useToast();
+    const [searchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState<TabType>('antifraud');
     const [loading, setLoading] = useState(true);
 
@@ -57,6 +59,14 @@ export const SecurityHub: React.FC = () => {
 
     // Search
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Read tab from URL on mount and when URL changes
+    useEffect(() => {
+        const tabParam = searchParams.get('tab');
+        if (tabParam === 'blacklist' || tabParam === 'users' || tabParam === 'antifraud') {
+            setActiveTab(tabParam);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         loadAllData();
