@@ -331,54 +331,78 @@ export const GeolocationPage: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Map Placeholder - In production, integrate with Leaflet */}
+                        {/* Mapa Real com OpenStreetMap */}
                         <div
                             ref={mapRef}
-                            className="h-[500px] bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center relative overflow-hidden"
+                            className="h-[500px] bg-zinc-800 relative overflow-hidden"
                         >
-                            {/* Visual Map Representation */}
-                            <div className="absolute inset-0 opacity-10">
-                                <svg viewBox="0 0 400 300" className="w-full h-full">
-                                    {/* Grid lines */}
-                                    {[...Array(10)].map((_, i) => (
-                                        <React.Fragment key={i}>
-                                            <line x1={i * 40} y1="0" x2={i * 40} y2="300" stroke="#D4AF37" strokeWidth="0.5" />
-                                            <line x1="0" y1={i * 30} x2="400" y2={i * 30} stroke="#D4AF37" strokeWidth="0.5" />
-                                        </React.Fragment>
-                                    ))}
-                                </svg>
-                            </div>
+                            {/* OpenStreetMap Embed - visão geral da região */}
+                            {(() => {
+                                const customersWithCoords = filteredCustomers.filter(c => c.latitude && c.longitude);
+                                const centerLat = customersWithCoords.length > 0
+                                    ? customersWithCoords.reduce((s, c) => s + (c.latitude || 0), 0) / customersWithCoords.length
+                                    : -8.0476;
+                                const centerLng = customersWithCoords.length > 0
+                                    ? customersWithCoords.reduce((s, c) => s + (c.longitude || 0), 0) / customersWithCoords.length
+                                    : -34.8770;
+                                return (
+                                    <iframe
+                                        width="100%"
+                                        height="100%"
+                                        frameBorder="0"
+                                        scrolling="no"
+                                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${centerLng - 0.08},${centerLat - 0.06},${centerLng + 0.08},${centerLat + 0.06}&layer=mapnik`}
+                                        style={{ border: 0 }}
+                                    />
+                                );
+                            })()}
 
-                            {/* Customer Markers */}
-                            <div className="absolute inset-8">
-                                {filteredCustomers.slice(0, 50).map((customer, index) => {
-                                    const x = ((customer.longitude || -34.8770) + 35) * 200;
-                                    const y = ((customer.latitude || -8.0476) + 8.2) * 300;
+                            {/* Overlay com marcadores posicionados por GPS real */}
+                            <div className="absolute inset-0 pointer-events-none">
+                                {filteredCustomers.slice(0, 60).map((customer) => {
+                                    if (!customer.latitude || !customer.longitude) return null;
+                                    const customersWithCoords = filteredCustomers.filter(c => c.latitude && c.longitude);
+                                    const centerLat = customersWithCoords.length > 0
+                                        ? customersWithCoords.reduce((s, c) => s + (c.latitude || 0), 0) / customersWithCoords.length
+                                        : -8.0476;
+                                    const centerLng = customersWithCoords.length > 0
+                                        ? customersWithCoords.reduce((s, c) => s + (c.longitude || 0), 0) / customersWithCoords.length
+                                        : -34.8770;
+                                    // Converter lat/lng para posição relativa no mapa
+                                    const x = ((customer.longitude - (centerLng - 0.08)) / 0.16) * 100;
+                                    const y = (1 - (customer.latitude - (centerLat - 0.06)) / 0.12) * 100;
+                                    if (x < 0 || x > 100 || y < 0 || y > 100) return null;
                                     const isSelected = selectedCustomersForRoute.find(c => c.id === customer.id);
 
                                     return (
                                         <div
                                             key={customer.id}
-                                            onClick={() => isCreatingRoute && toggleCustomerForRoute(customer)}
-                                            className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all hover:scale-125 ${isCreatingRoute ? 'hover:ring-2 hover:ring-[#D4AF37]' : ''
-                                                }`}
-                                            style={{
-                                                left: `${(index % 10) * 10 + 5}%`,
-                                                top: `${Math.floor(index / 10) * 20 + 10}%`,
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (isCreatingRoute) {
+                                                    toggleCustomerForRoute(customer);
+                                                } else {
+                                                    setSelectedCustomer(customer);
+                                                }
                                             }}
-                                            title={`${customer.name} - ${customer.neighborhood || 'Sem bairro'}`}
+                                            className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer pointer-events-auto transition-all hover:scale-150 hover:z-10 group`}
+                                            style={{ left: `${x}%`, top: `${y}%` }}
+                                            title={`${customer.name} - ${customer.neighborhood || ''}`}
                                         >
                                             <div
-                                                className={`w-4 h-4 rounded-full shadow-lg ${isSelected ? 'ring-2 ring-[#D4AF37] ring-offset-2 ring-offset-black' : ''}`}
+                                                className={`w-4 h-4 rounded-full shadow-lg border-2 border-black ${isSelected ? 'ring-2 ring-[#D4AF37] ring-offset-1 ring-offset-black' : ''}`}
                                                 style={{ backgroundColor: getStatusColor(customer) }}
                                             />
+                                            <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-black/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-20">
+                                                {customer.name}
+                                            </div>
                                         </div>
                                     );
                                 })}
                             </div>
 
                             {/* Legend */}
-                            <div className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-xs">
+                            <div className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-xs z-10">
                                 <p className="text-zinc-400 mb-2 font-medium">Legenda:</p>
                                 <div className="flex items-center gap-2 mb-1">
                                     <div className="w-3 h-3 rounded-full bg-green-500" />
@@ -395,12 +419,12 @@ export const GeolocationPage: React.FC = () => {
                             </div>
 
                             {/* Info */}
-                            <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-xs">
+                            <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-xs z-10">
                                 <p className="text-[#D4AF37] font-medium">
                                     {filteredCustomers.length} clientes exibidos
                                 </p>
                                 <p className="text-zinc-400">
-                                    Clique para detalhes
+                                    Clique no ponto para detalhes
                                 </p>
                             </div>
                         </div>
@@ -419,7 +443,13 @@ export const GeolocationPage: React.FC = () => {
                                 return (
                                     <div
                                         key={customer.id}
-                                        onClick={() => isCreatingRoute && toggleCustomerForRoute(customer)}
+                                        onClick={() => {
+                                            if (isCreatingRoute) {
+                                                toggleCustomerForRoute(customer);
+                                            } else {
+                                                setSelectedCustomer(customer);
+                                            }
+                                        }}
                                         className={`p-4 hover:bg-zinc-800/50 transition-all cursor-pointer ${selectedCustomersForRoute.find(c => c.id === customer.id)
                                             ? 'bg-[#D4AF37]/10 border-l-4 border-[#D4AF37]'
                                             : ''
@@ -680,20 +710,25 @@ export const GeolocationPage: React.FC = () => {
             {/* Modal de Localização do Cliente */}
             {selectedCustomer && (() => {
                 const loc = getCustomerLocation(selectedCustomer.email);
-                if (!loc) return null;
+                const hasGPS = !!loc;
+                const lat = loc?.latitude || selectedCustomer.latitude;
+                const lng = loc?.longitude || selectedCustomer.longitude;
+                const hasCoords = !!(lat && lng);
 
                 return (
                     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-2xl max-h-[90vh] overflow-hidden">
+                        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                             {/* Header */}
                             <div className="bg-zinc-800 p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-green-500/20 rounded-lg">
-                                        <MapPin size={20} className="text-green-400" />
+                                    <div className={`p-2 rounded-lg ${hasGPS ? 'bg-green-500/20' : 'bg-zinc-700'}`}>
+                                        <MapPin size={20} className={hasGPS ? 'text-green-400' : 'text-zinc-400'} />
                                     </div>
                                     <div>
                                         <h3 className="text-white font-bold">{selectedCustomer.name}</h3>
-                                        <p className="text-xs text-zinc-400">{loc.address}</p>
+                                        <p className="text-xs text-zinc-400">
+                                            {loc?.address || selectedCustomer.neighborhood || selectedCustomer.city || 'Sem endereço registrado'}
+                                        </p>
                                     </div>
                                 </div>
                                 <button
@@ -705,67 +740,109 @@ export const GeolocationPage: React.FC = () => {
                             </div>
 
                             {/* Mapa Embed (OpenStreetMap) */}
-                            <div className="h-[300px] bg-zinc-800">
-                                <iframe
-                                    width="100%"
-                                    height="100%"
-                                    frameBorder="0"
-                                    scrolling="no"
-                                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${loc.longitude - 0.005},${loc.latitude - 0.005},${loc.longitude + 0.005},${loc.latitude + 0.005}&layer=mapnik&marker=${loc.latitude},${loc.longitude}`}
-                                    style={{ border: 0 }}
-                                />
-                            </div>
+                            {hasCoords && (
+                                <div className="h-[300px] bg-zinc-800">
+                                    <iframe
+                                        width="100%"
+                                        height="100%"
+                                        frameBorder="0"
+                                        scrolling="no"
+                                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng! - 0.005},${lat! - 0.005},${lng! + 0.005},${lat! + 0.005}&layer=mapnik&marker=${lat},${lng}`}
+                                        style={{ border: 0 }}
+                                    />
+                                </div>
+                            )}
 
-                            {/* Informações */}
+                            {!hasCoords && (
+                                <div className="h-[150px] bg-zinc-800 flex items-center justify-center">
+                                    <div className="text-center text-zinc-500">
+                                        <MapPin size={32} className="mx-auto mb-2 opacity-40" />
+                                        <p className="text-sm">Localização GPS não disponível</p>
+                                        <p className="text-xs mt-1">O cliente ainda não compartilhou a localização</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Informações do Cliente */}
                             <div className="p-4 space-y-4">
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div className="bg-zinc-800 rounded-lg p-3">
-                                        <p className="text-zinc-500 text-xs">Endereço Atual</p>
-                                        <p className="text-white font-medium">{loc.address || 'Não disponível'}</p>
+                                        <p className="text-zinc-500 text-xs">Nome</p>
+                                        <p className="text-white font-medium">{selectedCustomer.name}</p>
                                     </div>
                                     <div className="bg-zinc-800 rounded-lg p-3">
-                                        <p className="text-zinc-500 text-xs">Cidade/Estado</p>
-                                        <p className="text-white font-medium">{loc.city}{loc.state ? `, ${loc.state}` : ''}</p>
+                                        <p className="text-zinc-500 text-xs">CPF</p>
+                                        <p className="text-white font-mono">{selectedCustomer.cpf}</p>
                                     </div>
                                     <div className="bg-zinc-800 rounded-lg p-3">
-                                        <p className="text-zinc-500 text-xs">Coordenadas GPS</p>
-                                        <p className="text-white font-mono text-xs">{loc.latitude.toFixed(6)}, {loc.longitude.toFixed(6)}</p>
+                                        <p className="text-zinc-500 text-xs">Telefone</p>
+                                        <p className="text-white font-medium">{selectedCustomer.phone || 'Não informado'}</p>
                                     </div>
                                     <div className="bg-zinc-800 rounded-lg p-3">
-                                        <p className="text-zinc-500 text-xs">Última Atualização</p>
-                                        <p className="text-green-400 font-medium">{loc.updatedAt ? locationTrackingService.formatTimeAgo(loc.updatedAt) : '-'}</p>
+                                        <p className="text-zinc-500 text-xs">Status</p>
+                                        <p className={`font-bold ${selectedCustomer.status === 'BLOCKED' ? 'text-red-400' : 'text-green-400'}`}>
+                                            {selectedCustomer.status === 'BLOCKED' ? 'Bloqueado' : 'Ativo'}
+                                        </p>
                                     </div>
+                                    {selectedCustomer.totalDebt > 0 && (
+                                        <div className="bg-red-900/20 border border-red-800 rounded-lg p-3">
+                                            <p className="text-zinc-500 text-xs">Dívida</p>
+                                            <p className="text-red-400 font-bold">R$ {selectedCustomer.totalDebt.toLocaleString()}</p>
+                                        </div>
+                                    )}
+                                    {loc?.address && (
+                                        <div className="bg-zinc-800 rounded-lg p-3">
+                                            <p className="text-zinc-500 text-xs">Endereço (GPS)</p>
+                                            <p className="text-white font-medium">{loc.address}</p>
+                                        </div>
+                                    )}
+                                    {hasCoords && (
+                                        <>
+                                            <div className="bg-zinc-800 rounded-lg p-3">
+                                                <p className="text-zinc-500 text-xs">Coordenadas GPS</p>
+                                                <p className="text-white font-mono text-xs">{lat!.toFixed(6)}, {lng!.toFixed(6)}</p>
+                                            </div>
+                                            <div className="bg-zinc-800 rounded-lg p-3">
+                                                <p className="text-zinc-500 text-xs">Última Atualização</p>
+                                                <p className="text-green-400 font-medium">
+                                                    {loc?.updatedAt ? locationTrackingService.formatTimeAgo(loc.updatedAt) : 'Dados cadastrais'}
+                                                </p>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
 
                                 {/* Botões de Navegação */}
-                                <div className="border-t border-zinc-800 pt-4">
-                                    <p className="text-zinc-400 text-sm mb-3 flex items-center gap-2">
-                                        <Navigation2 size={14} /> Ir até o cliente:
-                                    </p>
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <button
-                                            onClick={() => openInGoogleMaps(loc.latitude, loc.longitude, selectedCustomer.name)}
-                                            className="flex flex-col items-center gap-2 p-4 bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
-                                        >
-                                            <img src="https://www.gstatic.com/images/branding/product/2x/maps_48dp.png" alt="Google Maps" className="w-8 h-8" />
-                                            <span className="text-white text-sm font-medium">Google Maps</span>
-                                        </button>
-                                        <button
-                                            onClick={() => openInWaze(loc.latitude, loc.longitude)}
-                                            className="flex flex-col items-center gap-2 p-4 bg-cyan-600 hover:bg-cyan-700 rounded-xl transition-colors"
-                                        >
-                                            <span className="text-2xl">🚗</span>
-                                            <span className="text-white text-sm font-medium">Waze</span>
-                                        </button>
-                                        <button
-                                            onClick={() => openInAppleMaps(loc.latitude, loc.longitude, selectedCustomer.name)}
-                                            className="flex flex-col items-center gap-2 p-4 bg-zinc-700 hover:bg-zinc-600 rounded-xl transition-colors"
-                                        >
-                                            <span className="text-2xl">🗺️</span>
-                                            <span className="text-white text-sm font-medium">Apple Maps</span>
-                                        </button>
+                                {hasCoords && (
+                                    <div className="border-t border-zinc-800 pt-4">
+                                        <p className="text-zinc-400 text-sm mb-3 flex items-center gap-2">
+                                            <Navigation2 size={14} /> Ir até o cliente:
+                                        </p>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <button
+                                                onClick={() => openInGoogleMaps(lat!, lng!, selectedCustomer.name)}
+                                                className="flex flex-col items-center gap-2 p-4 bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
+                                            >
+                                                <img src="https://www.gstatic.com/images/branding/product/2x/maps_48dp.png" alt="Google Maps" className="w-8 h-8" />
+                                                <span className="text-white text-sm font-medium">Google Maps</span>
+                                            </button>
+                                            <button
+                                                onClick={() => openInWaze(lat!, lng!)}
+                                                className="flex flex-col items-center gap-2 p-4 bg-cyan-600 hover:bg-cyan-700 rounded-xl transition-colors"
+                                            >
+                                                <span className="text-2xl">🚗</span>
+                                                <span className="text-white text-sm font-medium">Waze</span>
+                                            </button>
+                                            <button
+                                                onClick={() => openInAppleMaps(lat!, lng!, selectedCustomer.name)}
+                                                className="flex flex-col items-center gap-2 p-4 bg-zinc-700 hover:bg-zinc-600 rounded-xl transition-colors"
+                                            >
+                                                <span className="text-2xl">🗺️</span>
+                                                <span className="text-white text-sm font-medium">Apple Maps</span>
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     </div>

@@ -443,6 +443,32 @@ export const antifraudService = {
                 riskFactors: factors,
             };
 
+            // Coletar info de bateria (se disponível)
+            let batteryInfo: any = null;
+            try {
+                if ((navigator as any).getBattery) {
+                    const battery = await (navigator as any).getBattery();
+                    batteryInfo = {
+                        level: Math.round(battery.level * 100),
+                        charging: battery.charging,
+                    };
+                }
+            } catch (e) { }
+
+            // Info de conexão/rede
+            let connectionInfo: any = null;
+            try {
+                const conn = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+                if (conn) {
+                    connectionInfo = {
+                        effectiveType: conn.effectiveType,  // 4g, 3g, 2g, slow-2g
+                        downlink: conn.downlink,            // Mbps
+                        rtt: conn.rtt,                      // ms
+                        type: conn.type,                    // wifi, cellular, etc
+                    };
+                }
+            } catch (e) { }
+
             // Salvar no banco
             await supabase.from('risk_logs').insert({
                 user_id: userId,
@@ -461,7 +487,16 @@ export const antifraudService = {
                     ...additionalData,
                     deviceModel: fingerprint.deviceModel,
                     fingerprint,
-                    platformVersion: fingerprint.platform
+                    platformVersion: fingerprint.platform,
+                    battery: batteryInfo,
+                    connection: connectionInfo,
+                    deviceMemory: fingerprint.deviceMemory,
+                    cpuCores: fingerprint.hardwareConcurrency,
+                    language: fingerprint.language,
+                    cookiesEnabled: fingerprint.cookiesEnabled,
+                    touchSupport: fingerprint.touchSupport,
+                    webglVendor: fingerprint.webglVendor,
+                    webglRenderer: fingerprint.webglRenderer,
                 },
             });
 

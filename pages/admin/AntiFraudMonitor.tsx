@@ -371,17 +371,27 @@ export const AntiFraudMonitor: React.FC = () => {
                                                     </span>
                                                 </span>
                                             </div>
-                                            <div className="text-xs text-zinc-500 mt-1">
-                                                Ação: <span className="text-zinc-400">{log.action}</span>
+                                            <div className="text-xs text-zinc-500 mt-1 flex flex-wrap gap-x-3 gap-y-1 items-center">
+                                                <span>Ação: <span className="text-zinc-400">{log.action}</span></span>
                                                 {log.additional_data?.deviceModel && (
-                                                    <span className="ml-2 text-pink-400 font-medium">
+                                                    <span className="text-pink-400 font-medium">
                                                         📱 {log.additional_data.deviceModel}
                                                     </span>
                                                 )}
+                                                {log.additional_data?.battery && (
+                                                    <span className={`${log.additional_data.battery.level > 20 ? 'text-green-400' : 'text-red-400'}`}>
+                                                        🔋 {log.additional_data.battery.level}%
+                                                    </span>
+                                                )}
+                                                {log.additional_data?.connection?.effectiveType && (
+                                                    <span className="text-blue-400">
+                                                        📶 {log.additional_data.connection.effectiveType.toUpperCase()}
+                                                    </span>
+                                                )}
                                                 {log.latitude && log.longitude && (
-                                                    <span className="ml-2">
-                                                        <MapPin size={10} className="inline" />
-                                                        {' '}{log.latitude.toFixed(4)}, {log.longitude.toFixed(4)}
+                                                    <span className="flex items-center gap-1">
+                                                        <MapPin size={10} className="inline text-red-400" />
+                                                        <span className="text-zinc-400">{log.latitude.toFixed(4)}, {log.longitude.toFixed(4)}</span>
                                                     </span>
                                                 )}
                                             </div>
@@ -521,31 +531,148 @@ export const AntiFraudMonitor: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {/* Localização */}
-                                    {selectedLog.latitude && selectedLog.longitude && (
-                                        <div className="bg-zinc-800 rounded-lg p-4">
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <MapPin size={16} className="text-red-400" />
-                                                <span className="text-zinc-400 text-sm">Localização</span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <p className="text-white font-mono">
-                                                        Lat: {selectedLog.latitude.toFixed(6)}
-                                                    </p>
-                                                    <p className="text-white font-mono">
-                                                        Lng: {selectedLog.longitude.toFixed(6)}
-                                                    </p>
+                                    {/* Informações Extras do Dispositivo */}
+                                    {selectedLog.additional_data && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {/* Bateria */}
+                                            <div className="bg-zinc-800 rounded-lg p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="text-yellow-400">🔋</span>
+                                                    <span className="text-zinc-400 text-sm">Bateria</span>
                                                 </div>
-                                                <a
-                                                    href={`https://www.google.com/maps?q=${selectedLog.latitude},${selectedLog.longitude}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                                                >
-                                                    <MapPin size={16} />
-                                                    Ver no Mapa
-                                                </a>
+                                                {selectedLog.additional_data.battery ? (
+                                                    <div>
+                                                        <p className={`text-lg font-bold ${selectedLog.additional_data.battery.level > 20 ? 'text-green-400' : 'text-red-400'}`}>
+                                                            {selectedLog.additional_data.battery.level}%
+                                                        </p>
+                                                        <p className="text-xs text-zinc-500">
+                                                            {selectedLog.additional_data.battery.charging ? '⚡ Carregando' : '🔌 Desconectado'}
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-zinc-500 text-sm">Não disponível</p>
+                                                )}
+                                            </div>
+
+                                            {/* Rede/Conexão */}
+                                            <div className="bg-zinc-800 rounded-lg p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Wifi size={16} className="text-blue-400" />
+                                                    <span className="text-zinc-400 text-sm">Conexão</span>
+                                                </div>
+                                                {selectedLog.additional_data.connection ? (
+                                                    <div>
+                                                        <p className="text-white font-bold uppercase">
+                                                            {selectedLog.additional_data.connection.effectiveType || 'N/A'}
+                                                            {selectedLog.additional_data.connection.type ? ` (${selectedLog.additional_data.connection.type})` : ''}
+                                                        </p>
+                                                        {selectedLog.additional_data.connection.downlink && (
+                                                            <p className="text-xs text-zinc-500">
+                                                                {selectedLog.additional_data.connection.downlink} Mbps
+                                                                {selectedLog.additional_data.connection.rtt ? ` • ${selectedLog.additional_data.connection.rtt}ms` : ''}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-zinc-500 text-sm">Não disponível</p>
+                                                )}
+                                            </div>
+
+                                            {/* Memória do Dispositivo */}
+                                            <div className="bg-zinc-800 rounded-lg p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Cpu size={16} className="text-emerald-400" />
+                                                    <span className="text-zinc-400 text-sm">Memória RAM</span>
+                                                </div>
+                                                <p className="text-white font-bold">
+                                                    {selectedLog.additional_data.deviceMemory
+                                                        ? `${selectedLog.additional_data.deviceMemory} GB`
+                                                        : selectedLog.additional_data.fingerprint?.deviceMemory
+                                                            ? `${selectedLog.additional_data.fingerprint.deviceMemory} GB`
+                                                            : 'Não informado'}
+                                                </p>
+                                            </div>
+
+                                            {/* CPU Cores */}
+                                            <div className="bg-zinc-800 rounded-lg p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Cpu size={16} className="text-purple-400" />
+                                                    <span className="text-zinc-400 text-sm">Processador (Cores)</span>
+                                                </div>
+                                                <p className="text-white font-bold">
+                                                    {selectedLog.additional_data.cpuCores
+                                                        ? `${selectedLog.additional_data.cpuCores} núcleos`
+                                                        : selectedLog.additional_data.fingerprint?.hardwareConcurrency
+                                                            ? `${selectedLog.additional_data.fingerprint.hardwareConcurrency} núcleos`
+                                                            : 'Não informado'}
+                                                </p>
+                                            </div>
+
+                                            {/* Idioma */}
+                                            <div className="bg-zinc-800 rounded-lg p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Globe size={16} className="text-teal-400" />
+                                                    <span className="text-zinc-400 text-sm">Idioma</span>
+                                                </div>
+                                                <p className="text-white">
+                                                    {selectedLog.additional_data.language
+                                                        || selectedLog.additional_data.fingerprint?.language
+                                                        || 'Não informado'}
+                                                </p>
+                                            </div>
+
+                                            {/* Touch / Cookies */}
+                                            <div className="bg-zinc-800 rounded-lg p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Fingerprint size={16} className="text-rose-400" />
+                                                    <span className="text-zinc-400 text-sm">Recursos</span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <span className={`text-xs px-2 py-1 rounded ${(selectedLog.additional_data.touchSupport ?? selectedLog.additional_data.fingerprint?.touchSupport) ? 'bg-green-900/30 text-green-400' : 'bg-zinc-700 text-zinc-400'}`}>
+                                                        {(selectedLog.additional_data.touchSupport ?? selectedLog.additional_data.fingerprint?.touchSupport) ? '✓ Touch' : '✕ Touch'}
+                                                    </span>
+                                                    <span className={`text-xs px-2 py-1 rounded ${(selectedLog.additional_data.cookiesEnabled ?? selectedLog.additional_data.fingerprint?.cookiesEnabled) ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+                                                        {(selectedLog.additional_data.cookiesEnabled ?? selectedLog.additional_data.fingerprint?.cookiesEnabled) ? '✓ Cookies' : '✕ Cookies'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Localização com Mapa */}
+                                    {selectedLog.latitude && selectedLog.longitude && (
+                                        <div className="bg-zinc-800 rounded-lg overflow-hidden">
+                                            <div className="h-[200px]">
+                                                <iframe
+                                                    width="100%"
+                                                    height="100%"
+                                                    frameBorder="0"
+                                                    scrolling="no"
+                                                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${selectedLog.longitude - 0.003},${selectedLog.latitude - 0.003},${selectedLog.longitude + 0.003},${selectedLog.latitude + 0.003}&layer=mapnik&marker=${selectedLog.latitude},${selectedLog.longitude}`}
+                                                    style={{ border: 0 }}
+                                                />
+                                            </div>
+                                            <div className="p-4">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <MapPin size={16} className="text-red-400" />
+                                                    <span className="text-zinc-400 text-sm">Localização do Acesso</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-white font-mono text-sm">
+                                                            Lat: {selectedLog.latitude.toFixed(6)} • Lng: {selectedLog.longitude.toFixed(6)}
+                                                        </p>
+                                                    </div>
+                                                    <a
+                                                        href={`https://www.google.com/maps?q=${selectedLog.latitude},${selectedLog.longitude}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm"
+                                                    >
+                                                        <MapPin size={14} />
+                                                        Google Maps
+                                                    </a>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
