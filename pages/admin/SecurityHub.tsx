@@ -5,19 +5,17 @@ import {
     Shield, Ban, UserCog, AlertTriangle, Search, Filter,
     RefreshCw, Download, Eye, Trash2, Plus, ToggleLeft, ToggleRight,
     CheckCircle, XCircle, Clock, MapPin, Smartphone, Monitor,
-    Globe, Fingerprint, User, Key, X, Save, Edit2, Phone, Mail,
-    Lock, Unlock, Bell, Settings, AlertCircle
+    Globe, Fingerprint, User, Key, X, Save, Edit2, Phone, Mail
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { supabase } from '../../services/supabaseClient';
 import { supabaseService } from '../../services/supabaseService';
 import { blacklistService } from '../../services/adminService';
-import { deviceSecurityService, TrustedDevice, SecurityBlock, SecurityAlert } from '../../services/deviceSecurityService';
 import { useToast } from '../../components/Toast';
 import { BlacklistEntry, UserAccess, UserRole } from '../../types';
 import { AntiFraudMonitor } from './AntiFraudMonitor';
 
-type TabType = 'antifraud' | 'blacklist' | 'users' | 'devices';
+type TabType = 'antifraud' | 'blacklist' | 'users';
 
 interface RiskLog {
     id: string;
@@ -63,16 +61,10 @@ export const SecurityHub: React.FC = () => {
     // Search
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Devices & Blocks
-    const [securityBlocks, setSecurityBlocks] = useState<SecurityBlock[]>([]);
-    const [securityAlerts, setSecurityAlerts] = useState<SecurityAlert[]>([]);
-    const [trustedDevices, setTrustedDevices] = useState<TrustedDevice[]>([]);
-    const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-
     // Read tab from URL on mount and when URL changes
     useEffect(() => {
         const tabParam = searchParams.get('tab');
-        if (tabParam === 'blacklist' || tabParam === 'users' || tabParam === 'antifraud' || tabParam === 'devices') {
+        if (tabParam === 'blacklist' || tabParam === 'users' || tabParam === 'antifraud') {
             setActiveTab(tabParam);
         }
     }, [searchParams]);
@@ -99,12 +91,6 @@ export const SecurityHub: React.FC = () => {
             // Users
             const usersData = await supabaseService.getUsers();
             setUsers(usersData);
-
-            // Security Blocks & Alerts
-            const blocks = await deviceSecurityService.getPendingBlocks();
-            setSecurityBlocks(blocks);
-            const alerts = await deviceSecurityService.getRecentAlerts(50);
-            setSecurityAlerts(alerts);
         } catch (error) {
             console.error('Error loading data:', error);
         }
@@ -234,47 +220,9 @@ export const SecurityHub: React.FC = () => {
 
     const tabs = [
         { id: 'antifraud', label: 'Antifraude', icon: <Shield size={18} />, badge: stats.highRiskCount },
-        { id: 'devices', label: 'Dispositivos', icon: <Smartphone size={18} />, badge: securityBlocks.length },
         { id: 'blacklist', label: 'Blacklist', icon: <Ban size={18} />, badge: stats.blacklistActive },
         { id: 'users', label: 'Acessos', icon: <UserCog size={18} />, badge: stats.totalUsers },
     ] as const;
-
-    // Device management handlers
-    const handleUnblockUser = async (block: SecurityBlock) => {
-        try {
-            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-            await deviceSecurityService.resolveBlock(block.id, currentUser.name || 'Admin', 'Liberado pelo admin');
-            addToast('Usuário desbloqueado com sucesso!', 'success');
-            loadAllData();
-        } catch (error) {
-            addToast('Erro ao desbloquear usuário', 'error');
-        }
-    };
-
-    const handleLoadUserDevices = async (userId: string) => {
-        const devices = await deviceSecurityService.getUserDevices(userId);
-        setTrustedDevices(devices);
-        setSelectedUserId(userId);
-    };
-
-    const handleRemoveDevice = async (deviceId: string) => {
-        if (!confirm('Remover este dispositivo da lista de confiáveis?')) return;
-        await deviceSecurityService.removeDevice(deviceId);
-        addToast('Dispositivo removido', 'success');
-        if (selectedUserId) handleLoadUserDevices(selectedUserId);
-    };
-
-    const handleResetUserDevices = async (userId: string) => {
-        if (!confirm('Remover TODOS os dispositivos deste usuário? Ele precisará fazer login novamente.')) return;
-        await deviceSecurityService.resetUserDevices(userId);
-        addToast('Dispositivos resetados. Próximo login registrará novo dispositivo.', 'success');
-        loadAllData();
-    };
-
-    const handleMarkAlertRead = async (alertId: string) => {
-        await deviceSecurityService.markAlertRead(alertId);
-        setSecurityAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_read: true } : a));
-    };
 
     return (
         <div className="p-4 md:p-8 bg-black min-h-screen text-white pb-32">
@@ -607,9 +555,9 @@ export const SecurityHub: React.FC = () => {
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className={`px-2 py-0.5 rounded text-xs font-bold ${alert.severity === 'critical' ? 'bg-red-900/50 text-red-400' :
-                                                            alert.severity === 'high' ? 'bg-orange-900/50 text-orange-400' :
-                                                                alert.severity === 'medium' ? 'bg-yellow-900/50 text-yellow-400' :
-                                                                    'bg-blue-900/50 text-blue-400'
+                                                        alert.severity === 'high' ? 'bg-orange-900/50 text-orange-400' :
+                                                            alert.severity === 'medium' ? 'bg-yellow-900/50 text-yellow-400' :
+                                                                'bg-blue-900/50 text-blue-400'
                                                         }`}>
                                                         {alert.severity.toUpperCase()}
                                                     </span>
