@@ -5,12 +5,13 @@ import {
     DollarSign, Check, X, Upload, Calendar, Search, Eye, Trash2,
     CheckCircle2, Clock, AlertTriangle, Plus, Receipt, Image, FileText,
     Trophy, Star, Flame, Target, TrendingUp, Award, Zap, Crown,
-    RefreshCw, Gift, Medal, Sparkles, ArrowUpRight, ArrowDownRight
+    RefreshCw, Gift, Medal, Sparkles, ArrowUpRight, ArrowDownRight, Calculator
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { supabase } from '../../services/supabaseClient';
 import { supabaseService } from '../../services/supabaseService';
 import { paymentService, LoanPayment } from '../../services/paymentService';
+import { loanSettingsService } from '../../services/loanSettingsService';
 import { LoanRequest, PaymentReceipt } from '../../types';
 import { useToast } from '../../components/Toast';
 import { autoNotificationService } from '../../services/autoNotificationService';
@@ -914,6 +915,66 @@ export const FinanceHub: React.FC = () => {
                                 </div>
                             </div>
 
+                            {/* Calculador de Juros Automático */}
+                            {paymentType === 'JUROS' && selectedRequestId && (() => {
+                                const selectedReq = requests.find(r => r.id === selectedRequestId);
+                                if (!selectedReq) return null;
+                                const isAutonomo = selectedReq.profileType === 'AUTONOMO';
+                                const loanAmount = selectedReq.amount || 0;
+                                const approvalDate = selectedReq.date ? new Date(selectedReq.date) : new Date();
+                                const endDate = paymentDate ? new Date(paymentDate) : new Date();
+                                const dailyRate = 1; // 1% ao dia padrão
+                                const result = loanSettingsService.calculateDailyInterest(
+                                    loanAmount, dailyRate, approvalDate, endDate, selectedReq.profileType
+                                );
+
+                                return (
+                                    <div className={`p-4 rounded-xl border ${isAutonomo ? 'bg-blue-900/10 border-blue-500/30' : 'bg-zinc-800/50 border-zinc-700'}`}>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Calculator size={16} className={isAutonomo ? 'text-blue-400' : 'text-zinc-400'} />
+                                            <span className="text-sm font-bold text-white">Cálculo de Juros</span>
+                                            {isAutonomo && (
+                                                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs font-bold">
+                                                    AUTÔNOMO - Sem Domingo
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                            <div>
+                                                <p className="text-zinc-500">Valor base</p>
+                                                <p className="text-white font-bold">R$ {loanAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-zinc-500">Taxa diária</p>
+                                                <p className="text-white font-bold">{dailyRate}% ao dia</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-zinc-500">Dias totais</p>
+                                                <p className="text-white font-bold">{result.totalDays} dias</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-zinc-500">Dias cobrados</p>
+                                                <p className={`font-bold ${isAutonomo ? 'text-blue-400' : 'text-white'}`}>
+                                                    {result.chargedDays} dias
+                                                    {isAutonomo && result.skippedSundays > 0 && (
+                                                        <span className="text-xs text-zinc-500 ml-1">(-{result.skippedSundays} dom)</span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 pt-3 border-t border-zinc-700 flex items-center justify-between">
+                                            <span className="text-zinc-400">Juros sugerido:</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setAmount(result.interest.toFixed(2).replace('.', ','))}
+                                                className="flex items-center gap-2 px-3 py-1.5 bg-[#D4AF37]/20 text-[#D4AF37] rounded-lg hover:bg-[#D4AF37]/30 font-bold"
+                                            >
+                                                R$ {result.interest.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} → Usar
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-bold text-zinc-400 mb-1">Valor (R$) *</label>
@@ -984,117 +1045,120 @@ export const FinanceHub: React.FC = () => {
                         </div>
                     </div>
                 </div>
-            )}
+            )
+            }
 
             {/* Modal Comprovante */}
-            {selectedReceipt && (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
-                            <h2 className="text-xl font-bold text-white">Analisar Comprovante</h2>
-                            <button onClick={() => setSelectedReceipt(null)} className="text-zinc-500 hover:text-white">
-                                <X size={24} />
-                            </button>
-                        </div>
-
-                        <div className="p-6 space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                                    <p className="text-xs text-zinc-500 mb-1">Cliente</p>
-                                    <p className="text-white font-bold">{selectedReceipt.customerName}</p>
-                                </div>
-                                <div className="bg-black p-4 rounded-xl border border-zinc-800">
-                                    <p className="text-xs text-zinc-500 mb-1">Valor</p>
-                                    <p className="text-[#D4AF37] font-bold text-lg">
-                                        R$ {selectedReceipt.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    </p>
-                                </div>
+            {
+                selectedReceipt && (
+                    <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                            <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
+                                <h2 className="text-xl font-bold text-white">Analisar Comprovante</h2>
+                                <button onClick={() => setSelectedReceipt(null)} className="text-zinc-500 hover:text-white">
+                                    <X size={24} />
+                                </button>
                             </div>
 
-                            <div>
-                                <p className="text-sm text-zinc-400 mb-2">Comprovante Enviado</p>
-                                <div className="bg-black border border-zinc-800 rounded-xl p-4">
-                                    {selectedReceipt.receiptType === 'IMAGE' ? (
-                                        <img
-                                            src={selectedReceipt.receiptUrl}
-                                            alt="Comprovante"
-                                            className="max-w-full max-h-96 mx-auto rounded-lg"
-                                        />
-                                    ) : (
-                                        <div className="text-center py-8">
-                                            <FileText size={48} className="mx-auto text-red-400 mb-4" />
-                                            <a
-                                                href={selectedReceipt.receiptUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-[#D4AF37] hover:underline"
-                                            >
-                                                Visualizar PDF
-                                            </a>
+                            <div className="p-6 space-y-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                                        <p className="text-xs text-zinc-500 mb-1">Cliente</p>
+                                        <p className="text-white font-bold">{selectedReceipt.customerName}</p>
+                                    </div>
+                                    <div className="bg-black p-4 rounded-xl border border-zinc-800">
+                                        <p className="text-xs text-zinc-500 mb-1">Valor</p>
+                                        <p className="text-[#D4AF37] font-bold text-lg">
+                                            R$ {selectedReceipt.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p className="text-sm text-zinc-400 mb-2">Comprovante Enviado</p>
+                                    <div className="bg-black border border-zinc-800 rounded-xl p-4">
+                                        {selectedReceipt.receiptType === 'IMAGE' ? (
+                                            <img
+                                                src={selectedReceipt.receiptUrl}
+                                                alt="Comprovante"
+                                                className="max-w-full max-h-96 mx-auto rounded-lg"
+                                            />
+                                        ) : (
+                                            <div className="text-center py-8">
+                                                <FileText size={48} className="mx-auto text-red-400 mb-4" />
+                                                <a
+                                                    href={selectedReceipt.receiptUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-[#D4AF37] hover:underline"
+                                                >
+                                                    Visualizar PDF
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {selectedReceipt.status === 'PENDING' && (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm text-zinc-400 mb-2">
+                                                Motivo da rejeição (opcional)
+                                            </label>
+                                            <textarea
+                                                value={rejectionReason}
+                                                onChange={e => setRejectionReason(e.target.value)}
+                                                placeholder="Informe o motivo caso rejeite..."
+                                                className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none h-20 resize-none"
+                                            />
                                         </div>
-                                    )}
-                                </div>
+
+                                        <div className="flex gap-4">
+                                            <Button
+                                                variant="danger"
+                                                className="flex-1"
+                                                onClick={() => handleRejectReceipt(selectedReceipt)}
+                                                isLoading={processing === selectedReceipt.id}
+                                            >
+                                                <X size={18} /> Rejeitar
+                                            </Button>
+                                            <Button
+                                                className="flex-1 bg-green-600 hover:bg-green-700"
+                                                onClick={() => handleApproveReceipt(selectedReceipt)}
+                                                isLoading={processing === selectedReceipt.id}
+                                            >
+                                                <Check size={18} /> Aprovar e Registrar Pagamento
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedReceipt.status !== 'PENDING' && (
+                                    <div className={`p-4 rounded-xl ${selectedReceipt.status === 'APPROVED'
+                                        ? 'bg-green-900/20 border border-green-700/30'
+                                        : 'bg-red-900/20 border border-red-700/30'
+                                        }`}>
+                                        <p className={`font-bold ${selectedReceipt.status === 'APPROVED' ? 'text-green-400' : 'text-red-400'}`}>
+                                            {selectedReceipt.status === 'APPROVED' ? '✅ Pagamento Aprovado' : '❌ Comprovante Rejeitado'}
+                                        </p>
+                                        {selectedReceipt.reviewedAt && (
+                                            <p className="text-xs text-zinc-500 mt-1">
+                                                Analisado em {new Date(selectedReceipt.reviewedAt).toLocaleString('pt-BR')}
+                                            </p>
+                                        )}
+                                        {selectedReceipt.rejectionReason && (
+                                            <p className="text-sm text-red-300 mt-2">
+                                                Motivo: {selectedReceipt.rejectionReason}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-
-                            {selectedReceipt.status === 'PENDING' && (
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm text-zinc-400 mb-2">
-                                            Motivo da rejeição (opcional)
-                                        </label>
-                                        <textarea
-                                            value={rejectionReason}
-                                            onChange={e => setRejectionReason(e.target.value)}
-                                            placeholder="Informe o motivo caso rejeite..."
-                                            className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none h-20 resize-none"
-                                        />
-                                    </div>
-
-                                    <div className="flex gap-4">
-                                        <Button
-                                            variant="danger"
-                                            className="flex-1"
-                                            onClick={() => handleRejectReceipt(selectedReceipt)}
-                                            isLoading={processing === selectedReceipt.id}
-                                        >
-                                            <X size={18} /> Rejeitar
-                                        </Button>
-                                        <Button
-                                            className="flex-1 bg-green-600 hover:bg-green-700"
-                                            onClick={() => handleApproveReceipt(selectedReceipt)}
-                                            isLoading={processing === selectedReceipt.id}
-                                        >
-                                            <Check size={18} /> Aprovar e Registrar Pagamento
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {selectedReceipt.status !== 'PENDING' && (
-                                <div className={`p-4 rounded-xl ${selectedReceipt.status === 'APPROVED'
-                                    ? 'bg-green-900/20 border border-green-700/30'
-                                    : 'bg-red-900/20 border border-red-700/30'
-                                    }`}>
-                                    <p className={`font-bold ${selectedReceipt.status === 'APPROVED' ? 'text-green-400' : 'text-red-400'}`}>
-                                        {selectedReceipt.status === 'APPROVED' ? '✅ Pagamento Aprovado' : '❌ Comprovante Rejeitado'}
-                                    </p>
-                                    {selectedReceipt.reviewedAt && (
-                                        <p className="text-xs text-zinc-500 mt-1">
-                                            Analisado em {new Date(selectedReceipt.reviewedAt).toLocaleString('pt-BR')}
-                                        </p>
-                                    )}
-                                    {selectedReceipt.rejectionReason && (
-                                        <p className="text-sm text-red-300 mt-2">
-                                            Motivo: {selectedReceipt.rejectionReason}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

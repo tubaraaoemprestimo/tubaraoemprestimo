@@ -122,6 +122,79 @@ export const loanSettingsService = {
     },
 
     /**
+     * Conta dias úteis (segunda a sábado, excluindo domingos)
+     * Usado para perfis AUTONOMO que não pagam juros no domingo
+     */
+    countBusinessDays(startDate: Date, endDate: Date): number {
+        let count = 0;
+        const current = new Date(startDate);
+        current.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(0, 0, 0, 0);
+
+        while (current < end) {
+            const dayOfWeek = current.getDay(); // 0 = Domingo
+            if (dayOfWeek !== 0) { // Pula domingos
+                count++;
+            }
+            current.setDate(current.getDate() + 1);
+        }
+        return count;
+    },
+
+    /**
+     * Conta todos os dias entre duas datas (incluindo domingos)
+     */
+    countTotalDays(startDate: Date, endDate: Date): number {
+        const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    },
+
+    /**
+     * Calcula juros diários acumulados com regra de domingo
+     * - AUTONOMO: juros cobrados apenas de segunda a sábado (6 dias/semana)
+     * - Outros perfis: juros cobrados todos os dias (7 dias/semana)
+     * 
+     * @param amount - Valor base do empréstimo
+     * @param dailyRate - Taxa diária de juros (%)
+     * @param startDate - Data de início (liberação ou último pagamento)
+     * @param endDate - Data final (today ou data de pagamento)
+     * @param profileType - Tipo do perfil do cliente
+     * @returns Objeto com dias cobrados, juros total e detalhamento
+     */
+    calculateDailyInterest(
+        amount: number,
+        dailyRate: number,
+        startDate: Date,
+        endDate: Date,
+        profileType?: string
+    ): { chargedDays: number; totalDays: number; interest: number; skippedSundays: number } {
+        const totalDays = this.countTotalDays(startDate, endDate);
+        const isAutonomo = profileType === 'AUTONOMO';
+
+        let chargedDays: number;
+        let skippedSundays = 0;
+
+        if (isAutonomo) {
+            // Autônomo/Comércio: não cobra juros no domingo
+            chargedDays = this.countBusinessDays(startDate, endDate);
+            skippedSundays = totalDays - chargedDays;
+        } else {
+            // Demais perfis: cobra todos os dias
+            chargedDays = totalDays;
+        }
+
+        const interest = amount * (dailyRate / 100) * chargedDays;
+
+        return {
+            chargedDays,
+            totalDays,
+            interest: Math.round(interest * 100) / 100, // Arredonda para 2 casas
+            skippedSundays
+        };
+    },
+
+    /**
      * Limpa cache
      */
     clearCache(): void {
