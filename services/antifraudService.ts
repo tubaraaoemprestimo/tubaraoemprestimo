@@ -514,14 +514,27 @@ export const antifraudService = {
 
             if (shouldNotifyAdmin) {
                 const severity = score >= 70 ? 'ERROR' : score >= 50 ? 'WARNING' : 'INFO';
-                await supabase.from('notifications').insert({
+                const payload: any = {
                     customer_email: null,
                     type: severity,
                     title: score >= 70 ? '🚨 Alerta crítico de antifraude' : '⚠️ Evento de antifraude',
                     message: `Ação ${action} detectada com score ${score}. Verifique os detalhes no monitor.`,
                     link: adminLink,
                     read: false,
-                });
+                    for_role: 'ADMIN',
+                };
+
+                let { error: notifError } = await supabase.from('notifications').insert(payload);
+
+                if (notifError && String(notifError.message || '').toLowerCase().includes('for_role')) {
+                    delete payload.for_role;
+                    const fallback = await supabase.from('notifications').insert(payload);
+                    notifError = fallback.error;
+                }
+
+                if (notifError) {
+                    console.error('[Antifraud] notification insert failed:', notifError);
+                }
             }
 
             console.log('[Antifraud] Risk event logged:', {

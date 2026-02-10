@@ -74,6 +74,18 @@ const saveToStorage = (key: string, data: any) => {
     }
 };
 
+const normalizeEmail = (email?: string | null): string => (email || '').trim().toLowerCase();
+
+const generatePlaceholderCpf = (seed: string): string => {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+        hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash).toString().padStart(11, '0').slice(0, 11);
+};
+
+
 // Default settings
 const DEFAULT_BRAND_SETTINGS: BrandSettings = {
     systemName: "TUBARÃO EMPRÉSTIMO",
@@ -137,7 +149,7 @@ export const supabaseService = {
                 }
 
                 // Get user profile from database
-                const { data: userData, error: userError } = await supabase
+                let { data: userData, error: userError } = await supabase
                     .from('users')
                     .select('*')
                     .eq('auth_id', authData.user.id)
@@ -148,8 +160,34 @@ export const supabaseService = {
                 console.log('[Auth] User data from DB:', userData);
                 console.log('[Auth] User error:', userError);
 
+                // Auto-recuperação: cria vínculo em users se necessário
+                if (userError || !userData) {
+                    const metadata = authData.user.user_metadata || {};
+                    const fallbackName = metadata.name || authData.user.email?.split('@')[0] || 'Usuário';
+                    const fallbackRole = (metadata.role || 'CLIENT').toString().toUpperCase();
+                    const fallbackPhone = metadata.phone || '';
+                    const fallbackEmail = normalizeEmail(authData.user.email);
+
+                    const { error: insertUserError } = await supabase.from('users').insert({
+                        auth_id: authData.user.id,
+                        name: fallbackName,
+                        email: fallbackEmail,
+                        role: fallbackRole,
+                        phone: fallbackPhone,
+                    });
+
+                    if (!insertUserError) {
+                        const reloaded = await supabase
+                            .from('users')
+                            .select('*')
+                            .eq('auth_id', authData.user.id)
+                            .single();
+                        userData = reloaded.data;
+                        userError = reloaded.error;
+                    }
+                }
+
                 // Conta sem vínculo na tabela users não pode acessar
-                // (garante que todos os logins sejam gerenciáveis na aba Acessos)
                 if (userError || !userData) {
                     await supabase.auth.signOut();
                     return {
@@ -168,6 +206,29 @@ export const supabaseService = {
                 const userId = userData.id;
                 const userName = userData.name || authData.user.email?.split('@')[0] || 'Usuário';
                 const userEmail = authData.user.email || '';
+
+                if (userRole === 'CLIENT') {
+                    const normalizedEmail = normalizeEmail(userEmail);
+                    const { data: existingCustomer } = await supabase
+                        .from('customers')
+                        .select('id')
+                        .eq('email', normalizedEmail)
+                        .maybeSingle();
+
+                    if (!existingCustomer?.id) {
+                        await supabase.from('customers').upsert({
+                            user_id: userId,
+                            name: userName,
+                            cpf: generatePlaceholderCpf(`${userId}:${normalizedEmail}`),
+                            email: normalizedEmail,
+                            phone: userData.phone || '',
+                            status: 'ACTIVE',
+                            internal_score: 500,
+                            total_debt: 0,
+                            active_loans_count: 0,
+                        }, { onConflict: 'email' });
+                    }
+                }
 
                 // 🔒 VERIFICAÇÃO DE SEGURANÇA DE DISPOSITIVO
                 // Só aplica para clientes (não admins)
@@ -223,8 +284,9 @@ export const supabaseService = {
 
         signUp: async (email: string, password: string, name: string, role: UserRole = UserRole.CLIENT, phone?: string) => {
             try {
+                const normalizedEmail = normalizeEmail(email);
                 const { data: authData, error: authError } = await supabase.auth.signUp({
-                    email,
+                    email: normalizedEmail,
                     password,
                     options: {
                         data: { name, role, phone },
@@ -236,13 +298,27 @@ export const supabaseService = {
 
                 // Create user profile
                 if (authData.user) {
-                    await supabase.from('users').insert({
+                    const { error: profileError } = await supabase.from('users').insert({
                         auth_id: authData.user.id,
                         name,
-                        email,
+                        email: normalizedEmail,
                         role,
                         ...(phone ? { phone } : {})
                     });
+
+                    if (!profileError && (role === UserRole.CLIENT || role === 'CLIENT')) {
+                        await supabase.from('customers').upsert({
+                            user_id: null,
+                            name,
+                            cpf: generatePlaceholderCpf(`${authData.user.id}:${normalizedEmail}`),
+                            email: normalizedEmail,
+                            phone: phone || '',
+                            status: 'ACTIVE',
+                            internal_score: 500,
+                            total_debt: 0,
+                            active_loans_count: 0,
+                        }, { onConflict: 'email' });
+                    }
                 }
 
                 return { data: authData, error: null };

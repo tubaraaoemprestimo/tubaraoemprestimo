@@ -272,3 +272,48 @@ git push origin main
     - Ícone muda de cinza (sem cadastro) para dourado (com cadastro)
 12. ✅ **Biometria obrigatória na área do cliente** — validação por sessão em iOS/Android/Desktop com autenticador de plataforma
 13. ✅ **Auditoria biométrica para admin** — logs de desafio/sucesso/falha no `risk_logs` (visível na Central de Segurança/Antifraude)
+
+---
+
+## 🤖 Registro de Alterações por IA (2026-02-10)
+
+### Codex (esta sessão)
+
+1. ✅ **Correção de segregação de notificações (Admin x Cliente)**
+   - Arquivo: `services/notificationService.ts`
+   - Implementado filtro por público com `for_role` (`ADMIN`, `CLIENT`, `ALL`) e fallback para estrutura legada sem `for_role`.
+   - Regras atuais:
+     - **Admin**: vê somente notificações de `for_role=ADMIN/ALL`.
+     - **Cliente**: vê notificações com `customer_email` próprio + `for_role=ALL`.
+   - Proteção extra: notificação de cliente sem `customerEmail` não é mais criada (evita “vazamento” para Admin).
+
+2. ✅ **Padronização de criação de notificações automáticas com público-alvo**
+   - Arquivo: `services/autoNotificationService.ts`
+   - `createNotification` agora grava como `for_role='CLIENT'`.
+   - `createAdminNotification` agora grava como `for_role='ADMIN'`.
+   - Incluído fallback automático para bancos antigos sem coluna `for_role`.
+
+3. ✅ **Antifraude e bloqueio aparecendo como notificação de Admin**
+   - Arquivos: `services/antifraudService.ts`, `services/deviceSecurityService.ts`
+   - Eventos críticos de antifraude e bloqueio de cliente agora geram notificação operacional para Admin com link direto para a Central de Segurança.
+
+4. ✅ **Comprovante de pagamento enviado por cliente agora notifica Admin**
+   - Arquivo: `components/PaymentReceiptUpload.tsx`
+   - Ao anexar comprovante, o sistema cria notificação de Admin para validação em `Finance Hub > Receipts`.
+
+5. ✅ **Correção de fluxo de cadastro para aparecer em Acessos e Clientes**
+   - Arquivo: `services/supabaseService.ts`
+   - `signUp`: normalização de email e criação automática de registro em `users`; para `CLIENT`, cria/atualiza registro em `customers`.
+   - `signIn`: auto-recupera vínculo em `users` se faltante e garante presença do cliente em `customers`.
+
+6. ✅ **Migration adicionada para padronizar audiência das notificações**
+   - Arquivo: `supabase/migrations/20260210_notifications_audience.sql`
+   - Adiciona coluna `for_role` em `notifications`, faz backfill de dados antigos e cria índices para performance.
+
+### Ação obrigatória de banco (produção/homolog)
+
+Executar no Supabase SQL Editor:
+
+- `supabase/migrations/20260210_notifications_audience.sql`
+
+Sem essa migration, o sistema ainda funciona (fallback legado), mas a separação Admin/Cliente fica limitada ao modelo antigo por `customer_email`.
