@@ -469,6 +469,18 @@ export const antifraudService = {
                 }
             } catch (e) { }
 
+            const shouldNotifyAdmin =
+                score >= 50 ||
+                [
+                    'BIOMETRIC_FAILED',
+                    'BIOMETRIC_UNAVAILABLE',
+                    'BIOMETRIC_REGISTER_FAILED',
+                    'DEVICE_BLOCKED',
+                    'ACCESS_NOT_MANAGED'
+                ].includes(action);
+
+            const adminLink = '/admin/security-hub?tab=antifraud';
+
             // Salvar no banco
             await supabase.from('risk_logs').insert({
                 user_id: userId,
@@ -499,6 +511,18 @@ export const antifraudService = {
                     webglRenderer: fingerprint.webglRenderer,
                 },
             });
+
+            if (shouldNotifyAdmin) {
+                const severity = score >= 70 ? 'ERROR' : score >= 50 ? 'WARNING' : 'INFO';
+                await supabase.from('notifications').insert({
+                    customer_email: null,
+                    type: severity,
+                    title: score >= 70 ? '🚨 Alerta crítico de antifraude' : '⚠️ Evento de antifraude',
+                    message: `Ação ${action} detectada com score ${score}. Verifique os detalhes no monitor.`,
+                    link: adminLink,
+                    read: false,
+                });
+            }
 
             console.log('[Antifraud] Risk event logged:', {
                 ip,

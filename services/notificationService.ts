@@ -24,6 +24,18 @@ const getCurrentUser = (): { email: string; role: string } | null => {
     }
 };
 
+const applyAudienceFilter = (query: any, user: { email: string; role: string }) => {
+    const role = (user.role || '').toUpperCase();
+
+    if (role === 'ADMIN') {
+        // Admin visualiza apenas notificações operacionais do admin
+        return query.is('customer_email', null);
+    }
+
+    // Cliente visualiza apenas notificações próprias
+    return query.eq('customer_email', user.email);
+};
+
 // Som de notificação
 const playNotificationSound = (): void => {
     try {
@@ -71,10 +83,8 @@ export const notificationService = {
                 .order('created_at', { ascending: false })
                 .limit(50);
 
-            // Filtrar por email do usuário ou notificações gerais
-            if (user.role !== 'ADMIN') {
-                query = query.or(`customer_email.eq.${user.email},customer_email.is.null`);
-            }
+            // Filtrar por público correto (admin x cliente)
+            query = applyAudienceFilter(query, user);
 
             const { data, error } = await query;
 
@@ -109,9 +119,7 @@ export const notificationService = {
                 .select('id', { count: 'exact', head: true })
                 .eq('read', false);
 
-            if (user.role !== 'ADMIN') {
-                query = query.or(`customer_email.eq.${user.email},customer_email.is.null`);
-            }
+            query = applyAudienceFilter(query, user);
 
             const { count } = await query;
             return count || 0;
@@ -134,24 +142,20 @@ export const notificationService = {
         if (!user) return;
 
         try {
-            if (user.role === 'ADMIN') {
-                // Admin marca TODAS as notificações como lidas
-                const { error } = await supabase
-                    .from('notifications')
-                    .update({ read: true })
-                    .eq('read', false); // Atualiza apenas as não lidas
+            const { data: list } = await applyAudienceFilter(
+                supabase.from('notifications').select('id').eq('read', false),
+                user
+            );
 
-                if (error) console.error('Erro ao marcar todas como lidas:', error);
-            } else {
-                // Cliente marca apenas suas notificações
-                const { error } = await supabase
-                    .from('notifications')
-                    .update({ read: true })
-                    .or(`customer_email.eq.${user.email},customer_email.is.null`)
-                    .eq('read', false);
+            const ids = (list || []).map((n: any) => n.id);
+            if (ids.length === 0) return;
 
-                if (error) console.error('Erro ao marcar como lidas:', error);
-            }
+            const { error } = await supabase
+                .from('notifications')
+                .update({ read: true })
+                .in('id', ids);
+
+            if (error) console.error('Erro ao marcar notificações como lidas:', error);
         } catch (e) {
             console.error('Exceção ao marcar notificações:', e);
         }
@@ -168,32 +172,20 @@ export const notificationService = {
         if (!user) return;
 
         try {
-            if (user.role === 'ADMIN') {
-                // Admin deleta todas as notificações
-                // Primeiro busca os IDs para deletar
-                const { data: notifications } = await supabase
-                    .from('notifications')
-                    .select('id')
-                    .limit(1000);
+            const { data: list } = await applyAudienceFilter(
+                supabase.from('notifications').select('id').limit(1000),
+                user
+            );
 
-                if (notifications && notifications.length > 0) {
-                    const ids = notifications.map(n => n.id);
-                    const { error } = await supabase
-                        .from('notifications')
-                        .delete()
-                        .in('id', ids);
+            const ids = (list || []).map((n: any) => n.id);
+            if (ids.length === 0) return;
 
-                    if (error) console.error('Erro ao limpar notificações:', error);
-                }
-            } else {
-                // Cliente deleta apenas suas notificações
-                const { error } = await supabase
-                    .from('notifications')
-                    .delete()
-                    .eq('customer_email', user.email);
+            const { error } = await supabase
+                .from('notifications')
+                .delete()
+                .in('id', ids);
 
-                if (error) console.error('Erro ao limpar notificações:', error);
-            }
+            if (error) console.error('Erro ao limpar notificações:', error);
         } catch (e) {
             console.error('Exceção ao limpar notificações:', e);
         }
@@ -338,10 +330,7 @@ export const notificationService = {
 
     // Alias para compatibilidade com código legado
     subscribe: (callback: (notifications: Notification[]) => void): (() => void) => {
-        // Chamar callback imediatamente com dados atuais
         notificationService.getAll().then(callback);
-
-        // Retornar função de unsubscribe (noop por enquanto, usar subscribeToChanges para real-time)
-        return () => { };
+        return notificationService.subscribeToChanges(callback);
     }
 };

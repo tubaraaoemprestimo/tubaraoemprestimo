@@ -148,12 +148,25 @@ export const supabaseService = {
                 console.log('[Auth] User data from DB:', userData);
                 console.log('[Auth] User error:', userError);
 
+                // Conta sem vínculo na tabela users não pode acessar
+                // (garante que todos os logins sejam gerenciáveis na aba Acessos)
+                if (userError || !userData) {
+                    await supabase.auth.signOut();
+                    return {
+                        user: null,
+                        error: {
+                            message: 'Acesso não autorizado. Conta sem cadastro ativo em Acessos. Contate o administrador.',
+                            code: 'ACCESS_NOT_MANAGED'
+                        }
+                    };
+                }
+
                 // Normalizar role para uppercase
-                const userRole = (userData?.role || 'CLIENT').toString().toUpperCase();
+                const userRole = (userData.role || 'CLIENT').toString().toUpperCase();
                 console.log('[Auth] Final role:', userRole);
 
-                const userId = userData?.id || authData.user.id;
-                const userName = userData?.name || authData.user.email?.split('@')[0] || 'Usuário';
+                const userId = userData.id;
+                const userName = userData.name || authData.user.email?.split('@')[0] || 'Usuário';
                 const userEmail = authData.user.email || '';
 
                 // 🔒 VERIFICAÇÃO DE SEGURANÇA DE DISPOSITIVO
@@ -248,6 +261,21 @@ export const supabaseService = {
         getSession: async () => {
             const { data } = await supabase.auth.getSession();
             return data.session;
+        },
+
+        hasManagedAccess: async (userId: string): Promise<boolean> => {
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('id', userId)
+                    .maybeSingle();
+
+                if (error) return false;
+                return !!data;
+            } catch {
+                return false;
+            }
         }
     },
 

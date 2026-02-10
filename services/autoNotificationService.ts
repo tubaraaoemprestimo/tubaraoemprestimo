@@ -62,6 +62,34 @@ export const autoNotificationService = {
         }
     },
 
+    createAdminNotification: async (
+        title: string,
+        message: string,
+        type: 'INFO' | 'WARNING' | 'ALERT' | 'SUCCESS' = 'INFO',
+        link?: string
+    ): Promise<boolean> => {
+        try {
+            const { error } = await supabase.from('notifications').insert({
+                customer_email: null,
+                title,
+                message,
+                type,
+                link: link || '/admin/security-hub',
+                read: false
+            });
+
+            if (error) {
+                console.error('Error creating admin notification:', error);
+                return false;
+            }
+
+            return true;
+        } catch (err) {
+            console.error('Admin notification error:', err);
+            return false;
+        }
+    },
+
     // ============================================
     // NOTIFICAÇÕES DE BOAS-VINDAS
     // ============================================
@@ -95,6 +123,14 @@ export const autoNotificationService = {
                 `_Tubarão Empréstimos 🦈_`
             ).catch(console.error);
         }
+
+        // Notificação operacional para admin (novo acesso/cadastro)
+        await autoNotificationService.createAdminNotification(
+            '👤 Novo acesso cadastrado',
+            `${customerName} concluiu cadastro e agora pode solicitar serviços.`,
+            'INFO',
+            '/admin/security-hub?tab=users'
+        );
 
         // Push para o cliente
         firebasePushService.sendPush({
@@ -155,6 +191,15 @@ export const autoNotificationService = {
                 : `Recebemos sua solicitação de R$ ${formattedAmount}`,
             link: '/client/contracts'
         }).catch(() => { });
+
+        await autoNotificationService.createAdminNotification(
+            isLimpaNome ? '📝 Nova solicitação Limpa Nome' : '📝 Nova solicitação de empréstimo',
+            isLimpaNome
+                ? `${clientName || customer.name} enviou solicitação do serviço Limpa Nome.`
+                : `${clientName || customer.name} solicitou R$ ${formattedAmount}.`,
+            'INFO',
+            '/admin/requests'
+        );
 
         // Push para admin
         firebasePushService.sendPush({
@@ -288,6 +333,13 @@ export const autoNotificationService = {
             '/client/contracts'
         );
 
+        await autoNotificationService.createAdminNotification(
+            '📅 Parcela vencendo (cliente)',
+            `${customer.name} possui parcela de R$ ${formattedAmount} vencendo em ${date}.`,
+            'WARNING',
+            '/admin/finance-hub'
+        );
+
         // 📱 Enviar WhatsApp
         if (customer.phone) {
             whatsappService.sendMessage(
@@ -340,6 +392,13 @@ export const autoNotificationService = {
             `Você possui uma parcela de R$ ${formattedAmount} em atraso há ${daysLate} dia(s). Regularize para evitar juros adicionais.`,
             'ALERT',
             '/client/contracts'
+        );
+
+        await autoNotificationService.createAdminNotification(
+            '🚨 Parcela em atraso',
+            `${customer.name} está com parcela de R$ ${formattedAmount} em atraso há ${daysLate} dia(s).`,
+            'ALERT',
+            '/admin/finance-hub'
         );
 
         // 📱 Enviar WhatsApp

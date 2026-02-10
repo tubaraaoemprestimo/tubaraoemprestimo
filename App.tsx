@@ -136,9 +136,40 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return isPathMatch && isSearchMatch ? 'text-[#D4AF37] bg-zinc-800' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
   };
   const user = supabaseService.auth.getUser();
+  const [accessChecked, setAccessChecked] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const validateManagedAccess = async () => {
+      if (!user) {
+        if (active) setAccessChecked(true);
+        return;
+      }
+
+      const hasAccess = await supabaseService.auth.hasManagedAccess(user.id);
+      if (!hasAccess) {
+        await supabaseService.auth.signOut();
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      if (active) setAccessChecked(true);
+    };
+
+    validateManagedAccess();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
   if (!user || user.role !== 'ADMIN') {
     return <Navigate to="/login" replace />;
+  }
+
+  if (!accessChecked) {
+    return <div className="min-h-screen bg-black" />;
   }
 
   const NavContent = () => (
@@ -283,6 +314,39 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
     location.pathname === path
       ? 'text-[#D4AF37] bg-zinc-800 font-bold'
       : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
+
+  const user = supabaseService.auth.getUser();
+  const [accessChecked, setAccessChecked] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const validateManagedAccess = async () => {
+      if (!user) {
+        if (active) setAccessChecked(true);
+        return;
+      }
+
+      const hasAccess = await supabaseService.auth.hasManagedAccess(user.id);
+      if (!hasAccess) {
+        await supabaseService.auth.signOut();
+        window.location.hash = '#/login';
+        return;
+      }
+
+      if (active) setAccessChecked(true);
+    };
+
+    validateManagedAccess();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+
+  if (!accessChecked) {
+    return <div className="min-h-screen bg-black" />;
+  }
 
   const ClientNavContent = () => (
     <>
