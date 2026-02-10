@@ -214,7 +214,8 @@ export const supabaseService = {
                     email,
                     password,
                     options: {
-                        data: { name, role, phone }
+                        data: { name, role, phone },
+                        emailRedirectTo: `${window.location.origin}/#/login?confirmed=true`
                     }
                 });
 

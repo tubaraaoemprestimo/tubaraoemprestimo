@@ -39,6 +39,8 @@ import { ScorePage } from './pages/admin/Score';
 import { DemoSimulator } from './pages/public/DemoSimulator';
 import { LandingPage } from './pages/public/LandingPage';
 import Register from './pages/auth/Register';
+import ResetPassword from './pages/auth/ResetPassword';
+import { SalesPage } from './pages/public/SalesPage';
 
 // Components
 import { Chatbot } from './components/Chatbot';
@@ -389,6 +391,8 @@ function App() {
             <Route path="/site" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/vendas" element={<SalesPage />} />
             <Route path="/wizard" element={<PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate>} />
             <Route path="/demo" element={<DemoSimulator />} />
 

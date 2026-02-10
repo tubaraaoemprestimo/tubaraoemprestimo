@@ -21,13 +21,18 @@ export const Login: React.FC = () => {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  const [emailConfirmed, setEmailConfirmed] = useState(false);
 
   useEffect(() => {
-    // If we are visiting login, we usually want to ensure we are logged out
-    // or if the user is already valid, redirect to dashboard.
-    // For this specific request ("Start from Login"), we will force logout 
-    // to ensure a clean slate, unless we want to auto-redirect.
-    // Let's stick to cleaning session to behave like a true "Entry Gate".
+    // Detectar se veio da confirmação de email
+    const hash = window.location.hash;
+    if (hash.includes('confirmed=true')) {
+      setEmailConfirmed(true);
+      // Limpar URL
+      window.history.replaceState(null, '', window.location.pathname + '#/login');
+    }
+
+    // Limpar sessão para fresh login
     supabaseService.auth.signOut();
   }, []);
 
@@ -175,6 +180,22 @@ export const Login: React.FC = () => {
         </div>
 
         {/* Login Form */}
+        {/* Banner de Email Confirmado */}
+        {emailConfirmed && (
+          <div className="flex items-center gap-3 p-4 bg-green-900/20 border border-green-500/30 rounded-xl mb-4 animate-in fade-in">
+            <CheckCircle2 size={20} className="text-green-400 flex-shrink-0" />
+            <p className="text-green-300 text-sm font-medium">Email confirmado com sucesso! Agora faça login para acessar os serviços.</p>
+          </div>
+        )}
+
+        {/* Banner de Erro */}
+        {error && (
+          <div className="flex items-center gap-3 p-4 bg-red-900/20 border border-red-500/30 rounded-xl mb-4">
+            <AlertCircle size={20} className="text-red-400 flex-shrink-0" />
+            <p className="text-red-300 text-sm">{error}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
             <div className="relative group">
