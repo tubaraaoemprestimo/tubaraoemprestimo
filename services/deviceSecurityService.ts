@@ -461,13 +461,22 @@ export const deviceSecurityService = {
     },
 
     /**
-     * Resolve um bloqueio
+     * Resolve um bloqueio e adiciona dispositivo como confiável
+     * O desbloqueio é INSTANTÂNEO — o dispositivo é liberado imediatamente
      */
     async resolveBlock(
         blockId: string,
         resolvedBy: string,
         notes?: string
     ): Promise<boolean> {
+        // 1. Buscar dados do bloqueio antes de resolver
+        const { data: blockData } = await supabase
+            .from('security_blocks')
+            .select('*')
+            .eq('id', blockId)
+            .single();
+
+        // 2. Resolver o bloqueio
         const { error } = await supabase
             .from('security_blocks')
             .update({
@@ -478,7 +487,59 @@ export const deviceSecurityService = {
             })
             .eq('id', blockId);
 
-        return !error;
+        if (error) return false;
+
+        // 3. Adicionar dispositivo como confiável (para que não bloqueie de novo)
+        if (blockData && blockData.device_fingerprint && blockData.user_id) {
+            try {
+                // Verifica se já não existe
+                const { data: existing } = await supabase
+                    .from('trusted_devices')
+                    .select('id')
+                    .eq('user_id', blockData.user_id)
+                    .eq('device_fingerprint', blockData.device_fingerprint)
+                    .limit(1);
+
+                if (!existing || existing.length === 0) {
+                    const deviceInfo = blockData.device_info || {};
+                    await supabase.from('trusted_devices').insert({
+                        user_id: blockData.user_id,
+                        device_fingerprint: blockData.device_fingerprint,
+                        device_name: deviceInfo.model || 'Dispositivo Liberado',
+                        device_model: deviceInfo.model || 'Desconhecido',
+                        platform: deviceInfo.platform || 'Desconhecido',
+                        browser: deviceInfo.browser || 'Desconhecido',
+                        screen_resolution: deviceInfo.screen || '',
+                        last_ip: blockData.ip_address || '',
+                        is_verified: true,
+                        is_primary: false,
+                        trust_score: 80,
+                        login_count: 0,
+                        first_seen_at: new Date().toISOString(),
+                        last_seen_at: new Date().toISOString(),
+                    });
+                    console.log('[DeviceSecurity] ✅ Device added as trusted after unblock');
+                }
+            } catch (e) {
+                console.error('[DeviceSecurity] Error adding trusted device after unblock:', e);
+            }
+        }
+
+        // 4. Resolver TODOS os bloqueios pendentes deste usuário (instantâneo)
+        if (blockData?.user_id) {
+            await supabase
+                .from('security_blocks')
+                .update({
+                    is_resolved: true,
+                    resolved_at: new Date().toISOString(),
+                    resolved_by: resolvedBy,
+                    resolution_notes: notes || 'Liberado junto com outro bloqueio'
+                })
+                .eq('user_id', blockData.user_id)
+                .eq('is_resolved', false);
+        }
+
+        return true;
     },
 
     /**
