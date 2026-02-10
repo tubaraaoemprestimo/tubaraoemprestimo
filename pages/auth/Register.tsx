@@ -62,7 +62,8 @@ const Register: React.FC = () => {
 
         setLoading(true);
         try {
-            const { data, error } = await supabaseService.auth.signUp(email, password, name, UserRole.CLIENT);
+            const cleanPhone = phone.replace(/\D/g, '');
+            const { data, error } = await supabaseService.auth.signUp(email, password, name, UserRole.CLIENT, cleanPhone);
 
             if (error) {
                 const errMsg = (error as any)?.message || '';
@@ -72,11 +73,6 @@ const Register: React.FC = () => {
                     addToast(`Erro ao cadastrar: ${errMsg}`, 'error');
                 }
                 return;
-            }
-
-            // Salvar telefone do usuário
-            if (data?.user) {
-                await supabaseService.updateUser(data.user.id, { phone: phone.replace(/\D/g, '') });
             }
 
             setRegistered(true);

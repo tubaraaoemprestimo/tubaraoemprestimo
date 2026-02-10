@@ -116,8 +116,9 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({ children, requir
         return <>{children}</>;
     }
 
-    // Se ambas estão concedidas (ou indisponíveis no browser), libera
-    const locationOk = locationStatus === 'granted' || locationStatus === 'unavailable';
+    // Localização é OBRIGATÓRIA - se indisponível no browser, bloqueia
+    const locationOk = locationStatus === 'granted';
+    // Notificação: ok se concedida OU se indisponível (alguns browsers mobile não suportam)
     const notificationOk = notificationStatus === 'granted' || notificationStatus === 'unavailable';
 
     if (locationOk && notificationOk) {
@@ -156,18 +157,18 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({ children, requir
                 <div className="space-y-4 mb-8">
                     {/* Localização */}
                     <div className={`relative overflow-hidden rounded-2xl border transition-all duration-500 ${locationStatus === 'granted'
-                            ? 'bg-green-900/10 border-green-500/30'
-                            : locationStatus === 'denied'
-                                ? 'bg-red-900/10 border-red-500/30'
-                                : 'bg-zinc-900 border-zinc-800 hover:border-[#D4AF37]/50'
+                        ? 'bg-green-900/10 border-green-500/30'
+                        : locationStatus === 'denied'
+                            ? 'bg-red-900/10 border-red-500/30'
+                            : 'bg-zinc-900 border-zinc-800 hover:border-[#D4AF37]/50'
                         }`}>
                         <div className="p-5">
                             <div className="flex items-start gap-4">
                                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${locationStatus === 'granted'
-                                        ? 'bg-green-500/20'
-                                        : locationStatus === 'denied'
-                                            ? 'bg-red-500/20'
-                                            : 'bg-blue-500/20'
+                                    ? 'bg-green-500/20'
+                                    : locationStatus === 'denied'
+                                        ? 'bg-red-500/20'
+                                        : 'bg-blue-500/20'
                                     }`}>
                                     {locationStatus === 'granted' ? (
                                         <CheckCircle2 size={24} className="text-green-400" />
@@ -227,18 +228,18 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({ children, requir
 
                     {/* Notificações */}
                     <div className={`relative overflow-hidden rounded-2xl border transition-all duration-500 ${notificationStatus === 'granted'
-                            ? 'bg-green-900/10 border-green-500/30'
-                            : notificationStatus === 'denied'
-                                ? 'bg-red-900/10 border-red-500/30'
-                                : 'bg-zinc-900 border-zinc-800 hover:border-[#D4AF37]/50'
+                        ? 'bg-green-900/10 border-green-500/30'
+                        : notificationStatus === 'denied'
+                            ? 'bg-red-900/10 border-red-500/30'
+                            : 'bg-zinc-900 border-zinc-800 hover:border-[#D4AF37]/50'
                         }`}>
                         <div className="p-5">
                             <div className="flex items-start gap-4">
                                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${notificationStatus === 'granted'
-                                        ? 'bg-green-500/20'
-                                        : notificationStatus === 'denied'
-                                            ? 'bg-red-500/20'
-                                            : 'bg-yellow-500/20'
+                                    ? 'bg-green-500/20'
+                                    : notificationStatus === 'denied'
+                                        ? 'bg-red-500/20'
+                                        : 'bg-yellow-500/20'
                                     }`}>
                                     {notificationStatus === 'granted' ? (
                                         <CheckCircle2 size={24} className="text-green-400" />

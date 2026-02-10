@@ -397,18 +397,6 @@ export const Requests: React.FC = () => {
                                     <>
                                         <InfoBox label="Serviço" value="Limpa Nome" highlight />
                                         <InfoBox label="Contrato Assinado" value={selectedRequest.limpaNomeContractSigned ? '✅ Sim' : '❌ Não'} />
-                                        <InfoBox label="WhatsApp" value={selectedRequest.phone || 'N/A'} />
-                                        <div className="p-4 rounded-xl border bg-zinc-800 border-green-500/30">
-                                            <p className="text-xs text-green-400 mb-2 uppercase tracking-wide">Contato</p>
-                                            <a
-                                                href={`https://wa.me/55${(selectedRequest.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${selectedRequest.clientName}! Sou da Tubarão Empréstimos. Recebi sua solicitação de Limpa Nome e gostaria de falar sobre o andamento do serviço.`)}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center justify-center gap-2 w-full py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-sm transition-all"
-                                            >
-                                                <Phone size={16} /> Chamar no WhatsApp
-                                            </a>
-                                        </div>
                                     </>
                                 ) : selectedRequest.profileType === 'MOTO' ? (
                                     <>
@@ -449,6 +437,24 @@ export const Requests: React.FC = () => {
                                     </>
                                 )}
                             </div>
+
+                            {/* 📱 Botão WhatsApp - TODOS os tipos de solicitação */}
+                            {selectedRequest.phone && (
+                                <div className="flex items-center gap-3 p-3 bg-zinc-900 border border-green-500/30 rounded-xl">
+                                    <div className="flex-1">
+                                        <p className="text-xs text-zinc-500">WhatsApp do Cliente</p>
+                                        <p className="text-white font-bold text-sm">{selectedRequest.phone}</p>
+                                    </div>
+                                    <a
+                                        href={`https://wa.me/55${(selectedRequest.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${selectedRequest.clientName}! Sou da Tubarão Empréstimos. ${selectedRequest.profileType === 'LIMPA_NOME' ? 'Recebi sua solicitação de Limpa Nome e gostaria de falar sobre o andamento do serviço.' : 'Gostaria de falar sobre a sua solicitação de empréstimo.'}`)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-sm transition-all shrink-0"
+                                    >
+                                        <Phone size={16} /> Chamar
+                                    </a>
+                                </div>
+                            )}
 
                             {/* Endereço do Cliente */}
                             {(() => {

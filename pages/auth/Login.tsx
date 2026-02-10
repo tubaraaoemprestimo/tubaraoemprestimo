@@ -54,28 +54,38 @@ export const Login: React.FC = () => {
     }
 
     try {
-      const { user } = await supabaseService.auth.signIn(creds) as any;
-      if (user) {
+      const result = await supabaseService.auth.signIn(creds) as any;
+      if (result.user) {
         // Antifraud Log com localização capturada
-        await antifraudService.logRiskEvent('LOGIN_SUCCESS', user.id, {
-          role: user.role,
+        await antifraudService.logRiskEvent('LOGIN_SUCCESS', result.user.id, {
+          role: result.user.role,
           method: creds.identifier === 'admin' ? 'PASSWORD_ADMIN' : 'PASSWORD_CLIENT',
           locationCaptured: locationData
         });
 
-        if (user.role === 'ADMIN') {
+        if (result.user.role === 'ADMIN') {
           navigate('/admin');
         } else {
           navigate('/client/dashboard');
         }
       } else {
-        // Antifraud Log - Failed Attempt
-        await antifraudService.logRiskEvent('LOGIN_FAILED', undefined, {
-          identifier: creds.identifier,
-          reason: 'Invalid Credentials',
-          locationCaptured: locationData
-        });
-        setError('Credenciais inválidas.');
+        // Tratar erros específicos
+        const errMsg = result.error?.message || '';
+        const errCode = result.error?.code || '';
+
+        if (errMsg.toLowerCase().includes('email not confirmed') || errMsg.toLowerCase().includes('email_not_confirmed')) {
+          setError('Seu email ainda não foi confirmado. Verifique sua caixa de entrada e clique no link de confirmação.');
+        } else if (errCode === 'DEVICE_BLOCKED') {
+          setError(errMsg);
+        } else {
+          // Antifraud Log - Failed Attempt
+          await antifraudService.logRiskEvent('LOGIN_FAILED', undefined, {
+            identifier: creds.identifier,
+            reason: errMsg || 'Invalid Credentials',
+            locationCaptured: locationData
+          });
+          setError('Credenciais inválidas.');
+        }
       }
     } catch (error) {
       console.error(error);

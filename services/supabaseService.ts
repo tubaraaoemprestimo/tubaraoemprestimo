@@ -208,13 +208,13 @@ export const supabaseService = {
             }
         },
 
-        signUp: async (email: string, password: string, name: string, role: UserRole = UserRole.CLIENT) => {
+        signUp: async (email: string, password: string, name: string, role: UserRole = UserRole.CLIENT, phone?: string) => {
             try {
                 const { data: authData, error: authError } = await supabase.auth.signUp({
                     email,
                     password,
                     options: {
-                        data: { name, role }
+                        data: { name, role, phone }
                     }
                 });
 
@@ -226,7 +226,8 @@ export const supabaseService = {
                         auth_id: authData.user.id,
                         name,
                         email,
-                        role
+                        role,
+                        ...(phone ? { phone } : {})
                     });
                 }
 
