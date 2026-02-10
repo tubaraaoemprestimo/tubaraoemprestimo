@@ -431,6 +431,15 @@ export const Wizard: React.FC = () => {
           return;
         }
       }
+
+      // 🚫 Verificar bloqueio de 30 dias após reprovação (funciona por CPF, independente do dispositivo)
+      if (profileType !== 'LIMPA_NOME') {
+        const cooldown = await antifraudService.checkRejectionCooldown(formData.cpf);
+        if (cooldown.blocked) {
+          addToast(cooldown.message || `Sua solicitação foi reprovada recentemente. Aguarde ${cooldown.daysRemaining} dias para tentar novamente.`, 'error');
+          return;
+        }
+      }
       if (!formData.phone || formData.phone.replace(/\D/g, '').length < 10) {
         addToast("Informe seu WhatsApp.", 'warning');
         return;

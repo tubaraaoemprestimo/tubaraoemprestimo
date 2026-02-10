@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronRight, Wallet, Plus, Calendar, FileText, TrendingUp, X, Percent, Eye, EyeOff, Gift, Tag, Sparkles, AlertTriangle, Upload, CheckCircle, Calculator, Ticket, Megaphone } from 'lucide-react';
+import { Bell, ChevronRight, Wallet, Plus, Calendar, FileText, TrendingUp, X, Percent, Eye, EyeOff, Gift, Tag, Sparkles, AlertTriangle, Upload, CheckCircle, Calculator, Ticket, Megaphone, Briefcase } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Skeleton } from '../../components/Skeleton';
 import { supabaseService } from '../../services/supabaseService';
@@ -345,8 +345,8 @@ export const ClientDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick Actions - Cleaned up */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
+          <ActionButton icon={Briefcase} label="Solicitar" onClick={() => navigate('/client/wizard')} />
           <ActionButton icon={FileText} label="Contratos" onClick={() => navigate('/client/contracts')} />
           <ActionButton icon={TrendingUp} label="Extrato" onClick={() => navigate('/client/statement')} />
           <ActionButton icon={Percent} label="Renegociar" onClick={() => setIsRenegotiateOpen(true)} disabled={userData.balance === 0} />
@@ -405,10 +405,10 @@ export const ClientDashboard: React.FC = () => {
           <ChevronRight size={16} className="text-zinc-600 ml-auto" />
         </div>
 
-        {/* FAB */}
+        {/* FAB - Solicitar Serviço */}
         <div className="fixed bottom-20 right-6 md:right-[calc(50%-14rem)] z-30">
-          <button onClick={() => navigate('/wizard')} className="bg-shark text-white px-6 py-4 rounded-full shadow-lg hover:bg-red-600 hover:scale-105 transition-all flex items-center gap-3 font-bold border border-white/10">
-            <Plus size={24} /> <span>Novo Empréstimo</span>
+          <button onClick={() => navigate('/client/wizard')} className="bg-shark text-white px-6 py-4 rounded-full shadow-lg hover:bg-red-600 hover:scale-105 transition-all flex items-center gap-3 font-bold border border-white/10">
+            <Plus size={24} /> <span>Novo Serviço</span>
           </button>
         </div>
       </main>

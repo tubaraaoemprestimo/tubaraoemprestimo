@@ -397,6 +397,18 @@ export const Requests: React.FC = () => {
                                     <>
                                         <InfoBox label="Serviço" value="Limpa Nome" highlight />
                                         <InfoBox label="Contrato Assinado" value={selectedRequest.limpaNomeContractSigned ? '✅ Sim' : '❌ Não'} />
+                                        <InfoBox label="WhatsApp" value={selectedRequest.phone || 'N/A'} />
+                                        <div className="p-4 rounded-xl border bg-zinc-800 border-green-500/30">
+                                            <p className="text-xs text-green-400 mb-2 uppercase tracking-wide">Contato</p>
+                                            <a
+                                                href={`https://wa.me/55${(selectedRequest.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${selectedRequest.clientName}! Sou da Tubarão Empréstimos. Recebi sua solicitação de Limpa Nome e gostaria de falar sobre o andamento do serviço.`)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center justify-center gap-2 w-full py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-sm transition-all"
+                                            >
+                                                <Phone size={16} /> Chamar no WhatsApp
+                                            </a>
+                                        </div>
                                     </>
                                 ) : selectedRequest.profileType === 'MOTO' ? (
                                     <>
