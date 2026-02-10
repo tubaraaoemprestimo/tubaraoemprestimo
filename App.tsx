@@ -388,11 +388,10 @@ function App() {
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Login />} />
-            <Route path="/site" element={<LandingPage />} />
+            <Route path="/site" element={<SalesPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/vendas" element={<SalesPage />} />
             <Route path="/wizard" element={<PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate>} />
             <Route path="/demo" element={<DemoSimulator />} />
 

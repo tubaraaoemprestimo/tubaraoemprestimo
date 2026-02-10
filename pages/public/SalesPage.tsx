@@ -97,7 +97,7 @@ const FeatureCard: React.FC<{ icon: React.ReactNode; title: string; desc: string
 );
 
 // ========= CTA WHATSAPP =========
-const WHATSAPP_NUMBER = '5511957577050';
+const WHATSAPP_NUMBER = '5511987577050';
 const WHATSAPP_MSG = encodeURIComponent('Olá! Vi a oferta do sistema Tubarão Empréstimo e quero saber mais sobre a plataforma. 🦈');
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MSG}`;
 
