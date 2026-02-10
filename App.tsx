@@ -59,6 +59,7 @@ import { supabaseService } from './services/supabaseService';
 import { BrandProvider } from './contexts/BrandContext';
 import { firebasePushService } from './services/firebasePushService';
 import { themeService } from './services/themeService';
+import { PermissionGate } from './components/PermissionGate';
 
 // --- Expandable Menu Item ---
 interface ExpandableMenuProps {
@@ -386,21 +387,21 @@ function App() {
             <Route path="/" element={<Login />} />
             <Route path="/site" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/wizard" element={<ClientLayout><Wizard /></ClientLayout>} />
+            <Route path="/wizard" element={<PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate>} />
             <Route path="/demo" element={<DemoSimulator />} />
 
             {/* Client Welcome & Onboarding */}
-            <Route path="/client/welcome" element={<ClientWelcome />} />
-            <Route path="/client/returning" element={<ReturningClientForm />} />
-            <Route path="/client/wizard" element={<ClientLayout><Wizard /></ClientLayout>} />
+            <Route path="/client/welcome" element={<PermissionGate><ClientWelcome /></PermissionGate>} />
+            <Route path="/client/returning" element={<PermissionGate><ReturningClientForm /></PermissionGate>} />
+            <Route path="/client/wizard" element={<PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate>} />
 
             {/* Client Protected */}
-            <Route path="/client/dashboard" element={<ClientLayout showNav={false} showBottomNav={true}><ClientDashboard /></ClientLayout>} />
-            <Route path="/client/contracts" element={<ClientLayout showNav={true} showBottomNav={true}><Contracts /></ClientLayout>} />
-            <Route path="/client/profile" element={<ClientLayout showNav={true} showBottomNav={true}><Profile /></ClientLayout>} />
-            <Route path="/client/statement" element={<ClientLayout showNav={true} showBottomNav={true}><Statement /></ClientLayout>} />
-            <Route path="/client/help" element={<ClientLayout showNav={true} showBottomNav={true}><HelpCenter /></ClientLayout>} />
-            <Route path="/client/documents" element={<ClientLayout showNav={true} showBottomNav={true}><MyDocuments /></ClientLayout>} />
+            <Route path="/client/dashboard" element={<PermissionGate><ClientLayout showNav={false} showBottomNav={true}><ClientDashboard /></ClientLayout></PermissionGate>} />
+            <Route path="/client/contracts" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Contracts /></ClientLayout></PermissionGate>} />
+            <Route path="/client/profile" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Profile /></ClientLayout></PermissionGate>} />
+            <Route path="/client/statement" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Statement /></ClientLayout></PermissionGate>} />
+            <Route path="/client/help" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><HelpCenter /></ClientLayout></PermissionGate>} />
+            <Route path="/client/documents" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><MyDocuments /></ClientLayout></PermissionGate>} />
 
             {/* Admin Protected - Core */}
             <Route path="/admin" element={<AdminLayout><Dashboard /></AdminLayout>} />

@@ -623,6 +623,88 @@ export const antifraudService = {
     needsManualReview(score: number): boolean {
         return score >= 30 && score < 50;
     },
+
+    /**
+     * 🚫 Verifica se o CPF está em período de cooldown após reprovação
+     * 
+     * Regra: Se um empréstimo foi REJECTED nos últimos 30 dias para aquele CPF,
+     * o cliente não pode solicitar novo empréstimo. Funciona por CPF, então
+     * mesmo trocando de celular/dispositivo o bloqueio persiste.
+     * 
+     * @param cpf - CPF do cliente (limpo, apenas números)
+     * @returns Objeto com status do bloqueio e informações de quando poderá tentar novamente
+     */
+    async checkRejectionCooldown(cpf: string): Promise<{
+        blocked: boolean;
+        daysRemaining: number;
+        rejectionDate?: string;
+        canRetryAt?: string;
+        message?: string;
+    }> {
+        try {
+            // Limpa o CPF (mantém apenas números)
+            const cleanCpf = cpf.replace(/\D/g, '');
+            if (!cleanCpf || cleanCpf.length < 11) {
+                return { blocked: false, daysRemaining: 0 };
+            }
+
+            // Data limite: 30 dias atrás
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+            // Busca solicitações REJEITADAS deste CPF nos últimos 30 dias
+            const { data: rejectedRequests, error } = await supabase
+                .from('loan_requests')
+                .select('id, cpf, status, date, updated_at')
+                .eq('cpf', cleanCpf)
+                .eq('status', 'REJECTED')
+                .gte('updated_at', thirtyDaysAgo.toISOString())
+                .order('updated_at', { ascending: false })
+                .limit(1);
+
+            if (error) {
+                console.error('[Antifraud] Erro ao verificar cooldown:', error);
+                return { blocked: false, daysRemaining: 0 };
+            }
+
+            if (!rejectedRequests || rejectedRequests.length === 0) {
+                return { blocked: false, daysRemaining: 0 };
+            }
+
+            // Existe reprovação nos últimos 30 dias
+            const lastRejection = rejectedRequests[0];
+            const rejectionDate = new Date(lastRejection.updated_at || lastRejection.date);
+            const canRetryAt = new Date(rejectionDate);
+            canRetryAt.setDate(canRetryAt.getDate() + 30);
+
+            const now = new Date();
+            const diffMs = canRetryAt.getTime() - now.getTime();
+            const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+            if (daysRemaining <= 0) {
+                return { blocked: false, daysRemaining: 0 };
+            }
+
+            // Registra tentativa bloqueada no log de risco
+            await this.logRiskEvent('BLOCKED_COOLDOWN_30DAYS', undefined, {
+                cpf: cleanCpf,
+                rejectionDate: rejectionDate.toISOString(),
+                daysRemaining,
+                canRetryAt: canRetryAt.toISOString()
+            });
+
+            return {
+                blocked: true,
+                daysRemaining,
+                rejectionDate: rejectionDate.toISOString(),
+                canRetryAt: canRetryAt.toISOString(),
+                message: `Sua solicitação foi reprovada em ${rejectionDate.toLocaleDateString('pt-BR')}. Você poderá solicitar novamente em ${canRetryAt.toLocaleDateString('pt-BR')} (${daysRemaining} dias restantes).`
+            };
+        } catch (error) {
+            console.error('[Antifraud] Erro ao verificar cooldown:', error);
+            return { blocked: false, daysRemaining: 0 };
+        }
+    },
 };
 
 export default antifraudService;
