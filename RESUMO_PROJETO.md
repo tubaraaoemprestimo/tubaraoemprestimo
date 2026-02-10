@@ -50,6 +50,9 @@ TUBARÃO EMPRESTIMOS/
 
 ### Login Biométrico (WebAuthn)
 - **Arquivo:** `services/biometricService.ts`
+- **Acesso obrigatório por biometria (cliente):** rotas do cliente agora exigem validação biométrica por sessão via `BiometricAccessGate`
+- **Reautenticação por sessão:** após validar Face ID/Touch ID/impressão, sessão recebe flag `biometric_verified_{userId}`
+- **Auditoria admin:** eventos `BIOMETRIC_CHALLENGE`, `BIOMETRIC_SUCCESS`, `BIOMETRIC_FAILED`, `BIOMETRIC_REGISTER_SUCCESS`, `BIOMETRIC_REGISTER_FAILED`, `BIOMETRIC_UNAVAILABLE` são gravados em `risk_logs`
 - **Tabela:** `webauthn_credentials` (user_id, credential_id, public_key, device_name, sign_count)
 - **Fluxo de cadastro biométrico:**
   1. Usuário faz primeiro login com senha
@@ -267,3 +270,5 @@ git push origin main
     - Cadastro automático na 1ª login com senha
     - Botão biometria só aparece se dispositivo suporta
     - Ícone muda de cinza (sem cadastro) para dourado (com cadastro)
+12. ✅ **Biometria obrigatória na área do cliente** — validação por sessão em iOS/Android/Desktop com autenticador de plataforma
+13. ✅ **Auditoria biométrica para admin** — logs de desafio/sucesso/falha no `risk_logs` (visível na Central de Segurança/Antifraude)

@@ -63,6 +63,7 @@ import { BrandProvider } from './contexts/BrandContext';
 import { firebasePushService } from './services/firebasePushService';
 import { themeService } from './services/themeService';
 import { PermissionGate } from './components/PermissionGate';
+import { BiometricAccessGate } from './components/BiometricAccessGate';
 
 // --- Expandable Menu Item ---
 interface ExpandableMenuProps {
@@ -392,21 +393,21 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/wizard" element={<PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate>} />
+            <Route path="/wizard" element={<BiometricAccessGate><PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/demo" element={<DemoSimulator />} />
 
             {/* Client Welcome & Onboarding */}
-            <Route path="/client/welcome" element={<PermissionGate><ClientWelcome /></PermissionGate>} />
-            <Route path="/client/returning" element={<PermissionGate><ReturningClientForm /></PermissionGate>} />
-            <Route path="/client/wizard" element={<PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate>} />
+            <Route path="/client/welcome" element={<BiometricAccessGate><PermissionGate><ClientWelcome /></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/returning" element={<BiometricAccessGate><PermissionGate><ReturningClientForm /></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/wizard" element={<BiometricAccessGate><PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
 
             {/* Client Protected */}
-            <Route path="/client/dashboard" element={<PermissionGate><ClientLayout showNav={false} showBottomNav={true}><ClientDashboard /></ClientLayout></PermissionGate>} />
-            <Route path="/client/contracts" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Contracts /></ClientLayout></PermissionGate>} />
-            <Route path="/client/profile" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Profile /></ClientLayout></PermissionGate>} />
-            <Route path="/client/statement" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Statement /></ClientLayout></PermissionGate>} />
-            <Route path="/client/help" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><HelpCenter /></ClientLayout></PermissionGate>} />
-            <Route path="/client/documents" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><MyDocuments /></ClientLayout></PermissionGate>} />
+            <Route path="/client/dashboard" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={false} showBottomNav={true}><ClientDashboard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/contracts" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Contracts /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/profile" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Profile /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/statement" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Statement /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/help" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><HelpCenter /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/documents" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><MyDocuments /></ClientLayout></PermissionGate></BiometricAccessGate>} />
 
             {/* Admin Protected - Core */}
             <Route path="/admin" element={<AdminLayout><Dashboard /></AdminLayout>} />
