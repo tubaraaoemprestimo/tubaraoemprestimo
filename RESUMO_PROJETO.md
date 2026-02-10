@@ -44,8 +44,25 @@ TUBARÃO EMPRESTIMOS/
 ### Fluxo de Login
 - **Clientes:** Login com email + senha → `/client/dashboard`
 - **Admin:** Login com credenciais admin → `/admin`
+- **Biometria (WebAuthn):** Face ID / Touch ID / Windows Hello → login direto
 - Verificação de dispositivo (device security) para clientes
 - Se email não confirmado: mensagem "Seu email ainda não foi confirmado"
+
+### Login Biométrico (WebAuthn)
+- **Arquivo:** `services/biometricService.ts`
+- **Tabela:** `webauthn_credentials` (user_id, credential_id, public_key, device_name, sign_count)
+- **Fluxo de cadastro biométrico:**
+  1. Usuário faz primeiro login com senha
+  2. Se biometria disponível no dispositivo → registra credencial WebAuthn automaticamente
+  3. Salva credencial no Supabase + referência local no localStorage
+  4. Próximos logins: botão de biometria dourado aparece ativo
+- **Fluxo de login biométrico:**
+  1. Clica no ícone de impressão digital na tela de login
+  2. Dispositivo solicita Face ID / Touch ID / Windows Hello
+  3. Valida credencial no Supabase
+  4. Faz login automático no Supabase Auth
+- **Segurança:** Credenciais WebAuthn são vinculadas ao dispositivo e domínio (origin)
+- **Compatibilidade:** iPhone (Face ID), Android (impressão digital), Windows (Hello), Mac (Touch ID)
 
 ### Fluxo de Recuperação de Senha
 1. Na tela de login, clica **"Esqueceu sua senha?"**
@@ -60,6 +77,7 @@ TUBARÃO EMPRESTIMOS/
 - `pages/auth/ResetPassword.tsx` — Tela de redefinir senha
 - `services/supabaseService.ts` — Funções `signIn`, `signUp`, `resetPassword`
 - `services/supabaseClient.ts` — Configuração do Supabase (URL, chave, detectSessionInUrl)
+- `services/biometricService.ts` — Login biométrico via WebAuthn
 
 ---
 
@@ -184,6 +202,7 @@ TUBARÃO EMPRESTIMOS/
 - `brand_settings` — Personalização da marca
 - `system_settings` — Configurações do sistema
 - `campaigns` — Campanhas de marketing
+- `webauthn_credentials` — Credenciais biométricas WebAuthn (user_id, credential_id, public_key, device_name)
 
 ### Edge Functions (supabase/functions/)
 - `whatsapp-webhook` — Webhook do WhatsApp (Evolution API)
@@ -197,6 +216,7 @@ TUBARÃO EMPRESTIMOS/
 - **Auth → Email:** Confirm email ✅ ativado
 - **Auth → URL Configuration:** `https://www.tubaraoemprestimo.com.br` na whitelist
 - **Tabela users:** coluna `phone` (TEXT) ✅ criada
+- **Tabela webauthn_credentials:** ✅ criada (SQL em `supabase/create_webauthn_table.sql`)
 
 ---
 
@@ -241,3 +261,9 @@ git push origin main
 8. ✅ **SalesPage** — Landing page premium de vendas em `/#/site`
 9. ✅ **Manifest PWA** — theme_color preto, shortcuts atualizados
 10. ✅ **Login** — Banner de email confirmado + tratamento de erros
+11. ✅ **Login Biométrico** — WebAuthn real (Face ID, Touch ID, Windows Hello)
+    - `services/biometricService.ts` criado com registro e autenticação
+    - Tabela `webauthn_credentials` criada no Supabase
+    - Cadastro automático na 1ª login com senha
+    - Botão biometria só aparece se dispositivo suporta
+    - Ícone muda de cinza (sem cadastro) para dourado (com cadastro)

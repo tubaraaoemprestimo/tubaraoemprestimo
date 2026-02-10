@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, ArrowRight, ShieldCheck, ScanFace, AlertCircle, Smartphone, Mail, Loader2, CheckCircle2, X } from 'lucide-react';
+import { User, Lock, ArrowRight, ShieldCheck, ScanFace, AlertCircle, Smartphone, Mail, Loader2, CheckCircle2, X, Fingerprint } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
 import { supabaseService } from '../../services/supabaseService';
 import { InstallPwaButton } from '../../components/InstallPwaButton';
-
+import { biometricService } from '../../services/biometricService';
 import { antifraudService } from '../../services/antifraudService';
 
 export const Login: React.FC = () => {
@@ -14,6 +14,8 @@ export const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricHasCredential, setBiometricHasCredential] = useState(false);
 
   // Modal Esqueceu Senha
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
@@ -31,6 +33,17 @@ export const Login: React.FC = () => {
       // Limpar URL
       window.history.replaceState(null, '', window.location.pathname + '#/login');
     }
+
+    // Verificar suporte a biometria
+    const checkBiometric = async () => {
+      const supported = await biometricService.isPlatformAuthenticatorAvailable();
+      setBiometricAvailable(supported);
+      if (supported) {
+        const hasLocal = biometricService.hasLocalCredential();
+        setBiometricHasCredential(hasLocal);
+      }
+    };
+    checkBiometric();
 
     // Limpar sessão para fresh login
     supabaseService.auth.signOut();
@@ -67,6 +80,35 @@ export const Login: React.FC = () => {
           method: creds.identifier === 'admin' ? 'PASSWORD_ADMIN' : 'PASSWORD_CLIENT',
           locationCaptured: locationData
         });
+
+        // 🔐 Biometria: salvar credenciais e tentar cadastrar se disponível
+        if (biometricAvailable && result.user.role !== 'ADMIN') {
+          try {
+            // Armazenar credenciais para login biométrico futuro
+            localStorage.setItem(`bio_auth_${result.user.id}`, JSON.stringify({
+              email: creds.identifier,
+              token: btoa(creds.password),
+            }));
+
+            // Se não tem credencial biométrica, cadastrar agora
+            const hasExisting = await biometricService.hasCredential(result.user.id);
+            if (!hasExisting) {
+              const bioResult = await biometricService.register(
+                result.user.id,
+                result.user.email || creds.identifier,
+                result.user.name || 'Usuário'
+              );
+              if (bioResult.success) {
+                setBiometricHasCredential(true);
+                console.log('[Biometric] Credential registered on login');
+              }
+            } else {
+              setBiometricHasCredential(true);
+            }
+          } catch (bioErr) {
+            console.log('[Biometric] Optional registration skipped:', bioErr);
+          }
+        }
 
         if (result.user.role === 'ADMIN') {
           navigate('/admin');
@@ -105,13 +147,66 @@ export const Login: React.FC = () => {
     await performLogin({ identifier: 'admin', password: 'admin' });
   };
 
-  const handleFaceIDLogin = () => {
+  const handleFaceIDLogin = async () => {
+    if (!biometricAvailable) {
+      setError('Biometria não disponível neste dispositivo. Configure Face ID ou impressão digital nas configurações.');
+      return;
+    }
+
+    if (!biometricHasCredential) {
+      setError('Nenhuma biometria cadastrada. Faça login com senha primeiro e cadastre sua biometria no perfil.');
+      return;
+    }
+
     setIsScanning(true);
-    // Simulate scanning process
-    setTimeout(() => {
-      // Automatically login as client after scan
-      performLogin({ identifier: '123.456.789-00', password: 'mock_password' });
-    }, 2500);
+    setError(null);
+
+    try {
+      const result = await biometricService.authenticate();
+
+      if (!result.success) {
+        setIsScanning(false);
+        setError(result.error || 'Falha na autenticação biométrica.');
+        return;
+      }
+
+      // Biometria OK! Agora fazer login real no Supabase
+      // Buscar senha armazenada localmente (criptografada)
+      const storedAuth = localStorage.getItem(`bio_auth_${result.userId}`);
+      if (!storedAuth) {
+        setIsScanning(false);
+        setError('Credencial expirada. Faça login com senha e recadastre a biometria.');
+        return;
+      }
+
+      const { email, token } = JSON.parse(storedAuth);
+
+      // Login via Supabase com token armazenado
+      const loginResult = await supabaseService.auth.signIn({ identifier: email, password: atob(token) }) as any;
+
+      if (loginResult.user) {
+        await antifraudService.logRiskEvent('LOGIN_SUCCESS', loginResult.user.id, {
+          role: loginResult.user.role,
+          method: 'BIOMETRIC',
+        });
+
+        setIsScanning(false);
+        if (loginResult.user.role === 'ADMIN') {
+          navigate('/admin');
+        } else {
+          navigate('/client/dashboard');
+        }
+      } else {
+        setIsScanning(false);
+        setError('Sessão expirada. Faça login com senha e recadastre a biometria.');
+        // Limpar credencial inválida
+        localStorage.removeItem(`bio_auth_${result.userId}`);
+      }
+    } catch (err) {
+      console.error('[Biometric] Login error:', err);
+      setIsScanning(false);
+      setError('Erro na autenticação biométrica.');
+    }
   };
 
   const handleForgotPassword = async () => {
@@ -150,20 +245,27 @@ export const Login: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center animate-in fade-in">
           <div className="relative w-64 h-64 border-2 border-zinc-800 rounded-full flex items-center justify-center overflow-hidden mb-8">
             {/* Scanning Laser */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-green-500 shadow-[0_0_15px_#22c55e] animate-[scan_2s_ease-in-out_infinite]"></div>
+            <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37] shadow-[0_0_15px_#D4AF37] animate-[scan_2s_ease-in-out_infinite]"></div>
 
             {/* Grid Overlay */}
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(212,175,55,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(212,175,55,0.1)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
 
-            <ScanFace size={120} className="text-zinc-700 animate-pulse" />
+            <Fingerprint size={120} className="text-[#D4AF37]/50 animate-pulse" />
 
             {/* Face Corners */}
-            <div className="absolute top-8 left-8 w-8 h-8 border-t-2 border-l-2 border-green-500 rounded-tl-xl"></div>
-            <div className="absolute top-8 right-8 w-8 h-8 border-t-2 border-r-2 border-green-500 rounded-tr-xl"></div>
-            <div className="absolute bottom-8 left-8 w-8 h-8 border-b-2 border-l-2 border-green-500 rounded-bl-xl"></div>
-            <div className="absolute bottom-8 right-8 w-8 h-8 border-b-2 border-r-2 border-green-500 rounded-br-xl"></div>
+            <div className="absolute top-8 left-8 w-8 h-8 border-t-2 border-l-2 border-[#D4AF37] rounded-tl-xl"></div>
+            <div className="absolute top-8 right-8 w-8 h-8 border-t-2 border-r-2 border-[#D4AF37] rounded-tr-xl"></div>
+            <div className="absolute bottom-8 left-8 w-8 h-8 border-b-2 border-l-2 border-[#D4AF37] rounded-bl-xl"></div>
+            <div className="absolute bottom-8 right-8 w-8 h-8 border-b-2 border-r-2 border-[#D4AF37] rounded-br-xl"></div>
           </div>
-          <h2 className="text-xl font-bold text-white tracking-widest animate-pulse">VERIFICANDO BIOMETRIA...</h2>
+          <h2 className="text-xl font-bold text-[#D4AF37] tracking-widest animate-pulse">VERIFICANDO BIOMETRIA...</h2>
+          <p className="text-zinc-500 text-sm mt-3">Use Face ID ou impressão digital</p>
+          <button
+            onClick={() => setIsScanning(false)}
+            className="mt-6 text-zinc-500 hover:text-white text-sm"
+          >
+            Cancelar
+          </button>
         </div>
       )}
 
@@ -246,14 +348,19 @@ export const Login: React.FC = () => {
               ENTRAR <ArrowRight size={20} />
             </Button>
 
-            <button
-              type="button"
-              onClick={handleFaceIDLogin}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 flex items-center justify-center text-[#D4AF37] hover:border-[#D4AF37] hover:bg-zinc-800/80 transition-all shadow-lg"
-              title="Entrar com Face ID"
-            >
-              <ScanFace size={24} />
-            </button>
+            {biometricAvailable && (
+              <button
+                type="button"
+                onClick={handleFaceIDLogin}
+                className={`bg-zinc-900 border rounded-xl px-4 flex items-center justify-center transition-all shadow-lg ${biometricHasCredential
+                  ? 'border-[#D4AF37]/50 text-[#D4AF37] hover:border-[#D4AF37] hover:bg-zinc-800/80'
+                  : 'border-zinc-800 text-zinc-600 cursor-not-allowed'
+                  }`}
+                title={biometricHasCredential ? 'Entrar com Biometria' : 'Cadastre biometria após o login'}
+              >
+                <Fingerprint size={24} />
+              </button>
+            )}
           </div>
         </form>
 

@@ -1,0 +1,358 @@
+/**
+ * 🔐 Serviço de Autenticação Biométrica (WebAuthn)
+ * 
+ * Usa a Web Authentication API para:
+ * - Registrar credencial biométrica (Face ID, Touch ID, Windows Hello)
+ * - Autenticar com biometria
+ * 
+ * Armazena credenciais no Supabase (tabela webauthn_credentials)
+ * e localmente no dispositivo via navigator.credentials
+ */
+
+import { supabase } from './supabaseClient';
+
+// Converte ArrayBuffer para base64url (para armazenamento)
+function bufferToBase64url(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// Converte base64url para ArrayBuffer
+function base64urlToBuffer(base64url: string): ArrayBuffer {
+    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
+// Gera um ID aleatório para challenge
+function generateChallenge(): Uint8Array {
+    return crypto.getRandomValues(new Uint8Array(32));
+}
+
+export interface BiometricCredential {
+    id: string;
+    rawId: string;
+    userId: string;
+    userEmail: string;
+    publicKey: string;
+    createdAt: string;
+    deviceName: string;
+}
+
+export const biometricService = {
+    /**
+     * Verifica se o dispositivo suporta WebAuthn/biometria
+     */
+    isSupported: (): boolean => {
+        return !!(window.PublicKeyCredential && navigator.credentials);
+    },
+
+    /**
+     * Verifica se WebAuthn com autenticador de plataforma está disponível
+     * (Face ID, Touch ID, Windows Hello - não chaves USB)
+     */
+    isPlatformAuthenticatorAvailable: async (): Promise<boolean> => {
+        try {
+            if (!biometricService.isSupported()) return false;
+            const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+            return available;
+        } catch {
+            return false;
+        }
+    },
+
+    /**
+     * Verifica se o usuário atual já tem credencial biométrica cadastrada
+     */
+    hasCredential: async (userId: string): Promise<boolean> => {
+        try {
+            const { data, error } = await supabase
+                .from('webauthn_credentials')
+                .select('id')
+                .eq('user_id', userId)
+                .limit(1);
+
+            if (error) {
+                console.error('[Biometric] Error checking credential:', error);
+                return false;
+            }
+
+            return (data && data.length > 0);
+        } catch {
+            return false;
+        }
+    },
+
+    /**
+     * Verifica se tem credencial salva localmente (para login rápido)
+     */
+    hasLocalCredential: (): boolean => {
+        try {
+            const stored = localStorage.getItem('biometric_credential');
+            return !!stored;
+        } catch {
+            return false;
+        }
+    },
+
+    /**
+     * Recupera credencial local armazenada
+     */
+    getLocalCredential: (): { credentialId: string; userId: string; userEmail: string } | null => {
+        try {
+            const stored = localStorage.getItem('biometric_credential');
+            if (!stored) return null;
+            return JSON.parse(stored);
+        } catch {
+            return null;
+        }
+    },
+
+    /**
+     * Registra credencial biométrica para um usuário
+     * Chamado após o cadastro ou no primeiro login
+     */
+    register: async (userId: string, userEmail: string, userName: string): Promise<{ success: boolean; error?: string }> => {
+        try {
+            if (!biometricService.isSupported()) {
+                return { success: false, error: 'Biometria não suportada neste dispositivo.' };
+            }
+
+            const platformAvailable = await biometricService.isPlatformAuthenticatorAvailable();
+            if (!platformAvailable) {
+                return { success: false, error: 'Autenticador biométrico não disponível. Verifique se Face ID ou impressão digital está configurado no dispositivo.' };
+            }
+
+            const challenge = generateChallenge();
+
+            // Buscar credenciais existentes para excluir (evitar duplicatas)
+            const { data: existingCreds } = await supabase
+                .from('webauthn_credentials')
+                .select('credential_id')
+                .eq('user_id', userId);
+
+            const excludeCredentials = (existingCreds || []).map(c => ({
+                id: base64urlToBuffer(c.credential_id),
+                type: 'public-key' as const,
+                transports: ['internal' as AuthenticatorTransport],
+            }));
+
+            const createOptions: PublicKeyCredentialCreationOptions = {
+                challenge: challenge.buffer,
+                rp: {
+                    name: 'Tubarão Empréstimos',
+                    id: window.location.hostname,
+                },
+                user: {
+                    id: new TextEncoder().encode(userId),
+                    name: userEmail,
+                    displayName: userName,
+                },
+                pubKeyCredParams: [
+                    { alg: -7, type: 'public-key' },   // ES256
+                    { alg: -257, type: 'public-key' },  // RS256
+                ],
+                authenticatorSelection: {
+                    authenticatorAttachment: 'platform', // Apenas biometria do dispositivo
+                    userVerification: 'required',
+                    residentKey: 'preferred',
+                },
+                timeout: 60000,
+                excludeCredentials,
+                attestation: 'none',
+            };
+
+            const credential = await navigator.credentials.create({
+                publicKey: createOptions,
+            }) as PublicKeyCredential;
+
+            if (!credential) {
+                return { success: false, error: 'Registro biométrico cancelado.' };
+            }
+
+            const response = credential.response as AuthenticatorAttestationResponse;
+
+            const credentialId = bufferToBase64url(credential.rawId);
+            const publicKeyData = bufferToBase64url(response.getPublicKey?.() || new ArrayBuffer(0));
+            const attestationObject = bufferToBase64url(response.attestationObject);
+
+            // Detectar nome do dispositivo
+            const deviceName = detectDeviceName();
+
+            // Salvar no Supabase
+            const { error: dbError } = await supabase
+                .from('webauthn_credentials')
+                .insert({
+                    user_id: userId,
+                    user_email: userEmail,
+                    credential_id: credentialId,
+                    public_key: publicKeyData,
+                    attestation_object: attestationObject,
+                    device_name: deviceName,
+                    sign_count: 0,
+                });
+
+            if (dbError) {
+                console.error('[Biometric] DB save error:', dbError);
+                return { success: false, error: 'Erro ao salvar credencial. Tente novamente.' };
+            }
+
+            // Salvar referência local
+            localStorage.setItem('biometric_credential', JSON.stringify({
+                credentialId,
+                userId,
+                userEmail,
+            }));
+
+            return { success: true };
+        } catch (err: any) {
+            console.error('[Biometric] Register error:', err);
+
+            if (err.name === 'NotAllowedError') {
+                return { success: false, error: 'Permissão negada. Autorize o uso da biometria.' };
+            }
+            if (err.name === 'InvalidStateError') {
+                return { success: false, error: 'Credencial já registrada neste dispositivo.' };
+            }
+
+            return { success: false, error: 'Erro ao registrar biometria. Tente novamente.' };
+        }
+    },
+
+    /**
+     * Autentica com biometria
+     * Retorna o userId e email se autenticado com sucesso
+     */
+    authenticate: async (): Promise<{ success: boolean; userId?: string; userEmail?: string; error?: string }> => {
+        try {
+            if (!biometricService.isSupported()) {
+                return { success: false, error: 'Biometria não suportada neste dispositivo.' };
+            }
+
+            const localCred = biometricService.getLocalCredential();
+
+            const challenge = generateChallenge();
+
+            const requestOptions: PublicKeyCredentialRequestOptions = {
+                challenge: challenge.buffer,
+                rpId: window.location.hostname,
+                timeout: 60000,
+                userVerification: 'required',
+                // Se temos credencial local, especificar para acesso direto
+                ...(localCred ? {
+                    allowCredentials: [{
+                        id: base64urlToBuffer(localCred.credentialId),
+                        type: 'public-key' as const,
+                        transports: ['internal' as AuthenticatorTransport],
+                    }],
+                } : {}),
+            };
+
+            const credential = await navigator.credentials.get({
+                publicKey: requestOptions,
+            }) as PublicKeyCredential;
+
+            if (!credential) {
+                return { success: false, error: 'Autenticação cancelada.' };
+            }
+
+            const credentialId = bufferToBase64url(credential.rawId);
+
+            // Buscar credencial no banco
+            const { data: credData, error: dbError } = await supabase
+                .from('webauthn_credentials')
+                .select('user_id, user_email, sign_count')
+                .eq('credential_id', credentialId)
+                .single();
+
+            if (dbError || !credData) {
+                console.error('[Biometric] Credential not found:', dbError);
+                return { success: false, error: 'Credencial biométrica não encontrada. Cadastre novamente.' };
+            }
+
+            // Atualizar sign count
+            await supabase
+                .from('webauthn_credentials')
+                .update({
+                    sign_count: (credData.sign_count || 0) + 1,
+                    last_used_at: new Date().toISOString(),
+                })
+                .eq('credential_id', credentialId);
+
+            // Atualizar referência local
+            localStorage.setItem('biometric_credential', JSON.stringify({
+                credentialId,
+                userId: credData.user_id,
+                userEmail: credData.user_email,
+            }));
+
+            return {
+                success: true,
+                userId: credData.user_id,
+                userEmail: credData.user_email,
+            };
+        } catch (err: any) {
+            console.error('[Biometric] Auth error:', err);
+
+            if (err.name === 'NotAllowedError') {
+                return { success: false, error: 'Autenticação biométrica negada ou cancelada.' };
+            }
+
+            return { success: false, error: 'Erro na autenticação biométrica. Tente novamente.' };
+        }
+    },
+
+    /**
+     * Remove credencial biométrica do usuário
+     */
+    removeCredential: async (userId: string): Promise<boolean> => {
+        try {
+            const { error } = await supabase
+                .from('webauthn_credentials')
+                .delete()
+                .eq('user_id', userId);
+
+            if (error) {
+                console.error('[Biometric] Remove error:', error);
+                return false;
+            }
+
+            localStorage.removeItem('biometric_credential');
+            return true;
+        } catch {
+            return false;
+        }
+    },
+};
+
+/**
+ * Detecta o nome do dispositivo para salvar junto com a credencial
+ */
+function detectDeviceName(): string {
+    const ua = navigator.userAgent;
+
+    if (/iPhone/i.test(ua)) return 'iPhone';
+    if (/iPad/i.test(ua)) return 'iPad';
+    if (/Samsung/i.test(ua)) return 'Samsung';
+    if (/Xiaomi|Redmi|POCO/i.test(ua)) return 'Xiaomi';
+    if (/Motorola/i.test(ua)) return 'Motorola';
+    if (/Pixel/i.test(ua)) return 'Google Pixel';
+    if (/Huawei/i.test(ua)) return 'Huawei';
+    if (/Android/i.test(ua)) return 'Android';
+    if (/Macintosh/i.test(ua)) return 'Mac';
+    if (/Windows/i.test(ua)) return 'Windows PC';
+    if (/Linux/i.test(ua)) return 'Linux';
+
+    return 'Dispositivo desconhecido';
+}
+
+export default biometricService;
