@@ -46,7 +46,7 @@ export interface LoanRequest {
   date: string;
 
   // Tipo de Perfil/Serviço - Multi Sistema
-  profileType?: 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA' | 'LIMPA_NOME' | 'GARANTIA_VEICULO';
+  profileType?: 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA' | 'LIMPA_NOME' | 'GARANTIA_VEICULO' | 'INVESTIDOR';
 
   // Campos GARANTIA
   guaranteeType?: 'veiculo' | 'eletronico';
@@ -636,3 +636,80 @@ export interface ReferralUsage {
   validatedAt?: string;
   fraudReason?: string;
 }
+
+// ==================== INVESTOR TYPES ====================
+
+export type InvestorStatus = 'PENDING' | 'APPROVED' | 'ACTIVE' | 'COMPLETED' | 'REJECTED' | 'CANCELLED';
+export type InvestorPayoutMode = 'MONTHLY' | 'ANNUAL';
+export type InvestorTier = 'STANDARD' | 'PREMIUM';
+
+export interface InvestorRequest {
+  id: string;
+  customerId?: string;
+
+  // Dados pessoais
+  fullName: string;
+  cpfCnpj: string;
+  rgCnh?: string;
+  birthDate?: string;
+  email: string;
+  phone: string;
+
+  // Endereço
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+
+  // Dados bancários
+  bankName?: string;
+  pixKey?: string;
+  pixKeyType?: string;
+  accountHolderName?: string;
+
+  // Investimento
+  investmentAmount: number;
+  investmentTier: InvestorTier;
+  payoutMode: InvestorPayoutMode;
+  monthlyRate: number;
+  contractMonths: number;
+  autoRenew: boolean;
+  withdrawalNoticeMonths: number;
+
+  // Aceite
+  termsAccepted: boolean;
+  termsAcceptedAt?: string;
+  signatureUrl?: string;
+
+  // Status
+  status: InvestorStatus;
+  adminNotes?: string;
+  approvedAt?: string;
+
+  // Documentos
+  idCardUrl?: string;
+  idCardBackUrl?: string;
+  proofOfAddressUrl?: string;
+  selfieUrl?: string;
+
+  // Metadata
+  profileType: 'INVESTIDOR';
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Taxas de remuneração do investidor
+export const INVESTOR_RATES = {
+  STANDARD: {
+    min: 10000,
+    max: 49999.99,
+    MONTHLY: 2.5,   // 2,5% ao mês
+    ANNUAL: 3.5,     // 3,5% ao mês (acumulado anual)
+  },
+  PREMIUM: {
+    min: 50000,
+    max: Infinity,
+    MONTHLY: 5.0,   // 5% ao mês
+    ANNUAL: 6.0,     // 6% ao mês (acumulado anual)
+  },
+} as const;

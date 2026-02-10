@@ -1,5 +1,3 @@
-// Termos e condições de cada serviço
-
 export const SERVICE_TERMS = {
     CLT: {
         title: 'Termos do Empréstimo para CLT',
@@ -125,27 +123,72 @@ export const SERVICE_TERMS = {
         ],
         checkboxText: `Declaro que li e compreendi que o serviço não paga dívidas, que a dívida continua existindo, que o processo pode durar até 12 meses, podendo manter a negativação sem exposição pública enquanto não houver atraso, e que qualquer inadimplência pode fazer a restrição retornar imediatamente.`,
         contractTitle: 'TERMO DE AUTORIZAÇÃO E REPRESENTAÇÃO',
-        contractText: `O(a) associado(a), por meio deste instrumento, autoriza a entidade representativa a atuar em seu nome, com poderes amplos e irrestritos, em qualquer juízo, instância ou tribunal, em todo o território nacional, inclusive junto aos seguintes órgãos e instituições: SPC Brasil, Serasa, Boa Vista, IEPTB São Paulo, IEPTB Nacional (Cenprot), cartórios de protesto e demais bureaus de crédito.
+        contractText: `O(a) associado(a), por meio deste instrumento, autoriza a entidade representativa a atuar em seu nome, com poderes amplos e irrestritos, em qualquer juízo, instância ou tribunal, em todo o território nacional, inclusive junto aos seguintes órgãos e instituições: SPC Brasil, Serasa, Boa Vista, IEPTB São Paulo, IEPTB Nacional (Cenprot), cartórios de protesto e demais bureaus de crédito.\n\nA entidade poderá propor as medidas judiciais ou extrajudiciais cabíveis, ingressar com ações contra terceiros, bem como defender o(a) associado(a) em ações contrárias, acompanhando todos os trâmites até decisão final, com uso de todos os recursos legais disponíveis.\n\nConfere-se à entidade, ainda, poderes especiais para:\n• Reconhecer a procedência de pedidos;\n• Desistir de ações;\n• Renunciar a direitos;\n• Firmar acordos judiciais ou extrajudiciais (transigir), exclusivamente para fins de defesa dos direitos do consumidor.\n\nAlém disso, o(a) associado(a) autoriza expressamente a entidade a atuar como substituta processual, nos termos do artigo 5º, inciso XXI, da Constituição Federal.\n\nNos termos da Lei Geral de Proteção de Dados Pessoais (Lei nº 13.709/2018), que protege os direitos fundamentais de liberdade, privacidade e o livre desenvolvimento da personalidade, o(a) associado(a) declara:\n\n1. Autorizar, por prazo indeterminado e de forma irrevogável, o compartilhamento de seus dados pessoais entre a entidade, seus representantes e parceiros, bem como com terceiros diretamente envolvidos nas ações judiciais ou extrajudiciais, sempre em conformidade com os objetivos de defesa dos direitos do consumidor;\n\n2. Reconhecer que esta autorização está em conformidade com os artigos 43 e 83 do Código de Defesa do Consumidor (CDC).`,
+    },
 
-A entidade poderá propor as medidas judiciais ou extrajudiciais cabíveis, ingressar com ações contra terceiros, bem como defender o(a) associado(a) em ações contrárias, acompanhando todos os trâmites até decisão final, com uso de todos os recursos legais disponíveis.
-
-Confere-se à entidade, ainda, poderes especiais para:
-• Reconhecer a procedência de pedidos;
-• Desistir de ações;
-• Renunciar a direitos;
-• Firmar acordos judiciais ou extrajudiciais (transigir), exclusivamente para fins de defesa dos direitos do consumidor.
-
-Além disso, o(a) associado(a) autoriza expressamente a entidade a atuar como substituta processual, nos termos do artigo 5º, inciso XXI, da Constituição Federal.
-
-Nos termos da Lei Geral de Proteção de Dados Pessoais (Lei nº 13.709/2018), que protege os direitos fundamentais de liberdade, privacidade e o livre desenvolvimento da personalidade, o(a) associado(a) declara:
-
-1. Autorizar, por prazo indeterminado e de forma irrevogável, o compartilhamento de seus dados pessoais entre a entidade, seus representantes e parceiros, bem como com terceiros diretamente envolvidos nas ações judiciais ou extrajudiciais, sempre em conformidade com os objetivos de defesa dos direitos do consumidor;
-
-2. Reconhecer que esta autorização está em conformidade com os artigos 43 e 83 do Código de Defesa do Consumidor (CDC).`,
+    INVESTIDOR: {
+        title: 'Contrato de Alocação de Capital - Aceite Eletrônico',
+        color: 'cyan',
+        contractIntro: 'Ao prosseguir, o INVESTIDOR declara que leu, compreendeu e concorda integralmente com os termos do Contrato de Alocação de Capital firmado com a TUBARÃO EMPRÉSTIMO LTDA (CNPJ 61.086.937/0001-16).',
+        registrationFields: [
+            'Nome completo / Razão social',
+            'CPF ou CNPJ',
+            'RG ou CNH',
+            'Data de nascimento',
+            'Endereço completo',
+            'Telefone',
+            'E-mail',
+            'Banco / Chave Pix',
+        ],
+        conditions: [
+            'Valor mínimo para investir: R$ 10.000,00',
+            'Prazo do contrato: 12 (doze) meses',
+            'Não é permitido resgate antecipado do capital',
+            'R$ 10.000 a R$ 49.999: 2,5% ao mês (mensal) e 3,5% ao mês (anual acumulado)',
+            'A partir de R$ 50.000: 5% ao mês (mensal) e 6% ao mês (anual acumulado)',
+            'A modalidade escolhida ficará registrada no sistema e no contrato',
+            'Resgate ao final exige aviso prévio de 3 meses',
+            'Sem aviso prévio: renovação automática por mais 12 meses',
+            'Existe garantia contratual de pagamento pela empresa',
+        ],
+        checkboxText: `Declaro que li, compreendi e concordo com todas as condições do Contrato de Alocação de Capital, que o valor mínimo para investir é de R$ 10.000,00, que o contrato tem prazo de 12 meses, que não há resgate antecipado do capital, que a remuneração é fixa conforme a faixa escolhida, que existe garantia contratual de pagamento pela empresa e que a ausência de aviso prévio de 3 meses implica renovação automática.`,
+        finalCheckboxText: `Declaro que li e compreendi como funciona a Área do Investidor, que o investimento mínimo é de R$ 10.000,00, que o contrato tem prazo de 12 meses, que não há resgate antecipado do capital, que a remuneração é fixa conforme a faixa escolhida, que existe garantia contratual de pagamento pela empresa e que o resgate do capital exige aviso prévio de 3 meses, sob pena de renovação automática.`,
+        infoPage: {
+            title: 'Entenda como funciona antes de investir',
+            sections: [
+                {
+                    title: 'Quem Somos e Como Operamos',
+                    content: 'Atuamos no mercado desde 2021 com operações ativas e contínuas: empréstimos para CLT, empréstimos com garantia, empréstimos para comerciantes (capital de giro), financiamento próprio de motocicletas, serviços administrativos (Limpa Nome), cursos, produtos digitais, mensalidades do aplicativo e ativos operacionais próprios, como motocicletas em circulação. Essa atuação diversificada gera múltiplas fontes de receita mensal.',
+                },
+                {
+                    title: 'Como Funciona o Investimento',
+                    content: '1) O investidor realiza um aporte mínimo para participar.\n2) O capital é alocado nas operações da empresa.\n3) A empresa utiliza esse capital para gerar resultado nas suas atividades.\n4) O investidor recebe uma remuneração contratual conforme a modalidade escolhida.\n\nO investidor não empresta dinheiro diretamente a clientes finais e não precisa acompanhar cobranças ou inadimplência.',
+                },
+                {
+                    title: 'Prazo e Disponibilidade do Capital',
+                    content: 'O contrato tem duração de 12 meses. Não é permitido resgate antecipado do capital. Durante o contrato, o investidor pode receber a remuneração mensalmente ou optar por receber a remuneração acumulada ao final do período.',
+                },
+                {
+                    title: 'Garantia Contratual',
+                    content: 'A empresa assume, por contrato, a obrigação de pagar a remuneração acordada e devolver o capital investido ao final do prazo, conforme as regras estabelecidas.',
+                },
+                {
+                    title: 'Valor Mínimo',
+                    content: 'Para se tornar investidor, é necessário capital mínimo de R$ 10.000,00. Valores inferiores não são aceitos.',
+                },
+                {
+                    title: 'Remuneração',
+                    content: 'Investimentos de R$ 10.000 a R$ 49.999: 2,5% ao mês (recebimento mensal) ou 3,5% ao mês (recebimento anual, pago ao final de 12 meses).\nInvestimentos a partir de R$ 50.000: 5% ao mês (recebimento mensal) ou 6% ao mês (recebimento anual, pago ao final de 12 meses).\nOs percentuais são fixos e definidos em contrato.',
+                },
+                {
+                    title: 'Considerações Importantes',
+                    content: 'O capital ficará alocado durante o prazo contratual. Não há resgate antecipado. A relação é empresarial, formalizada por contrato. O resgate ao final exige aviso prévio de 3 meses, sob pena de renovação automática por mais 12 meses.',
+                },
+            ],
+        },
     },
 };
 
-// Tipos de garantia aceitos
 export const GUARANTEE_TYPES = {
     VEHICLE: {
         id: 'veiculo',
@@ -170,11 +213,11 @@ export const GUARANTEE_TYPES = {
     },
 };
 
-// Cores para o painel administrativo
 export const PROFILE_ADMIN_COLORS: Record<string, { bg: string; text: string; label: string }> = {
     CLT: { bg: 'bg-gray-500', text: 'text-white', label: 'CLT' },
     AUTONOMO: { bg: 'bg-green-500', text: 'text-white', label: 'Comércio' },
     MOTO: { bg: 'bg-yellow-500', text: 'text-black', label: 'Moto' },
     GARANTIA: { bg: 'bg-orange-500', text: 'text-white', label: 'Garantia' },
     LIMPA_NOME: { bg: 'bg-purple-500', text: 'text-white', label: 'Limpa Nome' },
+    INVESTIDOR: { bg: 'bg-cyan-600', text: 'text-white', label: 'Investidor' },
 };

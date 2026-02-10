@@ -317,3 +317,21 @@ Executar no Supabase SQL Editor:
 - `supabase/migrations/20260210_notifications_audience.sql`
 
 Sem essa migration, o sistema ainda funciona (fallback legado), mas a separação Admin/Cliente fica limitada ao modelo antigo por `customer_email`.
+
+## ✅ Atualização Rápida (Área do Investidor)
+
+- Fluxo INVESTIDOR no wizard consolidado com 7 etapas: Serviço, Saiba Mais, Dados, Investimento, Banco, Termos, Confirmar.
+- Contrato digital do investidor aplicado no step de termos com:
+  - título **CONTRATO DE ALOCAÇÃO DE CAPITAL - ACEITE ELETRÔNICO**,
+  - introdução jurídica da TUBARÃO EMPRÉSTIMO LTDA,
+  - lista de dados cadastrais,
+  - condições obrigatórias (mínimo R$ 10.000, prazo 12 meses, sem resgate antecipado, aviso prévio 3 meses e renovação automática).
+- Tabela de remuneração fixa aplicada:
+  - R$ 10.000 a R$ 49.999: 2,5% mensal / 3,5% anual acumulado;
+  - R$ 50.000+: 5% mensal / 6% anual acumulado.
+- Checkbox final de aceite do investidor atualizado com texto completo de validade contratual.
+- Header do wizard para investidor atualizado para **Área do Investidor**.
+- Botão final do investidor atualizado para **QUERO SER INVESTIDOR**.
+- `constants/serviceTerms.ts` reestruturado e corrigido para incluir `INVESTIDOR` dentro de `SERVICE_TERMS` (arquivo válido para build).
+- Admin: criada página `pages/admin/Investors.tsx` para gestão de solicitações de investidores (busca, filtro por status, visualização e atualização de status com observações).
+- Rotas/Menu: adicionada rota `/admin/investors` e item “Investidores” no menu lateral do admin em `App.tsx`.

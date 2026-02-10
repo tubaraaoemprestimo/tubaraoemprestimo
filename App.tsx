@@ -19,6 +19,7 @@ import { Dashboard } from './pages/admin/Dashboard';
 import { Requests } from './pages/admin/Requests';
 import { Settings } from './pages/admin/Settings';
 import { Customers } from './pages/admin/Customers';
+import { Investors } from './pages/admin/Investors';
 import { ImportContacts } from './pages/admin/ImportContacts';
 import { DataSearch } from './pages/admin/DataSearch';
 
@@ -186,6 +187,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin')}`}><LayoutDashboard size={18} /> Dashboard</Link>
         <Link to="/admin/requests" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/requests')}`}><FileText size={18} /> Solicitações</Link>
         <Link to="/admin/customers" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/customers')}`}><Users size={18} /> Clientes</Link>
+        <Link to="/admin/investors" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/investors')}`}><Landmark size={18} /> Investidores</Link>
         <Link to="/admin/import-contacts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/import-contacts')}`}><Upload size={18} /> Importar Contatos</Link>
         <Link to="/admin/data-search" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/data-search')}`}><Search size={18} /> Investigação</Link>
 
@@ -477,6 +479,7 @@ function App() {
             <Route path="/admin" element={<AdminLayout><Dashboard /></AdminLayout>} />
             <Route path="/admin/requests" element={<AdminLayout><Requests /></AdminLayout>} />
             <Route path="/admin/customers" element={<AdminLayout><Customers /></AdminLayout>} />
+            <Route path="/admin/investors" element={<AdminLayout><Investors /></AdminLayout>} />
             <Route path="/admin/import-contacts" element={<AdminLayout><ImportContacts /></AdminLayout>} />
             <Route path="/admin/data-search" element={<AdminLayout><DataSearch /></AdminLayout>} />
             <Route path="/admin/settings" element={<AdminLayout><Settings /></AdminLayout>} />
