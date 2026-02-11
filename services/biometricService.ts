@@ -118,6 +118,26 @@ export const biometricService = {
     },
 
     /**
+     * Busca IDs de credenciais cadastradas para um usuário
+     */
+    getUserCredentialIds: async (userId: string): Promise<string[]> => {
+        try {
+            const { data, error } = await supabase
+                .from('webauthn_credentials')
+                .select('credential_id')
+                .eq('user_id', userId);
+
+            if (error || !data) {
+                return [];
+            }
+
+            return data.map((item) => item.credential_id);
+        } catch {
+            return [];
+        }
+    },
+
+    /**
      * Registra credencial biométrica para um usuário
      * Chamado após o cadastro ou no primeiro login
      */
@@ -307,6 +327,62 @@ export const biometricService = {
                 return { success: false, error: 'Autenticação biométrica negada ou cancelada.' };
             }
 
+            return { success: false, error: 'Erro na autenticação biométrica. Tente novamente.' };
+        }
+    },
+
+    /**
+     * Autentica biometria para um usuário específico
+     * (evita autenticar credencial de outro usuário no mesmo dispositivo)
+     */
+    authenticateForUser: async (userId: string): Promise<{ success: boolean; credentialId?: string; error?: string }> => {
+        try {
+            if (!biometricService.isSupported()) {
+                return { success: false, error: 'Biometria não suportada neste dispositivo.' };
+            }
+
+            const credentialIds = await biometricService.getUserCredentialIds(userId);
+            if (credentialIds.length === 0) {
+                return { success: false, error: 'Nenhuma biometria cadastrada para este usuário neste dispositivo.' };
+            }
+
+            const challenge = generateChallenge();
+
+            const requestOptions: PublicKeyCredentialRequestOptions = {
+                challenge: challenge.buffer,
+                rpId: window.location.hostname,
+                timeout: 60000,
+                userVerification: 'required',
+                allowCredentials: credentialIds.map((credentialId) => ({
+                    id: base64urlToBuffer(credentialId),
+                    type: 'public-key' as const,
+                    transports: ['internal' as AuthenticatorTransport],
+                })),
+            };
+
+            const credential = await navigator.credentials.get({
+                publicKey: requestOptions,
+            }) as PublicKeyCredential;
+
+            if (!credential) {
+                return { success: false, error: 'Autenticação cancelada.' };
+            }
+
+            const usedCredentialId = bufferToBase64url(credential.rawId);
+
+            await supabase
+                .from('webauthn_credentials')
+                .update({
+                    last_used_at: new Date().toISOString(),
+                })
+                .eq('credential_id', usedCredentialId)
+                .eq('user_id', userId);
+
+            return { success: true, credentialId: usedCredentialId };
+        } catch (err: any) {
+            if (err.name === 'NotAllowedError') {
+                return { success: false, error: 'Autenticação biométrica negada ou cancelada.' };
+            }
             return { success: false, error: 'Erro na autenticação biométrica. Tente novamente.' };
         }
     },

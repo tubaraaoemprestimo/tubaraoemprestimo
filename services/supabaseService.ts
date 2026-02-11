@@ -74,6 +74,18 @@ const saveToStorage = (key: string, data: any) => {
     }
 };
 
+const normalizeEmail = (email?: string | null): string => (email || '').trim().toLowerCase();
+
+const generatePlaceholderCpf = (seed: string): string => {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+        hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash).toString().padStart(11, '0').slice(0, 11);
+};
+
+
 // Default settings
 const DEFAULT_BRAND_SETTINGS: BrandSettings = {
     systemName: "TUBARÃO EMPRÉSTIMO",
@@ -137,7 +149,7 @@ export const supabaseService = {
                 }
 
                 // Get user profile from database
-                const { data: userData, error: userError } = await supabase
+                let { data: userData, error: userError } = await supabase
                     .from('users')
                     .select('*')
                     .eq('auth_id', authData.user.id)
@@ -148,13 +160,75 @@ export const supabaseService = {
                 console.log('[Auth] User data from DB:', userData);
                 console.log('[Auth] User error:', userError);
 
+                // Auto-recuperação: cria vínculo em users se necessário
+                if (userError || !userData) {
+                    const metadata = authData.user.user_metadata || {};
+                    const fallbackName = metadata.name || authData.user.email?.split('@')[0] || 'Usuário';
+                    const fallbackRole = (metadata.role || 'CLIENT').toString().toUpperCase();
+                    const fallbackPhone = metadata.phone || '';
+                    const fallbackEmail = normalizeEmail(authData.user.email);
+
+                    const { error: insertUserError } = await supabase.from('users').insert({
+                        auth_id: authData.user.id,
+                        name: fallbackName,
+                        email: fallbackEmail,
+                        role: fallbackRole,
+                        phone: fallbackPhone,
+                    });
+
+                    if (!insertUserError) {
+                        const reloaded = await supabase
+                            .from('users')
+                            .select('*')
+                            .eq('auth_id', authData.user.id)
+                            .single();
+                        userData = reloaded.data;
+                        userError = reloaded.error;
+                    }
+                }
+
+                // Conta sem vínculo na tabela users não pode acessar
+                if (userError || !userData) {
+                    await supabase.auth.signOut();
+                    return {
+                        user: null,
+                        error: {
+                            message: 'Acesso não autorizado. Conta sem cadastro ativo em Acessos. Contate o administrador.',
+                            code: 'ACCESS_NOT_MANAGED'
+                        }
+                    };
+                }
+
                 // Normalizar role para uppercase
-                const userRole = (userData?.role || 'CLIENT').toString().toUpperCase();
+                const userRole = (userData.role || 'CLIENT').toString().toUpperCase();
                 console.log('[Auth] Final role:', userRole);
 
-                const userId = userData?.id || authData.user.id;
-                const userName = userData?.name || authData.user.email?.split('@')[0] || 'Usuário';
+                const userId = userData.id;
+                const userName = userData.name || authData.user.email?.split('@')[0] || 'Usuário';
                 const userEmail = authData.user.email || '';
+
+                if (userRole === 'CLIENT') {
+                    const normalizedEmail = normalizeEmail(userEmail);
+                    const { data: existingCustomer } = await supabase
+                        .from('customers')
+                        .select('id')
+                        .eq('email', normalizedEmail)
+                        .maybeSingle();
+
+                    if (!existingCustomer?.id) {
+                        await supabase.from('customers').upsert({
+                            user_id: userId,
+                            name: userName,
+                            cpf: generatePlaceholderCpf(`${userId}:${normalizedEmail}`),
+                            email: normalizedEmail,
+                            phone: userData.phone || '',
+                            status: 'ACTIVE',
+                            internal_score: 500,
+                            total_debt: 0,
+                            active_loans_count: 0,
+                        }, { onConflict: 'email' });
+                    }
+                }
 
                 // 🔒 VERIFICAÇÃO DE SEGURANÇA DE DISPOSITIVO
                 // Só aplica para clientes (não admins)
@@ -210,8 +284,9 @@ export const supabaseService = {
 
         signUp: async (email: string, password: string, name: string, role: UserRole = UserRole.CLIENT, phone?: string) => {
             try {
+                const normalizedEmail = normalizeEmail(email);
                 const { data: authData, error: authError } = await supabase.auth.signUp({
-                    email,
+                    email: normalizedEmail,
                     password,
                     options: {
                         data: { name, role, phone },
@@ -223,13 +298,27 @@ export const supabaseService = {
 
                 // Create user profile
                 if (authData.user) {
-                    await supabase.from('users').insert({
+                    const { error: profileError } = await supabase.from('users').insert({
                         auth_id: authData.user.id,
                         name,
-                        email,
+                        email: normalizedEmail,
                         role,
                         ...(phone ? { phone } : {})
                     });
+
+                    if (!profileError && (role === UserRole.CLIENT || role === 'CLIENT')) {
+                        await supabase.from('customers').upsert({
+                            user_id: null,
+                            name,
+                            cpf: generatePlaceholderCpf(`${authData.user.id}:${normalizedEmail}`),
+                            email: normalizedEmail,
+                            phone: phone || '',
+                            status: 'ACTIVE',
+                            internal_score: 500,
+                            total_debt: 0,
+                            active_loans_count: 0,
+                        }, { onConflict: 'email' });
+                    }
                 }
 
                 return { data: authData, error: null };
@@ -248,6 +337,21 @@ export const supabaseService = {
         getSession: async () => {
             const { data } = await supabase.auth.getSession();
             return data.session;
+        },
+
+        hasManagedAccess: async (userId: string): Promise<boolean> => {
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('id', userId)
+                    .maybeSingle();
+
+                if (error) return false;
+                return !!data;
+            } catch {
+                return false;
+            }
         }
     },
 
@@ -1006,6 +1110,189 @@ export const supabaseService = {
             return false;
         } catch (err) {
             console.error('❌ Exceção em submitRequest:', err);
+            return false;
+        }
+    },
+
+    // ==================== INVESTIDOR ====================
+    // Submeter solicitação de investimento
+    submitInvestorRequest: async (data: any): Promise<boolean> => {
+        try {
+            // Buscar ou criar customer
+            let customerId: string | null = null;
+            const cleanCpf = (data.cpfCnpj || '').replace(/\D/g, '');
+
+            if (cleanCpf) {
+                const { data: existingCustomer } = await supabase
+                    .from('customers')
+                    .select('id')
+                    .eq('cpf', data.cpfCnpj)
+                    .single();
+                customerId = existingCustomer?.id || null;
+
+                if (!customerId && data.email) {
+                    const { data: customerByEmail } = await supabase
+                        .from('customers')
+                        .select('id')
+                        .eq('email', data.email)
+                        .single();
+                    customerId = customerByEmail?.id || null;
+                }
+
+                if (!customerId) {
+                    const { data: newCustomer } = await supabase
+                        .from('customers')
+                        .insert({
+                            name: data.fullName,
+                            cpf: data.cpfCnpj,
+                            email: data.email,
+                            phone: data.phone || '',
+                            status: 'ACTIVE',
+                            internal_score: 500,
+                            total_debt: 0,
+                            active_loans_count: 0
+                        })
+                        .select('id')
+                        .single();
+                    customerId = newCustomer?.id || null;
+                }
+            }
+
+            // Inserir na tabela investor_requests
+            const investorData = {
+                customer_id: customerId,
+                full_name: data.fullName,
+                cpf_cnpj: data.cpfCnpj,
+                rg_cnh: data.rgCnh || null,
+                birth_date: data.birthDate || null,
+                email: data.email,
+                phone: data.phone,
+                address: data.address || null,
+                city: data.city || null,
+                state: data.state || null,
+                zip_code: data.zipCode || null,
+                bank_name: data.bankName || null,
+                pix_key: data.pixKey || null,
+                pix_key_type: data.pixKeyType || 'cpf',
+                account_holder_name: data.accountHolderName || null,
+                investment_amount: Number(data.investmentAmount) || 10000,
+                investment_tier: data.investmentTier || 'STANDARD',
+                payout_mode: data.payoutMode || 'MONTHLY',
+                monthly_rate: Number(data.monthlyRate) || 2.5,
+                contract_months: 12,
+                auto_renew: true,
+                withdrawal_notice_months: 3,
+                terms_accepted: data.termsAccepted || false,
+                terms_accepted_at: data.termsAccepted ? new Date().toISOString() : null,
+                signature_url: data.signatureUrl || null,
+                status: 'PENDING',
+                id_card_url: data.idCardUrl || null,
+                id_card_back_url: data.idCardBackUrl || null,
+                proof_of_address_url: data.proofOfAddressUrl || null,
+                selfie_url: data.selfieUrl || null,
+                profile_type: 'INVESTIDOR',
+            };
+
+            console.log('📤 Enviando solicitação de investidor para DB:', {
+                name: data.fullName,
+                amount: investorData.investment_amount,
+                tier: investorData.investment_tier,
+                mode: investorData.payout_mode,
+                rate: investorData.monthly_rate,
+            });
+
+            const { error } = await supabase.from('investor_requests').insert(investorData);
+
+            if (error) {
+                console.error('❌ Erro ao criar investor_request:', error.message || error);
+                // Fallback: salvar como loan_request com profile_type=INVESTIDOR
+                console.log('⚠️ Tentando fallback via loan_requests...');
+                const fallbackData = {
+                    customer_id: customerId,
+                    client_name: data.fullName,
+                    cpf: data.cpfCnpj,
+                    email: data.email,
+                    phone: data.phone || '',
+                    amount: Number(data.investmentAmount) || 10000,
+                    installments: 12,
+                    status: 'PENDING',
+                    supplemental_description: JSON.stringify({
+                        type: 'INVESTIDOR',
+                        investmentTier: data.investmentTier,
+                        payoutMode: data.payoutMode,
+                        monthlyRate: data.monthlyRate,
+                        bankName: data.bankName,
+                        pixKey: data.pixKey,
+                        rgCnh: data.rgCnh,
+                        address: data.address,
+                        termsAccepted: data.termsAccepted,
+                    }),
+                    signature_url: data.signatureUrl || '',
+                };
+
+                // Tentar com profile_type
+                const extFallback = { ...fallbackData, profile_type: 'INVESTIDOR', service_type: 'INVESTIMENTO' };
+                const { error: err1 } = await supabase.from('loan_requests').insert(extFallback);
+                if (!err1) {
+                    console.log('✅ Investidor salvo via loan_requests (com profile_type)');
+                    return true;
+                }
+
+                // Tentar sem profile_type
+                const { error: err2 } = await supabase.from('loan_requests').insert(fallbackData);
+                if (!err2) {
+                    console.log('✅ Investidor salvo via loan_requests (base)');
+                    return true;
+                }
+
+                console.error('❌ Falha total ao salvar investidor:', err2?.message);
+                return false;
+            }
+
+            console.log('✅ Solicitação de investidor criada com sucesso!');
+            return true;
+        } catch (err) {
+            console.error('❌ Exceção em submitInvestorRequest:', err);
+            return false;
+        }
+    },
+
+    // Buscar solicitações de investimento (admin)
+    getInvestorRequests: async (): Promise<any[]> => {
+        try {
+            const { data, error } = await supabase
+                .from('investor_requests')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Erro ao buscar investor_requests:', error);
+                return [];
+            }
+            return data || [];
+        } catch {
+            return [];
+        }
+    },
+
+    // Atualizar status do investidor (admin)
+    updateInvestorStatus: async (id: string, status: string, notes?: string): Promise<boolean> => {
+        try {
+            const updateData: any = { status };
+            if (notes) updateData.admin_notes = notes;
+            if (status === 'APPROVED') updateData.approved_at = new Date().toISOString();
+
+            const { error } = await supabase
+                .from('investor_requests')
+                .update(updateData)
+                .eq('id', id);
+
+            if (error) {
+                console.error('Erro ao atualizar investor:', error);
+                return false;
+            }
+            return true;
+        } catch {
             return false;
         }
     },

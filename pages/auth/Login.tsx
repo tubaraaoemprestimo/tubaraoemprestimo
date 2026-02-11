@@ -162,9 +162,18 @@ export const Login: React.FC = () => {
     setError(null);
 
     try {
+      await antifraudService.logRiskEvent('BIOMETRIC_CHALLENGE', undefined, {
+        flow: 'LOGIN_BIOMETRIC_BUTTON',
+        stage: 'challenge_started',
+      });
+
       const result = await biometricService.authenticate();
 
       if (!result.success) {
+        await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
+          flow: 'LOGIN_BIOMETRIC_BUTTON',
+          reason: result.error || 'auth_failed',
+        });
         setIsScanning(false);
         setError(result.error || 'Falha na autenticação biométrica.');
         return;
@@ -174,6 +183,10 @@ export const Login: React.FC = () => {
       // Buscar senha armazenada localmente (criptografada)
       const storedAuth = localStorage.getItem(`bio_auth_${result.userId}`);
       if (!storedAuth) {
+        await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
+          flow: 'LOGIN_BIOMETRIC_BUTTON',
+          reason: 'missing_local_password_cache',
+        });
         setIsScanning(false);
         setError('Credencial expirada. Faça login com senha e recadastre a biometria.');
         return;
@@ -189,6 +202,13 @@ export const Login: React.FC = () => {
           role: loginResult.user.role,
           method: 'BIOMETRIC',
         });
+
+        await antifraudService.logRiskEvent('BIOMETRIC_SUCCESS', loginResult.user.id, {
+          flow: 'LOGIN_BIOMETRIC_BUTTON',
+          source: 'webauthn',
+        });
+
+        sessionStorage.setItem(`biometric_verified_${loginResult.user.id}`, new Date().toISOString());
 
         setIsScanning(false);
         if (loginResult.user.role === 'ADMIN') {

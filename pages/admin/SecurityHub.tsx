@@ -54,6 +54,9 @@ export const SecurityHub: React.FC = () => {
 
     // Users
     const [users, setUsers] = useState<UserAccess[]>([]);
+    const [biometricCountByUser, setBiometricCountByUser] = useState<Record<string, number>>({});
+    const [customerByEmail, setCustomerByEmail] = useState<Record<string, boolean>>({});
+    const [requestCountByEmail, setRequestCountByEmail] = useState<Record<string, number>>({});
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<Partial<UserAccess> | null>(null);
     const [newPassword, setNewPassword] = useState('');
@@ -91,6 +94,41 @@ export const SecurityHub: React.FC = () => {
             // Users
             const usersData = await supabaseService.getUsers();
             setUsers(usersData);
+
+            // Mapa de biometria por usuário (WebAuthn)
+            const { data: biometricRows } = await supabase
+                .from('webauthn_credentials')
+                .select('user_id');
+
+            const biometricMap: Record<string, number> = {};
+            (biometricRows || []).forEach((row: any) => {
+                const uid = row.user_id as string;
+                biometricMap[uid] = (biometricMap[uid] || 0) + 1;
+            });
+            setBiometricCountByUser(biometricMap);
+
+            const { data: customersData } = await supabase
+                .from('customers')
+                .select('email');
+
+            const customersMap: Record<string, boolean> = {};
+            (customersData || []).forEach((row: any) => {
+                const email = String(row.email || '').toLowerCase();
+                if (email) customersMap[email] = true;
+            });
+            setCustomerByEmail(customersMap);
+
+            const { data: requestsData } = await supabase
+                .from('loan_requests')
+                .select('email');
+
+            const requestsMap: Record<string, number> = {};
+            (requestsData || []).forEach((row: any) => {
+                const email = String(row.email || '').toLowerCase();
+                if (!email) return;
+                requestsMap[email] = (requestsMap[email] || 0) + 1;
+            });
+            setRequestCountByEmail(requestsMap);
         } catch (error) {
             console.error('Error loading data:', error);
         }
@@ -165,24 +203,84 @@ export const SecurityHub: React.FC = () => {
     };
 
     // Users handlers
-    const handleCreateUser = async () => {
-        if (!editingUser?.email || !editingUser?.name || !newPassword) {
-            addToast('Preencha todos os campos', 'warning');
+    const handleSaveUser = async () => {
+        if (!editingUser?.email || !editingUser?.name) {
+            addToast('Preencha nome e email', 'warning');
             return;
         }
+
+        if (editingUser.id) {
+            const updated = await supabaseService.updateUser(editingUser.id, {
+                name: editingUser.name,
+                role: editingUser.role as UserRole,
+            });
+
+            if (updated) {
+                addToast('Acesso atualizado com sucesso!', 'success');
+                setIsUserModalOpen(false);
+                setEditingUser(null);
+                setNewPassword('');
+                loadAllData();
+            } else {
+                addToast('Não foi possível atualizar o acesso', 'error');
+            }
+            return;
+        }
+
+        if (!newPassword) {
+            addToast('Defina uma senha para o novo acesso', 'warning');
+            return;
+        }
+
         const created = await supabaseService.createUser({
             email: editingUser.email,
             name: editingUser.name,
-            role: editingUser.role || 'OPERATOR',
+            role: editingUser.role || UserRole.CLIENT,
             password: newPassword
         });
+
         if (created) {
-            addToast('Usuário criado!', 'success');
+            addToast('Acesso criado!', 'success');
             setIsUserModalOpen(false);
             setEditingUser(null);
             setNewPassword('');
             loadAllData();
+        } else {
+            addToast('Falha ao criar acesso', 'error');
         }
+    };
+
+    const handleResetUserBiometrics = async (userId: string) => {
+        if (!confirm('Remover todas as credenciais biométricas deste usuário? Ele terá que cadastrar novamente no próximo acesso.')) return;
+
+        const { error } = await supabase
+            .from('webauthn_credentials')
+            .delete()
+            .eq('user_id', userId);
+
+        if (error) {
+            addToast('Erro ao resetar biometria do usuário', 'error');
+            return;
+        }
+
+        await supabase
+            .from('risk_logs')
+            .insert({
+                user_id: userId,
+                session_id: `admin_${Date.now()}`,
+                ip: 'admin-panel',
+                user_agent: navigator.userAgent,
+                platform: navigator.platform || 'web',
+                screen_resolution: `${window.screen.width}x${window.screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                action: 'BIOMETRIC_ADMIN_RESET',
+                risk_score: 0,
+                risk_factors: ['RESET_BY_ADMIN'],
+                additional_data: { source: 'SECURITY_HUB' },
+            });
+
+        addToast('Biometria resetada. Novo cadastro será exigido no próximo login.', 'success');
+        loadAllData();
     };
 
     const handleDeleteUser = async (id: string) => {
@@ -423,6 +521,43 @@ export const SecurityHub: React.FC = () => {
                                         </button>
                                     </div>
                                 </div>
+
+                                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                                    <div className="bg-black/60 border border-zinc-800 rounded-lg p-2">
+                                        <p className="text-[10px] text-zinc-500">Cliente</p>
+                                        <p className={`text-xs font-bold ${customerByEmail[(user.email || '').toLowerCase()] ? 'text-green-400' : 'text-zinc-500'}`}>
+                                            {customerByEmail[(user.email || '').toLowerCase()] ? 'Vinculado' : 'Sem cadastro'}
+                                        </p>
+                                    </div>
+                                    <div className="bg-black/60 border border-zinc-800 rounded-lg p-2">
+                                        <p className="text-[10px] text-zinc-500">Solicitacoes</p>
+                                        <p className="text-xs font-bold text-[#D4AF37]">
+                                            {requestCountByEmail[(user.email || '').toLowerCase()] || 0}
+                                        </p>
+                                    </div>
+                                    <div className="bg-black/60 border border-zinc-800 rounded-lg p-2">
+                                        <p className="text-[10px] text-zinc-500">Biometria</p>
+                                        <p className={`text-xs font-bold ${(biometricCountByUser[user.id] || 0) > 0 ? 'text-green-400' : 'text-zinc-500'}`}>
+                                            {(biometricCountByUser[user.id] || 0) > 0 ? `${biometricCountByUser[user.id]} ativa` : 'Sem cadastro'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-3 flex gap-2">
+                                    <button
+                                        onClick={() => handleResetUserBiometrics(user.id)}
+                                        className="flex-1 py-2 text-xs rounded-lg border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                                    >
+                                        Reset biometria
+                                    </button>
+                                    <button
+                                        onClick={() => { window.location.hash = '#/admin/requests'; }}
+                                        className="flex-1 py-2 text-xs rounded-lg border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                                    >
+                                        Ver solicitacoes
+                                    </button>
+                                </div>
+
                                 {user.phone && (
                                     <p className="text-xs text-zinc-500 mt-3 flex items-center gap-1">
                                         <Phone size={12} /> {user.phone}
@@ -761,7 +896,7 @@ export const SecurityHub: React.FC = () => {
                                     />
                                 </div>
                             )}
-                            <Button onClick={handleCreateUser} className="w-full">
+                            <Button onClick={handleSaveUser} className="w-full">
                                 <Save size={18} /> Salvar
                             </Button>
                         </div>

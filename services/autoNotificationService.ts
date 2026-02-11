@@ -28,6 +28,36 @@ async function getCustomerData(email: string): Promise<{ phone: string | null; n
     return { phone: data?.phone || null, name: data?.name || 'Cliente' };
 }
 
+const shouldFallbackLegacy = (error: any): boolean => {
+    const msg = String(error?.message || '').toLowerCase();
+    return msg.includes('for_role') || (msg.includes('column') && msg.includes('does not exist'));
+};
+
+async function insertScopedNotification(payload: {
+    customer_email: string | null;
+    title: string;
+    message: string;
+    type: 'INFO' | 'WARNING' | 'ALERT' | 'SUCCESS';
+    link: string | null;
+    for_role: 'CLIENT' | 'ADMIN' | 'ALL';
+}): Promise<boolean> {
+    let { error } = await supabase.from('notifications').insert(payload);
+
+    if (error && shouldFallbackLegacy(error)) {
+        const legacyPayload: any = { ...payload };
+        delete legacyPayload.for_role;
+        const fallback = await supabase.from('notifications').insert(legacyPayload);
+        error = fallback.error;
+    }
+
+    if (error) {
+        console.error('Error creating notification:', error);
+        return false;
+    }
+
+    return true;
+}
+
 export const autoNotificationService = {
     // ============================================
     // CRIAR NOTIFICAÇÃO
@@ -41,23 +71,42 @@ export const autoNotificationService = {
         link?: string
     ): Promise<boolean> => {
         try {
-            const { error } = await supabase.from('notifications').insert({
+            if (!customerEmail) {
+                console.warn('[Notification] createNotification called without customerEmail:', title);
+                return false;
+            }
+
+            return await insertScopedNotification({
                 customer_email: customerEmail,
                 title,
                 message,
                 type,
                 link: link || null,
-                read: false
+                for_role: 'CLIENT'
             });
-
-            if (error) {
-                console.error('Error creating notification:', error);
-                return false;
-            }
-
-            return true;
         } catch (err) {
             console.error('Notification error:', err);
+            return false;
+        }
+    },
+
+    createAdminNotification: async (
+        title: string,
+        message: string,
+        type: 'INFO' | 'WARNING' | 'ALERT' | 'SUCCESS' = 'INFO',
+        link?: string
+    ): Promise<boolean> => {
+        try {
+            return await insertScopedNotification({
+                customer_email: null,
+                title,
+                message,
+                type,
+                link: link || '/admin/security-hub',
+                for_role: 'ADMIN'
+            });
+        } catch (err) {
+            console.error('Admin notification error:', err);
             return false;
         }
     },
@@ -95,6 +144,14 @@ export const autoNotificationService = {
                 `_Tubarão Empréstimos 🦈_`
             ).catch(console.error);
         }
+
+        // Notificação operacional para admin (novo acesso/cadastro)
+        await autoNotificationService.createAdminNotification(
+            '👤 Novo acesso cadastrado',
+            `${customerName} concluiu cadastro e agora pode solicitar serviços.`,
+            'INFO',
+            '/admin/security-hub?tab=users'
+        );
 
         // Push para o cliente
         firebasePushService.sendPush({
@@ -155,6 +212,15 @@ export const autoNotificationService = {
                 : `Recebemos sua solicitação de R$ ${formattedAmount}`,
             link: '/client/contracts'
         }).catch(() => { });
+
+        await autoNotificationService.createAdminNotification(
+            isLimpaNome ? '📝 Nova solicitação Limpa Nome' : '📝 Nova solicitação de empréstimo',
+            isLimpaNome
+                ? `${clientName || customer.name} enviou solicitação do serviço Limpa Nome.`
+                : `${clientName || customer.name} solicitou R$ ${formattedAmount}.`,
+            'INFO',
+            '/admin/requests'
+        );
 
         // Push para admin
         firebasePushService.sendPush({
@@ -288,6 +354,13 @@ export const autoNotificationService = {
             '/client/contracts'
         );
 
+        await autoNotificationService.createAdminNotification(
+            '📅 Parcela vencendo (cliente)',
+            `${customer.name} possui parcela de R$ ${formattedAmount} vencendo em ${date}.`,
+            'WARNING',
+            '/admin/finance-hub'
+        );
+
         // 📱 Enviar WhatsApp
         if (customer.phone) {
             whatsappService.sendMessage(
@@ -342,6 +415,13 @@ export const autoNotificationService = {
             '/client/contracts'
         );
 
+        await autoNotificationService.createAdminNotification(
+            '🚨 Parcela em atraso',
+            `${customer.name} está com parcela de R$ ${formattedAmount} em atraso há ${daysLate} dia(s).`,
+            'ALERT',
+            '/admin/finance-hub'
+        );
+
         // 📱 Enviar WhatsApp
         if (customer.phone) {
             whatsappService.sendMessage(
@@ -381,6 +461,13 @@ export const autoNotificationService = {
             message,
             'SUCCESS',
             '/client/contracts'
+        );
+
+        await autoNotificationService.createAdminNotification(
+            '✅ Pagamento confirmado',
+            `${customer.name} teve pagamento de R$ ${formattedAmount} confirmado.`,
+            'SUCCESS',
+            '/admin/finance-hub?tab=receipts'
         );
 
         // 📱 Enviar WhatsApp

@@ -12,6 +12,7 @@ export interface Notification {
     read: boolean;
     actionUrl?: string;
     customerEmail?: string;
+    forRole?: 'CLIENT' | 'ADMIN' | 'ALL';
 }
 
 // Get current user from localStorage
@@ -22,6 +23,32 @@ const getCurrentUser = (): { email: string; role: string } | null => {
     } catch {
         return null;
     }
+};
+
+const applyAudienceFilter = (query: any, user: { email: string; role: string }) => {
+    const role = (user.role || '').toUpperCase();
+
+    if (role === 'ADMIN') {
+        // Novo modelo com for_role
+        return query.or('for_role.eq.ADMIN,for_role.eq.ALL');
+    }
+
+    return query.or(`customer_email.eq.${user.email},for_role.eq.ALL`);
+};
+
+const applyLegacyAudienceFilter = (query: any, user: { email: string; role: string }) => {
+    const role = (user.role || '').toUpperCase();
+
+    if (role === 'ADMIN') {
+        return query.is('customer_email', null);
+    }
+
+    return query.eq('customer_email', user.email);
+};
+
+const needsLegacyFallback = (error: any): boolean => {
+    const msg = String(error?.message || '').toLowerCase();
+    return msg.includes('for_role') || (msg.includes('column') && msg.includes('does not exist'));
 };
 
 // Som de notificação
@@ -71,12 +98,23 @@ export const notificationService = {
                 .order('created_at', { ascending: false })
                 .limit(50);
 
-            // Filtrar por email do usuário ou notificações gerais
-            if (user.role !== 'ADMIN') {
-                query = query.or(`customer_email.eq.${user.email},customer_email.is.null`);
-            }
+            // Filtrar por público correto (admin x cliente)
+            query = applyAudienceFilter(query, user);
 
-            const { data, error } = await query;
+            let { data, error } = await query;
+
+            if (error && needsLegacyFallback(error)) {
+                let fallbackQuery = supabase
+                    .from('notifications')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(50);
+
+                fallbackQuery = applyLegacyAudienceFilter(fallbackQuery, user);
+                const fallback = await fallbackQuery;
+                data = fallback.data;
+                error = fallback.error;
+            }
 
             if (error || !data) {
                 console.error('Error fetching notifications:', error);
@@ -91,7 +129,8 @@ export const notificationService = {
                 timestamp: n.created_at,
                 read: n.read || false,
                 actionUrl: n.link,
-                customerEmail: n.customer_email
+                customerEmail: n.customer_email,
+                forRole: (n.for_role || (n.customer_email ? 'CLIENT' : 'ADMIN'))
             }));
         } catch {
             return [];
@@ -109,11 +148,21 @@ export const notificationService = {
                 .select('id', { count: 'exact', head: true })
                 .eq('read', false);
 
-            if (user.role !== 'ADMIN') {
-                query = query.or(`customer_email.eq.${user.email},customer_email.is.null`);
+            query = applyAudienceFilter(query, user);
+
+            let { count, error } = await query;
+
+            if (error && needsLegacyFallback(error)) {
+                let fallbackQuery = supabase
+                    .from('notifications')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('read', false);
+
+                fallbackQuery = applyLegacyAudienceFilter(fallbackQuery, user);
+                const fallback = await fallbackQuery;
+                count = fallback.count;
             }
 
-            const { count } = await query;
             return count || 0;
         } catch {
             return 0;
@@ -134,24 +183,31 @@ export const notificationService = {
         if (!user) return;
 
         try {
-            if (user.role === 'ADMIN') {
-                // Admin marca TODAS as notificações como lidas
-                const { error } = await supabase
-                    .from('notifications')
-                    .update({ read: true })
-                    .eq('read', false); // Atualiza apenas as não lidas
+            let scopedQuery = applyAudienceFilter(
+                supabase.from('notifications').select('id').eq('read', false),
+                user
+            );
 
-                if (error) console.error('Erro ao marcar todas como lidas:', error);
-            } else {
-                // Cliente marca apenas suas notificações
-                const { error } = await supabase
-                    .from('notifications')
-                    .update({ read: true })
-                    .or(`customer_email.eq.${user.email},customer_email.is.null`)
-                    .eq('read', false);
+            let { data: list, error } = await scopedQuery;
 
-                if (error) console.error('Erro ao marcar como lidas:', error);
+            if (error && needsLegacyFallback(error)) {
+                const fallbackQuery = applyLegacyAudienceFilter(
+                    supabase.from('notifications').select('id').eq('read', false),
+                    user
+                );
+                const fallback = await fallbackQuery;
+                list = fallback.data;
             }
+
+            const ids = (list || []).map((n: any) => n.id);
+            if (ids.length === 0) return;
+
+            const { error: updateError } = await supabase
+                .from('notifications')
+                .update({ read: true })
+                .in('id', ids);
+
+            if (updateError) console.error('Erro ao marcar notificações como lidas:', updateError);
         } catch (e) {
             console.error('Exceção ao marcar notificações:', e);
         }
@@ -168,32 +224,31 @@ export const notificationService = {
         if (!user) return;
 
         try {
-            if (user.role === 'ADMIN') {
-                // Admin deleta todas as notificações
-                // Primeiro busca os IDs para deletar
-                const { data: notifications } = await supabase
-                    .from('notifications')
-                    .select('id')
-                    .limit(1000);
+            let scopedQuery = applyAudienceFilter(
+                supabase.from('notifications').select('id').limit(1000),
+                user
+            );
 
-                if (notifications && notifications.length > 0) {
-                    const ids = notifications.map(n => n.id);
-                    const { error } = await supabase
-                        .from('notifications')
-                        .delete()
-                        .in('id', ids);
+            let { data: list, error } = await scopedQuery;
 
-                    if (error) console.error('Erro ao limpar notificações:', error);
-                }
-            } else {
-                // Cliente deleta apenas suas notificações
-                const { error } = await supabase
-                    .from('notifications')
-                    .delete()
-                    .eq('customer_email', user.email);
-
-                if (error) console.error('Erro ao limpar notificações:', error);
+            if (error && needsLegacyFallback(error)) {
+                const fallbackQuery = applyLegacyAudienceFilter(
+                    supabase.from('notifications').select('id').limit(1000),
+                    user
+                );
+                const fallback = await fallbackQuery;
+                list = fallback.data;
             }
+
+            const ids = (list || []).map((n: any) => n.id);
+            if (ids.length === 0) return;
+
+            const { error: deleteError } = await supabase
+                .from('notifications')
+                .delete()
+                .in('id', ids);
+
+            if (deleteError) console.error('Erro ao limpar notificações:', deleteError);
         } catch (e) {
             console.error('Exceção ao limpar notificações:', e);
         }
@@ -206,20 +261,42 @@ export const notificationService = {
         message: string;
         customerEmail?: string | null;
         link?: string;
+        forRole?: 'CLIENT' | 'ADMIN' | 'ALL';
     }): Promise<string | null> => {
         try {
-            const { data, error } = await supabase
+            const inferredRole = notification.forRole || (notification.customerEmail ? 'CLIENT' : 'ADMIN');
+
+            if (inferredRole === 'CLIENT' && !notification.customerEmail) {
+                console.warn('[Notification] skipping CLIENT notification without customerEmail', notification.title);
+                return null;
+            }
+
+            const payload: any = {
+                type: notification.type.toUpperCase(),
+                title: notification.title,
+                message: notification.message,
+                customer_email: notification.customerEmail || null,
+                link: notification.link || null,
+                read: false,
+                for_role: inferredRole
+            };
+
+            let { data, error } = await supabase
                 .from('notifications')
-                .insert({
-                    type: notification.type.toUpperCase(),
-                    title: notification.title,
-                    message: notification.message,
-                    customer_email: notification.customerEmail || null,
-                    link: notification.link || null,
-                    read: false
-                })
+                .insert(payload)
                 .select('id')
                 .single();
+
+            if (error && needsLegacyFallback(error)) {
+                delete payload.for_role;
+                const fallback = await supabase
+                    .from('notifications')
+                    .insert(payload)
+                    .select('id')
+                    .single();
+                data = fallback.data;
+                error = fallback.error;
+            }
 
             if (!error && data) {
                 playNotificationSound();
@@ -239,7 +316,8 @@ export const notificationService = {
             title: '✅ Empréstimo Aprovado!',
             message: `Parabéns! Seu empréstimo de R$ ${amount.toLocaleString()} foi aprovado.`,
             customerEmail: clientEmail,
-            link: '/client/contracts'
+            link: '/client/contracts',
+            forRole: 'CLIENT'
         });
     },
 
@@ -248,7 +326,8 @@ export const notificationService = {
             type: 'error',
             title: '❌ Solicitação Não Aprovada',
             message: 'Infelizmente sua solicitação não foi aprovada desta vez.',
-            customerEmail: clientEmail
+            customerEmail: clientEmail,
+            forRole: 'CLIENT'
         });
     },
 
@@ -260,7 +339,8 @@ export const notificationService = {
             message: isLimpaNome
                 ? `${clientName} solicitou o serviço Limpa Nome.`
                 : `${clientName} solicitou um empréstimo de R$ ${amount.toLocaleString()}.`,
-            customerEmail: null // Para admin
+            customerEmail: null, // Para admin
+            forRole: 'ADMIN'
         });
     },
 
@@ -269,7 +349,8 @@ export const notificationService = {
             type: 'success',
             title: '💰 Pagamento Confirmado',
             message: `Seu pagamento de R$ ${amount.toLocaleString()} foi confirmado.`,
-            customerEmail: clientEmail
+            customerEmail: clientEmail,
+            forRole: 'CLIENT'
         });
     },
 
@@ -279,7 +360,8 @@ export const notificationService = {
             title: '⚠️ Parcela Vencendo',
             message: `Sua fatura de R$ ${amount.toLocaleString()} vence em ${dueDate}. Evite juros.`,
             customerEmail: clientEmail,
-            link: '/client/statement'
+            link: '/client/statement',
+            forRole: 'CLIENT'
         });
     },
 
@@ -289,7 +371,8 @@ export const notificationService = {
             title: '🎁 Nova Oferta de Parcelamento',
             message: `Você tem uma oferta especial de R$ ${amount.toLocaleString()} em ${installments}x!`,
             customerEmail: clientEmail,
-            link: '/client/dashboard'
+            link: '/client/dashboard',
+            forRole: 'CLIENT'
         });
     },
 
@@ -299,7 +382,8 @@ export const notificationService = {
             title: '🎫 Novo Cupom Disponível',
             message: `Use o cupom ${code} e ganhe ${discount}% de desconto!`,
             customerEmail: clientEmail,
-            link: '/client/dashboard'
+            link: '/client/dashboard',
+            forRole: 'CLIENT'
         });
     },
 
@@ -338,10 +422,7 @@ export const notificationService = {
 
     // Alias para compatibilidade com código legado
     subscribe: (callback: (notifications: Notification[]) => void): (() => void) => {
-        // Chamar callback imediatamente com dados atuais
         notificationService.getAll().then(callback);
-
-        // Retornar função de unsubscribe (noop por enquanto, usar subscribeToChanges para real-time)
-        return () => { };
+        return notificationService.subscribeToChanges(callback);
     }
 };

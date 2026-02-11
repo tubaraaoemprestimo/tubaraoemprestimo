@@ -19,6 +19,7 @@ import { Dashboard } from './pages/admin/Dashboard';
 import { Requests } from './pages/admin/Requests';
 import { Settings } from './pages/admin/Settings';
 import { Customers } from './pages/admin/Customers';
+import { Investors } from './pages/admin/Investors';
 import { ImportContacts } from './pages/admin/ImportContacts';
 import { DataSearch } from './pages/admin/DataSearch';
 
@@ -63,6 +64,7 @@ import { BrandProvider } from './contexts/BrandContext';
 import { firebasePushService } from './services/firebasePushService';
 import { themeService } from './services/themeService';
 import { PermissionGate } from './components/PermissionGate';
+import { BiometricAccessGate } from './components/BiometricAccessGate';
 
 // --- Expandable Menu Item ---
 interface ExpandableMenuProps {
@@ -135,9 +137,40 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return isPathMatch && isSearchMatch ? 'text-[#D4AF37] bg-zinc-800' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
   };
   const user = supabaseService.auth.getUser();
+  const [accessChecked, setAccessChecked] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const validateManagedAccess = async () => {
+      if (!user) {
+        if (active) setAccessChecked(true);
+        return;
+      }
+
+      const hasAccess = await supabaseService.auth.hasManagedAccess(user.id);
+      if (!hasAccess) {
+        await supabaseService.auth.signOut();
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      if (active) setAccessChecked(true);
+    };
+
+    validateManagedAccess();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
   if (!user || user.role !== 'ADMIN') {
     return <Navigate to="/login" replace />;
+  }
+
+  if (!accessChecked) {
+    return <div className="min-h-screen bg-black" />;
   }
 
   const NavContent = () => (
@@ -152,8 +185,9 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {/* Principal */}
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-2 pb-1">Principal</p>
         <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin')}`}><LayoutDashboard size={18} /> Dashboard</Link>
-        <Link to="/admin/requests" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/requests')}`}><FileText size={18} /> Solicitações</Link>
         <Link to="/admin/customers" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/customers')}`}><Users size={18} /> Clientes</Link>
+        <Link to="/admin/requests" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/requests')}`}><FileText size={18} /> Solicitações</Link>
+        <Link to="/admin/investors" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/investors')}`}><Landmark size={18} /> Solicitações de Investidores</Link>
         <Link to="/admin/import-contacts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/import-contacts')}`}><Upload size={18} /> Importar Contatos</Link>
         <Link to="/admin/data-search" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/data-search')}`}><Search size={18} /> Investigação</Link>
 
@@ -283,6 +317,39 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
       ? 'text-[#D4AF37] bg-zinc-800 font-bold'
       : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
 
+  const user = supabaseService.auth.getUser();
+  const [accessChecked, setAccessChecked] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const validateManagedAccess = async () => {
+      if (!user) {
+        if (active) setAccessChecked(true);
+        return;
+      }
+
+      const hasAccess = await supabaseService.auth.hasManagedAccess(user.id);
+      if (!hasAccess) {
+        await supabaseService.auth.signOut();
+        window.location.hash = '#/login';
+        return;
+      }
+
+      if (active) setAccessChecked(true);
+    };
+
+    validateManagedAccess();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+
+  if (!accessChecked) {
+    return <div className="min-h-screen bg-black" />;
+  }
+
   const ClientNavContent = () => (
     <>
       <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
@@ -392,26 +459,27 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/wizard" element={<PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate>} />
+            <Route path="/wizard" element={<BiometricAccessGate><PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/demo" element={<DemoSimulator />} />
 
             {/* Client Welcome & Onboarding */}
-            <Route path="/client/welcome" element={<PermissionGate><ClientWelcome /></PermissionGate>} />
-            <Route path="/client/returning" element={<PermissionGate><ReturningClientForm /></PermissionGate>} />
-            <Route path="/client/wizard" element={<PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate>} />
+            <Route path="/client/welcome" element={<BiometricAccessGate><PermissionGate><ClientWelcome /></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/returning" element={<BiometricAccessGate><PermissionGate><ReturningClientForm /></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/wizard" element={<BiometricAccessGate><PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
 
             {/* Client Protected */}
-            <Route path="/client/dashboard" element={<PermissionGate><ClientLayout showNav={false} showBottomNav={true}><ClientDashboard /></ClientLayout></PermissionGate>} />
-            <Route path="/client/contracts" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Contracts /></ClientLayout></PermissionGate>} />
-            <Route path="/client/profile" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Profile /></ClientLayout></PermissionGate>} />
-            <Route path="/client/statement" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Statement /></ClientLayout></PermissionGate>} />
-            <Route path="/client/help" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><HelpCenter /></ClientLayout></PermissionGate>} />
-            <Route path="/client/documents" element={<PermissionGate><ClientLayout showNav={true} showBottomNav={true}><MyDocuments /></ClientLayout></PermissionGate>} />
+            <Route path="/client/dashboard" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={false} showBottomNav={true}><ClientDashboard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/contracts" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Contracts /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/profile" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Profile /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/statement" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Statement /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/help" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><HelpCenter /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/documents" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><MyDocuments /></ClientLayout></PermissionGate></BiometricAccessGate>} />
 
             {/* Admin Protected - Core */}
             <Route path="/admin" element={<AdminLayout><Dashboard /></AdminLayout>} />
             <Route path="/admin/requests" element={<AdminLayout><Requests /></AdminLayout>} />
             <Route path="/admin/customers" element={<AdminLayout><Customers /></AdminLayout>} />
+            <Route path="/admin/investors" element={<AdminLayout><Investors /></AdminLayout>} />
             <Route path="/admin/import-contacts" element={<AdminLayout><ImportContacts /></AdminLayout>} />
             <Route path="/admin/data-search" element={<AdminLayout><DataSearch /></AdminLayout>} />
             <Route path="/admin/settings" element={<AdminLayout><Settings /></AdminLayout>} />

@@ -434,6 +434,27 @@ export const deviceSecurityService = {
             ...data,
             is_resolved: false
         });
+
+        const payload: any = {
+            customer_email: null,
+            type: 'WARNING',
+            title: '🔒 Cliente bloqueado pelo antifraude',
+            message: data.block_reason,
+            link: '/admin/security-hub?tab=antifraud',
+            read: false,
+            for_role: 'ADMIN'
+        };
+
+        let { error } = await supabase.from('notifications').insert(payload);
+        if (error && String(error.message || '').toLowerCase().includes('for_role')) {
+            delete payload.for_role;
+            const fallback = await supabase.from('notifications').insert(payload);
+            error = fallback.error;
+        }
+
+        if (error) {
+            console.error('[DeviceSecurity] failed to insert admin notification:', error);
+        }
     },
 
     /**

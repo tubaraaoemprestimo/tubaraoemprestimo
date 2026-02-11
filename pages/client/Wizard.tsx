@@ -31,8 +31,8 @@ const guaranteeTypes = [
   { id: 'outro', label: 'Outro', icon: Package },
 ];
 
-// NOVOS Tipos de Perfil - Multi Sistema (5 Serviços)
-type ProfileType = 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA' | 'LIMPA_NOME' | '';
+// NOVOS Tipos de Perfil - Multi Sistema (6 Serviços)
+type ProfileType = 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA' | 'LIMPA_NOME' | 'INVESTIDOR' | '';
 
 // Configuração dos perfis com descrições e cores para Admin
 const profileOptions = [
@@ -76,10 +76,30 @@ const profileOptions = [
     color: 'text-purple-400',
     adminColor: 'bg-purple-500'
   },
+  {
+    id: 'INVESTIDOR',
+    label: 'Seja um Investidor',
+    icon: Rocket,
+    description: 'Invista a partir de R$10.000 e lucre até 6%/mês',
+    color: 'text-cyan-400',
+    adminColor: 'bg-cyan-600'
+  },
 ];
 
 // Steps dinâmicos baseados no perfil
 const getStepsForProfile = (profile: ProfileType) => {
+  // INVESTIDOR tem fluxo próprio: Info > Dados > Investimento > Banco > Termos > Confirmar
+  if (profile === 'INVESTIDOR') {
+    return [
+      { id: 1, title: 'Serviço', icon: Users },
+      { id: 2, title: 'Saiba Mais', icon: Shield },
+      { id: 3, title: 'Dados', icon: User },
+      { id: 4, title: 'Investimento', icon: DollarSign },
+      { id: 5, title: 'Banco', icon: Landmark },
+      { id: 6, title: 'Termos', icon: FileSignature },
+      { id: 7, title: 'Confirmar', icon: CheckCircle2 },
+    ];
+  }
   // LIMPA_NOME é um SERVIÇO simples - não precisa de documentos
   if (profile === 'LIMPA_NOME') {
     return [
@@ -152,6 +172,20 @@ export const Wizard: React.FC = () => {
 
   // Aceites
   const [termsAccepted, setTermsAccepted] = useState(false);
+
+  // Investidor - campos específicos
+  const [investorData, setInvestorData] = useState({
+    fullName: '', cpfCnpj: '', rgCnh: '', birthDate: '',
+    email: '', phone: '',
+    address: '', city: '', state: '', zipCode: '',
+    bankName: '', pixKey: '', pixKeyType: 'cpf', accountHolderName: '',
+    investmentAmount: 10000,
+    customInvestmentAmount: '',
+    investmentTier: 'STANDARD' as 'STANDARD' | 'PREMIUM',
+    payoutMode: 'MONTHLY' as 'MONTHLY' | 'ANNUAL',
+    monthlyRate: 2.5,
+    showInfoPage: true,
+  });
 
   // Valores
   const [selectedAmount, setSelectedAmount] = useState<number>(1000);
@@ -371,10 +405,61 @@ export const Wizard: React.FC = () => {
         addToast("Selecione um serviço para continuar.", 'warning');
         return;
       }
+      // INVESTIDOR não precisa de verificação de cliente recorrente
       // Cliente recorrente apenas para CLT, AUTONOMO e GARANTIA
       if ((profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'GARANTIA') && !isReturningClient) {
         addToast("Por favor, informe se já é nosso cliente.", 'warning');
         return;
+      }
+    }
+
+    // === INVESTIDOR: Validações específicas por step ===
+    if (profileType === 'INVESTIDOR') {
+      // Step 2: "Saiba Mais" - apenas informativo, sem validação
+      // Step 3: Dados pessoais
+      if (currentStep === 3) {
+        if (!investorData.fullName.trim()) { addToast("Informe seu nome completo ou razão social.", 'warning'); return; }
+        const cpfCnpjDigits = investorData.cpfCnpj.replace(/\D/g, '');
+        if (!cpfCnpjDigits || (cpfCnpjDigits.length !== 11 && cpfCnpjDigits.length !== 14)) {
+          addToast("Informe um CPF ou CNPJ válido.", 'warning'); return;
+        }
+        if (!investorData.phone || investorData.phone.replace(/\D/g, '').length < 10) {
+          addToast("Informe seu telefone.", 'warning'); return;
+        }
+        if (!investorData.email.trim() || !investorData.email.includes('@')) {
+          addToast("Informe um email válido.", 'warning'); return;
+        }
+      }
+      // Step 4: Investimento (valor, modalidade)
+      if (currentStep === 4) {
+        const invAmount = investorData.customInvestmentAmount
+          ? parseFloat(investorData.customInvestmentAmount.replace(/\D/g, '')) || 0
+          : investorData.investmentAmount;
+        if (invAmount < 10000) {
+          addToast("O investimento mínimo é R$ 10.000,00.", 'warning'); return;
+        }
+        // Recalcular tier e rate
+        const tier = invAmount >= 50000 ? 'PREMIUM' : 'STANDARD';
+        const rate = tier === 'PREMIUM'
+          ? (investorData.payoutMode === 'MONTHLY' ? 5.0 : 6.0)
+          : (investorData.payoutMode === 'MONTHLY' ? 2.5 : 3.5);
+        setInvestorData(prev => ({
+          ...prev,
+          investmentAmount: invAmount,
+          investmentTier: tier,
+          monthlyRate: rate,
+        }));
+      }
+      // Step 5: Banco
+      if (currentStep === 5) {
+        if (!investorData.bankName.trim()) { addToast("Informe o nome do banco.", 'warning'); return; }
+        if (!investorData.pixKey.trim()) { addToast("Informe sua chave PIX.", 'warning'); return; }
+        if (!investorData.accountHolderName.trim()) { addToast("Informe o nome do titular.", 'warning'); return; }
+      }
+      // Step 6: Termos + Assinatura
+      if (currentStep === 6) {
+        if (!termsAccepted) { addToast("Aceite os termos para continuar.", 'warning'); return; }
+        if (!formData.signature) { addToast("Assine para confirmar.", 'warning'); return; }
       }
     }
 
@@ -789,7 +874,68 @@ export const Wizard: React.FC = () => {
     return results;
   };
 
+  // === INVESTIDOR: Submit separado ===
+  const handleInvestorSubmit = async () => {
+    if (!formData.signature) {
+      addToast("Assine para confirmar.", 'warning');
+      return;
+    }
+    setLoading(true);
+    addToast("Enviando sua solicitação de investimento... Aguarde.", 'info');
+
+    try {
+      // Upload da assinatura
+      const signatureUrl = formData.signature ? await uploadToStorage(formData.signature, 'investor_signature') : '';
+
+      const success = await supabaseService.submitInvestorRequest({
+        fullName: investorData.fullName,
+        cpfCnpj: investorData.cpfCnpj,
+        rgCnh: investorData.rgCnh,
+        birthDate: investorData.birthDate,
+        email: investorData.email,
+        phone: investorData.phone,
+        address: investorData.address,
+        city: investorData.city,
+        state: investorData.state,
+        zipCode: investorData.zipCode,
+        bankName: investorData.bankName,
+        pixKey: investorData.pixKey,
+        pixKeyType: investorData.pixKeyType,
+        accountHolderName: investorData.accountHolderName,
+        investmentAmount: investorData.investmentAmount,
+        investmentTier: investorData.investmentTier,
+        payoutMode: investorData.payoutMode,
+        monthlyRate: investorData.monthlyRate,
+        termsAccepted: true,
+        signatureUrl,
+      });
+
+      if (!success) throw new Error('Falha ao submeter');
+
+      // Notificação automática para admin
+      autoNotificationService.onLoanRequested(
+        investorData.email,
+        investorData.investmentAmount,
+        investorData.fullName,
+        'INVESTIDOR'
+      ).catch(() => { });
+
+      setLoading(false);
+      addToast("Solicitação de investimento enviada com sucesso!", 'success');
+      navigate('/client/dashboard');
+    } catch (error: any) {
+      console.error('Erro ao enviar solicitação de investidor:', error);
+      setLoading(false);
+      addToast('Erro ao enviar. Tente novamente.', 'error');
+    }
+  };
+
   const handleSubmit = async () => {
+    // INVESTIDOR usa fluxo próprio
+    if (profileType === 'INVESTIDOR') {
+      return handleInvestorSubmit();
+    }
+
     if (!formData.signature || !settings) {
       addToast("Assine para confirmar.", 'warning');
       return;
@@ -1023,7 +1169,7 @@ export const Wizard: React.FC = () => {
       <div className="sticky top-0 z-30 bg-black/80 backdrop-blur-md border-b border-zinc-900 p-4 flex items-center justify-between">
         <div className="flex items-center gap-2" onClick={() => navigate('/')}>
           <ChevronLeft className="text-zinc-400" />
-          <span className="font-bold">Solicitar Empréstimo</span>
+          <span className="font-bold">{profileType === 'INVESTIDOR' ? 'Área do Investidor' : profileType === 'LIMPA_NOME' ? 'Limpa Nome' : 'Solicitar Empréstimo'}</span>
         </div>
         <div className="flex items-center gap-3">
           <InstallPwaButton className="!py-1.5 !px-3" />
@@ -1084,7 +1230,7 @@ export const Wizard: React.FC = () => {
               </div>
 
               {/* Pergunta sobre cliente recorrente - apenas CLT, AUTONOMO e GARANTIA */}
-              {profileType && profileType !== 'MOTO' && profileType !== 'LIMPA_NOME' && (
+              {profileType && profileType !== 'MOTO' && profileType !== 'LIMPA_NOME' && profileType !== 'INVESTIDOR' && (
                 <div className="mt-6 p-5 bg-zinc-800/50 rounded-2xl border border-zinc-700 animate-in fade-in slide-in-from-bottom-2">
                   <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                     <Users size={18} className="text-[#D4AF37]" />
@@ -1134,6 +1280,356 @@ export const Wizard: React.FC = () => {
               )}
             </div>
           )}
+
+          {/* ========== INVESTIDOR STEPS (2-7) ========== */}
+
+          {/* INVESTIDOR STEP 2: "Saiba Mais" - Página explicativa */}
+          {currentStep === 2 && profileType === 'INVESTIDOR' && (
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center mb-4">
+                <div className="inline-flex items-center justify-center p-3 bg-cyan-500/10 rounded-full mb-4">
+                  <Rocket size={32} className="text-cyan-400" />
+                </div>
+                <h2 className="text-2xl font-bold">Entenda como funciona</h2>
+                <p className="text-zinc-400 text-sm mt-2">Conheça o programa Investidor Tubarão</p>
+              </div>
+
+              <div className="space-y-4">
+                {(SERVICE_TERMS as any).INVESTIDOR?.infoPage?.sections?.map((section: any, idx: number) => (
+                  <div key={idx} className="bg-black border border-zinc-800 rounded-xl p-4">
+                    <h3 className="font-bold text-cyan-400 mb-2 flex items-center gap-2">
+                      <Shield size={16} />
+                      {section.title}
+                    </h3>
+                    <p className="text-sm text-zinc-300 whitespace-pre-line leading-relaxed">{section.content}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Tabela de remuneração */}
+              <div className="bg-gradient-to-br from-cyan-900/30 to-zinc-900 border border-cyan-600/30 rounded-xl p-5">
+                <h3 className="font-bold text-cyan-400 mb-4 text-center">Tabela de Remuneração</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="bg-black/50 rounded-lg p-3">
+                    <p className="font-bold text-white mb-1">R$ 10.000 a R$ 49.999</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-zinc-800/50 rounded p-2 text-center">
+                        <p className="text-zinc-400">Mensal</p>
+                        <p className="text-cyan-400 font-bold text-lg">2,5%</p>
+                      </div>
+                      <div className="bg-zinc-800/50 rounded p-2 text-center">
+                        <p className="text-zinc-400">Anual Acumulado</p>
+                        <p className="text-cyan-400 font-bold text-lg">3,5%</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-black/50 rounded-lg p-3">
+                    <p className="font-bold text-white mb-1">R$ 50.000 ou mais</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-zinc-800/50 rounded p-2 text-center">
+                        <p className="text-zinc-400">Mensal</p>
+                        <p className="text-[#D4AF37] font-bold text-lg">5%</p>
+                      </div>
+                      <div className="bg-zinc-800/50 rounded p-2 text-center">
+                        <p className="text-zinc-400">Anual Acumulado</p>
+                        <p className="text-[#D4AF37] font-bold text-lg">6%</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* INVESTIDOR STEP 3: Dados Pessoais */}
+          {currentStep === 3 && profileType === 'INVESTIDOR' && (
+            <div className="space-y-5 animate-in slide-in-from-right">
+              <div className="text-center">
+                <User size={48} className="mx-auto text-cyan-400 mb-3" />
+                <h2 className="text-xl font-bold">Seus Dados</h2>
+                <p className="text-zinc-400 text-sm mt-1">Preencha seus dados pessoais ou empresariais</p>
+              </div>
+
+              <Input label="Nome Completo / Razão Social" name="investorFullName" value={investorData.fullName}
+                onChange={(e: any) => setInvestorData({ ...investorData, fullName: e.target.value })} placeholder="Seu nome completo" required />
+
+              <Input label="CPF ou CNPJ" name="investorCpfCnpj" value={investorData.cpfCnpj}
+                onChange={(e: any) => {
+                  let v = e.target.value.replace(/\D/g, '');
+                  if (v.length <= 11) v = v.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+                  else v = v.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
+                  setInvestorData({ ...investorData, cpfCnpj: v });
+                }} placeholder="000.000.000-00" required />
+
+              <Input label="RG ou CNH" name="investorRgCnh" value={investorData.rgCnh}
+                onChange={(e: any) => setInvestorData({ ...investorData, rgCnh: e.target.value })} placeholder="Número do documento" />
+
+              <Input label="Data de Nascimento" name="investorBirthDate" type="date" value={investorData.birthDate}
+                onChange={(e: any) => setInvestorData({ ...investorData, birthDate: e.target.value })} />
+
+              <Input label="Telefone / WhatsApp" name="investorPhone" value={investorData.phone}
+                onChange={(e: any) => {
+                  let v = e.target.value.replace(/\D/g, '').slice(0, 11);
+                  v = v.replace(/^(\d{2})(\d)/g, '($1) $2').replace(/(\d)(\d{4})$/, '$1-$2');
+                  setInvestorData({ ...investorData, phone: v });
+                }} placeholder="(11) 99999-9999" required />
+
+              <Input label="Email" name="investorEmail" type="email" value={investorData.email}
+                onChange={(e: any) => setInvestorData({ ...investorData, email: e.target.value })} placeholder="seu@email.com" required />
+
+              <Input label="Endereço Completo" name="investorAddress" value={investorData.address}
+                onChange={(e: any) => setInvestorData({ ...investorData, address: e.target.value })} placeholder="Rua, número, bairro" />
+
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="Cidade" name="investorCity" value={investorData.city}
+                  onChange={(e: any) => setInvestorData({ ...investorData, city: e.target.value })} placeholder="São Paulo" />
+                <Input label="UF" name="investorState" value={investorData.state}
+                  onChange={(e: any) => setInvestorData({ ...investorData, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="SP" />
+              </div>
+
+              <Input label="CEP" name="investorZipCode" value={investorData.zipCode}
+                onChange={(e: any) => {
+                  let v = e.target.value.replace(/\D/g, '').slice(0, 8);
+                  if (v.length > 5) v = v.replace(/^(\d{5})(\d)/, '$1-$2');
+                  setInvestorData({ ...investorData, zipCode: v });
+                }} placeholder="00000-000" />
+            </div>
+          )}
+
+          {/* INVESTIDOR STEP 4: Valor e Modalidade */}
+          {currentStep === 4 && profileType === 'INVESTIDOR' && (
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center">
+                <DollarSign size={48} className="mx-auto text-cyan-400 mb-3" />
+                <h2 className="text-xl font-bold">Quanto deseja investir?</h2>
+                <p className="text-zinc-400 text-sm mt-1">Mínimo: R$ 10.000,00 | Prazo: 12 meses</p>
+              </div>
+
+              {/* Valores pré-definidos */}
+              <div className="grid grid-cols-2 gap-3">
+                {[10000, 20000, 30000, 50000, 100000, 200000].map((val) => (
+                  <button key={val} onClick={() => {
+                    const tier = val >= 50000 ? 'PREMIUM' : 'STANDARD';
+                    const rate = tier === 'PREMIUM'
+                      ? (investorData.payoutMode === 'MONTHLY' ? 5.0 : 6.0)
+                      : (investorData.payoutMode === 'MONTHLY' ? 2.5 : 3.5);
+                    setInvestorData({ ...investorData, investmentAmount: val, customInvestmentAmount: '', investmentTier: tier, monthlyRate: rate });
+                  }}
+                    className={`p-4 rounded-xl border-2 transition-all ${investorData.investmentAmount === val && !investorData.customInvestmentAmount
+                      ? 'border-cyan-500 bg-cyan-500/10 scale-105'
+                      : 'border-zinc-800 bg-black hover:border-zinc-600'
+                      }`}>
+                    <span className="text-lg font-bold">R$ {val.toLocaleString('pt-BR')}</span>
+                    <p className="text-xs text-zinc-500 mt-1">{val >= 50000 ? 'Premium' : 'Standard'}</p>
+                  </button>
+                ))}
+              </div>
+
+              {/* Valor personalizado */}
+              <div className="space-y-2">
+                <label className="text-sm text-zinc-400">Ou digite o valor:</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">R$</span>
+                  <input type="number" value={investorData.customInvestmentAmount}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const numVal = parseFloat(val) || 0;
+                      const tier = numVal >= 50000 ? 'PREMIUM' : 'STANDARD';
+                      const rate = tier === 'PREMIUM'
+                        ? (investorData.payoutMode === 'MONTHLY' ? 5.0 : 6.0)
+                        : (investorData.payoutMode === 'MONTHLY' ? 2.5 : 3.5);
+                      setInvestorData({ ...investorData, customInvestmentAmount: val, investmentAmount: numVal, investmentTier: tier, monthlyRate: rate });
+                    }}
+                    placeholder="10000" min="10000"
+                    className="w-full bg-black border border-zinc-700 rounded-xl pl-12 pr-4 py-4 text-white text-xl font-bold focus:border-cyan-500 outline-none" />
+                </div>
+              </div>
+
+              {/* Modalidade de remuneração */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-white">Modalidade de Remuneração</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => {
+                    const rate = investorData.investmentTier === 'PREMIUM' ? 5.0 : 2.5;
+                    setInvestorData({ ...investorData, payoutMode: 'MONTHLY', monthlyRate: rate });
+                  }}
+                    className={`p-4 rounded-xl border-2 transition-all text-center ${investorData.payoutMode === 'MONTHLY' ? 'border-cyan-500 bg-cyan-500/10' : 'border-zinc-800 bg-black hover:border-zinc-600'}`}>
+                    <Banknote size={24} className="mx-auto text-cyan-400 mb-2" />
+                    <span className="font-bold block">Mensal</span>
+                    <span className="text-xs text-zinc-400">Receba todo mês</span>
+                    <span className="block text-lg font-bold text-cyan-400 mt-1">
+                      {investorData.investmentTier === 'PREMIUM' ? '5%' : '2,5%'}/mês
+                    </span>
+                  </button>
+                  <button onClick={() => {
+                    const rate = investorData.investmentTier === 'PREMIUM' ? 6.0 : 3.5;
+                    setInvestorData({ ...investorData, payoutMode: 'ANNUAL', monthlyRate: rate });
+                  }}
+                    className={`p-4 rounded-xl border-2 transition-all text-center ${investorData.payoutMode === 'ANNUAL' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-800 bg-black hover:border-zinc-600'}`}>
+                    <Clock size={24} className="mx-auto text-[#D4AF37] mb-2" />
+                    <span className="font-bold block">Anual Acumulado</span>
+                    <span className="text-xs text-zinc-400">Receba ao final</span>
+                    <span className="block text-lg font-bold text-[#D4AF37] mt-1">
+                      {investorData.investmentTier === 'PREMIUM' ? '6%' : '3,5%'}/mês
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Simulação de rendimento */}
+              {(() => {
+                const amount = investorData.investmentAmount || 10000;
+                const rate = investorData.monthlyRate / 100;
+                const monthlyReturn = amount * rate;
+                const annualReturn = monthlyReturn * 12;
+                return (
+                  <div className="bg-gradient-to-br from-cyan-900/20 to-zinc-900 border border-cyan-600/30 rounded-xl p-5">
+                    <h3 className="font-bold text-cyan-400 mb-3 text-center">Simulação de Rendimento</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between"><span className="text-zinc-400">Valor investido:</span><span className="font-bold">R$ {amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Taxa:</span><span className="font-bold text-cyan-400">{investorData.monthlyRate}% ao mês</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Rendimento mensal:</span><span className="font-bold text-green-400">R$ {monthlyReturn.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                      <div className="flex justify-between border-t border-zinc-700 pt-2"><span className="text-zinc-400">Rendimento em 12 meses:</span><span className="font-bold text-[#D4AF37]">R$ {annualReturn.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Total ao final:</span><span className="font-bold text-white text-lg">R$ {(amount + annualReturn).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* INVESTIDOR STEP 5: Dados Bancários */}
+          {currentStep === 5 && profileType === 'INVESTIDOR' && (
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center">
+                <Landmark size={48} className="mx-auto text-cyan-400 mb-3" />
+                <h2 className="text-xl font-bold">Dados Bancários para Recebimento</h2>
+                <p className="text-zinc-400 text-sm mt-1">Onde receberá seus rendimentos</p>
+              </div>
+
+              <Input label="Banco" name="investorBankName" value={investorData.bankName}
+                onChange={(e: any) => setInvestorData({ ...investorData, bankName: e.target.value })} placeholder="Ex: Nubank" required />
+
+              <div className="grid grid-cols-4 gap-2">
+                {[{ v: 'cpf', l: 'CPF' }, { v: 'phone', l: 'Celular' }, { v: 'email', l: 'Email' }, { v: 'random', l: 'Aleatória' }].map(o => (
+                  <button key={o.v} type="button" onClick={() => setInvestorData({ ...investorData, pixKeyType: o.v })}
+                    className={`p-2 rounded-lg border text-sm ${investorData.pixKeyType === o.v ? 'border-cyan-500 text-cyan-400' : 'border-zinc-700 text-zinc-400'}`}>{o.l}</button>
+                ))}
+              </div>
+
+              <Input label="Chave PIX" name="investorPixKey" value={investorData.pixKey}
+                onChange={(e: any) => setInvestorData({ ...investorData, pixKey: e.target.value })} placeholder="Sua chave" required />
+
+              <Input label="Nome do Titular da Conta" name="investorAccountHolder" value={investorData.accountHolderName}
+                onChange={(e: any) => setInvestorData({ ...investorData, accountHolderName: e.target.value })} placeholder="Seu nome completo" required />
+            </div>
+          )}
+
+          {/* INVESTIDOR STEP 6: Termos + Assinatura */}
+          {currentStep === 6 && profileType === 'INVESTIDOR' && (
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center">
+                <FileSignature size={48} className="mx-auto text-cyan-400 mb-3" />
+                <h2 className="text-xl font-bold">CONTRATO DE ALOCAÇÃO DE CAPITAL - ACEITE ELETRÔNICO</h2>
+                <p className="text-zinc-400 text-sm mt-1">Leia atentamente antes de continuar.</p>
+              </div>
+
+              <div className="bg-cyan-900/20 border border-cyan-600/30 rounded-xl p-4">
+                <p className="text-sm text-zinc-300">
+                  {(SERVICE_TERMS as any).INVESTIDOR?.contractIntro}
+                </p>
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                <h3 className="font-bold text-cyan-400 mb-3">Dados do Investidor (Cadastro)</h3>
+                <ul className="space-y-2">
+                  {(SERVICE_TERMS as any).INVESTIDOR?.registrationFields?.map((field: string, idx: number) => (
+                    <li key={idx} className="text-sm text-zinc-300 flex items-start gap-2">
+                      <CheckCircle2 size={14} className="text-cyan-500 mt-0.5 shrink-0" />
+                      {field}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Condições */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 max-h-[350px] overflow-y-auto">
+                <h3 className="font-bold text-cyan-400 mb-4 text-center">CONDIÇÕES DO INVESTIMENTO</h3>
+                <ul className="space-y-2">
+                  {(SERVICE_TERMS as any).INVESTIDOR?.conditions?.map((cond: string, idx: number) => (
+                    <li key={idx} className="text-sm text-zinc-300 flex items-start gap-2">
+                      <CheckCircle2 size={14} className="text-cyan-500 mt-0.5 shrink-0" />
+                      {cond}
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-6 pt-4 border-t border-zinc-700">
+                  <h4 className="font-bold text-white mb-2">Resumo do seu Investimento:</h4>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between"><span className="text-zinc-400">Valor:</span><span className="font-bold">R$ {investorData.investmentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">Faixa:</span><span className="font-bold text-cyan-400">{investorData.investmentTier === 'PREMIUM' ? 'Premium (R$50k+)' : 'Standard (R$10k-49k)'}</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">Modalidade:</span><span className="font-bold">{investorData.payoutMode === 'MONTHLY' ? 'Mensal' : 'Anual Acumulado'}</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">Taxa:</span><span className="font-bold text-[#D4AF37]">{investorData.monthlyRate}% ao mês</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">Prazo:</span><span className="font-bold">12 meses</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">Aviso de Resgate:</span><span className="font-bold">3 meses antes</span></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Checkbox de aceite */}
+              <label className="flex items-start gap-3 p-4 bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer hover:border-cyan-500 transition-all">
+                <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="w-6 h-6 mt-0.5 accent-cyan-500 shrink-0" />
+                <span className="text-xs text-zinc-300 leading-relaxed">
+                  {(SERVICE_TERMS as any).INVESTIDOR?.finalCheckboxText || (SERVICE_TERMS as any).INVESTIDOR?.checkboxText}
+                </span>
+              </label>
+
+              {/* Assinatura */}
+              <div className="space-y-2">
+                <h3 className="font-bold text-cyan-400">Confirmar e Assinar</h3>
+                <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
+                  <p className="text-xs text-red-400">
+                    <strong>OBRIGATÓRIO:</strong> Assine no campo abaixo para confirmar sua adesão ao programa de investimento.
+                  </p>
+                </div>
+                <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
+              </div>
+            </div>
+          )}
+
+          {/* INVESTIDOR STEP 7: Confirmação Final */}
+          {currentStep === 7 && profileType === 'INVESTIDOR' && (
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center">
+                <CheckCircle2 size={48} className="mx-auto text-green-500 mb-3" />
+                <h2 className="text-xl font-bold">Confirme seu Investimento</h2>
+              </div>
+
+              <div className="bg-black border border-zinc-800 rounded-xl p-4 space-y-3 text-sm">
+                <div className="flex justify-between"><span className="text-zinc-400">Serviço:</span><span className="font-bold text-cyan-400">Investidor Tubarão</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Nome:</span><span className="font-bold">{investorData.fullName}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">CPF/CNPJ:</span><span className="font-bold">{investorData.cpfCnpj}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Valor:</span><span className="font-bold text-[#D4AF37]">R$ {investorData.investmentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Faixa:</span><span className="font-bold">{investorData.investmentTier === 'PREMIUM' ? 'Premium' : 'Standard'}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Modalidade:</span><span className="font-bold">{investorData.payoutMode === 'MONTHLY' ? 'Mensal' : 'Anual Acumulado'}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Taxa:</span><span className="font-bold text-cyan-400">{investorData.monthlyRate}% ao mês</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Prazo:</span><span className="font-bold">12 meses</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Banco:</span><span className="font-bold">{investorData.bankName}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">PIX:</span><span className="font-bold">{investorData.pixKey}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Termos:</span><span className="font-bold text-green-400">Aceito e Assinado</span></div>
+              </div>
+
+              <div className="bg-cyan-900/20 border border-cyan-600/30 rounded-xl p-4">
+                <p className="text-sm text-zinc-300 text-center">
+                  Ao confirmar, sua solicitação será enviada para análise pela equipe Tubarão. Você receberá um retorno em até 48 horas.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ========== FIM INVESTIDOR STEPS ========== */}
 
           {/* STEP 2: Valores - APENAS para CLT, AUTONOMO e GARANTIA */}
           {currentStep === 2 && (profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'GARANTIA') && (
@@ -2211,7 +2707,8 @@ export const Wizard: React.FC = () => {
             </Button>
           ) : (
             <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading} disabled={!formData.signature}>
-              {profileType === 'LIMPA_NOME' ? 'SOLICITAR SERVIÇO' :
+              {profileType === 'INVESTIDOR' ? 'QUERO SER INVESTIDOR' :
+                profileType === 'LIMPA_NOME' ? 'SOLICITAR SERVIÇO' :
                 profileType === 'MOTO' ? 'SOLICITAR FINANCIAMENTO' : 'SOLICITAR MEU EMPRÉSTIMO'}
             </Button>
           )}

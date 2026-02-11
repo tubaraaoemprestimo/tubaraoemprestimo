@@ -5,6 +5,7 @@ import React, { useState, useRef } from 'react';
 import { Upload, FileText, Image, X, Check, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from './Button';
 import { supabase } from '../services/supabaseClient';
+import { autoNotificationService } from '../services/autoNotificationService';
 
 interface PaymentReceiptUploadProps {
     installmentId: string;
@@ -137,6 +138,14 @@ export const PaymentReceiptUpload: React.FC<PaymentReceiptUploadProps> = ({
                 });
                 localStorage.setItem('tubarao_payment_receipts', JSON.stringify(receipts));
             }
+
+            // Notificação operacional para admin: comprovante recebido
+            await autoNotificationService.createAdminNotification(
+                '📎 Comprovante de pagamento recebido',
+                `${customerName} enviou comprovante de R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para validação.`,
+                'INFO',
+                '/admin/finance-hub?tab=receipts'
+            );
 
             setSubmitted(true);
             onUploadSuccess?.(receiptUrl);

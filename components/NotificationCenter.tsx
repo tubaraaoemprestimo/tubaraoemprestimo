@@ -11,10 +11,14 @@ export const NotificationCenter: React.FC = () => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [userRole, setUserRole] = useState<string>('');
     const dropdownRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
 
     useEffect(() => {
+        const user = JSON.parse(localStorage.getItem('tubarao_user') || '{}');
+        setUserRole((user.role || '').toUpperCase());
+
         // Load initial (async)
         const loadNotifications = async () => {
             const data = await notificationService.getAll();
@@ -48,10 +52,27 @@ export const NotificationCenter: React.FC = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    const resolveActionUrl = (notification: Notification): string | null => {
+        if (notification.actionUrl) return notification.actionUrl;
+
+        if (userRole !== 'ADMIN') return null;
+
+        const title = (notification.title || '').toLowerCase();
+        const message = (notification.message || '').toLowerCase();
+        const text = `${title} ${message}`;
+
+        if (text.includes('solicita')) return '/admin/requests';
+        if (text.includes('parcela') || text.includes('atraso') || text.includes('venc')) return '/admin/finance-hub';
+        if (text.includes('acesso') || text.includes('biometr') || text.includes('antifraude') || text.includes('risco')) return '/admin/security-hub';
+
+        return '/admin';
+    };
+
     const handleNotificationClick = (notification: Notification) => {
         notificationService.markAsRead(notification.id);
-        if (notification.actionUrl) {
-            navigate(notification.actionUrl);
+        const url = resolveActionUrl(notification);
+        if (url) {
+            navigate(url);
             setIsOpen(false);
         }
     };
@@ -154,9 +175,9 @@ export const NotificationCenter: React.FC = () => {
                                             <p className="text-sm text-zinc-400 leading-relaxed">{notification.message}</p>
                                             <div className="flex items-center justify-between mt-3">
                                                 <span className="text-[10px] text-zinc-600 uppercase">{formatTime(notification.timestamp)}</span>
-                                                {notification.actionLabel && (
+                                                {resolveActionUrl(notification) && (
                                                     <span className="text-xs text-[#D4AF37] flex items-center gap-1 font-medium">
-                                                        {notification.actionLabel} <ExternalLink size={12} />
+                                                        Abrir <ExternalLink size={12} />
                                                     </span>
                                                 )}
                                             </div>
