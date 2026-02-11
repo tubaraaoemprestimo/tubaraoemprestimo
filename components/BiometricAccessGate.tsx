@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, Fingerprint, Loader2, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Fingerprint, Loader2, Monitor, ShieldCheck } from 'lucide-react';
 import { Button } from './Button';
 import { biometricService } from '../services/biometricService';
 import { antifraudService } from '../services/antifraudService';
@@ -11,6 +11,13 @@ interface BiometricAccessGateProps {
 }
 
 const getSessionKey = (userId: string) => `biometric_verified_${userId}`;
+const getSkipKey = (userId: string) => `biometric_skipped_${userId}`;
+
+// Detecta se o dispositivo e mobile (onde biometria faz sentido)
+const isMobileDevice = (): boolean => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+};
 
 export const BiometricAccessGate: React.FC<BiometricAccessGateProps> = ({ children }) => {
   const navigate = useNavigate();
@@ -23,36 +30,58 @@ export const BiometricAccessGate: React.FC<BiometricAccessGateProps> = ({ childr
     let cancelled = false;
 
     const runVerification = async () => {
+      // Admin nao precisa de biometria
       if (!user || user.role !== 'CLIENT') {
         if (!cancelled) setVerifying(false);
         return;
       }
 
       const sessionKey = getSessionKey(user.id);
+      const skipKey = getSkipKey(user.id);
+
+      // Ja verificou ou pulou nesta sessao
       const alreadyVerified = sessionStorage.getItem(sessionKey);
-      if (alreadyVerified) {
+      const alreadySkipped = sessionStorage.getItem(skipKey);
+      if (alreadyVerified || alreadySkipped) {
         if (!cancelled) setVerifying(false);
         return;
       }
 
       try {
         const platformAvailable = await biometricService.isPlatformAuthenticatorAvailable();
+
+        // Se biometria nao esta disponivel (PC sem Windows Hello, etc), pula automaticamente
         if (!platformAvailable) {
-          await antifraudService.logRiskEvent('BIOMETRIC_UNAVAILABLE', user.id, {
+          antifraudService.logRiskEvent('BIOMETRIC_UNAVAILABLE', user.id, {
             flow: 'APP_ACCESS_GATE',
             reason: 'platform_authenticator_unavailable',
-          });
-          if (!cancelled) {
-            setError('Este dispositivo não possui biometria/facial ativa. Ative Face ID ou impressão digital para acessar.');
-            setVerifying(false);
-          }
+            isMobile: isMobileDevice(),
+          }).catch(() => {});
+
+          // No PC: pula silenciosamente. No mobile: mostra aviso mas permite continuar
+          sessionStorage.setItem(skipKey, new Date().toISOString());
+          if (!cancelled) setVerifying(false);
           return;
         }
 
-        await antifraudService.logRiskEvent('BIOMETRIC_CHALLENGE', user.id, {
+        // So tenta biometria automatica em dispositivos moveis
+        // No PC, pula para evitar prompts de chave de acesso Google/Windows Hello indesejados
+        if (!isMobileDevice()) {
+          antifraudService.logRiskEvent('BIOMETRIC_SKIPPED_DESKTOP', user.id, {
+            flow: 'APP_ACCESS_GATE',
+            reason: 'desktop_device',
+          }).catch(() => {});
+
+          sessionStorage.setItem(skipKey, new Date().toISOString());
+          if (!cancelled) setVerifying(false);
+          return;
+        }
+
+        // Mobile: tenta biometria normalmente
+        antifraudService.logRiskEvent('BIOMETRIC_CHALLENGE', user.id, {
           flow: 'APP_ACCESS_GATE',
           stage: 'challenge_started',
-        });
+        }).catch(() => {});
 
         let hasCredential = await biometricService.hasCredential(user.id);
 
@@ -60,11 +89,12 @@ export const BiometricAccessGate: React.FC<BiometricAccessGateProps> = ({ childr
           const registerResult = await biometricService.register(user.id, user.email, user.name || 'Usuário');
 
           if (!registerResult.success) {
-            await antifraudService.logRiskEvent('BIOMETRIC_REGISTER_FAILED', user.id, {
+            antifraudService.logRiskEvent('BIOMETRIC_REGISTER_FAILED', user.id, {
               flow: 'APP_ACCESS_GATE',
               reason: registerResult.error || 'register_failed',
-            });
+            }).catch(() => {});
 
+            // Falhou registrar: permite continuar sem biometria
             if (!cancelled) {
               setError(registerResult.error || 'Não foi possível cadastrar biometria neste dispositivo.');
               setVerifying(false);
@@ -72,27 +102,26 @@ export const BiometricAccessGate: React.FC<BiometricAccessGateProps> = ({ childr
             return;
           }
 
-          await antifraudService.logRiskEvent('BIOMETRIC_REGISTER_SUCCESS', user.id, {
+          antifraudService.logRiskEvent('BIOMETRIC_REGISTER_SUCCESS', user.id, {
             flow: 'APP_ACCESS_GATE',
-          });
+          }).catch(() => {});
 
           hasCredential = true;
         }
 
         if (!hasCredential) {
-          if (!cancelled) {
-            setError('Nenhuma credencial biométrica encontrada para este usuário.');
-            setVerifying(false);
-          }
+          // Sem credencial: permite continuar
+          sessionStorage.setItem(skipKey, new Date().toISOString());
+          if (!cancelled) setVerifying(false);
           return;
         }
 
         const authResult = await biometricService.authenticateForUser(user.id);
         if (!authResult.success) {
-          await antifraudService.logRiskEvent('BIOMETRIC_FAILED', user.id, {
+          antifraudService.logRiskEvent('BIOMETRIC_FAILED', user.id, {
             flow: 'APP_ACCESS_GATE',
             reason: authResult.error || 'auth_failed',
-          });
+          }).catch(() => {});
 
           if (!cancelled) {
             setError(authResult.error || 'Autenticação biométrica falhou.');
@@ -103,20 +132,20 @@ export const BiometricAccessGate: React.FC<BiometricAccessGateProps> = ({ childr
 
         sessionStorage.setItem(sessionKey, new Date().toISOString());
 
-        await antifraudService.logRiskEvent('BIOMETRIC_SUCCESS', user.id, {
+        antifraudService.logRiskEvent('BIOMETRIC_SUCCESS', user.id, {
           flow: 'APP_ACCESS_GATE',
           credentialId: authResult.credentialId,
-        });
+        }).catch(() => {});
 
         if (!cancelled) {
           setError(null);
           setVerifying(false);
         }
       } catch (err: any) {
-        await antifraudService.logRiskEvent('BIOMETRIC_FAILED', user?.id, {
+        antifraudService.logRiskEvent('BIOMETRIC_FAILED', user?.id, {
           flow: 'APP_ACCESS_GATE',
           reason: err?.message || 'unexpected_error',
-        });
+        }).catch(() => {});
 
         if (!cancelled) {
           setError('Falha na validação biométrica. Tente novamente.');
@@ -132,6 +161,18 @@ export const BiometricAccessGate: React.FC<BiometricAccessGateProps> = ({ childr
     };
   }, [user]);
 
+  // Pular biometria e continuar
+  const handleSkip = () => {
+    if (user) {
+      sessionStorage.setItem(getSkipKey(user.id), new Date().toISOString());
+      antifraudService.logRiskEvent('BIOMETRIC_SKIPPED_BY_USER', user.id, {
+        flow: 'APP_ACCESS_GATE',
+      }).catch(() => {});
+    }
+    setError(null);
+    setVerifying(false);
+  };
+
   const handleTryAgain = () => {
     setError(null);
     setVerifying(true);
@@ -146,6 +187,7 @@ export const BiometricAccessGate: React.FC<BiometricAccessGateProps> = ({ childr
     try {
       if (user) {
         sessionStorage.removeItem(getSessionKey(user.id));
+        sessionStorage.removeItem(getSkipKey(user.id));
       }
       await supabaseService.auth.signOut();
     } finally {
@@ -188,6 +230,9 @@ export const BiometricAccessGate: React.FC<BiometricAccessGateProps> = ({ childr
           <div className="space-y-3">
             <Button className="w-full" onClick={handleTryAgain}>
               <ShieldCheck size={18} /> Tentar novamente
+            </Button>
+            <Button className="w-full bg-emerald-600 hover:bg-emerald-700" onClick={handleSkip}>
+              <Monitor size={18} /> Continuar sem biometria
             </Button>
             <Button variant="secondary" className="w-full" onClick={handleBackToLogin}>
               Voltar para login
