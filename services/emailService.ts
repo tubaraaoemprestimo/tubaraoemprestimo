@@ -788,7 +788,11 @@ export const emailService = {
   async notifyNewRequest(data: LoanEmailData): Promise<void> {
     const adminEmail = await this.getAdminEmail();
 
-    if (data.profileType === 'LIMPA_NOME') {
+    if (data.profileType === 'LOCACAO') {
+      // Locacao: admin notification + client confirmation
+      await this.sendEmail({ to: adminEmail, subject: `Nova Solicitacao de Locacao - ${data.clientName}`, html: `<p>Nova solicitacao de locacao de veiculo de <strong>${data.clientName}</strong>.</p><p>Acesse o painel para aprovar.</p>` });
+      await this.sendEmail({ to: data.clientEmail, subject: 'Solicitacao de Locacao Recebida', html: `<p>Ola ${data.clientName}, sua solicitacao de locacao de veiculo foi recebida e esta em analise.</p>` });
+    } else if (data.profileType === 'LIMPA_NOME') {
       // Templates específicos para Limpa Nome
       const adminTemplate = emailTemplates.adminLimpaNomeRequest(data);
       await this.sendEmail({ to: adminEmail, ...adminTemplate });
@@ -870,6 +874,112 @@ export const emailService = {
   // ==========================================
   // EMAIL PERSONALIZADO
   // ==========================================
+
+  // ==========================================
+  // FLEET RENTAL NOTIFICATIONS
+  // ==========================================
+
+  async notifyFleetPaymentReminder(data: { clientEmail: string; clientName: string; weekNumber: number; amount: number; dueDate: string }): Promise<void> {
+    const html = `
+      <!DOCTYPE html><html><head><style>${baseStyles}</style></head><body>
+        <div class="container">
+          <div class="header"><div class="logo">🦈 TUBARÃO LOCAÇÃO</div></div>
+          <div class="content">
+            <h1>Lembrete de Pagamento Semanal</h1>
+            <p>Olá <strong>${data.clientName}</strong>,</p>
+            <p>Seu pagamento da <strong>Semana ${data.weekNumber}</strong> no valor de <strong>R$ ${data.amount.toFixed(2)}</strong> vence em <strong>${data.dueDate}</strong>.</p>
+            <p>Efetue o pagamento via PIX pelo aplicativo para evitar multa e juros.</p>
+            <div class="highlight" style="background:#059669;color:white;padding:15px;border-radius:8px;text-align:center;margin:20px 0;">
+              <p style="font-size:24px;font-weight:bold;">R$ ${data.amount.toFixed(2)}</p>
+              <p>Vencimento: ${data.dueDate}</p>
+            </div>
+          </div>
+          <div class="footer"><p>© Tubarão Empréstimos - Locação de Veículos</p></div>
+        </div>
+      </body></html>`;
+    await this.sendEmail({ to: data.clientEmail, subject: `Pagamento Semana ${data.weekNumber} - R$ ${data.amount.toFixed(2)}`, html });
+  },
+
+  async notifyFleetPaymentLate(data: { clientEmail: string; clientName: string; weekNumber: number; totalDue: number; daysLate: number }): Promise<void> {
+    const html = `
+      <!DOCTYPE html><html><head><style>${baseStyles}</style></head><body>
+        <div class="container">
+          <div class="header"><div class="logo">🦈 TUBARÃO LOCAÇÃO</div></div>
+          <div class="content">
+            <h1 style="color:#EF4444;">Pagamento Atrasado!</h1>
+            <p>Olá <strong>${data.clientName}</strong>,</p>
+            <p>Seu pagamento da <strong>Semana ${data.weekNumber}</strong> está <strong>${data.daysLate} dia(s) atrasado</strong>.</p>
+            <div class="highlight" style="background:#EF4444;color:white;padding:15px;border-radius:8px;text-align:center;margin:20px 0;">
+              <p style="font-size:24px;font-weight:bold;">R$ ${data.totalDue.toFixed(2)}</p>
+              <p>Inclui multa + juros por atraso</p>
+            </div>
+            <p>Regularize para evitar o bloqueio do veículo.</p>
+          </div>
+          <div class="footer"><p>© Tubarão Empréstimos - Locação de Veículos</p></div>
+        </div>
+      </body></html>`;
+    await this.sendEmail({ to: data.clientEmail, subject: `URGENTE: Pagamento Atrasado - Semana ${data.weekNumber}`, html });
+  },
+
+  async notifyFleetVideoReminder(data: { clientEmail: string; clientName: string; weekNumber: number; dueDate: string }): Promise<void> {
+    const html = `
+      <!DOCTYPE html><html><head><style>${baseStyles}</style></head><body>
+        <div class="container">
+          <div class="header"><div class="logo">🦈 TUBARÃO LOCAÇÃO</div></div>
+          <div class="content">
+            <h1>Lembrete: Vídeos Obrigatórios</h1>
+            <p>Olá <strong>${data.clientName}</strong>,</p>
+            <p>Envie os 3 vídeos obrigatórios da <strong>Semana ${data.weekNumber}</strong> até <strong>${data.dueDate}</strong>:</p>
+            <ul><li>Vídeo exterior do veículo</li><li>Vídeo do painel/quilometragem</li><li>Vídeo na residência</li></ul>
+            <p>Acesse o aplicativo para enviar os vídeos.</p>
+          </div>
+          <div class="footer"><p>© Tubarão Empréstimos - Locação de Veículos</p></div>
+        </div>
+      </body></html>`;
+    await this.sendEmail({ to: data.clientEmail, subject: `Vídeos Obrigatórios - Semana ${data.weekNumber}`, html });
+  },
+
+  async notifyFleetRentalCreated(data: { clientEmail: string; clientName: string; vehicleInfo: string; weeklyRate: number; contractNumber: string }): Promise<void> {
+    const html = `
+      <!DOCTYPE html><html><head><style>${baseStyles}</style></head><body>
+        <div class="container">
+          <div class="header"><div class="logo">🦈 TUBARÃO LOCAÇÃO</div></div>
+          <div class="content">
+            <h1 style="color:#059669;">Locação Aprovada!</h1>
+            <p>Parabéns <strong>${data.clientName}</strong>,</p>
+            <p>Sua locação foi aprovada com sucesso!</p>
+            <div class="highlight" style="background:#059669;color:white;padding:20px;border-radius:8px;margin:20px 0;">
+              <p style="font-weight:bold;font-size:18px;">${data.vehicleInfo}</p>
+              <p>Contrato: ${data.contractNumber}</p>
+              <p style="font-size:24px;font-weight:bold;margin-top:10px;">R$ ${data.weeklyRate.toFixed(2)}/semana</p>
+            </div>
+            <p>Acesse o aplicativo para ver detalhes e efetuar pagamentos.</p>
+          </div>
+          <div class="footer"><p>© Tubarão Empréstimos - Locação de Veículos</p></div>
+        </div>
+      </body></html>`;
+    await this.sendEmail({ to: data.clientEmail, subject: `Locação Aprovada - ${data.vehicleInfo}`, html });
+  },
+
+  async notifyFleetVehicleBlocked(data: { clientEmail: string; clientName: string; reason: string }): Promise<void> {
+    const html = `
+      <!DOCTYPE html><html><head><style>${baseStyles}</style></head><body>
+        <div class="container">
+          <div class="header"><div class="logo">🦈 TUBARÃO LOCAÇÃO</div></div>
+          <div class="content">
+            <h1 style="color:#EF4444;">Veículo Bloqueado</h1>
+            <p>Olá <strong>${data.clientName}</strong>,</p>
+            <p>Seu veículo foi <strong>bloqueado</strong>.</p>
+            <div class="highlight" style="background:#EF4444;color:white;padding:15px;border-radius:8px;text-align:center;margin:20px 0;">
+              <p><strong>Motivo:</strong> ${data.reason}</p>
+            </div>
+            <p>Entre em contato urgente para resolver a situação.</p>
+          </div>
+          <div class="footer"><p>© Tubarão Empréstimos - Locação de Veículos</p></div>
+        </div>
+      </body></html>`;
+    await this.sendEmail({ to: data.clientEmail, subject: 'ALERTA: Veículo Bloqueado', html });
+  },
 
   async sendCustomEmail(to: string, subject: string, message: string): Promise<boolean> {
     const html = `

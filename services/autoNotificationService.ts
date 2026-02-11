@@ -668,7 +668,65 @@ export const autoNotificationService = {
             console.error('[WhatsApp] History error:', error);
             return [];
         }
-    }
+    },
+
+    // ============================================
+    // FLEET RENTAL NOTIFICATIONS
+    // ============================================
+
+    notifyRentalPaymentDue: async (customerEmail: string, customerName: string, weekNumber: number, amount: number, dueDate: string) => {
+        try {
+            const phone = await getCustomerPhone(customerEmail);
+            const msg = `Ola ${customerName}! Lembrete: seu pagamento semanal #${weekNumber} de R$ ${amount.toFixed(2)} vence em ${dueDate}. Pague via PIX no app. ${APP_LINK}`;
+
+            await autoNotificationService.createNotification(customerEmail, 'Pagamento Semanal', msg, 'INFO');
+            if (phone) await whatsappService.sendText(phone, msg).catch(() => {});
+            firebasePushService.sendToUser(customerEmail, 'Pagamento Semanal', `Semana ${weekNumber} - R$ ${amount.toFixed(2)} vence ${dueDate}`).catch(() => {});
+        } catch (err) { console.error('[Fleet] Payment due notification error:', err); }
+    },
+
+    notifyRentalPaymentLate: async (customerEmail: string, customerName: string, weekNumber: number, totalDue: number, daysLate: number) => {
+        try {
+            const phone = await getCustomerPhone(customerEmail);
+            const msg = `ATENCAO ${customerName}! Seu pagamento da semana ${weekNumber} esta ${daysLate} dia(s) atrasado. Total com multa/juros: R$ ${totalDue.toFixed(2)}. Regularize para evitar bloqueio. ${APP_LINK}`;
+
+            await autoNotificationService.createNotification(customerEmail, 'Pagamento Atrasado', msg, 'WARNING');
+            if (phone) await whatsappService.sendText(phone, msg).catch(() => {});
+            firebasePushService.sendToUser(customerEmail, 'Pagamento Atrasado!', `Semana ${weekNumber} - ${daysLate} dia(s) atrasado`).catch(() => {});
+        } catch (err) { console.error('[Fleet] Payment late notification error:', err); }
+    },
+
+    notifyVideoCheckDue: async (customerEmail: string, customerName: string, weekNumber: number, dueDate: string) => {
+        try {
+            const phone = await getCustomerPhone(customerEmail);
+            const msg = `Ola ${customerName}! Lembrete: envie seus videos obrigatorios da semana ${weekNumber} ate ${dueDate} pelo app. ${APP_LINK}`;
+
+            await autoNotificationService.createNotification(customerEmail, 'Video Semanal', msg, 'INFO');
+            if (phone) await whatsappService.sendText(phone, msg).catch(() => {});
+        } catch (err) { console.error('[Fleet] Video due notification error:', err); }
+    },
+
+    notifyRentalCreated: async (customerEmail: string, customerName: string, vehicleInfo: string, weeklyRate: number) => {
+        try {
+            const phone = await getCustomerPhone(customerEmail);
+            const msg = `Parabens ${customerName}! Sua locacao foi aprovada! Veiculo: ${vehicleInfo}. Valor semanal: R$ ${weeklyRate.toFixed(2)}. Acesse o app para detalhes. ${APP_LINK}`;
+
+            await autoNotificationService.createNotification(customerEmail, 'Locacao Aprovada!', msg, 'SUCCESS');
+            if (phone) await whatsappService.sendText(phone, msg).catch(() => {});
+            firebasePushService.sendToUser(customerEmail, 'Locacao Aprovada!', `${vehicleInfo} - R$ ${weeklyRate.toFixed(2)}/semana`).catch(() => {});
+        } catch (err) { console.error('[Fleet] Rental created notification error:', err); }
+    },
+
+    notifyVehicleBlocked: async (customerEmail: string, customerName: string, reason: string) => {
+        try {
+            const phone = await getCustomerPhone(customerEmail);
+            const msg = `ALERTA ${customerName}: Seu veiculo foi bloqueado. Motivo: ${reason}. Entre em contato urgente para resolver. ${APP_LINK}`;
+
+            await autoNotificationService.createNotification(customerEmail, 'Veiculo Bloqueado', msg, 'ALERT');
+            if (phone) await whatsappService.sendText(phone, msg).catch(() => {});
+            firebasePushService.sendToUser(customerEmail, 'Veiculo Bloqueado!', reason).catch(() => {});
+        } catch (err) { console.error('[Fleet] Vehicle blocked notification error:', err); }
+    },
 };
 
 export default autoNotificationService;

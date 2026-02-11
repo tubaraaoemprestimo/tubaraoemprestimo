@@ -187,6 +187,47 @@ export const SERVICE_TERMS = {
             ],
         },
     },
+
+    LOCACAO: {
+        title: 'Termos - Locação Semanal de Veículo',
+        color: 'emerald',
+        conditions: [
+            'Locação semanal com renovação automática',
+            'Valor semanal definido por veículo',
+            'Caução/depósito de segurança obrigatório',
+            'Vídeo semanal obrigatório: exterior do veículo, painel (km) e frente da residência',
+            'GPS do celular rastreado ao acessar o sistema, pagar e enviar vídeo',
+            'Multa por atraso: valor fixo + juros diários definidos pelo admin',
+            'Atraso superior a 7 dias: veículo sujeito a bloqueio',
+            'Manutenção preventiva e seguro são responsabilidade do locador',
+            'Cliente deve reportar qualquer incidente em até 24 horas',
+            'Proibido sublocação ou uso por terceiros não autorizados',
+        ],
+        documents: [
+            'CNH válida (categoria compatível com o veículo)',
+            'Documento com foto (RG ou CNH)',
+            'Comprovante de residência',
+            'Selfie segurando o documento',
+            'Vídeo da fachada da residência',
+        ],
+        checkboxText: `Declaro que li e compreendi as condições da Locação Semanal de Veículo, que o pagamento é semanal via PIX, que devo enviar vídeo semanal obrigatório mostrando o exterior do veículo, o painel com quilometragem e a frente da minha residência, que minha localização será rastreada via GPS do celular ao acessar o sistema, que em caso de atraso haverá multa fixa acrescida de juros diários, que o veículo pode ser bloqueado em caso de inadimplência superior a 7 dias, e que devo reportar qualquer incidente em até 24 horas.`,
+        contractTitle: 'CONTRATO DE LOCAÇÃO SEMANAL DE VEÍCULO',
+        contractText: `O(a) LOCATÁRIO(A), por meio deste instrumento, contrata a locação semanal do veículo descrito neste contrato, comprometendo-se a:
+
+1. Efetuar o pagamento semanal pontualmente via PIX até a data de vencimento;
+2. Enviar semanalmente os vídeos obrigatórios: exterior do veículo (mostrando estado de conservação), painel com quilometragem visível e vídeo na frente da residência;
+3. Manter o veículo em bom estado de conservação, responsabilizando-se por danos causados por mau uso;
+4. Não sublocar, emprestar ou permitir que terceiros não autorizados utilizem o veículo;
+5. Reportar qualquer incidente, acidente ou defeito mecânico em até 24 horas;
+6. Permitir o rastreamento de localização via aplicativo sempre que acessar o sistema;
+7. Devolver o veículo nas mesmas condições em que o recebeu, salvo desgaste natural.
+
+O LOCATÁRIO declara estar ciente de que:
+• O atraso no pagamento semanal acarretará multa fixa acrescida de juros diários;
+• O não envio dos vídeos obrigatórios gerará alerta e poderá resultar em suspensão;
+• A inadimplência superior a 7 dias autoriza o bloqueio e recolhimento do veículo;
+• O depósito/caução será retido em caso de danos ao veículo não cobertos pelo seguro.`,
+    },
 };
 
 export const GUARANTEE_TYPES = {

@@ -29,6 +29,10 @@ import { CommunicationHub } from './pages/admin/CommunicationHub';
 import { SecurityHub } from './pages/admin/SecurityHub';
 import { AIHub } from './pages/admin/AIHub';
 import { AnalyticsHub } from './pages/admin/AnalyticsHub';
+import { FleetHub } from './pages/admin/FleetHub';
+
+// Pages - Client Fleet
+import { FleetDashboard } from './pages/client/FleetDashboard';
 
 // Pages - Admin (mantidas para rotas legadas)
 import { FinancePage } from './pages/admin/Finance';
@@ -56,7 +60,8 @@ import {
   LayoutDashboard, FileText, Settings as SettingsIcon, LogOut, Users, Bot, Menu, X,
   UserCog, Home as HomeIcon, PieChart, User as UserIcon, Megaphone, BarChart3,
   Calendar, Ban, FileCheck, DollarSign, MessageSquare, Star, ChevronDown, ChevronRight,
-  MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload, Search
+  MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload, Search, Car, AlertTriangle as AlertTriangleIcon,
+  Video, Wrench, Settings2, Truck
 } from 'lucide-react';
 import { Logo } from './components/Logo';
 import { supabaseService } from './services/supabaseService';
@@ -239,6 +244,26 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           ]}
         />
 
+        {/* Locação */}
+        <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Locação</p>
+        <ExpandableMenu
+          icon={<Car size={18} />}
+          label="Gestão de Frota"
+          badge="NEW"
+          isActive={isActive}
+          onItemClick={() => setIsMobileMenuOpen(false)}
+          items={[
+            { to: '/admin/fleet-hub', label: 'Dashboard', icon: <PieChart size={14} /> },
+            { to: '/admin/fleet-hub?tab=vehicles', label: 'Veículos', icon: <Truck size={14} /> },
+            { to: '/admin/fleet-hub?tab=rentals', label: 'Locações', icon: <FileText size={14} /> },
+            { to: '/admin/fleet-hub?tab=payments', label: 'Pagamentos', icon: <DollarSign size={14} /> },
+            { to: '/admin/fleet-hub?tab=videos', label: 'Vídeos', icon: <Video size={14} /> },
+            { to: '/admin/fleet-hub?tab=maintenance', label: 'Manutenção', icon: <Wrench size={14} /> },
+            { to: '/admin/fleet-hub?tab=alerts', label: 'Alertas', icon: <AlertTriangleIcon size={14} /> },
+            { to: '/admin/fleet-hub?tab=settings', label: 'Configurações', icon: <Settings2 size={14} /> },
+          ]}
+        />
+
         {/* Segurança */}
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Segurança</p>
         <ExpandableMenu
@@ -371,6 +396,9 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
         <Link to="/client/profile" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/profile')}`}>
           <UserIcon size={20} /> Meu Perfil
         </Link>
+        <Link to="/client/fleet-dashboard" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/fleet-dashboard')}`}>
+          <Car size={20} /> Meu Veículo
+        </Link>
         <Link to="/client/help" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/help')}`}>
           <MessageSquare size={20} /> Ajuda
         </Link>
@@ -474,6 +502,7 @@ function App() {
             <Route path="/client/statement" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Statement /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/help" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><HelpCenter /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/documents" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><MyDocuments /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/fleet-dashboard" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><FleetDashboard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
 
             {/* Admin Protected - Core */}
             <Route path="/admin" element={<AdminLayout><Dashboard /></AdminLayout>} />
@@ -490,6 +519,7 @@ function App() {
             <Route path="/admin/security-hub" element={<AdminLayout><SecurityHub /></AdminLayout>} />
             <Route path="/admin/ai-hub" element={<AdminLayout><AIHub /></AdminLayout>} />
             <Route path="/admin/analytics-hub" element={<AdminLayout><AnalyticsHub /></AdminLayout>} />
+            <Route path="/admin/fleet-hub" element={<AdminLayout><FleetHub /></AdminLayout>} />
 
             {/* Admin Protected - Páginas legadas (ainda acessíveis) */}
             <Route path="/admin/finance" element={<AdminLayout><FinancePage /></AdminLayout>} />

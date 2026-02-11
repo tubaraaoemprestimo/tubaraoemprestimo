@@ -46,7 +46,7 @@ export interface LoanRequest {
   date: string;
 
   // Tipo de Perfil/Serviço - Multi Sistema
-  profileType?: 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA' | 'LIMPA_NOME' | 'GARANTIA_VEICULO' | 'INVESTIDOR';
+  profileType?: 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA' | 'LIMPA_NOME' | 'GARANTIA_VEICULO' | 'INVESTIDOR' | 'LOCACAO';
 
   // Campos GARANTIA
   guaranteeType?: 'veiculo' | 'eletronico';
@@ -714,3 +714,195 @@ export const INVESTOR_RATES = {
     ANNUAL: 6.0,     // 6% ao mês (acumulado anual)
   },
 } as const;
+
+// ==================== FLEET RENTAL TYPES ====================
+
+export type VehicleType = 'CAR' | 'MOTORCYCLE' | 'VAN' | 'TRUCK';
+export type VehicleStatus = 'AVAILABLE' | 'RENTED' | 'MAINTENANCE' | 'BLOCKED' | 'RETIRED';
+export type RentalStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'COMPLETED' | 'CANCELLED';
+export type RentalPaymentStatus = 'PENDING' | 'PAID' | 'LATE' | 'CANCELLED';
+export type VideoCheckStatus = 'PENDING' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+export type MaintenanceTicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CANCELLED';
+export type FleetAlertType = 'NO_ACCESS' | 'NO_VIDEO' | 'LATE_PAYMENT' | 'LOCATION_CHANGE' | 'VEHICLE_BLOCKED';
+
+export interface FleetVehicle {
+    id: string;
+    type: VehicleType;
+    brand: string;
+    model: string;
+    year: number;
+    licensePlate: string;
+    color?: string;
+    chassis?: string;
+    renavam?: string;
+    weeklyRate: number;
+    depositAmount: number;
+    mileage: number;
+    fuelType?: string;
+    status: VehicleStatus;
+    photoUrls: string[];
+    notes?: string;
+    insurancePolicy?: string;
+    insuranceExpiresAt?: string;
+    nextInspectionAt?: string;
+    blockable: boolean;
+    createdAt: string;
+    updatedAt?: string;
+}
+
+export interface FleetRental {
+    id: string;
+    vehicleId: string;
+    customerId: string;
+    contractNumber?: string;
+    status: RentalStatus;
+    startDate: string;
+    endDate?: string;
+    weeklyRate: number;
+    depositAmount: number;
+    depositPaid: boolean;
+    lateFixedFee: number;
+    lateDailyInterest: number;
+    contractPdfUrl?: string;
+    signatureUrl?: string;
+    signedAt?: string;
+    signIp?: string;
+    signLatitude?: number;
+    signLongitude?: number;
+    termsAccepted: boolean;
+    termsAcceptedAt?: string;
+    adminNotes?: string;
+    cancelledReason?: string;
+    createdAt: string;
+    updatedAt?: string;
+    // Joined
+    vehicle?: FleetVehicle;
+    customerName?: string;
+    customerCpf?: string;
+    customerPhone?: string;
+    customerEmail?: string;
+}
+
+export interface FleetWeeklyPayment {
+    id: string;
+    rentalId: string;
+    customerId: string;
+    weekNumber: number;
+    periodStart: string;
+    periodEnd: string;
+    amount: number;
+    lateFee: number;
+    lateInterest: number;
+    totalDue: number;
+    status: RentalPaymentStatus;
+    pixCode?: string;
+    proofUrl?: string;
+    paidAt?: string;
+    confirmedBy?: string;
+    confirmedAt?: string;
+    dueDate: string;
+    createdAt: string;
+}
+
+export interface FleetVideoCheck {
+    id: string;
+    rentalId: string;
+    customerId: string;
+    weekNumber: number;
+    dueDate: string;
+    videoExteriorUrl?: string;
+    videoDashboardUrl?: string;
+    videoResidenceUrl?: string;
+    latitude?: number;
+    longitude?: number;
+    accuracy?: number;
+    address?: string;
+    capturedAt?: string;
+    status: VideoCheckStatus;
+    adminNotes?: string;
+    reviewedBy?: string;
+    reviewedAt?: string;
+    createdAt: string;
+}
+
+export interface FleetLocationLog {
+    id: string;
+    rentalId: string;
+    customerId: string;
+    eventType: string;
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    address?: string;
+    deviceInfo?: string;
+    ipAddress?: string;
+    createdAt: string;
+}
+
+export interface FleetMaintenanceTicket {
+    id: string;
+    vehicleId: string;
+    rentalId?: string;
+    customerId?: string;
+    type: 'MAINTENANCE' | 'INCIDENT' | 'INSPECTION';
+    title: string;
+    description: string;
+    photoUrls: string[];
+    priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+    status: MaintenanceTicketStatus;
+    resolution?: string;
+    resolvedBy?: string;
+    resolvedAt?: string;
+    scheduledAt?: string;
+    cost?: number;
+    createdAt: string;
+    updatedAt?: string;
+}
+
+export interface FleetAlert {
+    id: string;
+    rentalId?: string;
+    customerId?: string;
+    vehicleId?: string;
+    type: FleetAlertType;
+    title: string;
+    message: string;
+    severity: 'INFO' | 'WARNING' | 'CRITICAL';
+    resolved: boolean;
+    resolvedAt?: string;
+    resolvedBy?: string;
+    metadata?: Record<string, any>;
+    createdAt: string;
+}
+
+export interface FleetSettings {
+    id: string;
+    defaultLateFixedFee: number;
+    defaultLateDailyInterest: number;
+    videoCheckRequired: boolean;
+    videoCheckDayOfWeek: number;
+    autoGeneratePix: boolean;
+    autoSendWhatsappReminders: boolean;
+    autoSendEmailReminders: boolean;
+    daysBeforeDueReminder: number;
+    maxDaysLateBeforeBlock: number;
+    pixKey?: string;
+    pixKeyType?: string;
+    pixReceiverName?: string;
+    updatedAt: string;
+}
+
+export const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
+    CAR: 'Carro',
+    MOTORCYCLE: 'Moto',
+    VAN: 'Van',
+    TRUCK: 'Caminhao',
+};
+
+export const VEHICLE_STATUS_LABELS: Record<VehicleStatus, string> = {
+    AVAILABLE: 'Disponivel',
+    RENTED: 'Alugado',
+    MAINTENANCE: 'Manutencao',
+    BLOCKED: 'Bloqueado',
+    RETIRED: 'Inativo',
+};
