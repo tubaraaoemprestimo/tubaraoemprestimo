@@ -35,30 +35,38 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({ children, requir
     const checkExistingPermissions = async () => {
         setChecking(true);
 
-        // Verificar localização
+        // Verificar localizacao
         if ('geolocation' in navigator) {
+            // iOS Safari nao suporta navigator.permissions.query para geolocation
+            // Entao verificamos se ja temos acesso tentando a Permissions API primeiro
+            // e se falhar, deixamos como 'pending' (usuario precisa clicar o botao)
             try {
-                const permResult = await navigator.permissions.query({ name: 'geolocation' });
-                if (permResult.state === 'granted') {
-                    setLocationStatus('granted');
-                } else if (permResult.state === 'denied') {
-                    setLocationStatus('denied');
+                if (navigator.permissions && navigator.permissions.query) {
+                    const permResult = await navigator.permissions.query({ name: 'geolocation' });
+                    if (permResult.state === 'granted') {
+                        setLocationStatus('granted');
+                    } else if (permResult.state === 'denied') {
+                        setLocationStatus('denied');
+                    } else {
+                        setLocationStatus('pending');
+                    }
+                    permResult.onchange = () => {
+                        if (permResult.state === 'granted') setLocationStatus('granted');
+                        else if (permResult.state === 'denied') setLocationStatus('denied');
+                    };
                 } else {
+                    // iOS Safari: Permissions API nao disponivel, manter como pending
                     setLocationStatus('pending');
                 }
-                // Ouvir mudanças
-                permResult.onchange = () => {
-                    if (permResult.state === 'granted') setLocationStatus('granted');
-                    else if (permResult.state === 'denied') setLocationStatus('denied');
-                };
             } catch {
+                // Fallback: manter como pending (nao concedido)
                 setLocationStatus('pending');
             }
         } else {
             setLocationStatus('unavailable');
         }
 
-        // Verificar notificação
+        // Verificar notificacao
         if ('Notification' in window) {
             if (Notification.permission === 'granted') {
                 setNotificationStatus('granted');
@@ -68,6 +76,8 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({ children, requir
                 setNotificationStatus('pending');
             }
         } else {
+            // iOS Safari sem suporte a Notification API = unavailable
+            // Mas como e obrigatorio, mostramos como 'pending' com instrucao de instalar o app
             setNotificationStatus('unavailable');
         }
 
@@ -116,10 +126,9 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({ children, requir
         return <>{children}</>;
     }
 
-    // Localização é OBRIGATÓRIA - se indisponível no browser, bloqueia
+    // AMBAS as permissoes sao OBRIGATORIAS - sem excecao
     const locationOk = locationStatus === 'granted';
-    // Notificação: ok se concedida OU se indisponível (alguns browsers mobile não suportam)
-    const notificationOk = notificationStatus === 'granted' || notificationStatus === 'unavailable';
+    const notificationOk = notificationStatus === 'granted';
 
     if (locationOk && notificationOk) {
         return <>{children}</>;
@@ -275,6 +284,24 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({ children, requir
                                     {notificationStatus === 'requesting' && (
                                         <div className="mt-3 py-3 bg-zinc-800 rounded-xl text-center text-zinc-400 text-sm flex items-center justify-center gap-2">
                                             <Loader2 size={16} className="animate-spin" /> Aguardando permissão...
+                                        </div>
+                                    )}
+
+                                    {notificationStatus === 'unavailable' && (
+                                        <div className="mt-3 p-3 bg-yellow-900/20 border border-yellow-500/30 rounded-xl">
+                                            <p className="text-yellow-400 text-xs flex items-center gap-1 mb-2">
+                                                <AlertTriangle size={14} />
+                                                Notificações não disponíveis neste navegador.
+                                            </p>
+                                            <p className="text-zinc-400 text-xs leading-relaxed">
+                                                <strong>iPhone/iPad:</strong> Toque em <span className="text-white">Compartilhar</span> (ícone ↑) → <span className="text-white">"Adicionar à Tela de Início"</span> e abra o app pela tela inicial.
+                                            </p>
+                                            <button
+                                                onClick={() => checkExistingPermissions()}
+                                                className="mt-2 w-full py-2 bg-yellow-900/30 text-yellow-300 rounded-lg text-xs font-bold hover:bg-yellow-900/50"
+                                            >
+                                                Já instalei, verificar novamente
+                                            </button>
                                         </div>
                                     )}
 
