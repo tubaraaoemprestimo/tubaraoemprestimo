@@ -5,7 +5,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff, Loader2, CheckCircle2, Phone } from 'lucide-react';
+import { User, Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff, Loader2, Phone } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
 import { supabaseService } from '../../services/supabaseService';
@@ -23,7 +23,6 @@ const Register: React.FC = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [registered, setRegistered] = useState(false);
 
     const formatPhone = (value: string) => {
         const digits = value.replace(/\D/g, '');
@@ -75,67 +74,27 @@ const Register: React.FC = () => {
                 return;
             }
 
-            setRegistered(true);
-            addToast('Cadastro realizado! Verifique seu email para confirmar.', 'success');
+            // Login automatico apos cadastro - redireciona direto para o app
+            addToast('Cadastro realizado com sucesso!', 'success');
+
+            try {
+                const loginResult = await supabaseService.auth.signIn({ identifier: email, password }) as any;
+                if (loginResult.user) {
+                    navigate('/client/dashboard');
+                    return;
+                }
+            } catch {
+                // Se auto-login falhar, vai para tela de login
+            }
+
+            // Fallback: redireciona para login
+            navigate('/login');
         } catch (error: any) {
             addToast('Erro ao criar conta. Tente novamente.', 'error');
         } finally {
             setLoading(false);
         }
     };
-
-    // Tela de sucesso - aguardando confirmação de email
-    if (registered) {
-        return (
-            <div className="min-h-screen bg-black flex items-center justify-center p-4">
-                <div className="w-full max-w-md text-center">
-                    <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-[0_0_60px_rgba(34,197,94,0.3)]">
-                        <CheckCircle2 size={48} className="text-white" />
-                    </div>
-                    <h1 className="text-3xl font-bold text-white mb-3">Cadastro Realizado!</h1>
-                    <p className="text-zinc-400 mb-6 leading-relaxed">
-                        Enviamos um email de confirmação para <strong className="text-[#D4AF37]">{email}</strong>.
-                        Clique no link do email para ativar sua conta e poder solicitar serviços.
-                    </p>
-
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-6">
-                        <div className="flex items-start gap-3 text-left">
-                            <Mail size={24} className="text-[#D4AF37] flex-shrink-0 mt-1" />
-                            <div>
-                                <h3 className="text-white font-bold mb-1">Verifique seu email</h3>
-                                <ul className="text-zinc-400 text-sm space-y-1">
-                                    <li>1. Abra seu email ({email})</li>
-                                    <li>2. Procure o email da Tubarão Empréstimos</li>
-                                    <li>3. Clique no link de confirmação</li>
-                                    <li>4. Volte aqui e faça login</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        <Button
-                            onClick={() => navigate('/login')}
-                            className="w-full bg-[#D4AF37] text-black"
-                        >
-                            <ArrowRight size={18} className="mr-2" /> Ir para Login
-                        </Button>
-
-                        <button
-                            onClick={() => {
-                                setRegistered(false);
-                                setPassword('');
-                                setConfirmPassword('');
-                            }}
-                            className="text-zinc-500 text-sm hover:text-zinc-300"
-                        >
-                            Tentar com outro email
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen bg-black flex items-center justify-center p-4">

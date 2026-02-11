@@ -120,9 +120,7 @@ export const Login: React.FC = () => {
         const errMsg = result.error?.message || '';
         const errCode = result.error?.code || '';
 
-        if (errMsg.toLowerCase().includes('email not confirmed') || errMsg.toLowerCase().includes('email_not_confirmed')) {
-          setError('Seu email ainda não foi confirmado. Verifique sua caixa de entrada e clique no link de confirmação.');
-        } else if (errCode === 'DEVICE_BLOCKED') {
+        if (errCode === 'DEVICE_BLOCKED') {
           setError(errMsg);
         } else {
           // Antifraud Log - Failed Attempt
