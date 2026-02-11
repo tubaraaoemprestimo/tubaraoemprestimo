@@ -582,96 +582,6 @@ export async function uploadContractPdf(pdfBlob: Blob, cpf: string, profileType:
 // =====================================================
 // ORQUESTRADOR: Gera HTML > PDF > Upload > Retorna URL
 // =====================================================
-// =====================================================
-// RENTAL CONTRACT HTML (LOCACAO)
-// =====================================================
-export function generateRentalContractHTML(
-    data: {
-        name: string;
-        cpf: string;
-        phone: string;
-        email: string;
-        vehicleInfo?: string;
-        licensePlate?: string;
-        weeklyRate?: number;
-        depositAmount?: number;
-        contractNumber?: string;
-    },
-    signatureUrl: string,
-    brandSettings?: { companyName?: string; cnpj?: string; logoUrl?: string | null; address?: string }
-): string {
-    const docHash = generateHash(`LOCACAO-${data.cpf}-${Date.now()}`);
-    const qrUrl = generateQRCodeUrl(docHash);
-    const now = new Date();
-    const dateFormatted = now.toLocaleDateString('pt-BR');
-    const companyName = brandSettings?.companyName || 'Tubarao Emprestimos S.A.';
-    const cnpj = brandSettings?.cnpj || '00.000.000/0001-00';
-    const address = brandSettings?.address || '';
-
-    const termData = SERVICE_TERMS['LOCACAO'];
-    const conditions = termData?.conditions || [];
-
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${getDocumentCSS()}</style></head><body>
-<div class="document-container">
-    <div class="header">
-        <div><h1 style="font-size:20px;font-weight:700;">CONTRATO DE LOCACAO DE VEICULO</h1><p style="font-size:12px;margin-top:4px;">${companyName}</p></div>
-        <div style="text-align:right;"><p style="font-size:11px;">N: ${data.contractNumber || docHash.substring(0, 16)}</p><p style="font-size:11px;">${dateFormatted}</p></div>
-    </div>
-    <div style="padding:30px 35px;">
-        <div class="section">
-            <h2 class="section-title">1. PARTES</h2>
-            <p><strong>LOCADORA:</strong> ${companyName}, CNPJ ${cnpj}${address ? `, ${address}` : ''}</p>
-            <p style="margin-top:8px;"><strong>LOCATARIO:</strong> ${data.name}, CPF ${data.cpf}, Tel: ${data.phone}, Email: ${data.email}</p>
-        </div>
-        <div class="section">
-            <h2 class="section-title">2. VEICULO</h2>
-            <p><strong>Veiculo:</strong> ${data.vehicleInfo || 'A definir pela locadora'}</p>
-            <p><strong>Placa:</strong> ${data.licensePlate || 'A definir'}</p>
-        </div>
-        <div class="section">
-            <h2 class="section-title">3. VALORES</h2>
-            <p><strong>Valor Semanal:</strong> R$ ${(data.weeklyRate || 0).toFixed(2)}</p>
-            <p><strong>Caucao:</strong> R$ ${(data.depositAmount || 0).toFixed(2)}</p>
-        </div>
-        <div class="section">
-            <h2 class="section-title">4. CONDICOES</h2>
-            <ul style="list-style:disc;padding-left:20px;">
-                ${conditions.map(c => `<li style="margin-bottom:6px;font-size:13px;">${c}</li>`).join('')}
-            </ul>
-        </div>
-        <div class="section">
-            <h2 class="section-title">5. OBRIGACOES DO LOCATARIO</h2>
-            <ul style="list-style:disc;padding-left:20px;font-size:13px;">
-                <li>Manter o veiculo em bom estado de conservacao</li>
-                <li>Efetuar pagamentos semanais pontualmente via PIX</li>
-                <li>Enviar videos obrigatorios semanais (exterior, painel, residencia)</li>
-                <li>Permitir rastreamento GPS durante vigencia do contrato</li>
-                <li>Nao sublocar ou emprestar o veiculo a terceiros</li>
-                <li>Comunicar imediatamente qualquer incidente ou avaria</li>
-            </ul>
-        </div>
-        <div class="section" style="margin-top:30px;">
-            <h2 class="section-title">ASSINATURA DIGITAL</h2>
-            <div style="display:flex;gap:30px;align-items:flex-end;margin-top:15px;">
-                <div style="flex:1;">
-                    <p style="font-size:12px;color:#666;">Assinatura do Locatario:</p>
-                    ${signatureUrl ? `<img src="${signatureUrl}" style="max-height:80px;margin-top:8px;" />` : '<div style="border-bottom:1px solid #333;height:60px;"></div>'}
-                    <p style="font-size:11px;margin-top:4px;"><strong>${data.name}</strong></p>
-                    <p style="font-size:10px;color:#666;">CPF: ${data.cpf}</p>
-                </div>
-                <div style="text-align:center;">
-                    <img src="${qrUrl}" style="width:80px;height:80px;" />
-                    <p style="font-size:8px;color:#999;margin-top:4px;">${docHash}</p>
-                </div>
-            </div>
-        </div>
-        <div style="margin-top:20px;padding-top:15px;border-top:1px solid #eee;text-align:center;">
-            <p style="font-size:9px;color:#999;">Documento gerado eletronicamente em ${now.toLocaleString('pt-BR')} | Hash: ${docHash}</p>
-        </div>
-    </div>
-</div></body></html>`;
-}
-
 export async function generateAndUploadContract(
     profileType: string,
     formData: {
@@ -692,9 +602,7 @@ export async function generateAndUploadContract(
 
     // 1. Gerar HTML
     let html: string;
-    if (profileType === 'LOCACAO') {
-        html = generateRentalContractHTML(formData, signatureUrl, brandSettings);
-    } else if (profileType === 'LIMPA_NOME') {
+    if (profileType === 'LIMPA_NOME') {
         html = generateLimpaNomeContractHTML(formData, signatureUrl, brandSettings);
     } else {
         html = generateGenericContractHTML(
@@ -729,7 +637,6 @@ export async function generateAndUploadContract(
 export const contractPdfService = {
     generateLimpaNomeContractHTML,
     generateGenericContractHTML,
-    generateRentalContractHTML,
     generatePdfFromHTML,
     uploadContractPdf,
     generateAndUploadContract,

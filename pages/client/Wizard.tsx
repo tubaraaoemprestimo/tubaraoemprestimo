@@ -32,7 +32,7 @@ const guaranteeTypes = [
 ];
 
 // NOVOS Tipos de Perfil - Multi Sistema (6 Serviços)
-type ProfileType = 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA' | 'LIMPA_NOME' | 'INVESTIDOR' | 'LOCACAO' | '';
+type ProfileType = 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA' | 'LIMPA_NOME' | 'INVESTIDOR' | '';
 
 // Configuração dos perfis com descrições e cores para Admin
 const profileOptions = [
@@ -84,14 +84,6 @@ const profileOptions = [
     color: 'text-cyan-400',
     adminColor: 'bg-cyan-600'
   },
-  {
-    id: 'LOCACAO',
-    label: 'Locação de Veículo',
-    icon: Car,
-    description: 'Aluguel semanal de veículos com cobrança via PIX',
-    color: 'text-emerald-400',
-    adminColor: 'bg-emerald-600'
-  },
 ];
 
 // Steps dinâmicos baseados no perfil
@@ -105,18 +97,6 @@ const getStepsForProfile = (profile: ProfileType) => {
       { id: 4, title: 'Investimento', icon: DollarSign },
       { id: 5, title: 'Banco', icon: Landmark },
       { id: 6, title: 'Termos', icon: FileSignature },
-      { id: 7, title: 'Confirmar', icon: CheckCircle2 },
-    ];
-  }
-  // LOCACAO: Serviço > Termos > Dados > Documentos > Videos > Contrato > Confirmar
-  if (profile === 'LOCACAO') {
-    return [
-      { id: 1, title: 'Serviço', icon: Users },
-      { id: 2, title: 'Termos', icon: Shield },
-      { id: 3, title: 'Dados', icon: User },
-      { id: 4, title: 'Documentos', icon: FileText },
-      { id: 5, title: 'Vídeos', icon: Video },
-      { id: 6, title: 'Contrato', icon: FileSignature },
       { id: 7, title: 'Confirmar', icon: CheckCircle2 },
     ];
   }
@@ -425,7 +405,7 @@ export const Wizard: React.FC = () => {
         addToast("Selecione um serviço para continuar.", 'warning');
         return;
       }
-      // Cliente recorrente apenas para CLT, AUTONOMO e GARANTIA (nao INVESTIDOR, MOTO, LIMPA_NOME, LOCACAO)
+      // Cliente recorrente apenas para CLT, AUTONOMO e GARANTIA (nao INVESTIDOR, MOTO, LIMPA_NOME)
       if ((profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'GARANTIA') && !isReturningClient) {
         addToast("Por favor, informe se já é nosso cliente.", 'warning');
         return;
@@ -1249,7 +1229,7 @@ export const Wizard: React.FC = () => {
               </div>
 
               {/* Pergunta sobre cliente recorrente - apenas CLT, AUTONOMO e GARANTIA */}
-              {profileType && profileType !== 'MOTO' && profileType !== 'LIMPA_NOME' && profileType !== 'INVESTIDOR' && profileType !== 'LOCACAO' && (
+              {profileType && profileType !== 'MOTO' && profileType !== 'LIMPA_NOME' && profileType !== 'INVESTIDOR' && (
                 <div className="mt-6 p-5 bg-zinc-800/50 rounded-2xl border border-zinc-700 animate-in fade-in slide-in-from-bottom-2">
                   <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                     <Users size={18} className="text-[#D4AF37]" />
