@@ -456,6 +456,24 @@ export const Requests: React.FC = () => {
                                 </div>
                             )}
 
+                            {/* Contrato PDF Download */}
+                            {selectedRequest.contractPdfUrl && (
+                                <div className="flex items-center gap-3 p-3 bg-zinc-900 border border-emerald-500/30 rounded-xl">
+                                    <div className="flex-1">
+                                        <p className="text-xs text-zinc-500">Contrato Assinado (PDF)</p>
+                                        <p className="text-white font-bold text-sm">Documento gerado automaticamente</p>
+                                    </div>
+                                    <a
+                                        href={selectedRequest.contractPdfUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-sm transition-all shrink-0"
+                                    >
+                                        <Download size={16} /> Baixar PDF
+                                    </a>
+                                </div>
+                            )}
+
                             {/* Endereço do Cliente */}
                             {(() => {
                                 let extraAddr: any = null;

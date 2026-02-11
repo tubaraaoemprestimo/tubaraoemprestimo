@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronRight, Wallet, Plus, Calendar, FileText, TrendingUp, X, Percent, Eye, EyeOff, Gift, Tag, Sparkles, AlertTriangle, Upload, CheckCircle, Calculator, Ticket, Megaphone, Briefcase } from 'lucide-react';
+import { Bell, ChevronRight, Wallet, Plus, Calendar, FileText, TrendingUp, X, Percent, Eye, EyeOff, Gift, Tag, Sparkles, AlertTriangle, Upload, CheckCircle, Calculator, Ticket, Megaphone, Briefcase, Download } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Skeleton } from '../../components/Skeleton';
 import { supabaseService } from '../../services/supabaseService';
@@ -45,6 +45,9 @@ export const ClientDashboard: React.FC = () => {
   // Upload Modal for Waiting Docs
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  // Contract PDF
+  const [contractPdfUrl, setContractPdfUrl] = useState<string | null>(null);
 
   // Renegotiation State
   const [renegotiateInstallments, setRenegotiateInstallments] = useState(12);
@@ -125,6 +128,22 @@ export const ClientDashboard: React.FC = () => {
     setPreApprovedAmount(preApproved);
     setInstallmentOffer(offer);
     setCoupons(clientCoupons);
+
+    // Buscar URL do contrato PDF (se existir)
+    try {
+      const latestReq = await supabaseService.getClientLatestRequest();
+      if (latestReq) {
+        // Tentar campo dedicado primeiro, depois fallback para supplemental_description
+        let pdfUrl = latestReq.contract_pdf_url;
+        if (!pdfUrl && latestReq.supplemental_description) {
+          try {
+            const desc = JSON.parse(latestReq.supplemental_description);
+            pdfUrl = desc.contractPdfUrl;
+          } catch { }
+        }
+        if (pdfUrl) setContractPdfUrl(pdfUrl);
+      }
+    } catch { }
 
     if (user) {
       const code = await referralService.getOrCreateCode(user.id, user.name);
@@ -307,6 +326,23 @@ export const ClientDashboard: React.FC = () => {
             amount={pendingRequest.amount}
             installments={pendingRequest.installments}
           />
+        )}
+
+        {/* Contract PDF Download Card */}
+        {contractPdfUrl && (
+          <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-green-900/20 rounded-2xl p-4 border border-green-500/30 flex items-center gap-4">
+            <div className="bg-green-500/20 p-3 rounded-xl">
+              <FileText size={24} className="text-green-400" />
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-white text-sm">Contrato Assinado</p>
+              <p className="text-xs text-zinc-400">Seu contrato foi gerado em PDF</p>
+            </div>
+            <a href={contractPdfUrl} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-sm transition-all shrink-0">
+              <Download size={16} /> Baixar PDF
+            </a>
+          </div>
         )}
 
         {/* Main Debt Card */}

@@ -1,6 +1,6 @@
 # 🦈 Tubarão Empréstimos — Resumo do Projeto
 
-> **Última atualização:** 2026-02-10
+> **Última atualização:** 2026-02-10 (v2)
 > **Repositório:** https://github.com/tubaraaoemprestimo/tubaraoemprestimo.git
 > **Produção:** https://www.tubaraoemprestimo.com.br
 > **Stack:** React + TypeScript + Vite + Supabase
@@ -171,6 +171,60 @@ TUBARÃO EMPRESTIMOS/
 
 ---
 
+## 📄 Geração de PDF do Contrato Assinado
+
+### Visão Geral
+Ao completar o Wizard de solicitação, o sistema gera automaticamente um **PDF real** do contrato assinado e faz upload para o Supabase Storage. O PDF fica disponível para download tanto pelo **cliente** (no Dashboard) quanto pelo **admin** (na tela de Solicitações).
+
+### Fluxo Completo
+```
+Cliente completa o Wizard (qualquer perfil)
+  → Assinatura capturada via SignaturePad
+  → Submit dos dados ao Supabase
+  → contractPdfService gera HTML estilizado do contrato
+  → html2pdf.js converte HTML → PDF Blob (client-side)
+  → Upload do PDF para Supabase Storage (documents/contracts/{cpf}/)
+  → URL salva na tabela loan_requests (contract_pdf_url)
+  → Cliente redirecionado ao Dashboard
+```
+
+### Arquivos Envolvidos
+| Arquivo | Função |
+|---------|--------|
+| `services/contractPdfService.ts` | Serviço principal: gera HTML, converte PDF, faz upload |
+| `pages/client/Wizard.tsx` | Chama o serviço após submit bem-sucedido (em background) |
+| `pages/client/ClientDashboard.tsx` | Card "Contrato Assinado" com botão "Baixar PDF" |
+| `pages/admin/Requests.tsx` | Botão "Baixar PDF" no modal de detalhes da solicitação |
+| `services/supabaseService.ts` | `updateContractPdfUrl()` e `getClientLatestRequest()` |
+| `types.ts` | Campo `contractPdfUrl` na interface `LoanRequest` |
+
+### Funções do contractPdfService
+- `generateLimpaNomeContractHTML()` — HTML do Termo de Autorização e Representação (Limpa Nome)
+- `generateGenericContractHTML()` — HTML do contrato para CLT, Autônomo, Moto, Garantia
+- `generatePdfFromHTML()` — Converte HTML para PDF Blob via html2pdf.js (importação dinâmica)
+- `uploadContractPdf()` — Upload para Supabase Storage
+- `generateAndUploadContract()` — Orquestra tudo: HTML → PDF → Upload → retorna URL
+
+### Conteúdo do PDF
+- Header dourado com logo + nome da empresa + CNPJ
+- Dados do cliente (nome, CPF, telefone, email)
+- Dados financeiros (valor, parcelas, juros, total) — para empréstimos
+- Condições do serviço/empréstimo (carregadas do `serviceTerms.ts`)
+- Texto do contrato completo (para Limpa Nome: Termo de Autorização)
+- Seção de assinaturas com imagem da assinatura digital
+- Rodapé com hash de verificação + QR Code de autenticidade
+- Layout otimizado para impressão (A4)
+
+### Armazenamento
+- **Bucket:** `documents` (Supabase Storage)
+- **Caminho:** `contracts/{cpf_numeros}/contrato_{tipo}_{timestamp}.pdf`
+- **Persistência da URL:** Campo `contract_pdf_url` na tabela `loan_requests` (com fallback para campo JSON `supplemental_description.contractPdfUrl`)
+
+### Dependência
+- `html2pdf.js` — Biblioteca leve, client-side, sem necessidade de backend. Importada dinamicamente para code-splitting automático.
+
+---
+
 ## 🚀 Landing Page (SalesPage)
 
 ### URL: `/#/site`
@@ -251,7 +305,14 @@ git push origin main
 
 ## 📝 Últimas Alterações (2026-02-10)
 
-1. ✅ **Página de Cadastro** (`/register`) — Nome, email, WhatsApp, senha
+1. ✅ **Geração de PDF do Contrato Assinado** — PDF real gerado automaticamente ao completar o Wizard
+    - `services/contractPdfService.ts` criado com geração HTML + conversão PDF + upload Storage
+    - Suporta TODOS os perfis: CLT, Autônomo, Moto, Garantia, Limpa Nome
+    - PDF com header dourado, dados do contrato, assinatura digital, hash + QR Code
+    - Card "Contrato Assinado" no Dashboard do cliente com botão "Baixar PDF"
+    - Botão "Baixar PDF" no painel admin (Requests.tsx) para download direto
+    - Dependência: `html2pdf.js` (client-side, code-split automático)
+2. ✅ **Página de Cadastro** (`/register`) — Nome, email, WhatsApp, senha
 2. ✅ **Email de confirmação** — Supabase envia automaticamente, redirect para login
 3. ✅ **Página ResetPassword** (`/reset-password`) — Detecta token, permite nova senha
 4. ✅ **PermissionGate** — Localização OBRIGATÓRIA, notificação obrigatória

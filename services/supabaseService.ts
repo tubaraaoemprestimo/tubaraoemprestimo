@@ -813,7 +813,14 @@ export const supabaseService = {
                 uploadedAt: r.supplemental_uploaded_at
             } : undefined,
             supplementalDescription: r.supplemental_description || undefined,
-            signatureUrl: r.signature_url
+            signatureUrl: r.signature_url,
+            contractPdfUrl: r.contract_pdf_url || (() => {
+                // Fallback: tentar extrair do supplemental_description JSON
+                try {
+                    const desc = JSON.parse(r.supplemental_description || '{}');
+                    return desc.contractPdfUrl || undefined;
+                } catch { return undefined; }
+            })()
         }));
     },
 
@@ -2140,6 +2147,67 @@ export const supabaseService = {
             console.error('❌ Upload error:', error?.message || error);
             return null;
         }
+    },
+
+    // Update contract PDF URL on loan_requests table
+    updateContractPdfUrl: async (requestId: string, pdfUrl: string): Promise<boolean> => {
+        try {
+            // Tentativa 1: campo dedicado contract_pdf_url
+            const { error } = await supabase
+                .from('loan_requests')
+                .update({ contract_pdf_url: pdfUrl })
+                .eq('id', requestId);
+
+            if (!error) {
+                console.log('✅ contract_pdf_url salvo no loan_requests');
+                return true;
+            }
+
+            // Tentativa 2: se coluna não existe, salvar no supplemental_description JSON
+            console.warn('⚠️ Coluna contract_pdf_url pode não existir, salvando no supplemental_description...');
+            const { data: current } = await supabase
+                .from('loan_requests')
+                .select('supplemental_description')
+                .eq('id', requestId)
+                .single();
+
+            if (current) {
+                let desc: any = {};
+                try { desc = JSON.parse(current.supplemental_description || '{}'); } catch { desc = {}; }
+                desc.contractPdfUrl = pdfUrl;
+
+                const { error: error2 } = await supabase
+                    .from('loan_requests')
+                    .update({ supplemental_description: JSON.stringify(desc) })
+                    .eq('id', requestId);
+
+                if (!error2) {
+                    console.log('✅ contractPdfUrl salvo no supplemental_description');
+                    return true;
+                }
+            }
+
+            return false;
+        } catch (err) {
+            console.error('❌ Erro ao salvar contract_pdf_url:', err);
+            return false;
+        }
+    },
+
+    // Get the most recent request for current client (any status, for contract download)
+    getClientLatestRequest: async (): Promise<any | null> => {
+        const user = loadFromStorage<any>(STORAGE_KEYS.USER, null);
+        if (!user) return null;
+
+        const { data } = await supabase
+            .from('loan_requests')
+            .select('*')
+            .eq('email', user.email)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        return data || null;
     },
 
     // Lead Import Helper

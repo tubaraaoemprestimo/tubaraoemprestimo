@@ -19,6 +19,7 @@ import { autoNotificationService } from '../../services/autoNotificationService'
 import { useToast } from '../../components/Toast';
 import { InstallPwaButton } from '../../components/InstallPwaButton';
 import { SERVICE_TERMS } from '../../constants/serviceTerms';
+import { contractPdfService } from '../../services/contractPdfService';
 
 // Tipos de garantia (para CLT com valores altos)
 const guaranteeTypes = [
@@ -908,6 +909,43 @@ export const Wizard: React.FC = () => {
       if (!success) {
         throw new Error('Falha ao submeter');
       }
+
+      // Gerar PDF do contrato assinado (silencioso - não bloqueia fluxo)
+      (async () => {
+        try {
+          const brandData = await supabaseService.getBrandSettings();
+          const pdfUrl = await contractPdfService.generateAndUploadContract(
+            profileType,
+            {
+              name: formData.name,
+              cpf: formData.cpf,
+              phone: formData.phone,
+              email: formData.email,
+              amount: getAmount(),
+              installments: settings.defaultInstallments,
+              installmentValue: calculateInstallment(),
+              interestRate: settings.interestRateMonthly,
+              totalAmount: calculateTotal(),
+            },
+            signatureUrl,
+            brandData ? {
+              companyName: brandData.companyName,
+              cnpj: brandData.cnpj,
+              logoUrl: brandData.logoUrl,
+              address: brandData.address,
+            } : undefined
+          );
+
+          // Buscar request mais recente do cliente para atualizar com o PDF URL
+          const latestReq = await supabaseService.getClientLatestRequest();
+          if (latestReq?.id && pdfUrl) {
+            await supabaseService.updateContractPdfUrl(latestReq.id, pdfUrl);
+            console.log('✅ Contrato PDF salvo com sucesso!');
+          }
+        } catch (pdfErr) {
+          console.error('⚠️ Erro ao gerar PDF do contrato (não bloqueia):', pdfErr);
+        }
+      })();
 
       // Registrar assinatura (antifraude - silencioso)
       antifraudService.logRiskEvent('contract_signed', undefined, {

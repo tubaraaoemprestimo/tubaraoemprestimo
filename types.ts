@@ -106,6 +106,7 @@ export interface LoanRequest {
 
   signatureUrl?: string;
   supplementalDescription?: string;
+  contractPdfUrl?: string;
 }
 
 export interface DashboardStats {
