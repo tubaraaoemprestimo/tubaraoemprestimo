@@ -425,8 +425,7 @@ export const Wizard: React.FC = () => {
         addToast("Selecione um serviço para continuar.", 'warning');
         return;
       }
-      // INVESTIDOR não precisa de verificação de cliente recorrente
-      // Cliente recorrente apenas para CLT, AUTONOMO e GARANTIA
+      // Cliente recorrente apenas para CLT, AUTONOMO e GARANTIA (nao INVESTIDOR, MOTO, LIMPA_NOME, LOCACAO)
       if ((profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'GARANTIA') && !isReturningClient) {
         addToast("Por favor, informe se já é nosso cliente.", 'warning');
         return;
@@ -1250,7 +1249,7 @@ export const Wizard: React.FC = () => {
               </div>
 
               {/* Pergunta sobre cliente recorrente - apenas CLT, AUTONOMO e GARANTIA */}
-              {profileType && profileType !== 'MOTO' && profileType !== 'LIMPA_NOME' && profileType !== 'INVESTIDOR' && (
+              {profileType && profileType !== 'MOTO' && profileType !== 'LIMPA_NOME' && profileType !== 'INVESTIDOR' && profileType !== 'LOCACAO' && (
                 <div className="mt-6 p-5 bg-zinc-800/50 rounded-2xl border border-zinc-700 animate-in fade-in slide-in-from-bottom-2">
                   <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                     <Users size={18} className="text-[#D4AF37]" />
