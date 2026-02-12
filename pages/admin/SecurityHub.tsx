@@ -60,6 +60,8 @@ export const SecurityHub: React.FC = () => {
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<Partial<UserAccess> | null>(null);
     const [newPassword, setNewPassword] = useState('');
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [selectedUserForPassword, setSelectedUserForPassword] = useState<UserAccess | null>(null);
 
     // Search
     const [searchTerm, setSearchTerm] = useState('');
@@ -244,6 +246,23 @@ export const SecurityHub: React.FC = () => {
         await apiService.deleteUser(id);
         addToast('Usuário excluído', 'success');
         loadAllData();
+    };
+
+    const handleResetPasswordSubmit = async () => {
+        if (!newPassword || !selectedUserForPassword) {
+            addToast('Informe a nova senha', 'warning');
+            return;
+        }
+
+        try {
+            await apiService.resetUserPassword(selectedUserForPassword.id, newPassword);
+            addToast('Senha alterada com sucesso!', 'success');
+            setIsPasswordModalOpen(false);
+            setSelectedUserForPassword(null);
+            setNewPassword('');
+        } catch (error) {
+            addToast('Erro ao resetar senha', 'error');
+        }
     };
 
     const getRoleColor = (role: UserRole) => {
@@ -466,8 +485,16 @@ export const SecurityHub: React.FC = () => {
                                         <button
                                             onClick={() => { setEditingUser(user); setIsUserModalOpen(true); }}
                                             className="p-2 bg-zinc-800 rounded hover:bg-zinc-700"
+                                            title="Editar"
                                         >
                                             <Edit2 size={14} />
+                                        </button>
+                                        <button
+                                            onClick={() => { setSelectedUserForPassword(user); setNewPassword(''); setIsPasswordModalOpen(true); }}
+                                            className="p-2 bg-zinc-800 rounded hover:bg-zinc-700 text-yellow-400"
+                                            title="Redefinir Senha"
+                                        >
+                                            <Key size={14} />
                                         </button>
                                         <button
                                             onClick={() => handleDeleteUser(user.id)}
@@ -951,6 +978,37 @@ export const SecurityHub: React.FC = () => {
                                     {selectedLog.user_agent}
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Password Reset Modal */}
+            {isPasswordModalOpen && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md">
+                        <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Key className="text-yellow-400" /> Redefinir Senha
+                            </h3>
+                            <button onClick={() => setIsPasswordModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-zinc-400 text-sm">
+                                Definindo nova senha para <strong>{selectedUserForPassword?.name}</strong>
+                            </p>
+                            <div>
+                                <label className="block text-sm text-zinc-400 mb-1">Nova Senha</label>
+                                <input
+                                    type="text"
+                                    value={newPassword}
+                                    onChange={e => setNewPassword(e.target.value)}
+                                    placeholder="Digite a nova senha"
+                                    className={inputStyle}
+                                />
+                            </div>
+                            <Button onClick={handleResetPasswordSubmit} className="w-full">
+                                <Save size={18} /> Salvar Nova Senha
+                            </Button>
                         </div>
                     </div>
                 </div>
