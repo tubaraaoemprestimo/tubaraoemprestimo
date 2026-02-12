@@ -141,7 +141,8 @@ export const apiService = {
     },
 
     async resetUserPassword(id: string, password: string) {
-        const { data, error } = await api.put(`/users/${id}`, { password });
+        // Fix: Use correct endpoint and payload key (newPassword)
+        const { data, error } = await api.put(`/users/${id}/password`, { newPassword: password });
         if (error) throw new Error(error.error || 'Erro ao resetar senha');
         return data;
     },
