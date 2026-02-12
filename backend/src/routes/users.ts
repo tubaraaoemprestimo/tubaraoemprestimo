@@ -64,7 +64,8 @@ usersRouter.post('/', requireAdmin, async (req: Request, res: Response) => {
                             name: user.name,
                             email: user.email,
                             phone: user.phone || '',
-                            cpf: `ADMIN_${user.id.substring(0, 8)}`,
+                            // Fix: Add random suffix
+                            cpf: `ADMIN_${user.id.substring(0, 8)}_${Date.now().toString().slice(-4)}`,
                             status: 'ACTIVE'
                         }
                     });

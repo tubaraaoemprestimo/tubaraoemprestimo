@@ -55,7 +55,8 @@ authRouter.post('/register', async (req: Request, res: Response) => {
                             name: user.name,
                             email: user.email,
                             phone: user.phone || '',
-                            cpf: `REG_${user.id.replace(/-/g, '').slice(0, 11)}`,
+                            // Fix: Add random suffix to prevent unique constraint violation on CPF tests
+                            cpf: `REG_${user.id.substring(0, 8)}_${Date.now().toString().slice(-4)}`,
                             status: 'ACTIVE',
                             source: 'MANUAL'
                         }
@@ -132,7 +133,8 @@ authRouter.post('/login', async (req: Request, res: Response) => {
                             name: user.name,
                             email: user.email,
                             phone: user.phone || '',
-                            cpf: `MIG_${user.id.replace(/-/g, '').slice(0, 11)}`,
+                            // Fix: Add random suffix
+                            cpf: `MIG_${user.id.substring(0, 8)}_${Date.now().toString().slice(-4)}`,
                             status: 'ACTIVE',
                             source: 'MANUAL'
                         }
