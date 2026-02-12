@@ -372,5 +372,18 @@ Empréstimos Ativos: ${customer.active_loans_count || 0}`;
         await aiChatbotService.saveChatMessage(phone, 'assistant', response, customer?.id);
 
         return response;
+    },
+    // Gerar resposta (Wrapper para uso geral/teste)
+    generateResponse: async (message: string, history: ChatMessage[] = []): Promise<string> => {
+        const config = await aiChatbotService.getConfig();
+        const apiKey = config.provider === 'gemini' ? config.geminiApiKey : config.perplexityApiKey;
+
+        if (!apiKey) return "Erro: API Key não configurada.";
+
+        if (config.provider === 'gemini') {
+            return aiChatbotService.generateResponseGemini(history, config.systemPrompt, apiKey);
+        } else {
+            return aiChatbotService.generateResponsePerplexity(history, config.systemPrompt, apiKey);
+        }
     }
 };

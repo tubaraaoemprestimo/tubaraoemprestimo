@@ -26,6 +26,7 @@ import { cpfLookupRouter } from './routes/cpfLookup';
 import { whatsappStatusRouter } from './routes/whatsappStatus';
 import { referralsRouter } from './routes/referrals';
 import { communicationRouter } from './routes/communication';
+import { adminRouter } from './routes/admin';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -68,6 +69,7 @@ app.use('/api/cpf', cpfLookupRouter);
 app.use('/api/whatsapp', whatsappStatusRouter);
 app.use('/api/referrals', referralsRouter);
 app.use('/api/communication', communicationRouter);
+app.use('/api/admin', adminRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
