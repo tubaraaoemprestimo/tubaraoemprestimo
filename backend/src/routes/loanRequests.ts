@@ -290,7 +290,7 @@ loanRequestsRouter.put('/:id/supplemental-upload', async (req: Request, res: Res
 loanRequestsRouter.put('/:id/contract', async (req: Request, res: Response) => {
     try {
         const { contractPdfUrl } = req.body;
-        const id = req.params.id;
+        const id = req.params.id as string;
 
         const request = await prisma.loanRequest.findUnique({ where: { id } });
         if (!request) {
