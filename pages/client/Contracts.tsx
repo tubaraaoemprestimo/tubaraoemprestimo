@@ -4,7 +4,7 @@ import { ChevronLeft, Calendar, DollarSign, CheckCircle2, Clock, AlertCircle, Qr
 import { Button } from '../../components/Button';
 import { PixModal } from '../../components/PixModal';
 import { ReceiptModal } from '../../components/ReceiptModal';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { Loan, Installment, SystemSettings } from '../../types';
 import { useToast } from '../../components/Toast';
 import { calculateLateInterest, getDaysLate } from '../../utils/lateInterest';
@@ -27,14 +27,14 @@ export const Contracts: React.FC = () => {
    }, []);
 
    const loadContracts = async () => {
-      const data = await supabaseService.getClientLoans();
+      const data = await apiService.getClientLoans();
       setLoans(data);
       if (data.length > 0 && !selectedLoanId) setSelectedLoanId(data[0].id);
       setLoading(false);
    };
 
    const loadSettings = async () => {
-      const data = await supabaseService.getSettings();
+      const data = await apiService.getSettings();
       setSettings(data);
    };
 

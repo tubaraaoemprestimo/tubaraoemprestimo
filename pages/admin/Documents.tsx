@@ -1,4 +1,4 @@
-// 📄 Document Generator - Contratos, Recibos e Declarações com Assinatura Digital
+﻿// 📄 Document Generator - Contratos, Recibos e Declarações com Assinatura Digital
 import React, { useState, useEffect, useRef } from 'react';
 import {
     FileText, Download, Printer, Eye, Receipt as ReceiptIcon, Award, FileCheck,
@@ -8,7 +8,7 @@ import {
 import { Button } from '../../components/Button';
 import { contractService, GeneratedDocument, ContractTemplateExtended } from '../../services/contractService';
 import { documentService } from '../../services/adminService';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { useBrand } from '../../contexts/BrandContext';
 import { Receipt, DischargeDeclaration, Customer, Loan } from '../../types';
 import { useToast } from '../../components/Toast';
@@ -60,8 +60,8 @@ export const DocumentsPage: React.FC = () => {
     const loadData = async () => {
         try {
             const [customersData, loansData] = await Promise.all([
-                supabaseService.getCustomers(),
-                supabaseService.getClientLoans()
+                apiService.getCustomers(),
+                apiService.getClientLoans()
             ]);
             setCustomers(Array.isArray(customersData) ? customersData : []);
             setLoans(Array.isArray(loansData) ? loansData : []);

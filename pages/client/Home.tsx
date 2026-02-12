@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calculator, ShieldCheck, Zap, ArrowRight, DollarSign } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { LoanPackage } from '../../types';
 
 export const Home: React.FC = () => {
@@ -14,7 +14,7 @@ export const Home: React.FC = () => {
   const [selectedPackage, setSelectedPackage] = useState<LoanPackage | null>(null);
 
   useEffect(() => {
-    supabaseService.getPackages().then(pkgs => {
+    apiService.getPackages().then(pkgs => {
       setPackages(pkgs);
       if (pkgs.length > 0) setSelectedPackage(pkgs[0]);
     });

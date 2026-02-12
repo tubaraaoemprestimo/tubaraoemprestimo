@@ -1,7 +1,7 @@
 // 📊 Score Service - Gerenciamento de Score do Cliente
 // Lógica real para aumentar/diminuir score baseado em comportamento
 
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 
 // Configuração de pontos
 const SCORE_CONFIG = {
@@ -34,11 +34,7 @@ export const scoreService = {
     updateScore: async (customerEmail: string, change: number, reason: string): Promise<boolean> => {
         try {
             // Buscar cliente e score atual
-            const { data: customer, error: findError } = await supabase
-                .from('customers')
-                .select('id, internal_score, email')
-                .eq('email', customerEmail)
-                .single();
+            const { data: customer, error: findError } = await api.get<any>(`/customers?email=${encodeURIComponent(customerEmail)}&single=true`);
 
             if (findError || !customer) {
                 console.error('Customer not found:', customerEmail);
@@ -52,10 +48,7 @@ export const scoreService = {
             newScore = Math.max(SCORE_CONFIG.MIN_SCORE, Math.min(SCORE_CONFIG.MAX_SCORE, newScore));
 
             // Atualizar score do cliente
-            const { error: updateError } = await supabase
-                .from('customers')
-                .update({ internal_score: newScore })
-                .eq('id', customer.id);
+            const { error: updateError } = await api.put('/customers/' + customer.id, { internal_score: newScore });
 
             if (updateError) {
                 console.error('Error updating score:', updateError);
@@ -63,11 +56,12 @@ export const scoreService = {
             }
 
             // Registrar histórico
-            await supabase.from('score_history').insert({
-                customer_email: customerEmail,
-                score_before: oldScore,
-                score_after: newScore,
-                reason: reason
+            await api.post('/finance/transactions', {
+                type: 'SCORE',
+                description: reason,
+                customerEmail,
+                scoreBefore: oldScore,
+                scoreAfter: newScore
             });
 
             console.log(`Score updated: ${customerEmail} ${oldScore} -> ${newScore} (${reason})`);
@@ -147,12 +141,7 @@ export const scoreService = {
 
     // Obter histórico de score
     getScoreHistory: async (customerEmail: string): Promise<any[]> => {
-        const { data, error } = await supabase
-            .from('score_history')
-            .select('*')
-            .eq('customer_email', customerEmail)
-            .order('created_at', { ascending: false })
-            .limit(20);
+        const { data, error } = await api.get<any[]>('/customers/score-history?email=' + encodeURIComponent(customerEmail));
 
         if (error) return [];
         return data || [];
@@ -160,11 +149,7 @@ export const scoreService = {
 
     // Obter score atual
     getScore: async (customerEmail: string): Promise<number> => {
-        const { data } = await supabase
-            .from('customers')
-            .select('internal_score')
-            .eq('email', customerEmail)
-            .single();
+        const { data } = await api.get<any>('/customers?email=' + encodeURIComponent(customerEmail) + '&single=true');
 
         return data?.internal_score || SCORE_CONFIG.INITIAL_SCORE;
     },

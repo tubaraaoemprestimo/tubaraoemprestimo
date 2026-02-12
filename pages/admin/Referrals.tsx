@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Gift, Check, X, Search, UserPlus, Clock, CheckCircle2, XCircle, DollarSign, RefreshCcw } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabase } from '../../services/supabaseClient';
+import { api } from '../../services/apiClient';
 import { useToast } from '../../components/Toast';
 import { Referral } from '../../types';
 

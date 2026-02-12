@@ -1,8 +1,8 @@
-
+﻿
 import React, { useState, useRef } from 'react';
 import { Upload, Smartphone, MessageSquare, Check, X, Trash2, Users, ChevronLeft, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { whatsappService } from '../../services/whatsappService';
 import { useToast } from '../../components/Toast';
 import { useNavigate } from 'react-router-dom';
@@ -305,7 +305,7 @@ export const ImportContacts: React.FC = () => {
         const leads = selected.map(c => ({ name: c.name, phone: c.phone }));
 
         try {
-            const result = await supabaseService.bulkImportLeads(leads);
+            const result = await apiService.bulkImportLeads(leads);
             added = result.added;
             errors = result.errors;
             duplicates = selected.length - added - errors;

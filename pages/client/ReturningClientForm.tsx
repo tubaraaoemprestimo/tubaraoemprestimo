@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '../../components/Logo';
 import { useToast } from '../../components/Toast';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { SystemSettings } from '../../types';
 
 // Componente Input
@@ -99,7 +99,7 @@ export const ReturningClientForm: React.FC = () => {
     });
 
     useEffect(() => {
-        supabaseService.getSettings().then(setSettings);
+        apiService.getSettings().then(setSettings);
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -153,7 +153,7 @@ export const ReturningClientForm: React.FC = () => {
 
         try {
             // Submeter como cliente antigo pendente
-            const result = await supabaseService.submitReturningClientRequest({
+            const result = await apiService.submitReturningClientRequest({
                 name: formData.name,
                 cpf: formData.cpf.replace(/\D/g, ''),
                 phone: formData.phone.replace(/\D/g, ''),

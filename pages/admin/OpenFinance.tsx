@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
     Landmark, TrendingUp, Shield, AlertCircle, CheckCircle,
     Search, RefreshCw, FileText, DollarSign, PieChart,
@@ -9,7 +9,7 @@ import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
 import { Customer, CreditScore, IncomeAnalysis } from '../../types';
 import { openFinanceService } from '../../services/openFinanceService';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 
 export const OpenFinancePage: React.FC = () => {
     const { addToast } = useToast();
@@ -38,7 +38,7 @@ export const OpenFinancePage: React.FC = () => {
 
     const loadData = async () => {
         try {
-            const customersData = await supabaseService.getCustomers();
+            const customersData = await apiService.getCustomers();
             // Add mock monthly income
             const customersWithIncome = customersData.map(c => ({
                 ...c,

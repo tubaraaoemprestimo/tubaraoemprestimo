@@ -1,10 +1,10 @@
-// 💳 Payment Receipts Management - Gestão de Comprovantes de Pagamento
+﻿// 💳 Payment Receipts Management - Gestão de Comprovantes de Pagamento
 // Admin pode aprovar ou rejeitar comprovantes enviados pelos clientes
 
 import React, { useState, useEffect } from 'react';
 import { Receipt, Check, X, Eye, Clock, Filter, Download, Search, AlertCircle, CheckCircle, XCircle, Image, FileText, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabase } from '../../services/supabaseClient';
+import { api } from '../../services/apiClient';
 import { PaymentReceipt } from '../../types';
 import { useToast } from '../../components/Toast';
 import { autoNotificationService } from '../../services/autoNotificationService';

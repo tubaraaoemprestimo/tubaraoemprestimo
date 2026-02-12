@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Save, Plus, Trash2, Edit2, X, Percent, Zap, Smartphone, QrCode, CheckCircle2, RotateCcw, MessageSquare, Clock, Palette, Upload, Image as ImageIcon, Building2, Settings as SettingsIcon, RefreshCw, AlertCircle, Target, TrendingUp, DollarSign, Users } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { whatsappService } from '../../services/whatsappService';
 import { emailService } from '../../services/emailService';
 import { useBrand } from '../../contexts/BrandContext';
@@ -64,11 +64,11 @@ export const Settings: React.FC = () => {
 
   const loadData = async () => {
     const [settingsData, packagesData, rulesData, waData, goalsData] = await Promise.all([
-      supabaseService.getSettings(),
-      supabaseService.getPackages(),
-      supabaseService.getCollectionRules(),
+      apiService.getSettings(),
+      apiService.getPackages(),
+      apiService.getCollectionRules(),
       whatsappService.getConfig(),
-      supabaseService.getGoalsSettings()
+      apiService.getGoalsSettings()
     ]);
     setSettings(settingsData);
     setPackages(packagesData);
@@ -110,7 +110,7 @@ export const Settings: React.FC = () => {
     setWaStatus(status);
     if (status === 'open') {
       setWaConfig(prev => ({ ...prev, isConnected: true }));
-      supabaseService.saveWhatsappConfig({ ...waConfig, isConnected: true });
+      apiService.saveWhatsappConfig({ ...waConfig, isConnected: true });
       setQrCode(null);
     } else {
       setWaConfig(prev => ({ ...prev, isConnected: false }));
@@ -121,7 +121,7 @@ export const Settings: React.FC = () => {
   // --- Financial Handlers ---
   const handleSaveSettings = async () => {
     setLoadingFinancial(true);
-    await supabaseService.updateSettings(settings);
+    await apiService.updateSettings(settings);
     setLoadingFinancial(false);
     addToast('Taxas atualizadas!', 'success');
   };
@@ -137,7 +137,7 @@ export const Settings: React.FC = () => {
       maxInstallments: currentPkg.maxInstallments || 12,
     } as LoanPackage;
 
-    await supabaseService.savePackage(pkgToSave);
+    await apiService.savePackage(pkgToSave);
     setLoadingPkg(false);
     setIsPkgModalOpen(false);
     loadData();
@@ -145,7 +145,7 @@ export const Settings: React.FC = () => {
 
   const handleDeletePackage = async (id: string) => {
     if (confirm('Excluir este pacote?')) {
-      await supabaseService.deletePackage(id);
+      await apiService.deletePackage(id);
       loadData();
     }
   };
@@ -162,7 +162,7 @@ export const Settings: React.FC = () => {
       active: currentRule.active ?? true
     } as CollectionRule;
 
-    await supabaseService.saveCollectionRule(ruleToSave);
+    await apiService.saveCollectionRule(ruleToSave);
     setLoadingAutomation(false);
     setIsRuleModalOpen(false);
     loadData();
@@ -170,7 +170,7 @@ export const Settings: React.FC = () => {
 
   const handleDeleteRule = async (id: string) => {
     if (confirm('Excluir esta regra de automação?')) {
-      await supabaseService.deleteCollectionRule(id);
+      await apiService.deleteCollectionRule(id);
       loadData();
     }
   };
@@ -283,7 +283,7 @@ export const Settings: React.FC = () => {
   const handleSaveGoals = async () => {
     if (!goals) return;
     setLoadingGoals(true);
-    await supabaseService.saveGoalsSettings(goals);
+    await apiService.saveGoalsSettings(goals);
     setLoadingGoals(false);
     addToast('Metas e projeções atualizadas!', 'success');
   };

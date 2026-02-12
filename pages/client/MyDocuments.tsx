@@ -8,7 +8,7 @@ import {
 import { Button } from '../../components/Button';
 import { contractService, GeneratedDocument } from '../../services/contractService';
 import { documentService } from '../../services/adminService';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { useBrand } from '../../contexts/BrandContext';
 import { useToast } from '../../components/Toast';
 
@@ -137,7 +137,7 @@ export const MyDocuments: React.FC = () => {
     }, []);
 
     const loadDocuments = () => {
-        const user = supabaseService.auth.getUser();
+        const user = apiService.auth.getUser();
         if (user) {
             const allDocs = contractService.getDocuments(user.id);
             setDocuments(allDocs);

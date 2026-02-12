@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Megaphone, Plus, Trash2, Edit2, Calendar, Link as LinkIcon, Image as ImageIcon, CheckCircle, XCircle, Search, Users, Gift, AlertTriangle, ShieldCheck, Ban, Send, Loader2, Ticket, MessageCircle } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { referralService } from '../../services/referralService';
 import { firebasePushService } from '../../services/firebasePushService';
 import { emailService } from '../../services/emailService';
@@ -52,8 +52,8 @@ export const Marketing: React.FC = () => {
     }, []);
 
     const loadData = async () => {
-        const campaignsData = await supabaseService.getCampaigns();
-        const customersData = await supabaseService.getCustomers();
+        const campaignsData = await apiService.getCampaigns();
+        const customersData = await apiService.getCustomers();
         setCampaigns(campaignsData);
         setCustomers(customersData);
 
@@ -74,7 +74,7 @@ export const Marketing: React.FC = () => {
         setReferrals(checkedReferrals);
 
         // Fetch coupons
-        const couponsData = await supabaseService.getCoupons();
+        const couponsData = await apiService.getCoupons();
         setCoupons(couponsData);
     };
 
@@ -94,7 +94,7 @@ export const Marketing: React.FC = () => {
         }
 
         setLoading(true);
-        const success = await supabaseService.saveCoupon({
+        const success = await apiService.saveCoupon({
             id: couponForm.id || undefined,
             code: couponForm.code.toUpperCase(),
             discount: couponForm.discount,
@@ -117,7 +117,7 @@ export const Marketing: React.FC = () => {
 
     const handleDeleteCoupon = async (id: string) => {
         if (confirm("Tem certeza que deseja excluir este cupom?")) {
-            await supabaseService.deleteCoupon(id);
+            await apiService.deleteCoupon(id);
             addToast("Cupom excluído!", 'info');
             loadData();
         }
@@ -155,7 +155,7 @@ export const Marketing: React.FC = () => {
             priority: formData.priority || 1
         } as Campaign;
 
-        await supabaseService.saveCampaign(campaignToSave);
+        await apiService.saveCampaign(campaignToSave);
         setLoading(false);
         setIsModalOpen(false);
         addToast("Campanha salva com sucesso!", 'success');
@@ -164,7 +164,7 @@ export const Marketing: React.FC = () => {
 
     const handleDelete = async (id: string) => {
         if (confirm("Excluir esta campanha permanentemente?")) {
-            await supabaseService.deleteCampaign(id);
+            await apiService.deleteCampaign(id);
             addToast("Campanha removida.", 'info');
             loadData();
         }

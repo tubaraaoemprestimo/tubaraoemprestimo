@@ -2,7 +2,7 @@
 // Triggers automáticos para enviar notificações ao cliente
 // Integrado com Firebase Push Notifications e WhatsApp
 
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 import { scoreService } from './scoreService';
 import { firebasePushService } from './firebasePushService';
 import { whatsappService } from './whatsappService';
@@ -11,21 +11,15 @@ const APP_LINK = 'https://www.tubaraoemprestimo.com.br/';
 
 // Helper para buscar telefone do cliente pelo email
 async function getCustomerPhone(email: string): Promise<string | null> {
-    const { data } = await supabase
-        .from('customers')
-        .select('phone, name')
-        .eq('email', email)
-        .single();
-    return data?.phone || null;
+    const { data } = await api.get<any>(`/customers?email=${encodeURIComponent(email)}`);
+    const customer = Array.isArray(data) ? data[0] : data;
+    return customer?.phone || null;
 }
 
 async function getCustomerData(email: string): Promise<{ phone: string | null; name: string }> {
-    const { data } = await supabase
-        .from('customers')
-        .select('phone, name')
-        .eq('email', email)
-        .single();
-    return { phone: data?.phone || null, name: data?.name || 'Cliente' };
+    const { data } = await api.get<any>(`/customers?email=${encodeURIComponent(email)}`);
+    const customer = Array.isArray(data) ? data[0] : data;
+    return { phone: customer?.phone || null, name: customer?.name || 'Cliente' };
 }
 
 const shouldFallbackLegacy = (error: any): boolean => {
@@ -41,12 +35,12 @@ async function insertScopedNotification(payload: {
     link: string | null;
     for_role: 'CLIENT' | 'ADMIN' | 'ALL';
 }): Promise<boolean> {
-    let { error } = await supabase.from('notifications').insert(payload);
+    let { error } = await api.post('/notifications', payload);
 
     if (error && shouldFallbackLegacy(error)) {
         const legacyPayload: any = { ...payload };
         delete legacyPayload.for_role;
-        const fallback = await supabase.from('notifications').insert(legacyPayload);
+        const fallback = await api.post('/notifications', legacyPayload);
         error = fallback.error;
     }
 
@@ -316,12 +310,8 @@ export const autoNotificationService = {
                 let content = `Olá ${name?.split(' ')[0] || clientName?.split(' ')[0]}! Seu contrato foi assinado com sucesso. O valor será liberado em breve.`;
 
                 // Tenta buscar template
-                const { data: template } = await supabase
-                    .from('message_templates')
-                    .select('content')
-                    .eq('trigger_event', 'CONTRACT_SIGNED')
-                    .eq('is_active', true)
-                    .single();
+                const { data: templates } = await api.get<any[]>('/settings/templates?trigger_event=CONTRACT_SIGNED&is_active=true');
+                const template = Array.isArray(templates) ? templates[0] : templates;
 
                 if (template) {
                     content = template.content.replace('{nome}', name?.split(' ')[0] || clientName?.split(' ')[0] || 'Cliente');
@@ -546,12 +536,9 @@ export const autoNotificationService = {
         threeDaysFromNow.setDate(today.getDate() + 3);
 
         // Buscar parcelas que vencem em 3 dias
-        const { data: dueSoon } = await supabase
-            .from('installments')
-            .select('id, due_date, amount, loans(customers(email))')
-            .eq('status', 'OPEN')
-            .gte('due_date', today.toISOString().split('T')[0])
-            .lte('due_date', threeDaysFromNow.toISOString().split('T')[0]);
+        const { data: dueSoon } = await api.get<any[]>(
+            `/installments?status=OPEN&due_date_gte=${today.toISOString().split('T')[0]}&due_date_lte=${threeDaysFromNow.toISOString().split('T')[0]}`
+        );
 
         if (dueSoon) {
             for (const installment of dueSoon) {
@@ -567,11 +554,9 @@ export const autoNotificationService = {
         }
 
         // Buscar parcelas atrasadas
-        const { data: overdue } = await supabase
-            .from('installments')
-            .select('id, due_date, amount, loans(customers(email))')
-            .eq('status', 'OPEN')
-            .lt('due_date', today.toISOString().split('T')[0]);
+        const { data: overdue } = await api.get<any[]>(
+            `/installments?status=OPEN&due_date_lt=${today.toISOString().split('T')[0]}`
+        );
 
         if (overdue) {
             for (const installment of overdue) {
@@ -605,12 +590,10 @@ export const autoNotificationService = {
      */
     triggerManualCampaign: async (campaignId: string): Promise<{ success: boolean; results?: any; error?: string }> => {
         try {
-            const { data, error } = await supabase.functions.invoke('auto-notifications', {
-                body: { action: 'campaign', campaignId: campaignId }
-            });
+            const { data, error } = await api.post<any>('/auto-notifications/campaign', { campaignId });
 
             if (error) throw error;
-            return { success: true, results: data.results };
+            return { success: true, results: data?.results };
         } catch (error: any) {
             console.error('[Auto] Campaign error:', error);
             return { success: false, error: error.message || 'Erro ao processar campanha' };
@@ -622,12 +605,10 @@ export const autoNotificationService = {
      */
     triggerManualCoupon: async (couponId: string): Promise<{ success: boolean; results?: any; error?: string }> => {
         try {
-            const { data, error } = await supabase.functions.invoke('auto-notifications', {
-                body: { action: 'coupon', couponId: couponId }
-            });
+            const { data, error } = await api.post<any>('/auto-notifications/coupon', { couponId });
 
             if (error) throw error;
-            return { success: true, results: data.results };
+            return { success: true, results: data?.results };
         } catch (error: any) {
             console.error('[Auto] Coupon error:', error);
             return { success: false, error: error.message || 'Erro ao processar cupom' };
@@ -639,12 +620,10 @@ export const autoNotificationService = {
      */
     triggerManualCollections: async (): Promise<{ success: boolean; results?: any; error?: string }> => {
         try {
-            const { data, error } = await supabase.functions.invoke('auto-notifications', {
-                body: { action: 'collections' }
-            });
+            const { data, error } = await api.post<any>('/auto-notifications/collections', {});
 
             if (error) throw error;
-            return { success: true, results: data.results };
+            return { success: true, results: data?.results };
         } catch (error: any) {
             console.error('[Auto] Collections error:', error);
             return { success: false, error: error.message || 'Erro ao processar cobranças' };
@@ -656,11 +635,7 @@ export const autoNotificationService = {
      */
     getWhatsAppHistory: async (limit: number = 50) => {
         try {
-            const { data, error } = await supabase
-                .from('notification_logs')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(limit);
+            const { data, error } = await api.get<any[]>(`/notifications/logs?limit=${limit}`);
 
             if (error) throw error;
             return data || [];

@@ -1,7 +1,7 @@
 // 🤝 Referral Service - Sistema de Indicações
 // Migrado para Supabase
 
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 import { ReferralCode, ReferralUsage, Customer } from '../types';
 
 const STORAGE_KEYS = {
@@ -32,11 +32,7 @@ export const referralService = {
     getOrCreateCode: async (userId: string, userName: string): Promise<ReferralCode> => {
         try {
             // Check if code already exists
-            const { data: existing } = await supabase
-                .from('referrals')
-                .select('*')
-                .eq('referrer_customer_id', userId)
-                .limit(1);
+            const { data: existing } = await api.get<any[]>(`/referrals?referrer_customer_id=${userId}&limit=1`);
 
             if (existing && existing.length > 0) {
                 const first = existing[0];
@@ -108,16 +104,12 @@ export const referralService = {
 
         try {
             // Check if already referred
-            const { data: existing } = await supabase
-                .from('referrals')
-                .select('id')
-                .eq('referred_cpf', newUserId)
-                .limit(1);
+            const { data: existing } = await api.get<any[]>(`/referrals?referred_cpf=${newUserId}&limit=1`);
 
             if (existing && existing.length > 0) return;
 
-            // Create referral in Supabase
-            await supabase.from('referrals').insert({
+            // Create referral via API
+            await api.post('/referrals', {
                 referrer_customer_id: referralCode.userId,
                 referrer_name: referralCode.userName,
                 referred_name: newUserName,
@@ -157,10 +149,7 @@ export const referralService = {
     // Admin: Get all usages
     getAllUsages: async (): Promise<ReferralUsage[]> => {
         try {
-            const { data, error } = await supabase
-                .from('referrals')
-                .select('*')
-                .order('created_at', { ascending: false });
+            const { data, error } = await api.get<any[]>('/referrals');
 
             if (error || !data) throw error;
 
@@ -185,14 +174,11 @@ export const referralService = {
         try {
             const newStatus = action === 'VALIDATE' ? 'CONVERTED' : action === 'FRAUD' ? 'REJECTED' : 'REJECTED';
 
-            await supabase
-                .from('referrals')
-                .update({
-                    status: newStatus,
-                    converted_at: new Date().toISOString(),
-                    notes: reason
-                })
-                .eq('id', usageId);
+            await api.put(`/referrals/${usageId}`, {
+                status: newStatus,
+                converted_at: new Date().toISOString(),
+                notes: reason
+            });
         } catch (e) {
             const usages = loadFromStorage<ReferralUsage[]>(STORAGE_KEYS.REFERRAL_USAGES, []);
             const index = usages.findIndex(u => u.id === usageId);

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Bot, Save, MessageSquare, Settings2, Brain, Clock, TestTube, Send, History, User, Trash2, RefreshCw, Search, Phone, Calendar, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { aiChatbotService } from '../../services/aiChatbotService';
 import { useToast } from '../../components/Toast';
-import { supabase } from '../../services/supabaseClient';
+import { api } from '../../services/apiClient';
 
 interface ChatbotConfig {
     id: string;

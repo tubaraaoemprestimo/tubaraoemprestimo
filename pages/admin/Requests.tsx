@@ -1,10 +1,10 @@
-
+﻿
 
 
 import React, { useState, useEffect } from 'react';
 import { Check, X, Eye, Maximize, Layers, Download, Filter, Video, Users, Phone, FileWarning, Send, AlertTriangle, MapPin } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { emailService } from '../../services/emailService';
 import { LoanRequest, LoanStatus } from '../../types';
 import { ImageViewer } from '../../components/ImageViewer';
@@ -64,14 +64,14 @@ export const Requests: React.FC = () => {
     }, []);
 
     const loadRequests = async () => {
-        const data = await supabaseService.getRequests();
+        const data = await apiService.getRequests();
         setRequests(data);
     };
 
     const handleApprove = async (id: string) => {
         if (!selectedRequest) return;
         setProcessing(id);
-        await supabaseService.approveLoan(id);
+        await apiService.approveLoan(id);
 
         // Enviar email de aprovação
         emailService.notifyApproved({
@@ -90,7 +90,7 @@ export const Requests: React.FC = () => {
     const handleReject = async (id: string) => {
         if (!selectedRequest) return;
         setProcessing(id);
-        await supabaseService.rejectLoan(id);
+        await apiService.rejectLoan(id);
 
         // Enviar email de reprovação
         emailService.notifyRejected({
@@ -110,7 +110,7 @@ export const Requests: React.FC = () => {
         if (!selectedRequest || !docRequestDesc) return;
 
         setProcessing(selectedRequest.id);
-        await supabaseService.requestSupplementalDoc(selectedRequest.id, docRequestDesc);
+        await apiService.requestSupplementalDoc(selectedRequest.id, docRequestDesc);
 
         // Enviar email solicitando documentos
         emailService.notifyWaitingDocs({
@@ -366,7 +366,7 @@ export const Requests: React.FC = () => {
                                                 return;
                                             }
                                             setProcessing('saving');
-                                            const success = await supabaseService.updateLoanRequestValues(selectedRequest.id, editAmount, editInstallments);
+                                            const success = await apiService.updateLoanRequestValues(selectedRequest.id, editAmount, editInstallments);
                                             if (success) {
                                                 addToast('Proposta atualizada!', 'success');
                                                 setSelectedRequest({ ...selectedRequest, amount: editAmount, installments: editInstallments });

@@ -3,7 +3,7 @@
 // Tubarão Empréstimos - Automação de Cobranças via WhatsApp
 
 import { whatsappService } from './whatsappService';
-import { supabaseService } from './supabaseService';
+import { apiService } from './apiService';
 import { notificationService } from './notificationService';
 import { Loan, Installment, CollectionRule, Customer } from '../types';
 
@@ -145,9 +145,9 @@ const daysDiff = (date1: Date, date2: Date): number => {
 export const collectionService = {
     // Get all pending collection actions for today
     getPendingActions: async (): Promise<CollectionAction[]> => {
-        const loans = await supabaseService.getClientLoans();
-        const rules = await supabaseService.getCollectionRules();
-        const customers = await supabaseService.getCustomers();
+        const loans = await apiService.getClientLoans();
+        const rules = await apiService.getCollectionRules();
+        const customers = await apiService.getCustomers();
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -282,7 +282,7 @@ export const collectionService = {
         overdueClients: number;
         totalOverdueAmount: number;
     }> => {
-        const loans = await supabaseService.getClientLoans();
+        const loans = await apiService.getClientLoans();
         const today = new Date();
 
         let totalOverdue = 0;
@@ -309,7 +309,7 @@ export const collectionService = {
 
     // Initialize default collection rules if none exist
     initializeDefaultRules: async (): Promise<void> => {
-        const existing = await supabaseService.getCollectionRules();
+        const existing = await apiService.getCollectionRules();
         if (existing.length > 0) return;
 
         const defaultRules = [
@@ -323,7 +323,7 @@ export const collectionService = {
         ];
 
         for (const rule of defaultRules) {
-            await supabaseService.saveCollectionRule({
+            await apiService.saveCollectionRule({
                 id: `rule_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
                 ...rule
             });

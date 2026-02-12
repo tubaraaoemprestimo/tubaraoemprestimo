@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { AIGenerateCaption } from '../../components/AIGenerateCaption';
 import {
     Camera, Plus, Trash2, Clock, CheckCircle, XCircle,
@@ -6,7 +6,7 @@ import {
     RefreshCw, Play, Edit, Repeat, CalendarDays, CheckSquare, Square
 } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabase } from '../../services/supabaseClient';
+import { api } from '../../services/apiClient';
 import { useToast } from '../../components/Toast';
 
 interface ScheduledStatus {

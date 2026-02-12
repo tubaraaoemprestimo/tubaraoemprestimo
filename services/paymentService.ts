@@ -1,5 +1,5 @@
 // 💰 Serviço de Pagamentos de Empréstimos
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 
 export interface LoanPayment {
     id?: string;
@@ -21,11 +21,7 @@ export interface LoanPayment {
 export const paymentService = {
     // Buscar pagamentos de uma solicitação
     getPaymentsByRequest: async (requestId: string): Promise<LoanPayment[]> => {
-        const { data, error } = await supabase
-            .from('loan_payments')
-            .select('*')
-            .eq('request_id', requestId)
-            .order('payment_date', { ascending: false });
+        const { data, error } = await api.get<LoanPayment[]>(`/payments?request_id=${requestId}`);
 
         if (error) {
             console.error('Erro ao buscar pagamentos:', error);
@@ -36,10 +32,7 @@ export const paymentService = {
 
     // Buscar todos os pagamentos
     getAllPayments: async (): Promise<LoanPayment[]> => {
-        const { data, error } = await supabase
-            .from('loan_payments')
-            .select('*')
-            .order('created_at', { ascending: false });
+        const { data, error } = await api.get<LoanPayment[]>('/payments');
 
         if (error) {
             console.error('Erro ao buscar pagamentos:', error);
@@ -50,11 +43,7 @@ export const paymentService = {
 
     // Registrar novo pagamento
     createPayment: async (payment: Omit<LoanPayment, 'id' | 'created_at'>): Promise<LoanPayment | null> => {
-        const { data, error } = await supabase
-            .from('loan_payments')
-            .insert([payment])
-            .select()
-            .single();
+        const { data, error } = await api.post<LoanPayment>('/payments', payment);
 
         if (error) {
             console.error('Erro ao criar pagamento:', error);
@@ -69,14 +58,11 @@ export const paymentService = {
 
     // Confirmar pagamento
     confirmPayment: async (paymentId: string, adminName: string): Promise<boolean> => {
-        const { error } = await supabase
-            .from('loan_payments')
-            .update({
-                confirmed: true,
-                confirmed_by: adminName,
-                confirmed_at: new Date().toISOString()
-            })
-            .eq('id', paymentId);
+        const { error } = await api.put(`/payments/${paymentId}/confirm`, {
+            confirmed: true,
+            confirmed_by: adminName,
+            confirmed_at: new Date().toISOString()
+        });
 
         if (error) {
             console.error('Erro ao confirmar pagamento:', error);
@@ -88,16 +74,9 @@ export const paymentService = {
     // Excluir pagamento
     deletePayment: async (paymentId: string): Promise<boolean> => {
         // Primeiro, buscar o pagamento para saber o request_id
-        const { data: payment } = await supabase
-            .from('loan_payments')
-            .select('request_id')
-            .eq('id', paymentId)
-            .single();
+        const { data: payment } = await api.get<any>(`/payments/${paymentId}`);
 
-        const { error } = await supabase
-            .from('loan_payments')
-            .delete()
-            .eq('id', paymentId);
+        const { error } = await api.delete(`/payments/${paymentId}`);
 
         if (error) {
             console.error('Erro ao excluir pagamento:', error);
@@ -115,24 +94,17 @@ export const paymentService = {
     // Atualizar totais na solicitação
     updateRequestTotals: async (requestId: string): Promise<void> => {
         // Buscar todos os pagamentos confirmados
-        const { data: payments } = await supabase
-            .from('loan_payments')
-            .select('amount, payment_date')
-            .eq('request_id', requestId)
-            .eq('confirmed', true);
+        const { data: payments } = await api.get<any[]>(`/payments?request_id=${requestId}&confirmed=true`);
 
-        const totalPaid = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+        const totalPaid = payments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0;
         const paymentsCount = payments?.length || 0;
         const lastPayment = payments?.[0]?.payment_date || null;
 
-        await supabase
-            .from('loan_requests')
-            .update({
-                total_paid: totalPaid,
-                payments_count: paymentsCount,
-                last_payment_date: lastPayment
-            })
-            .eq('id', requestId);
+        await api.put(`/loan-requests/${requestId}`, {
+            total_paid: totalPaid,
+            payments_count: paymentsCount,
+            last_payment_date: lastPayment
+        });
     },
 
     // Obter resumo de pagamentos
@@ -145,23 +117,13 @@ export const paymentService = {
         const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
 
         // Total confirmado
-        const { data: confirmed } = await supabase
-            .from('loan_payments')
-            .select('amount')
-            .eq('confirmed', true);
+        const { data: confirmed } = await api.get<any[]>('/payments?confirmed=true');
 
         // Pendente de confirmação
-        const { data: pending } = await supabase
-            .from('loan_payments')
-            .select('amount')
-            .eq('confirmed', false);
+        const { data: pending } = await api.get<any[]>('/payments?confirmed=false');
 
         // Este mês
-        const { data: thisMonth } = await supabase
-            .from('loan_payments')
-            .select('amount')
-            .eq('confirmed', true)
-            .gte('payment_date', firstDayOfMonth);
+        const { data: thisMonth } = await api.get<any[]>(`/payments?confirmed=true&payment_date_gte=${firstDayOfMonth}`);
 
         return {
             totalReceived: confirmed?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0,
@@ -172,24 +134,13 @@ export const paymentService = {
 
     // Upload de comprovante
     uploadProof: async (file: File, requestId: string): Promise<string | null> => {
-        const fileName = `payments/${requestId}/${Date.now()}_${file.name}`;
-
-        const { data, error } = await supabase.storage
-            .from('documents')
-            .upload(fileName, file, {
-                cacheControl: '3600',
-                upsert: true
-            });
+        const { data, error } = await api.upload(file, `payment_${requestId}_${Date.now()}_${file.name}`);
 
         if (error) {
             console.error('Erro ao fazer upload do comprovante:', error);
             return null;
         }
 
-        const { data: urlData } = supabase.storage
-            .from('documents')
-            .getPublicUrl(data.path);
-
-        return urlData.publicUrl;
+        return data?.url || null;
     }
 };

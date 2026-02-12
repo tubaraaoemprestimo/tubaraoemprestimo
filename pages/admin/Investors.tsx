@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Clock3, ExternalLink, Mail, Phone, Search, ShieldCheck, TrendingUp, XCircle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
 import { InvestorStatus } from '../../types';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 
 type InvestorRow = {
   id: string;
@@ -137,7 +137,7 @@ export const Investors: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
-    const data = await supabaseService.getInvestorRequests();
+    const data = await apiService.getInvestorRequests();
     setItems((data || []).map(toInvestorRow));
     setLoading(false);
   };
@@ -202,7 +202,7 @@ export const Investors: React.FC = () => {
   const updateStatus = async () => {
     if (!selected) return;
     setSaving(true);
-    const ok = await supabaseService.updateInvestorStatus(selected.id, nextStatus, notes);
+    const ok = await apiService.updateInvestorStatus(selected.id, nextStatus, notes);
     setSaving(false);
 
     if (!ok) {

@@ -3,7 +3,7 @@
  * Coleta informações silenciosas para análise de risco
  */
 
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 
 export interface DeviceFingerprint {
     ip: string;
@@ -186,8 +186,6 @@ export const antifraudService = {
             throw new Error('Ipify failed');
         } catch (e) {
             try {
-                // Fallback para ip-api.com (gratuito para uso não comercial, sem https as vezes, mas tenta)
-                // Ou usar outro serviço confiável https
                 const response = await fetch('https://api.db-ip.com/v2/free/self');
                 if (response.ok) {
                     const data = await response.json();
@@ -419,17 +417,14 @@ export const antifraudService = {
                 fingerprint.deviceModel = this.parseDeviceModel(fingerprint.userAgent);
             }
 
-            // Verificar quantas solicitações do mesmo IP
-            const { count: sameIpCount } = await supabase
-                .from('risk_logs')
-                .select('*', { count: 'exact', head: true })
-                .eq('ip', ip)
-                .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+            // Verificar quantas solicitações do mesmo IP via API
+            const { data: ipCountData } = await api.get<any>(`/antifraud/risk-count?ip=${ip}`);
+            const sameIpCount = (ipCountData as any)?.count || 0;
 
             const { score, factors } = this.calculateRiskScore({
                 fingerprint,
                 location,
-                sameIpRequests: sameIpCount || 0,
+                sameIpRequests: sameIpCount,
             });
 
             const riskData: RiskData = {
@@ -481,8 +476,8 @@ export const antifraudService = {
 
             const adminLink = '/admin/security-hub?tab=antifraud';
 
-            // Salvar no banco
-            await supabase.from('risk_logs').insert({
+            // Salvar no banco via API
+            await api.post('/antifraud/risk-event', {
                 user_id: userId,
                 session_id: sessionId,
                 ip: ip,
@@ -524,13 +519,7 @@ export const antifraudService = {
                     for_role: 'ADMIN',
                 };
 
-                let { error: notifError } = await supabase.from('notifications').insert(payload);
-
-                if (notifError && String(notifError.message || '').toLowerCase().includes('for_role')) {
-                    delete payload.for_role;
-                    const fallback = await supabase.from('notifications').insert(payload);
-                    notifError = fallback.error;
-                }
+                const { error: notifError } = await api.post('/notifications', payload);
 
                 if (notifError) {
                     console.error('[Antifraud] notification insert failed:', notifError);
@@ -576,7 +565,7 @@ export const antifraudService = {
         const token = `${type}_${referenceId}_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
         const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
 
-        await supabase.from('temporary_links').insert({
+        await api.post('/antifraud/temporary-link', {
             token,
             type,
             reference_id: referenceId,
@@ -591,29 +580,24 @@ export const antifraudService = {
      * Valida link temporário
      */
     async validateTemporaryLink(token: string): Promise<{ valid: boolean; type?: string; referenceId?: string }> {
-        const { data, error } = await supabase
-            .from('temporary_links')
-            .select('*')
-            .eq('token', token)
-            .eq('used', false)
-            .single();
+        const { data, error } = await api.get<any>(`/antifraud/temporary-link/validate?token=${token}`);
 
         if (error || !data) {
             return { valid: false };
         }
 
-        if (new Date(data.expires_at) < new Date()) {
+        if (new Date((data as any).expires_at) < new Date()) {
             return { valid: false };
         }
 
-        return { valid: true, type: data.type, referenceId: data.reference_id };
+        return { valid: true, type: (data as any).type, referenceId: (data as any).reference_id };
     },
 
     /**
      * Marca link como usado
      */
     async markLinkAsUsed(token: string): Promise<void> {
-        await supabase.from('temporary_links').update({ used: true }).eq('token', token);
+        await api.put('/antifraud/temporary-link/use', { token });
     },
 
     /**
@@ -630,7 +614,7 @@ export const antifraudService = {
         const ip = await this.getPublicIP();
         const location = await this.requestLocation();
 
-        await supabase.from('contract_signatures').insert({
+        await api.post('/antifraud/contract-signature', {
             contract_id: contractId,
             user_id: userId,
             session_id: sessionId,
@@ -663,13 +647,6 @@ export const antifraudService = {
 
     /**
      * 🚫 Verifica se o CPF está em período de cooldown após reprovação
-     * 
-     * Regra: Se um empréstimo foi REJECTED nos últimos 30 dias para aquele CPF,
-     * o cliente não pode solicitar novo empréstimo. Funciona por CPF, então
-     * mesmo trocando de celular/dispositivo o bloqueio persiste.
-     * 
-     * @param cpf - CPF do cliente (limpo, apenas números)
-     * @returns Objeto com status do bloqueio e informações de quando poderá tentar novamente
      */
     async checkRejectionCooldown(cpf: string): Promise<{
         blocked: boolean;
@@ -685,58 +662,28 @@ export const antifraudService = {
                 return { blocked: false, daysRemaining: 0 };
             }
 
-            // Data limite: 30 dias atrás
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            // Busca via API
+            const { data, error } = await api.get<any>(`/antifraud/rejection-cooldown?cpf=${cleanCpf}`);
 
-            // Busca solicitações REJEITADAS deste CPF nos últimos 30 dias
-            const { data: rejectedRequests, error } = await supabase
-                .from('loan_requests')
-                .select('id, cpf, status, date, updated_at')
-                .eq('cpf', cleanCpf)
-                .eq('status', 'REJECTED')
-                .gte('updated_at', thirtyDaysAgo.toISOString())
-                .order('updated_at', { ascending: false })
-                .limit(1);
-
-            if (error) {
-                console.error('[Antifraud] Erro ao verificar cooldown:', error);
+            if (error || !data) {
                 return { blocked: false, daysRemaining: 0 };
             }
 
-            if (!rejectedRequests || rejectedRequests.length === 0) {
-                return { blocked: false, daysRemaining: 0 };
-            }
+            const result = data as any;
 
-            // Existe reprovação nos últimos 30 dias
-            const lastRejection = rejectedRequests[0];
-            const rejectionDate = new Date(lastRejection.updated_at || lastRejection.date);
-            const canRetryAt = new Date(rejectionDate);
-            canRetryAt.setDate(canRetryAt.getDate() + 30);
-
-            const now = new Date();
-            const diffMs = canRetryAt.getTime() - now.getTime();
-            const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-            if (daysRemaining <= 0) {
+            if (!result.blocked) {
                 return { blocked: false, daysRemaining: 0 };
             }
 
             // Registra tentativa bloqueada no log de risco
             await this.logRiskEvent('BLOCKED_COOLDOWN_30DAYS', undefined, {
                 cpf: cleanCpf,
-                rejectionDate: rejectionDate.toISOString(),
-                daysRemaining,
-                canRetryAt: canRetryAt.toISOString()
+                rejectionDate: result.rejectionDate,
+                daysRemaining: result.daysRemaining,
+                canRetryAt: result.canRetryAt
             });
 
-            return {
-                blocked: true,
-                daysRemaining,
-                rejectionDate: rejectionDate.toISOString(),
-                canRetryAt: canRetryAt.toISOString(),
-                message: `Sua solicitação foi reprovada em ${rejectionDate.toLocaleDateString('pt-BR')}. Você poderá solicitar novamente em ${canRetryAt.toLocaleDateString('pt-BR')} (${daysRemaining} dias restantes).`
-            };
+            return result;
         } catch (error) {
             console.error('[Antifraud] Erro ao verificar cooldown:', error);
             return { blocked: false, daysRemaining: 0 };

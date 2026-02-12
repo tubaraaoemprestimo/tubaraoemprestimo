@@ -12,7 +12,7 @@ import {
     CheckCircle, Clock, XCircle, ArrowUpRight, ArrowDownRight, Zap,
     Calendar, RefreshCw, Percent
 } from 'lucide-react';
-import { supabaseService } from '../services/supabaseService';
+import { apiService } from '../services/apiService';
 import { LoanStatus, GoalsSettings } from '../types';
 
 interface KPIData {
@@ -90,10 +90,10 @@ export const AdvancedKPIs: React.FC = () => {
         setLoading(true);
         try {
             const [requests, customers, loans, goalsData] = await Promise.all([
-                supabaseService.getRequests(),
-                supabaseService.getCustomers(),
-                supabaseService.getClientLoans(),
-                supabaseService.getGoalsSettings()
+                apiService.getRequests(),
+                apiService.getCustomers(),
+                apiService.getClientLoans(),
+                apiService.getGoalsSettings()
             ]);
 
             setGoals(goalsData);

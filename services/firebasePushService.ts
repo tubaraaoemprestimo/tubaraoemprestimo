@@ -1,7 +1,7 @@
 // 🔥 Firebase Push Notification Service
 // Tubarão Empréstimos - Push Notifications via FCM
 
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 
 // Firebase config - Projeto tubarao-emprestimo
 const FIREBASE_CONFIG = {
@@ -151,7 +151,7 @@ export const firebasePushService = {
     },
 
     /**
-     * Save FCM token to Supabase for the current user
+     * Save FCM token to database via API for the current user
      */
     saveTokenToDatabase: async (token: string): Promise<boolean> => {
         try {
@@ -168,16 +168,14 @@ export const firebasePushService = {
                 language: navigator.language
             };
 
-            // Upsert token in push_subscriptions table
-            const { error } = await supabase.from('push_subscriptions').upsert({
+            // Upsert token via API
+            const { error } = await api.post('/push/subscriptions', {
                 user_email: user.email,
                 fcm_token: token,
                 device_type: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
                 device_info: deviceInfo,
                 is_active: true,
                 last_used_at: new Date().toISOString()
-            }, {
-                onConflict: 'user_email,fcm_token'
             });
 
             if (error) {
@@ -217,11 +215,11 @@ export const firebasePushService = {
     },
 
     // ============================================
-    // SERVER-SIDE (via Edge Function)
+    // SERVER-SIDE (via API)
     // ============================================
 
     /**
-     * Send push notification via Supabase Edge Function
+     * Send push notification via API
      */
     sendPush: async (options: {
         to: string | string[];  // User email(s) or 'all'
@@ -232,37 +230,25 @@ export const firebasePushService = {
         link?: string;
     }): Promise<{ success: boolean; sent: number; failed: number }> => {
         try {
-            const session = await supabase.auth.getSession();
-            const token = session.data.session?.access_token;
+            const { data, error } = await api.post<any>('/push/send', {
+                to: options.to,
+                notification: {
+                    title: options.title,
+                    body: options.body,
+                    icon: options.icon || '/Logo.png'
+                },
+                data: {
+                    ...options.data,
+                    link: options.link || '/'
+                }
+            });
 
-            if (!token) {
-                console.error('[FCM] No auth token available');
+            if (error) {
+                console.error('[FCM] Send error:', error);
                 return { success: false, sent: 0, failed: 0 };
             }
 
-            const supabaseUrl = 'https://cwhiujeragsethxjekkb.supabase.co';
-
-            const response = await fetch(`${supabaseUrl}/functions/v1/send-push`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    to: options.to,
-                    notification: {
-                        title: options.title,
-                        body: options.body,
-                        icon: options.icon || '/Logo.png'
-                    },
-                    data: {
-                        ...options.data,
-                        link: options.link || '/'
-                    }
-                })
-            });
-
-            const result = await response.json();
+            const result = data as any;
             console.log('[FCM] Send result:', result);
 
             return {
@@ -401,10 +387,9 @@ export const firebasePushService = {
         if (!user) return;
 
         try {
-            await supabase
-                .from('push_subscriptions')
-                .update({ is_active: false })
-                .eq('user_email', user.email);
+            await api.put('/push/subscriptions/deactivate', {
+                user_email: user.email
+            });
 
             console.log('[FCM] Token deactivated');
         } catch (error) {

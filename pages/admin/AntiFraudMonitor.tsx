@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
     Shield, MapPin, Smartphone, Monitor, Globe, Clock,
     AlertTriangle, CheckCircle, XCircle, RefreshCw, Search,
@@ -7,10 +7,10 @@ import {
     Bell, Trash2, List
 } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabase } from '../../services/supabaseClient';
+import { api } from '../../services/apiClient';
 import { useToast } from '../../components/Toast';
 import { deviceSecurityService, TrustedDevice, SecurityBlock, SecurityAlert } from '../../services/deviceSecurityService';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { UserAccess } from '../../types';
 
 interface RiskLog {
@@ -145,7 +145,7 @@ export const AntiFraudMonitor: React.FC = () => {
             setSecurityAlerts(alerts);
 
             // Usuários para gerenciamento de dispositivos
-            const usersData = await supabaseService.getUsers();
+            const usersData = await apiService.getUsers();
             setUsers(usersData);
         } catch (err: any) {
             console.error('Erro ao carregar dados:', err);

@@ -11,7 +11,7 @@ import { Button } from '../../components/Button';
 import { Camera } from '../../components/Camera';
 import { SignaturePad } from '../../components/SignaturePad';
 import { VideoUpload } from '../../components/VideoUpload';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { loanSettingsService, LoanSettings } from '../../services/loanSettingsService';
 import { antifraudService } from '../../services/antifraudService';
 import { emailService } from '../../services/emailService';
@@ -839,7 +839,7 @@ export const Wizard: React.FC = () => {
       let retries = 3;
 
       while (retries > 0 && !uploadedUrl) {
-        uploadedUrl = await supabaseService.uploadFile('documents', filePath, file);
+        uploadedUrl = await apiService.uploadFile('documents', filePath, file);
         if (!uploadedUrl) {
           retries--;
           if (retries > 0) {
@@ -886,7 +886,7 @@ export const Wizard: React.FC = () => {
       // Upload da assinatura
       const signatureUrl = formData.signature ? await uploadToStorage(formData.signature, 'investor_signature') : '';
 
-      const success = await supabaseService.submitInvestorRequest({
+      const success = await apiService.submitInvestorRequest({
         fullName: investorData.fullName,
         cpfCnpj: investorData.cpfCnpj,
         rgCnh: investorData.rgCnh,
@@ -1022,7 +1022,7 @@ export const Wizard: React.FC = () => {
       // Concatenar Perfil e CNPJ na profissão para visualização no admin
       const finalOccupation = `[${profileType}] ${uploadedData.occupation || ''} ${uploadedData.cnpj ? '- CNPJ: ' + uploadedData.cnpj : ''}`;
 
-      const success = await supabaseService.submitRequest({
+      const success = await apiService.submitRequest({
         ...uploadedData,
         occupation: finalOccupation,
         profileType,

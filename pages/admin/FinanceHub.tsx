@@ -1,4 +1,4 @@
-// 🎮 Finance Hub - Pagamentos, Comprovantes e Gamificação Unificados
+﻿// 🎮 Finance Hub - Pagamentos, Comprovantes e Gamificação Unificados
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -8,8 +8,8 @@ import {
     RefreshCw, Gift, Medal, Sparkles, ArrowUpRight, ArrowDownRight, Calculator
 } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabase } from '../../services/supabaseClient';
-import { supabaseService } from '../../services/supabaseService';
+import { api } from '../../services/apiClient';
+import { apiService } from '../../services/apiService';
 import { paymentService, LoanPayment } from '../../services/paymentService';
 import { loanSettingsService } from '../../services/loanSettingsService';
 import { LoanRequest, PaymentReceipt } from '../../types';
@@ -79,7 +79,7 @@ export const FinanceHub: React.FC = () => {
         try {
             const [paymentsData, requestsData] = await Promise.all([
                 paymentService.getAllPayments(),
-                supabaseService.getRequests()
+                apiService.getRequests()
             ]);
             setPayments(paymentsData);
             setRequests(requestsData);

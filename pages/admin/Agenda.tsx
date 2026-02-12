@@ -1,7 +1,7 @@
-// 📅 Agenda de Recebimentos - Calendário visual com parcelas
+﻿// 📅 Agenda de Recebimentos - Calendário visual com parcelas
 import React, { useState, useEffect } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, DollarSign, AlertTriangle, CheckCircle, Clock, User, Filter } from 'lucide-react';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { calendarService } from '../../services/adminService';
 import { CalendarEvent, Customer, Loan } from '../../types';
 
@@ -19,8 +19,8 @@ export const AgendaPage: React.FC = () => {
 
     const loadData = async () => {
         const [customersData, loansData] = await Promise.all([
-            supabaseService.getCustomers(),
-            supabaseService.getClientLoans()
+            apiService.getCustomers(),
+            apiService.getClientLoans()
         ]);
         setCustomers(customersData);
         setLoans(loansData);

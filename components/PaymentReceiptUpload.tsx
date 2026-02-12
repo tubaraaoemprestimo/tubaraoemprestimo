@@ -4,7 +4,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, Image, X, Check, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from './Button';
-import { supabase } from '../services/supabaseClient';
+import { api } from '../services/apiClient';
 import { autoNotificationService } from '../services/autoNotificationService';
 
 interface PaymentReceiptUploadProps {
@@ -87,7 +87,7 @@ export const PaymentReceiptUpload: React.FC<PaymentReceiptUploadProps> = ({
             const fileExt = file.name.split('.').pop();
             const fileName = `${customerId}/${installmentId}_${Date.now()}.${fileExt}`;
 
-            const { data: uploadData, error: uploadError } = await supabase.storage
+            const { data: uploadData, error: uploadError } = await api.storage
                 .from('receipts')
                 .upload(fileName, file, {
                     cacheControl: '3600',
@@ -99,14 +99,14 @@ export const PaymentReceiptUpload: React.FC<PaymentReceiptUploadProps> = ({
             }
 
             // Obter URL pública
-            const { data: urlData } = supabase.storage
+            const { data: urlData } = api.storage
                 .from('receipts')
                 .getPublicUrl(fileName);
 
             const receiptUrl = urlData.publicUrl;
 
             // Salvar registro no banco
-            const { error: dbError } = await supabase
+            const { error: dbError } = await api
                 .from('payment_receipts')
                 .insert({
                     installment_id: installmentId,

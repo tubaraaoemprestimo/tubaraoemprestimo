@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, Lock, ArrowRight, ShieldCheck, ScanFace, AlertCircle, Smartphone, Mail, Loader2, CheckCircle2, X, Fingerprint } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { InstallPwaButton } from '../../components/InstallPwaButton';
 import { biometricService } from '../../services/biometricService';
 import { antifraudService } from '../../services/antifraudService';
@@ -46,7 +46,7 @@ export const Login: React.FC = () => {
     checkBiometric();
 
     // Limpar sessão para fresh login
-    supabaseService.auth.signOut();
+    apiService.auth.signOut();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,7 +72,7 @@ export const Login: React.FC = () => {
     }
 
     try {
-      const result = await supabaseService.auth.signIn(creds) as any;
+      const result = await apiService.auth.signIn(creds) as any;
       if (result.user) {
         // Antifraud Log com localização capturada
         await antifraudService.logRiskEvent('LOGIN_SUCCESS', result.user.id, {
@@ -193,7 +193,7 @@ export const Login: React.FC = () => {
       const { email, token } = JSON.parse(storedAuth);
 
       // Login via Supabase com token armazenado
-      const loginResult = await supabaseService.auth.signIn({ identifier: email, password: atob(token) }) as any;
+      const loginResult = await apiService.auth.signIn({ identifier: email, password: atob(token) }) as any;
 
       if (loginResult.user) {
         await antifraudService.logRiskEvent('LOGIN_SUCCESS', loginResult.user.id, {
@@ -236,7 +236,7 @@ export const Login: React.FC = () => {
     setResetLoading(true);
     setResetError(null);
 
-    const result = await supabaseService.resetPassword(resetEmail);
+    const result = await apiService.resetPassword(resetEmail);
 
     setResetLoading(false);
 

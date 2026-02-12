@@ -1,7 +1,7 @@
 /**
  * 🔒 Device Security Service
  * Sistema inteligente de detecção e bloqueio de dispositivos suspeitos
- * 
+ *
  * Funcionalidades:
  * - Detecta login em dispositivo diferente
  * - Bloqueia automaticamente dispositivos não reconhecidos
@@ -9,7 +9,7 @@
  * - Mantém lista de dispositivos confiáveis por usuário
  */
 
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 import { antifraudService, DeviceFingerprint } from './antifraudService';
 
 export interface TrustedDevice {
@@ -125,12 +125,10 @@ export const deviceSecurityService = {
      */
     async getSecuritySettings(): Promise<Record<string, string>> {
         try {
-            const { data } = await supabase
-                .from('security_settings')
-                .select('setting_key, setting_value');
+            const { data } = await api.get<any[]>('/antifraud/security-settings');
 
             const settings: Record<string, string> = {};
-            (data || []).forEach((item: any) => {
+            ((data as any[]) || []).forEach((item: any) => {
                 settings[item.setting_key] = item.setting_value;
             });
 
@@ -152,18 +150,14 @@ export const deviceSecurityService = {
      * Obtém todos os dispositivos confiáveis de um usuário
      */
     async getUserDevices(userId: string): Promise<TrustedDevice[]> {
-        const { data, error } = await supabase
-            .from('trusted_devices')
-            .select('*')
-            .eq('user_id', userId)
-            .order('last_seen_at', { ascending: false });
+        const { data, error } = await api.get<any[]>(`/antifraud/device/list?user_id=${userId}`);
 
         if (error) {
             console.error('[DeviceSecurity] Error fetching devices:', error);
             return [];
         }
 
-        return data || [];
+        return (data as any[]) || [];
     },
 
     /**
@@ -319,24 +313,20 @@ export const deviceSecurityService = {
         const existingDevices = await this.getUserDevices(userId);
         const isPrimary = existingDevices.length === 0;
 
-        const { data, error } = await supabase
-            .from('trusted_devices')
-            .insert({
-                user_id: userId,
-                device_fingerprint: deviceFingerprint,
-                device_name: deviceName,
-                device_model: fingerprint.deviceModel || 'Desconhecido',
-                platform: fingerprint.platform,
-                browser: browser,
-                screen_resolution: fingerprint.screenResolution,
-                last_ip: ip,
-                is_verified: isVerified,
-                is_primary: isPrimary,
-                trust_score: isVerified ? 100 : 50,
-                login_count: 1
-            })
-            .select()
-            .single();
+        const { data, error } = await api.post<any>('/antifraud/device/trust', {
+            user_id: userId,
+            device_fingerprint: deviceFingerprint,
+            device_name: deviceName,
+            device_model: fingerprint.deviceModel || 'Desconhecido',
+            platform: fingerprint.platform,
+            browser: browser,
+            screen_resolution: fingerprint.screenResolution,
+            last_ip: ip,
+            is_verified: isVerified,
+            is_primary: isPrimary,
+            trust_score: isVerified ? 100 : 50,
+            login_count: 1
+        });
 
         if (error) {
             console.error('[DeviceSecurity] Error adding device:', error);
@@ -344,7 +334,7 @@ export const deviceSecurityService = {
         }
 
         console.log('[DeviceSecurity] Device added:', deviceName);
-        return data;
+        return data as TrustedDevice;
     },
 
     /**
@@ -355,32 +345,17 @@ export const deviceSecurityService = {
         ip: string,
         fingerprint?: DeviceFingerprint
     ): Promise<void> {
-        // Busca o login_count atual e incrementa
-        const { data: device } = await supabase
-            .from('trusted_devices')
-            .select('login_count')
-            .eq('id', deviceId)
-            .single();
-
-        await supabase
-            .from('trusted_devices')
-            .update({
-                last_ip: ip,
-                last_seen_at: new Date().toISOString(),
-                login_count: (device?.login_count || 0) + 1
-            })
-            .eq('id', deviceId);
+        await api.put(`/antifraud/device/${deviceId}/activity`, {
+            last_ip: ip,
+            last_seen_at: new Date().toISOString()
+        });
     },
 
     /**
      * Remove um dispositivo da lista de confiáveis
      */
     async removeDevice(deviceId: string): Promise<boolean> {
-        const { error } = await supabase
-            .from('trusted_devices')
-            .delete()
-            .eq('id', deviceId);
-
+        const { error } = await api.delete(`/antifraud/device/${deviceId}`);
         return !error;
     },
 
@@ -388,14 +363,10 @@ export const deviceSecurityService = {
      * Marca dispositivo como verificado
      */
     async verifyDevice(deviceId: string): Promise<boolean> {
-        const { error } = await supabase
-            .from('trusted_devices')
-            .update({
-                is_verified: true,
-                trust_score: 100
-            })
-            .eq('id', deviceId);
-
+        const { error } = await api.put(`/antifraud/device/${deviceId}/verify`, {
+            is_verified: true,
+            trust_score: 100
+        });
         return !error;
     },
 
@@ -403,18 +374,9 @@ export const deviceSecurityService = {
      * Define dispositivo como primário
      */
     async setPrimaryDevice(userId: string, deviceId: string): Promise<boolean> {
-        // Remove primário anterior
-        await supabase
-            .from('trusted_devices')
-            .update({ is_primary: false })
-            .eq('user_id', userId);
-
-        // Define novo primário
-        const { error } = await supabase
-            .from('trusted_devices')
-            .update({ is_primary: true })
-            .eq('id', deviceId);
-
+        const { error } = await api.put(`/antifraud/device/${deviceId}/set-primary`, {
+            user_id: userId
+        });
         return !error;
     },
 
@@ -429,13 +391,14 @@ export const deviceSecurityService = {
         device_info?: any;
         expires_at?: string;
     }): Promise<void> {
-        await supabase.from('security_blocks').insert({
+        await api.post('/antifraud/security-block', {
             user_id: userId,
             ...data,
             is_resolved: false
         });
 
-        const payload: any = {
+        // Also create admin notification
+        const notifPayload: any = {
             customer_email: null,
             type: 'WARNING',
             title: '🔒 Cliente bloqueado pelo antifraude',
@@ -445,13 +408,7 @@ export const deviceSecurityService = {
             for_role: 'ADMIN'
         };
 
-        let { error } = await supabase.from('notifications').insert(payload);
-        if (error && String(error.message || '').toLowerCase().includes('for_role')) {
-            delete payload.for_role;
-            const fallback = await supabase.from('notifications').insert(payload);
-            error = fallback.error;
-        }
-
+        const { error } = await api.post('/notifications', notifPayload);
         if (error) {
             console.error('[DeviceSecurity] failed to insert admin notification:', error);
         }
@@ -461,24 +418,17 @@ export const deviceSecurityService = {
      * Verifica se o usuário está bloqueado
      */
     async checkUserBlocked(userId: string): Promise<SecurityBlock | null> {
-        const { data } = await supabase
-            .from('security_blocks')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('is_resolved', false)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
+        const { data } = await api.get<any>(`/antifraud/security-block/check?user_id=${userId}`);
 
         if (data) {
             // Verifica se expirou
-            if (data.expires_at && new Date(data.expires_at) < new Date()) {
-                await this.resolveBlock(data.id, 'SYSTEM', 'Bloqueio expirado');
+            if ((data as any).expires_at && new Date((data as any).expires_at) < new Date()) {
+                await this.resolveBlock((data as any).id, 'SYSTEM', 'Bloqueio expirado');
                 return null;
             }
         }
 
-        return data;
+        return data as SecurityBlock;
     },
 
     /**
@@ -490,76 +440,15 @@ export const deviceSecurityService = {
         resolvedBy: string,
         notes?: string
     ): Promise<boolean> {
-        // 1. Buscar dados do bloqueio antes de resolver
-        const { data: blockData } = await supabase
-            .from('security_blocks')
-            .select('*')
-            .eq('id', blockId)
-            .single();
-
-        // 2. Resolver o bloqueio
-        const { error } = await supabase
-            .from('security_blocks')
-            .update({
-                is_resolved: true,
-                resolved_at: new Date().toISOString(),
-                resolved_by: resolvedBy,
-                resolution_notes: notes
-            })
-            .eq('id', blockId);
+        const { data, error } = await api.put<any>(`/antifraud/security-block/${blockId}/resolve`, {
+            resolved_by: resolvedBy,
+            resolution_notes: notes
+        });
 
         if (error) return false;
 
-        // 3. Adicionar dispositivo como confiável (para que não bloqueie de novo)
-        if (blockData && blockData.device_fingerprint && blockData.user_id) {
-            try {
-                // Verifica se já não existe
-                const { data: existing } = await supabase
-                    .from('trusted_devices')
-                    .select('id')
-                    .eq('user_id', blockData.user_id)
-                    .eq('device_fingerprint', blockData.device_fingerprint)
-                    .limit(1);
-
-                if (!existing || existing.length === 0) {
-                    const deviceInfo = blockData.device_info || {};
-                    await supabase.from('trusted_devices').insert({
-                        user_id: blockData.user_id,
-                        device_fingerprint: blockData.device_fingerprint,
-                        device_name: deviceInfo.model || 'Dispositivo Liberado',
-                        device_model: deviceInfo.model || 'Desconhecido',
-                        platform: deviceInfo.platform || 'Desconhecido',
-                        browser: deviceInfo.browser || 'Desconhecido',
-                        screen_resolution: deviceInfo.screen || '',
-                        last_ip: blockData.ip_address || '',
-                        is_verified: true,
-                        is_primary: false,
-                        trust_score: 80,
-                        login_count: 0,
-                        first_seen_at: new Date().toISOString(),
-                        last_seen_at: new Date().toISOString(),
-                    });
-                    console.log('[DeviceSecurity] ✅ Device added as trusted after unblock');
-                }
-            } catch (e) {
-                console.error('[DeviceSecurity] Error adding trusted device after unblock:', e);
-            }
-        }
-
-        // 4. Resolver TODOS os bloqueios pendentes deste usuário (instantâneo)
-        if (blockData?.user_id) {
-            await supabase
-                .from('security_blocks')
-                .update({
-                    is_resolved: true,
-                    resolved_at: new Date().toISOString(),
-                    resolved_by: resolvedBy,
-                    resolution_notes: notes || 'Liberado junto com outro bloqueio'
-                })
-                .eq('user_id', blockData.user_id)
-                .eq('is_resolved', false);
-        }
-
+        // The backend should handle adding the device as trusted and resolving
+        // all pending blocks for this user. If not, this is handled server-side.
         return true;
     },
 
@@ -567,13 +456,8 @@ export const deviceSecurityService = {
      * Obtém bloqueios pendentes (para admin)
      */
     async getPendingBlocks(): Promise<SecurityBlock[]> {
-        const { data } = await supabase
-            .from('security_blocks')
-            .select('*')
-            .eq('is_resolved', false)
-            .order('created_at', { ascending: false });
-
-        return data || [];
+        const { data } = await api.get<any[]>('/antifraud/security-blocks?resolved=false');
+        return (data as any[]) || [];
     },
 
     /**
@@ -591,7 +475,7 @@ export const deviceSecurityService = {
         ip_address?: string;
         location?: any;
     }): Promise<void> {
-        await supabase.from('security_alerts').insert({
+        await api.post('/antifraud/security-alerts', {
             ...data,
             is_read: false,
             is_actioned: false
@@ -604,62 +488,42 @@ export const deviceSecurityService = {
      * Obtém alertas não lidos (para admin)
      */
     async getUnreadAlerts(): Promise<SecurityAlert[]> {
-        const { data } = await supabase
-            .from('security_alerts')
-            .select('*')
-            .eq('is_read', false)
-            .order('created_at', { ascending: false });
-
-        return data || [];
+        const { data } = await api.get<any[]>('/antifraud/security-alerts?is_read=false');
+        return (data as any[]) || [];
     },
 
     /**
      * Obtém todos os alertas recentes
      */
     async getRecentAlerts(limit: number = 50): Promise<SecurityAlert[]> {
-        const { data } = await supabase
-            .from('security_alerts')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(limit);
-
-        return data || [];
+        const { data } = await api.get<any[]>(`/antifraud/security-alerts?limit=${limit}`);
+        return (data as any[]) || [];
     },
 
     /**
      * Marca alerta como lido
      */
     async markAlertRead(alertId: string): Promise<void> {
-        await supabase
-            .from('security_alerts')
-            .update({ is_read: true })
-            .eq('id', alertId);
+        await api.put(`/antifraud/security-alerts/${alertId}/read`, { is_read: true });
     },
 
     /**
      * Conta alertas não lidos
      */
     async getUnreadAlertCount(): Promise<number> {
-        const { count } = await supabase
-            .from('security_alerts')
-            .select('*', { count: 'exact', head: true })
-            .eq('is_read', false);
-
-        return count || 0;
+        const { data } = await api.get<any>('/antifraud/security-alerts/count?is_read=false');
+        return (data as any)?.count || 0;
     },
 
     /**
      * Atualiza configuração de segurança
      */
     async updateSecuritySetting(key: string, value: string): Promise<boolean> {
-        const { error } = await supabase
-            .from('security_settings')
-            .upsert({
-                setting_key: key,
-                setting_value: value,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'setting_key' });
-
+        const { error } = await api.put('/antifraud/security-settings', {
+            setting_key: key,
+            setting_value: value,
+            updated_at: new Date().toISOString()
+        });
         return !error;
     },
 
@@ -667,11 +531,7 @@ export const deviceSecurityService = {
      * Libera todos os dispositivos de um usuário (reset)
      */
     async resetUserDevices(userId: string): Promise<boolean> {
-        const { error } = await supabase
-            .from('trusted_devices')
-            .delete()
-            .eq('user_id', userId);
-
+        const { error } = await api.delete(`/antifraud/device/reset?user_id=${userId}`);
         return !error;
     },
 
@@ -679,17 +539,11 @@ export const deviceSecurityService = {
      * Libera um usuário de todos os bloqueios
      */
     async unblockUser(userId: string, adminName: string): Promise<boolean> {
-        const { error } = await supabase
-            .from('security_blocks')
-            .update({
-                is_resolved: true,
-                resolved_at: new Date().toISOString(),
-                resolved_by: adminName,
-                resolution_notes: 'Desbloqueado manualmente pelo admin'
-            })
-            .eq('user_id', userId)
-            .eq('is_resolved', false);
-
+        const { error } = await api.put(`/antifraud/security-block/unblock-user`, {
+            user_id: userId,
+            resolved_by: adminName,
+            resolution_notes: 'Desbloqueado manualmente pelo admin'
+        });
         return !error;
     }
 };

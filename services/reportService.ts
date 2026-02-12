@@ -3,7 +3,7 @@
 // Tubarão Empréstimos - Sistema de Relatórios Profissionais
 
 import { LoanRequest, Customer, Loan, Transaction, LoanStatus } from '../types';
-import { supabaseService } from './supabaseService';
+import { apiService } from './apiService';
 
 interface ReportData {
   title: string;
@@ -148,7 +148,7 @@ const getStatusLabel = (status: LoanStatus): string => {
 export const reportService = {
   // 📊 Relatório de Solicitações
   exportRequests: async (format: 'excel' | 'pdf'): Promise<void> => {
-    const requests = await supabaseService.getRequests();
+    const requests = await apiService.getRequests();
     const now = new Date().toLocaleString('pt-BR');
 
     const columns = [
@@ -196,7 +196,7 @@ export const reportService = {
 
   // 👥 Relatório de Clientes
   exportCustomers: async (format: 'excel' | 'pdf'): Promise<void> => {
-    const customers = await supabaseService.getCustomers();
+    const customers = await apiService.getCustomers();
     const now = new Date().toLocaleString('pt-BR');
 
     const columns = [
@@ -247,7 +247,7 @@ export const reportService = {
 
   // 💰 Relatório Financeiro (Empréstimos Ativos)
   exportLoans: async (format: 'excel' | 'pdf'): Promise<void> => {
-    const loans = await supabaseService.getClientLoans();
+    const loans = await apiService.getClientLoans();
     const now = new Date().toLocaleString('pt-BR');
 
     const columns = [
@@ -299,7 +299,7 @@ export const reportService = {
 
   // 📅 Relatório de Parcelas (Vencimentos)
   exportInstallments: async (format: 'excel' | 'pdf', filter?: 'all' | 'open' | 'late' | 'paid'): Promise<void> => {
-    const loans = await supabaseService.getClientLoans();
+    const loans = await apiService.getClientLoans();
     const now = new Date().toLocaleString('pt-BR');
     const today = new Date();
 
@@ -360,8 +360,8 @@ export const reportService = {
 
   // 📈 Relatório de Inadimplência
   exportDefaultReport: async (format: 'excel' | 'pdf'): Promise<void> => {
-    const loans = await supabaseService.getClientLoans();
-    const customers = await supabaseService.getCustomers();
+    const loans = await apiService.getClientLoans();
+    const customers = await apiService.getCustomers();
     const now = new Date().toLocaleString('pt-BR');
     const today = new Date();
 

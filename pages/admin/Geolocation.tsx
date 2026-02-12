@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
     MapPin, Navigation, Route, Users, AlertTriangle,
     Clock, Target, Play, CheckCircle, Trash2, Plus,
@@ -8,7 +8,7 @@ import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
 import { Customer, GeoCluster, CollectionRoute } from '../../types';
 import { geolocationService } from '../../services/geolocationService';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { locationTrackingService, CustomerLocation } from '../../services/locationTrackingService';
 
 export const GeolocationPage: React.FC = () => {
@@ -33,7 +33,7 @@ export const GeolocationPage: React.FC = () => {
     const loadData = async () => {
         try {
             const [customersData, locationsData] = await Promise.all([
-                supabaseService.getCustomers(),
+                apiService.getCustomers(),
                 locationTrackingService.getAllLocations()
             ]);
 

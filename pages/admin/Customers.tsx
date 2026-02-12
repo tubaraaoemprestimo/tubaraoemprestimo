@@ -1,8 +1,8 @@
-
+﻿
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings, Calendar, RotateCcw, Calculator, Edit2, Trash2, Gift, Upload, UserPlus, Save, Key } from 'lucide-react';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { whatsappService } from '../../services/whatsappService';
 import { dataEnrichmentService } from '../../services/dataEnrichmentService';
 import { Customer, SystemSettings } from '../../types';
@@ -107,7 +107,7 @@ export const Customers: React.FC = () => {
     addToast('Excluindo clientes...', 'info');
 
     try {
-      await supabaseService.bulkDeleteCustomers(selectedIds);
+      await apiService.bulkDeleteCustomers(selectedIds);
       addToast(`${selectedIds.length} clientes excluídos.`, 'success');
       setSelectedIds([]);
       loadCustomers();
@@ -125,13 +125,13 @@ export const Customers: React.FC = () => {
 
   const loadCustomers = async () => {
     setLoading(true);
-    const data = await supabaseService.getCustomers();
+    const data = await apiService.getCustomers();
     setCustomers(data);
     setLoading(false);
   };
 
   const loadGlobalSettings = async () => {
-    const settings = await supabaseService.getSettings();
+    const settings = await apiService.getSettings();
     setGlobalSettings(settings);
   };
 
@@ -140,7 +140,7 @@ export const Customers: React.FC = () => {
     const action = newStatus === 'ACTIVE' ? 'desbloquear' : 'bloquear';
 
     if (confirm(`Tem certeza que deseja ${action} o cliente ${cust.name}?`)) {
-      await supabaseService.toggleCustomerStatus(cust.id, newStatus);
+      await apiService.toggleCustomerStatus(cust.id, newStatus);
       addToast(`Cliente ${newStatus === 'ACTIVE' ? 'desbloqueado' : 'bloqueado'} com sucesso.`, 'info');
       loadCustomers();
     }
@@ -222,7 +222,7 @@ export const Customers: React.FC = () => {
     if (!selectedCustomer) return;
     setSending(true);
 
-    const success = await supabaseService.updateCustomer(selectedCustomer.id, editData);
+    const success = await apiService.updateCustomer(selectedCustomer.id, editData);
 
     setSending(false);
     setEditModalOpen(false);
@@ -254,7 +254,7 @@ export const Customers: React.FC = () => {
     }
 
     setSending(true);
-    const result = await supabaseService.createUserFromCustomer(selectedCustomer.id, newUserPassword);
+    const result = await apiService.createUserFromCustomer(selectedCustomer.id, newUserPassword);
     setSending(false);
 
     if (result.success) {
@@ -296,7 +296,7 @@ export const Customers: React.FC = () => {
       lateInterestMonthly: customRates.lateInterestMonthly
     } : undefined;
 
-    await supabaseService.updateCustomerRates(selectedCustomer.id, ratesToSave);
+    await apiService.updateCustomerRates(selectedCustomer.id, ratesToSave);
 
     setSending(false);
     setRatesModalOpen(false);
@@ -337,7 +337,7 @@ export const Customers: React.FC = () => {
   const handleDeleteOffer = async (cust: Customer) => {
     if (!confirm(`Remover oferta de parcelamento de ${cust.name}?`)) return;
 
-    await supabaseService.deleteInstallmentOffer(cust.id);
+    await apiService.deleteInstallmentOffer(cust.id);
     addToast('Oferta removida!', 'info');
     loadCustomers();
   };
@@ -369,7 +369,7 @@ export const Customers: React.FC = () => {
 
     try {
       // Salvar oferta no banco
-      await supabaseService.sendInstallmentOffer(selectedCustomer.id, {
+      await apiService.sendInstallmentOffer(selectedCustomer.id, {
         amount: installmentOffer.amount,
         installments: installmentOffer.installments,
         interestRate: installmentOffer.interestRate,
@@ -408,7 +408,7 @@ export const Customers: React.FC = () => {
     setSending(true);
 
     // Save to DB
-    await supabaseService.sendPreApproval(selectedCustomer.id, preApproveAmount);
+    await apiService.sendPreApproval(selectedCustomer.id, preApproveAmount);
 
     // Send WhatsApp (Optional but good UX)
     const msg = `Olá ${selectedCustomer.name.split(' ')[0]}! 🦈\n\nTemos uma ótima notícia: Você possui um Crédito Pré-aprovado de *R$ ${preApproveAmount.toLocaleString('pt-BR')}* disponível agora!\n\nAcesse o app para conferir.`;
@@ -521,7 +521,7 @@ export const Customers: React.FC = () => {
 
     if (leadsToImport.length > 0) {
       addToast(`Importando ${leadsToImport.length} contatos...`, 'info');
-      const result = await supabaseService.bulkImportLeads(leadsToImport);
+      const result = await apiService.bulkImportLeads(leadsToImport);
       addToast(`Importação finalizada! ${result.added} adicionados.`, 'success');
     } else {
       addToast('Nenhum contato válido encontrado.', 'warning');
@@ -570,7 +570,7 @@ export const Customers: React.FC = () => {
 
     setLoading(true);
     try {
-      const count = await supabaseService.deleteWhatsappLeads();
+      const count = await apiService.deleteWhatsappLeads();
       addToast(`${count} contatos removidos.`, 'success');
       loadCustomers();
     } catch {

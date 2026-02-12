@@ -1,5 +1,5 @@
 // Serviço de IA para Chatbot do Tubarão Empréstimos
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 
 interface AIChatbotConfig {
     id: string;
@@ -74,32 +74,29 @@ export const aiChatbotService = {
     // Buscar configurações do chatbot
     getConfig: async (): Promise<AIChatbotConfig> => {
         try {
-            const { data, error } = await supabase
-                .from('ai_chatbot_config')
-                .select('*')
-                .limit(1)
-                .single();
+            const { data, error } = await api.get<any>('/chatbot/config');
 
             if (error || !data) {
                 console.log('[AI Chatbot] Using default config');
                 return DEFAULT_CONFIG;
             }
 
+            const d = data as any;
             return {
-                id: data.id,
-                enabled: data.enabled,
-                provider: data.provider,
-                geminiApiKey: data.gemini_api_key,
-                perplexityApiKey: data.perplexity_api_key,
-                systemPrompt: data.system_prompt || DEFAULT_CONFIG.systemPrompt,
-                welcomeMessage: data.welcome_message || DEFAULT_CONFIG.welcomeMessage,
-                fallbackMessage: data.fallback_message || DEFAULT_CONFIG.fallbackMessage,
-                transferKeywords: data.transfer_keywords || DEFAULT_CONFIG.transferKeywords,
-                autoReplyEnabled: data.auto_reply_enabled ?? true,
-                workingHoursOnly: data.working_hours_only ?? false,
-                workingHoursStart: data.working_hours_start || '08:00',
-                workingHoursEnd: data.working_hours_end || '18:00',
-                maxMessagesPerChat: data.max_messages_per_chat || 50
+                id: d.id,
+                enabled: d.enabled,
+                provider: d.provider,
+                geminiApiKey: d.gemini_api_key || d.geminiApiKey,
+                perplexityApiKey: d.perplexity_api_key || d.perplexityApiKey,
+                systemPrompt: d.system_prompt || d.systemPrompt || DEFAULT_CONFIG.systemPrompt,
+                welcomeMessage: d.welcome_message || d.welcomeMessage || DEFAULT_CONFIG.welcomeMessage,
+                fallbackMessage: d.fallback_message || d.fallbackMessage || DEFAULT_CONFIG.fallbackMessage,
+                transferKeywords: d.transfer_keywords || d.transferKeywords || DEFAULT_CONFIG.transferKeywords,
+                autoReplyEnabled: d.auto_reply_enabled ?? d.autoReplyEnabled ?? true,
+                workingHoursOnly: d.working_hours_only ?? d.workingHoursOnly ?? false,
+                workingHoursStart: d.working_hours_start || d.workingHoursStart || '08:00',
+                workingHoursEnd: d.working_hours_end || d.workingHoursEnd || '18:00',
+                maxMessagesPerChat: d.max_messages_per_chat || d.maxMessagesPerChat || 50
             };
         } catch (err) {
             console.error('[AI Chatbot] Error fetching config:', err);
@@ -110,25 +107,23 @@ export const aiChatbotService = {
     // Salvar configurações
     saveConfig: async (config: Partial<AIChatbotConfig>): Promise<boolean> => {
         try {
-            const { error } = await supabase
-                .from('ai_chatbot_config')
-                .upsert({
-                    id: config.id || 'b0000000-0000-0000-0000-000000000001',
-                    enabled: config.enabled,
-                    provider: config.provider,
-                    gemini_api_key: config.geminiApiKey,
-                    perplexity_api_key: config.perplexityApiKey,
-                    system_prompt: config.systemPrompt,
-                    welcome_message: config.welcomeMessage,
-                    fallback_message: config.fallbackMessage,
-                    transfer_keywords: config.transferKeywords,
-                    auto_reply_enabled: config.autoReplyEnabled,
-                    working_hours_only: config.workingHoursOnly,
-                    working_hours_start: config.workingHoursStart,
-                    working_hours_end: config.workingHoursEnd,
-                    max_messages_per_chat: config.maxMessagesPerChat,
-                    updated_at: new Date().toISOString()
-                });
+            const { error } = await api.put('/chatbot/config', {
+                id: config.id || 'b0000000-0000-0000-0000-000000000001',
+                enabled: config.enabled,
+                provider: config.provider,
+                gemini_api_key: config.geminiApiKey,
+                perplexity_api_key: config.perplexityApiKey,
+                system_prompt: config.systemPrompt,
+                welcome_message: config.welcomeMessage,
+                fallback_message: config.fallbackMessage,
+                transfer_keywords: config.transferKeywords,
+                auto_reply_enabled: config.autoReplyEnabled,
+                working_hours_only: config.workingHoursOnly,
+                working_hours_start: config.workingHoursStart,
+                working_hours_end: config.workingHoursEnd,
+                max_messages_per_chat: config.maxMessagesPerChat,
+                updated_at: new Date().toISOString()
+            });
 
             if (error) {
                 console.error('[AI Chatbot] Error saving config:', error);
@@ -144,16 +139,11 @@ export const aiChatbotService = {
     // Buscar histórico de conversa
     getChatHistory: async (phone: string, limit: number = 10): Promise<ChatMessage[]> => {
         try {
-            const { data, error } = await supabase
-                .from('ai_chat_history')
-                .select('role, message')
-                .eq('phone', phone)
-                .order('created_at', { ascending: false })
-                .limit(limit);
+            const { data, error } = await api.get<any[]>(`/chatbot/history/${encodeURIComponent(phone)}?limit=${limit}`);
 
             if (error || !data) return [];
 
-            return data.reverse().map(m => ({
+            return (data as any[]).reverse().map(m => ({
                 role: m.role as 'user' | 'assistant',
                 content: m.message
             }));
@@ -166,7 +156,7 @@ export const aiChatbotService = {
     // Salvar mensagem no histórico
     saveChatMessage: async (phone: string, role: 'user' | 'assistant', message: string, customerId?: string): Promise<void> => {
         try {
-            await supabase.from('ai_chat_history').insert({
+            await api.post('/chatbot/history', {
                 phone,
                 customer_id: customerId || null,
                 role,
@@ -182,13 +172,12 @@ export const aiChatbotService = {
         try {
             const cleanPhone = phone.replace(/\D/g, '').replace(/^55/, '');
 
-            const { data } = await supabase
-                .from('customers')
-                .select('*')
-                .or(`phone.ilike.%${cleanPhone}%,phone.ilike.%${phone}%`)
-                .limit(1)
-                .single();
+            const { data } = await api.get<any>(`/customers?phone=${encodeURIComponent(cleanPhone)}`);
 
+            // If data is an array, take the first element
+            if (Array.isArray(data)) {
+                return (data as any[])[0] || null;
+            }
             return data;
         } catch {
             return null;

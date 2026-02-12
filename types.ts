@@ -105,8 +105,8 @@ export interface LoanRequest {
   };
 
   signatureUrl?: string;
-  supplementalDescription?: string;
   contractPdfUrl?: string;
+  supplementalDescription?: string;
 }
 
 export interface DashboardStats {
@@ -681,6 +681,7 @@ export interface InvestorRequest {
   termsAccepted: boolean;
   termsAcceptedAt?: string;
   signatureUrl?: string;
+  contractPdfUrl?: string;
 
   // Status
   status: InvestorStatus;
@@ -715,3 +716,11 @@ export const INVESTOR_RATES = {
   },
 } as const;
 
+
+export interface ClientContractFile {
+  id: string;
+  type: 'LIMPA_NOME' | 'INVESTIDOR';
+  title: string;
+  createdAt: string;
+  contractPdfUrl: string;
+}

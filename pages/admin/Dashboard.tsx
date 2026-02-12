@@ -1,9 +1,9 @@
-
+﻿
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { DollarSign, Users, AlertTriangle, TrendingUp, Check, X, Maximize, Layers, Activity, BarChart3, LayoutGrid, Clock } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { whatsappService } from '../../services/whatsappService';
 import { notificationService } from '../../services/notificationService';
 import { LoanRequest, LoanStatus } from '../../types';
@@ -28,8 +28,8 @@ export const Dashboard: React.FC = () => {
 
   const loadData = async () => {
     const [reqs, sett] = await Promise.all([
-      supabaseService.getRequests(),
-      supabaseService.getSettings(),
+      apiService.getRequests(),
+      apiService.getSettings(),
     ]);
     setAllRequests(reqs);
     setSettings(sett);
@@ -143,7 +143,7 @@ export const Dashboard: React.FC = () => {
 
   const handleApprove = async (id: string) => {
     setProcessing(id);
-    await supabaseService.approveLoan(id);
+    await apiService.approveLoan(id);
 
     const req = allRequests.find(r => r.id === id);
     if (req && req.phone) {
@@ -163,7 +163,7 @@ export const Dashboard: React.FC = () => {
   const handleReject = async (id: string) => {
     setProcessing(id);
     const req = allRequests.find(r => r.id === id);
-    await supabaseService.rejectLoan(id);
+    await apiService.rejectLoan(id);
 
     if (req) {
       notificationService.notifyLoanRejected(req.email, req.clientName);

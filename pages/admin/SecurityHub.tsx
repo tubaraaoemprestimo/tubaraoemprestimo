@@ -1,4 +1,4 @@
-// 🛡️ Central de Segurança - Antifraude, Blacklist e Acessos Unificados
+﻿// 🛡️ Central de Segurança - Antifraude, Blacklist e Acessos Unificados
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -8,8 +8,8 @@ import {
     Globe, Fingerprint, User, Key, X, Save, Edit2, Phone, Mail
 } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabase } from '../../services/supabaseClient';
-import { supabaseService } from '../../services/supabaseService';
+import { api } from '../../services/apiClient';
+import { apiService } from '../../services/apiService';
 import { blacklistService } from '../../services/adminService';
 import { useToast } from '../../components/Toast';
 import { BlacklistEntry, UserAccess, UserRole } from '../../types';
@@ -92,7 +92,7 @@ export const SecurityHub: React.FC = () => {
             setBlacklist(blacklistData);
 
             // Users
-            const usersData = await supabaseService.getUsers();
+            const usersData = await apiService.getUsers();
             setUsers(usersData);
 
             // Mapa de biometria por usuário (WebAuthn)
@@ -210,7 +210,7 @@ export const SecurityHub: React.FC = () => {
         }
 
         if (editingUser.id) {
-            const updated = await supabaseService.updateUser(editingUser.id, {
+            const updated = await apiService.updateUser(editingUser.id, {
                 name: editingUser.name,
                 role: editingUser.role as UserRole,
             });
@@ -232,7 +232,7 @@ export const SecurityHub: React.FC = () => {
             return;
         }
 
-        const created = await supabaseService.createUser({
+        const created = await apiService.createUser({
             email: editingUser.email,
             name: editingUser.name,
             role: editingUser.role || UserRole.CLIENT,
@@ -285,7 +285,7 @@ export const SecurityHub: React.FC = () => {
 
     const handleDeleteUser = async (id: string) => {
         if (!confirm('Excluir usuário?')) return;
-        await supabaseService.deleteUser(id);
+        await apiService.deleteUser(id);
         addToast('Usuário excluído', 'success');
         loadAllData();
     };

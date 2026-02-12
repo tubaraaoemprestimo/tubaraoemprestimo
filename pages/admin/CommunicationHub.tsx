@@ -1,4 +1,4 @@
-// 📨 Central de Comunicação - Mensagens, Marketing, Status e Indicações Unificados
+﻿// 📨 Central de Comunicação - Mensagens, Marketing, Status e Indicações Unificados
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -8,8 +8,8 @@ import {
     Play, AlertCircle, ChevronDown, ChevronUp, Eye, DollarSign, UserPlus
 } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabase } from '../../services/supabaseClient';
-import { supabaseService } from '../../services/supabaseService';
+import { api } from '../../services/apiClient';
+import { apiService } from '../../services/apiService';
 import { whatsappService } from '../../services/whatsappService';
 import { useToast } from '../../components/Toast';
 import { AIGenerateCaption } from '../../components/AIGenerateCaption';
@@ -87,7 +87,7 @@ export const CommunicationHub: React.FC = () => {
     const loadAllData = async () => {
         setLoading(true);
         try {
-            const customersData = await supabaseService.getCustomers();
+            const customersData = await apiService.getCustomers();
             setCustomers(customersData);
 
             // Templates

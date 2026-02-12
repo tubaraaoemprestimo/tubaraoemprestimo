@@ -1,4 +1,4 @@
-// 🤖 Central de IA - Chatbot e Logs Unificados
+﻿// 🤖 Central de IA - Chatbot e Logs Unificados
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -9,9 +9,9 @@ import {
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { aiChatbotService } from '../../services/aiChatbotService';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { useToast } from '../../components/Toast';
-import { supabase } from '../../services/supabaseClient';
+import { api } from '../../services/apiClient';
 import { InteractionLog } from '../../types';
 
 type TabType = 'config' | 'conversations' | 'logs' | 'test';
@@ -147,7 +147,7 @@ export const AIHub: React.FC = () => {
             }
 
             // Load interaction logs
-            const logsData = await supabaseService.getInteractionLogs();
+            const logsData = await apiService.getInteractionLogs();
             setLogs(logsData);
 
         } catch (error) {

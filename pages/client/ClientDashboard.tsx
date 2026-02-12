@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, ChevronRight, Wallet, Plus, Calendar, FileText, TrendingUp, X, Percent, Eye, EyeOff, Gift, Tag, Sparkles, AlertTriangle, Upload, CheckCircle, Calculator, Ticket, Megaphone, Briefcase, Download } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Skeleton } from '../../components/Skeleton';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { useToast } from '../../components/Toast';
 import { LoanTimeline } from '../../components/LoanTimeline';
 import { LoanRequest, Campaign, LoanStatus } from '../../types';
@@ -84,18 +84,18 @@ export const ClientDashboard: React.FC = () => {
 
   const loadDashboardData = async () => {
     setLoading(true);
-    const user = supabaseService.auth.getUser();
-    const loans = await supabaseService.getClientLoans();
-    const pendingReq = await supabaseService.getClientPendingRequest();
-    const campaigns = await supabaseService.getActiveCampaigns();
-    const preApproved = await supabaseService.getPreApproval();
+    const user = apiService.auth.getUser();
+    const loans = await apiService.getClientLoans();
+    const pendingReq = await apiService.getClientPendingRequest();
+    const campaigns = await apiService.getActiveCampaigns();
+    const preApproved = await apiService.getPreApproval();
 
     // Buscar oferta de parcelamento e cupons
-    const offer = await supabaseService.getClientInstallmentOffer();
-    const clientCoupons = await supabaseService.getClientCoupons();
+    const offer = await apiService.getClientInstallmentOffer();
+    const clientCoupons = await apiService.getClientCoupons();
 
     // Buscar notificações reais do banco
-    const notifs = await supabaseService.getClientNotifications();
+    const notifs = await apiService.getClientNotifications();
     setRealNotifications(notifs);
 
     let totalDebt = 0;
@@ -187,7 +187,7 @@ export const ClientDashboard: React.FC = () => {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const result = reader.result as string;
-        await supabaseService.uploadSupplementalDoc(pendingRequest.id, result);
+        await apiService.uploadSupplementalDoc(pendingRequest.id, result);
         setUploadingDoc(false);
         setIsUploadModalOpen(false);
         addToast("Documento enviado! Sua análise continuará.", 'success');

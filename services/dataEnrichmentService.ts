@@ -3,9 +3,7 @@
 // CNPJ: BrasilAPI (100% gratuita)
 // CPF: RapidAPI CPF DataPro
 
-// URL do Supabase
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://cwhiujeragsethxjekkb.supabase.co';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MTAyODUsImV4cCI6MjA4MzQ4NjI4NX0.7e7P2PVY8DnvBYxsdpVWnNYK2Z3E6WgbiaS_XcChKvI';
+import { api } from './apiClient';
 
 export interface EnrichedCpfData {
     cpf?: string;
@@ -118,25 +116,17 @@ export const dataEnrichmentService = {
             const cleanCpf = cpf.replace(/\D/g, '');
             console.log('[DataEnrichment] Consultando CPF via RapidAPI:', cleanCpf);
 
-            // Chamar Edge Function do Supabase (proxy para RapidAPI)
-            const response = await fetch(`${SUPABASE_URL}/functions/v1/cpf-lookup`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-                },
-                body: JSON.stringify({
-                    cpf: cleanCpf,
-                    rapidapi_key: rapidApiKey
-                })
+            // Chamar API backend (proxy para RapidAPI)
+            const { data: result, error: apiError } = await api.post<any>('/cpf/lookup', {
+                cpf: cleanCpf,
+                rapidapi_key: rapidApiKey
             });
 
-            const result = await response.json();
             console.log('[DataEnrichment] Resposta CPF:', result);
 
             // Verificar erro
-            if (!response.ok || result.error) {
-                const errorMsg = result.message || result.error || `Erro: ${response.status}`;
+            if (apiError || !result) {
+                const errorMsg = apiError?.message || apiError?.error || 'Erro na consulta';
                 return { success: false, error: errorMsg };
             }
 
