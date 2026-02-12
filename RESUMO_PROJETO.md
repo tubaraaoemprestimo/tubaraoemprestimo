@@ -396,3 +396,33 @@ Sem essa migration, o sistema ainda funciona (fallback legado), mas a separaçã
 - `constants/serviceTerms.ts` reestruturado e corrigido para incluir `INVESTIDOR` dentro de `SERVICE_TERMS` (arquivo válido para build).
 - Admin: criada página `pages/admin/Investors.tsx` para gestão de solicitações de investidores (busca, filtro por status, visualização e atualização de status com observações).
 - Rotas/Menu: adicionada rota `/admin/investors` e item “Investidores” no menu lateral do admin em `App.tsx`.
+
+---
+
+## 🔄 Migração Supabase -> API Própria (2026-02-12)
+
+### Visão Geral
+Migração completa do frontend para deixar de depender do SDK do Supabase e passar a utilizar a API própria (Node.js + Prisma + PostgreSQL) hospedada na VPS Oracle.
+
+### Alterações Principais
+1. **Frontend Desacoplado:**
+   - Remoção do cliente `supabase-js` direto nas páginas.
+   - Substituição de `supabaseService.ts` por `apiService.ts` (100% via `apiClient`).
+   - Todos os serviços (`auth`, `storage`, `db`) agora passam pela API.
+
+2. **Upload de Arquivos:**
+   - Migrado de Supabase Storage para Endpoint Local/S3 via API (`POST /upload`).
+   - `PaymentReceiptUpload`, `contractPdfService`, `Wizard` e `StatusScheduler` atualizados.
+
+3. **Contratos PDF:**
+   - Novo endpoint `PUT /api/loan-requests/:id/contract` para salvar URL do PDF.
+   - Novo endpoint `GET /api/loan-requests/latest` para buscar última solicitação.
+   - Schema do banco atualizado com campo `contractPdfUrl`.
+
+4. **Real-time:**
+   - Substituído Supabase Realtime por **Polling** (30s-60s) em `themeService` e `notificationService`.
+
+5. **Backend (VPS Oracle):**
+   - Banco de dados PostgreSQL rodando via Docker.
+   - API Node.js atualizada com novos endpoints.
+   - Schema Prisma sincronizado (`contractPdfUrl` adicionado).

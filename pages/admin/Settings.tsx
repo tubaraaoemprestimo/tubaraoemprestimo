@@ -425,13 +425,13 @@ export const Settings: React.FC = () => {
             <div className="bg-black/50 p-4 rounded-xl border border-zinc-800">
               <p className="text-xs text-zinc-500 mb-2">Exemplo de cálculo (parcela de R$ 500, 10 dias de atraso):</p>
               <div className="text-sm text-zinc-300 space-y-1">
-                <p>• Multa: {settings.lateFixedFeeType === 'PERCENT' ? `${settings.lateFixedFee || 0}% = R$ ${((500 * (settings.lateFixedFee || 0)) / 100).toFixed(2)}` : `R$ ${(settings.lateFixedFee || 0).toFixed(2)}`}</p>
-                <p>• Juros 10 dias: {settings.lateInterestDailyType === 'FIXED' ? `R$ ${((settings.lateInterestDaily || 0) * 10).toFixed(2)}` : `${settings.lateInterestDaily || 0}% x 10 = R$ ${(500 * ((settings.lateInterestDaily || 0) / 100) * 10).toFixed(2)}`}</p>
+                <p>• Multa: {settings.lateFixedFeeType === 'PERCENT' ? `${settings.lateFixedFee || 0}% = R$ ${(500 * Number(settings.lateFixedFee || 0) / 100).toFixed(2)}` : `R$ ${Number(settings.lateFixedFee || 0).toFixed(2)}`}</p>
+                <p>• Juros 10 dias: {settings.lateInterestDailyType === 'FIXED' ? `R$ ${(Number(settings.lateInterestDaily || 0) * 10).toFixed(2)}` : `${settings.lateInterestDaily || 0}% x 10 = R$ ${(500 * (Number(settings.lateInterestDaily || 0) / 100) * 10).toFixed(2)}`}</p>
                 <p className="text-[#D4AF37] font-bold pt-2 border-t border-zinc-800">
-                  Total: R$ {(
+                  Total: R$ {Number(
                     500 +
-                    (settings.lateFixedFeeType === 'PERCENT' ? (500 * (settings.lateFixedFee || 0) / 100) : (settings.lateFixedFee || 0)) +
-                    (settings.lateInterestDailyType === 'FIXED' ? ((settings.lateInterestDaily || 0) * 10) : (500 * ((settings.lateInterestDaily || 0) / 100) * 10))
+                    (settings.lateFixedFeeType === 'PERCENT' ? (500 * Number(settings.lateFixedFee || 0) / 100) : Number(settings.lateFixedFee || 0)) +
+                    (settings.lateInterestDailyType === 'FIXED' ? (Number(settings.lateInterestDaily || 0) * 10) : (500 * (Number(settings.lateInterestDaily || 0) / 100) * 10))
                   ).toFixed(2)}
                 </p>
               </div>

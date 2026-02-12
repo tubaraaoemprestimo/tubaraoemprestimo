@@ -35,4 +35,10 @@ dist-ssr
 # AI Skills
 .agent/skills
 .claude/skills
-.cursor/skills
+
+# Security
+*.key
+*.pem
+*.pub
+backend.tar.gz
+ssh-key-*
