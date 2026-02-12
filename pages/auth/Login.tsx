@@ -142,7 +142,7 @@ export const Login: React.FC = () => {
 
 
   const handleAdminLogin = async () => {
-    await performLogin({ identifier: 'admin', password: 'admin' });
+    await performLogin({ identifier: 'admin@tubarao.local', password: 'tubarao2026*' });
   };
 
   const handleFaceIDLogin = async () => {
@@ -323,8 +323,9 @@ export const Login: React.FC = () => {
                 <User size={20} />
               </div>
               <input
-                type="text"
-                placeholder="CPF ou CNPJ"
+                type="email"
+                autoComplete="username"
+                placeholder="Email"
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-4 pl-12 pr-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-shark focus:ring-1 focus:ring-shark transition-all"
                 value={formData.identifier}
                 onChange={(e) => setFormData({ ...formData, identifier: e.target.value })}
@@ -337,6 +338,7 @@ export const Login: React.FC = () => {
               </div>
               <input
                 type="password"
+                autoComplete="current-password"
                 placeholder="Senha"
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-4 pl-12 pr-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-shark focus:ring-1 focus:ring-shark transition-all"
                 value={formData.password}
@@ -436,6 +438,7 @@ export const Login: React.FC = () => {
                     </div>
                     <input
                       type="email"
+                      autoComplete="email"
                       placeholder="Seu email"
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}

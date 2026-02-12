@@ -30,10 +30,8 @@ authRouter.post('/register', async (req: Request, res: Response) => {
         // Hash da senha
         const hashedPassword = await bcrypt.hash(password, 12);
 
-        // Gera token de confirmação de email
-        const confirmToken = uuidv4();
-
-        // Cria user
+        // Em produção pós-migração, ativamos conta imediatamente
+        // para manter compatibilidade com o fluxo atual do app.
         const user = await prisma.user.create({
             data: {
                 name,
@@ -41,16 +39,13 @@ authRouter.post('/register', async (req: Request, res: Response) => {
                 password: hashedPassword,
                 role: role || 'CLIENT',
                 phone: phone || null,
-                authId: confirmToken // Usa como token de confirmação temporário
+                authId: null
             }
         });
 
-        // Envia email de confirmação
-        await emailService.sendConfirmation(email, name, confirmToken);
-
         res.status(201).json({
             success: true,
-            message: 'Conta criada! Verifique seu email para confirmar.',
+            message: 'Conta criada com sucesso.',
             user: {
                 id: user.id,
                 name: user.name,
@@ -70,15 +65,16 @@ authRouter.post('/register', async (req: Request, res: Response) => {
 // ============================================
 authRouter.post('/login', async (req: Request, res: Response) => {
     try {
-        const { identifier, password } = req.body;
+        const { identifier, email: emailFromBody, password } = req.body;
+        const rawIdentifier = String(identifier || emailFromBody || '').trim();
 
-        if (!identifier || !password) {
+        if (!rawIdentifier || !password) {
             res.status(400).json({ error: 'Email e senha são obrigatórios' });
             return;
         }
 
         // Busca user por email
-        const email = identifier.toLowerCase();
+        const email = rawIdentifier.toLowerCase();
         const user = await prisma.user.findUnique({
             where: { email }
         });
@@ -92,16 +88,6 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
             res.status(401).json({ error: 'Credenciais inválidas' });
-            return;
-        }
-
-        // Verifica se email foi confirmado (authId null = confirmado)
-        // Se authId ainda contém UUID, não foi confirmado
-        if (user.authId && user.authId.includes('-') && user.role !== 'ADMIN') {
-            res.status(401).json({
-                error: 'Seu email ainda não foi confirmado. Verifique sua caixa de entrada.',
-                code: 'EMAIL_NOT_CONFIRMED'
-            });
             return;
         }
 

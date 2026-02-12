@@ -7,11 +7,11 @@ async function main() {
     console.log('🌱 Starting seed...');
 
     // 1. Criar ADMIN padrão
-    const adminEmail = 'admin@tubarao.com';
+    const adminEmail = 'admin@tubarao.local';
     const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
 
     if (!existingAdmin) {
-        const hashedPassword = await bcrypt.hash('admin123', 12);
+        const hashedPassword = await bcrypt.hash('tubarao2026*', 12);
         await prisma.user.create({
             data: {
                 name: 'Administrador',
@@ -21,7 +21,7 @@ async function main() {
                 authId: null
             }
         });
-        console.log('✅ Admin user created: admin@tubarao.com / admin123');
+        console.log('✅ Admin user created: admin@tubarao.local / tubarao2026*');
     } else {
         console.log('ℹ️ Admin already exists');
     }

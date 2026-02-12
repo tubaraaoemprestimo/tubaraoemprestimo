@@ -150,16 +150,24 @@ export const apiService = {
 
     auth: {
         async signIn(creds: { identifier?: string; email?: string; password: string }) {
-            const email = normalizeEmail(creds.identifier || creds.email || '');
-            const { data, error } = await api.auth.signIn({ email, password: creds.password });
-            if (data && !error) {
-                // Salva user no localStorage
-                const userResp = await api.auth.getUser();
-                if (userResp.data) {
-                    saveToStorage(STORAGE_KEYS.USER, userResp.data);
-                }
+            const identifier = normalizeEmail(creds.identifier || creds.email || '');
+            const { data, error } = await api.auth.signIn({ identifier, password: creds.password });
+
+            if (error || !data) {
+                return { user: null, accessToken: null, refreshToken: null, error };
             }
-            return { data, error };
+
+            const authData = data as any;
+            if (authData.user) {
+                saveToStorage(STORAGE_KEYS.USER, authData.user);
+            }
+
+            return {
+                user: authData.user || null,
+                accessToken: authData.accessToken || null,
+                refreshToken: authData.refreshToken || null,
+                error: null
+            };
         },
 
         async signUp(creds: { email: string; password: string; name?: string; phone?: string }) {

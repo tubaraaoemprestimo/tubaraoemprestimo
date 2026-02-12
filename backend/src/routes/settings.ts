@@ -3,12 +3,11 @@ import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 
 export const settingsRouter = Router();
-settingsRouter.use(authenticate);
 
 // ============ SYSTEM SETTINGS ============
 
 // GET /api/settings — Configurações do sistema
-settingsRouter.get('/', async (_req: Request, res: Response) => {
+settingsRouter.get('/', authenticate, async (_req: Request, res: Response) => {
     try {
         const settings = await prisma.systemSetting.findMany();
         const result: Record<string, string> = {};
@@ -20,7 +19,7 @@ settingsRouter.get('/', async (_req: Request, res: Response) => {
 });
 
 // PUT /api/settings — Salvar configurações
-settingsRouter.put('/', requireAdmin, async (req: Request, res: Response) => {
+settingsRouter.put('/', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         const settings = req.body;
         for (const [key, value] of Object.entries(settings)) {
@@ -54,7 +53,7 @@ settingsRouter.get('/brand', async (_req: Request, res: Response) => {
 });
 
 // PUT /api/settings/brand
-settingsRouter.put('/brand', requireAdmin, async (req: Request, res: Response) => {
+settingsRouter.put('/brand', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         const data = req.body;
         const existing = await prisma.brandSetting.findFirst();
@@ -69,10 +68,69 @@ settingsRouter.put('/brand', requireAdmin, async (req: Request, res: Response) =
     }
 });
 
+
+// GET /api/settings/theme
+settingsRouter.get('/theme', async (_req: Request, res: Response) => {
+    const fallback = {
+        primaryColor: '#D4AF37',
+        secondaryColor: '#1a1a1a',
+        accentColor: '#10b981',
+        dangerColor: '#ef4444',
+        warningColor: '#f59e0b',
+        successColor: '#22c55e',
+        backgroundColor: '#000000',
+        cardColor: '#18181b',
+        textColor: '#ffffff'
+    };
+
+    try {
+        const themeSetting = await prisma.systemSetting.findUnique({ where: { key: 'theme' } });
+        if (!themeSetting?.value) {
+            res.json(fallback);
+            return;
+        }
+        try {
+            res.json(JSON.parse(themeSetting.value));
+        } catch {
+            res.json(fallback);
+        }
+    } catch {
+        res.status(500).json({ error: 'Erro ao buscar tema' });
+    }
+});
+
+// PUT /api/settings/theme
+settingsRouter.put('/theme', authenticate, requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const d = req.body || {};
+        const payload = {
+            primaryColor: d.primary_color || '#D4AF37',
+            secondaryColor: d.secondary_color || '#1a1a1a',
+            accentColor: d.accent_color || '#10b981',
+            dangerColor: d.danger_color || '#ef4444',
+            warningColor: d.warning_color || '#f59e0b',
+            successColor: d.success_color || '#22c55e',
+            backgroundColor: d.background_color || '#000000',
+            cardColor: d.card_color || '#18181b',
+            textColor: d.text_color || '#ffffff'
+        };
+
+        await prisma.systemSetting.upsert({
+            where: { key: 'theme' },
+            update: { value: JSON.stringify(payload) },
+            create: { key: 'theme', value: JSON.stringify(payload) }
+        });
+
+        res.json({ success: true });
+    } catch {
+        res.status(500).json({ error: 'Erro ao salvar tema' });
+    }
+});
+
 // ============ WHATSAPP CONFIG ============
 
 // GET /api/settings/whatsapp
-settingsRouter.get('/whatsapp', requireAdmin, async (_req: Request, res: Response) => {
+settingsRouter.get('/whatsapp', authenticate, requireAdmin, async (_req: Request, res: Response) => {
     try {
         const config = await prisma.whatsappConfig.findFirst();
         res.json(config || { apiUrl: '', apiKey: '', instanceName: '', isConnected: false });
@@ -82,7 +140,7 @@ settingsRouter.get('/whatsapp', requireAdmin, async (_req: Request, res: Respons
 });
 
 // PUT /api/settings/whatsapp
-settingsRouter.put('/whatsapp', requireAdmin, async (req: Request, res: Response) => {
+settingsRouter.put('/whatsapp', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         const data = req.body;
         const existing = await prisma.whatsappConfig.findFirst();
@@ -100,7 +158,7 @@ settingsRouter.put('/whatsapp', requireAdmin, async (req: Request, res: Response
 // ============ GOALS ============
 
 // GET /api/settings/goals
-settingsRouter.get('/goals', async (_req: Request, res: Response) => {
+settingsRouter.get('/goals', authenticate, async (_req: Request, res: Response) => {
     try {
         const goals = await prisma.goalsSetting.findFirst();
         res.json(goals || {
@@ -117,7 +175,7 @@ settingsRouter.get('/goals', async (_req: Request, res: Response) => {
 });
 
 // PUT /api/settings/goals
-settingsRouter.put('/goals', requireAdmin, async (req: Request, res: Response) => {
+settingsRouter.put('/goals', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         const data = req.body;
         const existing = await prisma.goalsSetting.findFirst();
@@ -135,7 +193,7 @@ settingsRouter.put('/goals', requireAdmin, async (req: Request, res: Response) =
 // ============ PACKAGES ============
 
 // GET /api/settings/packages
-settingsRouter.get('/packages', async (_req: Request, res: Response) => {
+settingsRouter.get('/packages', authenticate, async (_req: Request, res: Response) => {
     try {
         const packages = await prisma.loanPackage.findMany({ orderBy: { createdAt: 'desc' } });
         res.json(packages);
@@ -145,7 +203,7 @@ settingsRouter.get('/packages', async (_req: Request, res: Response) => {
 });
 
 // POST /api/settings/packages
-settingsRouter.post('/packages', requireAdmin, async (req: Request, res: Response) => {
+settingsRouter.post('/packages', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         const data = req.body;
         if (data.id) {
@@ -160,7 +218,7 @@ settingsRouter.post('/packages', requireAdmin, async (req: Request, res: Respons
 });
 
 // DELETE /api/settings/packages/:id
-settingsRouter.delete('/packages/:id', requireAdmin, async (req: Request, res: Response) => {
+settingsRouter.delete('/packages/:id', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         await prisma.loanPackage.delete({ where: { id: req.params.id as string } });
         res.json({ success: true });
@@ -172,7 +230,7 @@ settingsRouter.delete('/packages/:id', requireAdmin, async (req: Request, res: R
 // ============ COLLECTION RULES ============
 
 // GET /api/settings/collection-rules
-settingsRouter.get('/collection-rules', async (_req: Request, res: Response) => {
+settingsRouter.get('/collection-rules', authenticate, async (_req: Request, res: Response) => {
     try {
         const rules = await prisma.collectionRule.findMany({ orderBy: { daysOffset: 'asc' } });
         res.json(rules);
@@ -182,7 +240,7 @@ settingsRouter.get('/collection-rules', async (_req: Request, res: Response) => 
 });
 
 // POST /api/settings/collection-rules
-settingsRouter.post('/collection-rules', requireAdmin, async (req: Request, res: Response) => {
+settingsRouter.post('/collection-rules', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         const data = req.body;
         if (data.id) {
@@ -197,7 +255,7 @@ settingsRouter.post('/collection-rules', requireAdmin, async (req: Request, res:
 });
 
 // DELETE /api/settings/collection-rules/:id
-settingsRouter.delete('/collection-rules/:id', requireAdmin, async (req: Request, res: Response) => {
+settingsRouter.delete('/collection-rules/:id', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         await prisma.collectionRule.delete({ where: { id: req.params.id as string } });
         res.json({ success: true });
