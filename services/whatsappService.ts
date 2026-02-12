@@ -1,6 +1,7 @@
 
 import { WhatsappConfig } from '../types';
 import { apiService } from './apiService';
+import { getApiBaseUrl } from './runtimeConfig';
 
 const cleanUrl = (url: string) => {
     if (!url) return '';
@@ -24,7 +25,7 @@ export const whatsappService = {
     // Ensure Webhook is Configured
     ensureWebhookConfigured: async (config: WhatsappConfig): Promise<boolean> => {
         const baseUrl = cleanUrl(config.apiUrl);
-        const webhookUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3001/api') + '/webhook/whatsapp';
+        const webhookUrl = getApiBaseUrl() + '/webhook/whatsapp';
 
         try {
             console.log(`[WhatsApp] Configuring webhook for ${config.instanceName}...`);

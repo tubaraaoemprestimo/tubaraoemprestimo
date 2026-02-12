@@ -62,7 +62,12 @@ const Register: React.FC = () => {
         setLoading(true);
         try {
             const cleanPhone = phone.replace(/\D/g, '');
-            const { data, error } = await apiService.auth.signUp(email, password, name, UserRole.CLIENT, cleanPhone);
+            const { data, error } = await apiService.auth.signUp({
+                email,
+                password,
+                name,
+                phone: cleanPhone
+            });
 
             if (error) {
                 const errMsg = (error as any)?.message || '';
@@ -78,7 +83,7 @@ const Register: React.FC = () => {
             addToast('Cadastro realizado com sucesso!', 'success');
 
             try {
-                const loginResult = await supabaseService.auth.signIn({ identifier: email, password }) as any;
+                const loginResult = await apiService.auth.signIn({ identifier: email, password }) as any;
                 if (loginResult.user) {
                     navigate('/client/dashboard');
                     return;
@@ -117,6 +122,7 @@ const Register: React.FC = () => {
                             <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                             <input
                                 type="text"
+                                autoComplete="name"
                                 value={name}
                                 onChange={e => setName(e.target.value)}
                                 placeholder="Seu nome completo"
@@ -132,6 +138,7 @@ const Register: React.FC = () => {
                             <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                             <input
                                 type="email"
+                                autoComplete="email"
                                 value={email}
                                 onChange={e => setEmail(e.target.value)}
                                 placeholder="seuemail@exemplo.com"
@@ -147,6 +154,7 @@ const Register: React.FC = () => {
                             <Phone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                             <input
                                 type="tel"
+                                autoComplete="tel"
                                 value={phone}
                                 onChange={e => setPhone(formatPhone(e.target.value))}
                                 placeholder="(00) 00000-0000"
@@ -163,6 +171,7 @@ const Register: React.FC = () => {
                             <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                             <input
                                 type={showPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                                 placeholder="Mínimo 6 caracteres"
@@ -188,6 +197,7 @@ const Register: React.FC = () => {
                             <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                             <input
                                 type={showPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
                                 value={confirmPassword}
                                 onChange={e => setConfirmPassword(e.target.value)}
                                 placeholder="Repita a senha"

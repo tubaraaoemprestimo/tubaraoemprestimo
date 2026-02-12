@@ -1,7 +1,8 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import { getApiBaseUrl } from './runtimeConfig';
 
 // URL da API (dev ou prod)
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = getApiBaseUrl();
 
 class ApiClient {
     private client: AxiosInstance;
