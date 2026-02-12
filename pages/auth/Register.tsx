@@ -70,11 +70,13 @@ const Register: React.FC = () => {
             });
 
             if (error) {
-                const errMsg = (error as any)?.message || '';
-                if (errMsg.includes('already registered') || errMsg.includes('already exists')) {
+                const errObj = error as any;
+                const errMsg = errObj?.error || errObj?.message || '';
+
+                if (errMsg.includes('already') || errMsg.includes('exists') || errMsg.includes('cadastrado')) {
                     addToast('Este email já está cadastrado. Faça login.', 'error');
                 } else {
-                    addToast(`Erro ao cadastrar: ${errMsg}`, 'error');
+                    addToast(errMsg ? `Erro ao cadastrar: ${errMsg}` : 'Erro ao cadastrar. Tente novamente.', 'error');
                 }
                 return;
             }
