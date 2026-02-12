@@ -67,7 +67,7 @@ adminRouter.post('/blacklist', authenticate, isAdmin, async (req: Request, res: 
 // DELETE /api/admin/blacklist/:id - Remover da blacklist
 adminRouter.delete('/blacklist/:id', authenticate, isAdmin, async (req: Request, res: Response) => {
     try {
-        const { id } = req.params;
+        const id = String(req.params.id);
         await prisma.blacklist.delete({ where: { id } });
         res.json({ success: true });
     } catch (err) {
