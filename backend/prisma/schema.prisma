@@ -98,6 +98,7 @@ model LoanRequest {
   installments          Int      @default(1)
   status                String   @default("PENDING") // PENDING | WAITING_DOCS | APPROVED | REJECTED
   profileType           String?  @map("profile_type") // CLT | AUTONOMO | MOTO | GARANTIA | LIMPA_NOME | INVESTIDOR
+  referralCode          String?  @map("referral_code")
   fatherPhone           String?  @map("father_phone")
   motherPhone           String?  @map("mother_phone")
   spousePhone           String?  @map("spouse_phone")

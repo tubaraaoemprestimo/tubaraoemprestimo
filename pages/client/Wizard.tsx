@@ -203,7 +203,7 @@ export const Wizard: React.FC = () => {
   });
 
   const [formData, setFormData] = useState({
-    name: '', cpf: '', email: '', phone: '', birthDate: '',
+    name: '', cpf: '', email: '', phone: '', birthDate: '', referralCode: '',
     whatsappPersonal: '',
     contactTrust1: '', contactTrust1Name: '',
     contactTrust2: '', contactTrust2Name: '',
@@ -2139,6 +2139,7 @@ export const Wizard: React.FC = () => {
                     <Input label="CPF ou CNPJ" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00 ou 00.000.000/0000-00" error={errors.cpf} />
                     <Input label="Data de Nascimento" type="date" name="birthDate" value={formData.birthDate} onChange={handleChange} />
                     <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="seu@email.com" />
+                    <Input label="Cupom de Indicação (Opcional)" name="referralCode" value={formData.referralCode} onChange={handleChange} placeholder="Código ou CPF de quem indicou" />
                   </div>
                 ) : (
                   <>
@@ -2147,6 +2148,7 @@ export const Wizard: React.FC = () => {
                       <Input label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00" error={errors.cpf} />
                       <Input label="WhatsApp Principal" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
                       <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} />
+                      <Input label="Cupom de Indicação (Opcional)" name="referralCode" value={formData.referralCode} onChange={handleChange} placeholder="Insira seu cupom aqui" />
                       <Input label="Instagram" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="@seu_usuario" required />
                     </div>
 

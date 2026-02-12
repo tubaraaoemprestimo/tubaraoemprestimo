@@ -108,6 +108,7 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 amount: data.amount || 0,
                 installments: data.installments || 1,
                 profileType: data.profileType,
+                referralCode: data.referralCode,
                 fatherPhone: data.fatherPhone,
                 motherPhone: data.motherPhone,
                 spousePhone: data.spousePhone,
