@@ -17,6 +17,99 @@ customersRouter.get('/', async (req: Request, res: Response) => {
     }
 });
 
+
+// PUT /api/customers/location — Salvar localizacao do usuario atual
+customersRouter.put('/location', async (req: Request, res: Response) => {
+    try {
+        const email = String(req.body?.customer_email || req.user?.email || '').trim().toLowerCase();
+        if (!email) {
+            res.status(400).json({ error: 'Email obrigatorio' });
+            return;
+        }
+
+        const customer = await prisma.customer.findFirst({ where: { email } });
+        if (!customer) {
+            // Nao quebrar fluxo de admin sem customer associado
+            res.status(204).send();
+            return;
+        }
+
+        await prisma.customer.update({
+            where: { id: customer.id },
+            data: {
+                latitude: req.body?.latitude ?? null,
+                longitude: req.body?.longitude ?? null,
+                city: req.body?.city ?? customer.city,
+                state: req.body?.state ?? customer.state,
+                address: req.body?.address ?? customer.address
+            }
+        });
+
+        res.json({ success: true });
+    } catch {
+        res.status(500).json({ error: 'Erro ao salvar localizacao' });
+    }
+});
+
+// GET /api/customers/locations — Listar localizacoes (admin)
+customersRouter.get('/locations', requireAdmin, async (_req: Request, res: Response) => {
+    try {
+        const rows = await prisma.customer.findMany({
+            where: {
+                latitude: { not: null },
+                longitude: { not: null }
+            },
+            select: {
+                email: true,
+                name: true,
+                latitude: true,
+                longitude: true,
+                city: true,
+                state: true,
+                address: true
+            },
+            orderBy: { joinedAt: 'desc' }
+        });
+
+        res.json(rows.map((r) => ({
+            customer_email: r.email,
+            customer_name: r.name,
+            latitude: r.latitude,
+            longitude: r.longitude,
+            city: r.city,
+            state: r.state,
+            address: r.address,
+            updated_at: new Date().toISOString()
+        })));
+    } catch {
+        res.status(500).json({ error: 'Erro ao buscar localizacoes' });
+    }
+});
+
+// GET /api/customers/locations/:email — Localizacao por email (admin)
+customersRouter.get('/locations/:email', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const email = decodeURIComponent(String(req.params.email || '')).toLowerCase();
+        const customer = await prisma.customer.findFirst({ where: { email } });
+        if (!customer) {
+            res.status(404).json({ error: 'Cliente nao encontrado' });
+            return;
+        }
+        res.json({
+            customer_email: customer.email,
+            customer_name: customer.name,
+            latitude: customer.latitude,
+            longitude: customer.longitude,
+            city: customer.city,
+            state: customer.state,
+            address: customer.address,
+            updated_at: new Date().toISOString()
+        });
+    } catch {
+        res.status(500).json({ error: 'Erro ao buscar localizacao' });
+    }
+});
+
 // GET /api/customers/:id — Buscar cliente por ID
 customersRouter.get('/:id', async (req: Request, res: Response) => {
     try {

@@ -1,78 +1,174 @@
 import { Router, Request, Response } from 'express';
+import { randomUUID } from 'crypto';
 import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 
 export const notificationsRouter = Router();
 notificationsRouter.use(authenticate);
 
-// GET /api/notifications - Listar notificações do cliente (não lidas)
+const isAdminUser = (req: Request) => (req.user?.role || '').toUpperCase() === 'ADMIN';
+
+function esc(value: string): string {
+    return value.replace(/'/g, "''");
+}
+
+// GET /api/notifications
 notificationsRouter.get('/', async (req: Request, res: Response) => {
     try {
-        // Busca customer do user
-        const customer = await prisma.customer.findFirst({ where: { userId: req.user!.id } });
-        const where: any = { isRead: false };
-        if (customer) {
-            where.OR = [
-                { customerId: customer.id },
-                { customerEmail: req.user!.email }
-            ];
-        } else {
-            where.customerEmail = req.user!.email;
+        const forRole = String(req.query.forRole || '').toUpperCase();
+        const email = String(req.query.email || req.user?.email || '');
+        const limit = Math.min(Number(req.query.limit || 50), 200);
+        const unreadOnly = String(req.query.unread || '').toLowerCase() === 'true';
+
+        const clauses: string[] = [];
+        if (unreadOnly) clauses.push('is_read = false');
+
+        if (forRole === 'ADMIN' || (isAdminUser(req) && !email)) {
+            clauses.push('customer_email IS NULL');
+        } else if (email) {
+            clauses.push(`customer_email = '${esc(email)}'`);
         }
-        const notifications = await prisma.notification.findMany({
-            where,
-            take: 20,
-            orderBy: { createdAt: 'desc' }
-        });
-        res.json(notifications);
+
+        const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+        const sql = `SELECT id, title, message, type, is_read, created_at, customer_email FROM notifications ${where} ORDER BY created_at DESC LIMIT ${Number.isFinite(limit) ? limit : 50}`;
+        const rows = await prisma.$queryRawUnsafe<any[]>(sql);
+
+        const payload = (rows || []).map((n: any) => ({
+            id: n.id,
+            title: n.title,
+            message: n.message,
+            type: n.type,
+            is_read: n.is_read,
+            created_at: n.created_at,
+            customer_email: n.customer_email,
+            for_role: n.customer_email ? 'CLIENT' : 'ADMIN'
+        }));
+
+        res.json(payload);
     } catch {
-        res.status(500).json({ error: 'Erro ao buscar notificações' });
+        res.json([]);
     }
 });
 
-// PUT /api/notifications/:id/read - Marcar como lida
+// GET /api/notifications/count
+notificationsRouter.get('/count', async (req: Request, res: Response) => {
+    try {
+        const forRole = String(req.query.forRole || '').toUpperCase();
+        const email = String(req.query.email || req.user?.email || '');
+        const unreadOnly = String(req.query.unread || 'true').toLowerCase() === 'true';
+
+        const clauses: string[] = [];
+        if (unreadOnly) clauses.push('is_read = false');
+
+        if (forRole === 'ADMIN' || (isAdminUser(req) && !email)) {
+            clauses.push('customer_email IS NULL');
+        } else if (email) {
+            clauses.push(`customer_email = '${esc(email)}'`);
+        }
+
+        const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+        const sql = `SELECT COUNT(*)::int AS count FROM notifications ${where}`;
+        const rows = await prisma.$queryRawUnsafe<any[]>(sql);
+        res.json({ count: rows?.[0]?.count || 0 });
+    } catch {
+        res.json({ count: 0 });
+    }
+});
+
+// PUT /api/notifications/:id/read
 notificationsRouter.put('/:id/read', async (req: Request, res: Response) => {
     try {
-        await prisma.notification.update({
-            where: { id: req.params.id as string },
-            data: { isRead: true }
-        });
+        const id = esc(String(req.params.id || ''));
+        await prisma.$executeRawUnsafe(`UPDATE notifications SET is_read = true WHERE id = '${id}'`);
         res.json({ success: true });
     } catch {
-        res.status(500).json({ error: 'Erro ao marcar como lida' });
+        res.json({ success: false });
     }
 });
 
-// POST /api/notifications - Criar notificação
-notificationsRouter.post('/', async (req: Request, res: Response) => {
+// PUT /api/notifications/read-all
+notificationsRouter.put('/read-all', async (req: Request, res: Response) => {
     try {
-        const { customerId, customerEmail, title, message, type } = req.body;
-        await prisma.notification.create({
-            data: {
-                customerId: customerId || null,
-                customerEmail: customerEmail || null,
-                title,
-                message,
-                type: type || 'INFO'
-            }
-        });
+        const forRole = String(req.body?.forRole || '').toUpperCase();
+        const email = String(req.body?.email || req.user?.email || '');
+
+        let where = '';
+        if (forRole === 'ADMIN' || (isAdminUser(req) && !email)) {
+            where = 'WHERE customer_email IS NULL';
+        } else if (email) {
+            where = `WHERE customer_email = '${esc(email)}'`;
+        }
+
+        await prisma.$executeRawUnsafe(`UPDATE notifications SET is_read = true ${where}`);
         res.json({ success: true });
     } catch {
-        res.status(500).json({ error: 'Erro ao criar notificação' });
+        res.json({ success: false });
+    }
+});
+
+// DELETE /api/notifications/:id
+notificationsRouter.delete('/:id', async (req: Request, res: Response) => {
+    try {
+        const id = esc(String(req.params.id || ''));
+        await prisma.$executeRawUnsafe(`DELETE FROM notifications WHERE id = '${id}'`);
+        res.json({ success: true });
+    } catch {
+        res.json({ success: false });
+    }
+});
+
+// DELETE /api/notifications/clear-all
+notificationsRouter.delete('/clear-all', async (req: Request, res: Response) => {
+    try {
+        const forRole = String(req.query.forRole || '').toUpperCase();
+        const email = String(req.query.email || req.user?.email || '');
+
+        let where = '';
+        if (forRole === 'ADMIN' || (isAdminUser(req) && !email)) {
+            where = 'WHERE customer_email IS NULL';
+        } else if (email) {
+            where = `WHERE customer_email = '${esc(email)}'`;
+        }
+
+        await prisma.$executeRawUnsafe(`DELETE FROM notifications ${where}`);
+        res.json({ success: true });
+    } catch {
+        res.json({ success: false });
+    }
+});
+
+// POST /api/notifications
+notificationsRouter.post('/', async (req: Request, res: Response) => {
+    try {
+        const body = req.body || {};
+        const id = randomUUID();
+        const title = esc(String(body.title || 'Notificacao'));
+        const message = esc(String(body.message || ''));
+        const type = esc(String(body.type || 'INFO').toUpperCase());
+        const isRead = Boolean(body.is_read || body.read || false);
+        const email = body.customerEmail || body.customer_email || null;
+
+        const emailSql = email ? `'${esc(String(email))}'` : 'NULL';
+        await prisma.$executeRawUnsafe(
+            `INSERT INTO notifications (id, title, message, type, is_read, created_at, customer_email) VALUES ('${id}', '${title}', '${message}', '${type}', ${isRead ? 'true' : 'false'}, NOW(), ${emailSql})`
+        );
+
+        res.json({ success: true, id });
+    } catch {
+        res.status(500).json({ error: 'Erro ao criar notificacao' });
     }
 });
 
 // ============ COUPONS ============
 
-// GET /api/notifications/coupons - Cupons do cliente logado
 notificationsRouter.get('/coupons', async (req: Request, res: Response) => {
     try {
-        const email = req.query.email as string || req.user!.email;
+        const email = (req.query.email as string) || req.user!.email;
         const coupons = await prisma.coupon.findMany({
             where: {
                 OR: [
                     { customerEmail: email },
-                    { customerEmail: null } // Cupons públicos
+                    { customerEmail: null }
                 ],
                 active: true,
                 expiresAt: { gte: new Date() },
@@ -86,19 +182,15 @@ notificationsRouter.get('/coupons', async (req: Request, res: Response) => {
     }
 });
 
-// GET /api/notifications/coupons/all - Todos os cupons (admin)
 notificationsRouter.get('/coupons/all', requireAdmin, async (_req: Request, res: Response) => {
     try {
-        const coupons = await prisma.coupon.findMany({
-            orderBy: { createdAt: 'desc' }
-        });
+        const coupons = await prisma.coupon.findMany({ orderBy: { createdAt: 'desc' } });
         res.json(coupons);
     } catch {
         res.status(500).json({ error: 'Erro ao buscar cupons' });
     }
 });
 
-// POST /api/notifications/coupons - Criar/atualizar cupom (admin)
 notificationsRouter.post('/coupons', requireAdmin, async (req: Request, res: Response) => {
     try {
         const data = req.body;
@@ -115,7 +207,6 @@ notificationsRouter.post('/coupons', requireAdmin, async (req: Request, res: Res
     }
 });
 
-// DELETE /api/notifications/coupons/:id - Deletar cupom (admin)
 notificationsRouter.delete('/coupons/:id', requireAdmin, async (req: Request, res: Response) => {
     try {
         await prisma.coupon.delete({ where: { id: req.params.id as string } });

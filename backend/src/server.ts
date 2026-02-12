@@ -24,6 +24,7 @@ import { pushRouter } from './routes/push';
 import { chatbotRouter } from './routes/chatbot';
 import { cpfLookupRouter } from './routes/cpfLookup';
 import { whatsappStatusRouter } from './routes/whatsappStatus';
+import { referralsRouter } from './routes/referrals';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -64,6 +65,7 @@ app.use('/api/push', pushRouter);
 app.use('/api/chatbot', chatbotRouter);
 app.use('/api/cpf', cpfLookupRouter);
 app.use('/api/whatsapp', whatsappStatusRouter);
+app.use('/api/referrals', referralsRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
