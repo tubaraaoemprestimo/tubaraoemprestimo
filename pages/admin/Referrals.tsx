@@ -24,67 +24,63 @@ export const Referrals: React.FC = () => {
     const loadReferrals = async () => {
         setLoading(true);
 
-        const { data, error } = await supabase
-            .from('referrals')
-            .select('*')
-            .order('created_at', { ascending: false });
+        try {
+            const { data } = await api.get('/referrals');
 
-        if (error) {
+            if (data) {
+                setReferrals((data as any[]).map((r: any) => ({
+                    id: r.id,
+                    referrerCustomerId: r.referrer_customer_id || r.referrerCustomerId,
+                    referrerCode: r.referrer_code || r.referrerCode,
+                    referrerName: r.referrer_name || r.referrerName,
+                    referrerEmail: r.referrer_email || r.referrerEmail,
+                    referredName: r.referred_name || r.referredName,
+                    referredCpf: r.referred_cpf || r.referredCpf,
+                    referredPhone: r.referred_phone || r.referredPhone,
+                    referredEmail: r.referred_email || r.referredEmail,
+                    status: r.status,
+                    rejectionReason: r.rejection_reason || r.rejectionReason,
+                    bonusAmount: r.bonus_amount || r.bonusAmount,
+                    bonusPaidAt: r.bonus_paid_at || r.bonusPaidAt,
+                    createdAt: r.created_at || r.createdAt,
+                    approvedAt: r.approved_at || r.approvedAt,
+                    approvedBy: r.approved_by || r.approvedBy
+                })));
+            } else {
+                setReferrals([]);
+            }
+        } catch (error) {
             console.error('Error loading referrals:', error);
             setReferrals([]);
-        } else {
-            setReferrals(data.map((r: any) => ({
-                id: r.id,
-                referrerCustomerId: r.referrer_customer_id,
-                referrerCode: r.referrer_code,
-                referrerName: r.referrer_name,
-                referrerEmail: r.referrer_email,
-                referredName: r.referred_name,
-                referredCpf: r.referred_cpf,
-                referredPhone: r.referred_phone,
-                referredEmail: r.referred_email,
-                status: r.status,
-                rejectionReason: r.rejection_reason,
-                bonusAmount: r.bonus_amount,
-                bonusPaidAt: r.bonus_paid_at,
-                createdAt: r.created_at,
-                approvedAt: r.approved_at,
-                approvedBy: r.approved_by
-            })));
         }
 
         setLoading(false);
     };
 
     const loadBonusConfig = async () => {
-        const { data } = await supabase
-            .from('system_settings')
-            .select('value')
-            .eq('key', 'referral_bonus')
-            .single();
-
-        if (data?.value) {
-            setBonusAmount(Number(data.value) || 50);
+        try {
+            const { data } = await api.get('/communication/referral-bonus');
+            if ((data as any)?.value) {
+                setBonusAmount(Number((data as any).value) || 50);
+            }
+        } catch {
+            // Use default
         }
     };
 
     const handleApprove = async (referral: Referral) => {
         setProcessing(referral.id);
 
-        const { error } = await supabase
-            .from('referrals')
-            .update({
+        try {
+            await api.put(`/referrals/${referral.id}`, {
                 status: 'APPROVED',
                 bonus_amount: bonusAmount,
                 approved_at: new Date().toISOString()
-            })
-            .eq('id', referral.id);
-
-        if (error) {
-            addToast('Erro ao aprovar indicação', 'error');
-        } else {
+            });
             addToast(`Indicação aprovada! Bônus de R$ ${bonusAmount} será creditado.`, 'success');
             loadReferrals();
+        } catch {
+            addToast('Erro ao aprovar indicação', 'error');
         }
 
         setProcessing(null);
@@ -93,19 +89,15 @@ export const Referrals: React.FC = () => {
     const handleReject = async (referral: Referral, reason: string) => {
         setProcessing(referral.id);
 
-        const { error } = await supabase
-            .from('referrals')
-            .update({
+        try {
+            await api.put(`/referrals/${referral.id}`, {
                 status: 'REJECTED',
                 rejection_reason: reason
-            })
-            .eq('id', referral.id);
-
-        if (error) {
-            addToast('Erro ao rejeitar indicação', 'error');
-        } else {
+            });
             addToast('Indicação rejeitada.', 'info');
             loadReferrals();
+        } catch {
+            addToast('Erro ao rejeitar indicação', 'error');
         }
 
         setProcessing(null);
@@ -114,19 +106,15 @@ export const Referrals: React.FC = () => {
     const handlePayBonus = async (referral: Referral) => {
         setProcessing(referral.id);
 
-        const { error } = await supabase
-            .from('referrals')
-            .update({
+        try {
+            await api.put(`/referrals/${referral.id}`, {
                 status: 'BONUS_PAID',
                 bonus_paid_at: new Date().toISOString()
-            })
-            .eq('id', referral.id);
-
-        if (error) {
-            addToast('Erro ao marcar bônus como pago', 'error');
-        } else {
+            });
             addToast('Bônus marcado como pago!', 'success');
             loadReferrals();
+        } catch {
+            addToast('Erro ao marcar bônus como pago', 'error');
         }
 
         setProcessing(null);
@@ -222,8 +210,8 @@ export const Referrals: React.FC = () => {
                             key={f}
                             onClick={() => setFilter(f)}
                             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${filter === f
-                                    ? 'bg-purple-600 text-white'
-                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                                 }`}
                         >
                             {f === 'ALL' ? 'Todos' : f === 'PENDING' ? 'Pendentes' : f === 'APPROVED' ? 'Aprovados' : 'Rejeitados'}

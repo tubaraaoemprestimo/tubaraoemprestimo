@@ -35,6 +35,20 @@ loanRequestsRouter.get('/pending', async (req: Request, res: Response) => {
     }
 });
 
+// GET /api/loan-requests/latest — Última solicitação (qualquer status)
+loanRequestsRouter.get('/latest', async (req: Request, res: Response) => {
+    try {
+        const userId = req.user!.id;
+        const request = await prisma.loanRequest.findFirst({
+            where: { userId },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(request);
+    } catch (error) {
+        res.status(500).json({ error: 'Erro ao buscar última solicitação' });
+    }
+});
+
 // POST /api/loan-requests — Nova solicitação
 loanRequestsRouter.post('/', async (req: Request, res: Response) => {
     try {
@@ -271,3 +285,36 @@ loanRequestsRouter.put('/:id/supplemental-upload', async (req: Request, res: Res
         res.status(500).json({ error: 'Erro' });
     }
 });
+
+// PUT /api/loan-requests/:id/contract — Atualizar URL do PDF do contrato
+loanRequestsRouter.put('/:id/contract', async (req: Request, res: Response) => {
+    try {
+        const { contractPdfUrl } = req.body;
+        const id = req.params.id;
+
+        const request = await prisma.loanRequest.findUnique({ where: { id } });
+        if (!request) {
+            res.status(404).json({ error: 'Solicitação não encontrada' });
+            return;
+        }
+
+        // Allow update if admin OR if user owns the request
+        const isAdmin = req.user?.role === 'ADMIN';
+        const isOwner = req.user?.id === request.userId;
+
+        if (!isAdmin && !isOwner) {
+            res.status(403).json({ error: 'Acesso negado' });
+            return;
+        }
+
+        await prisma.loanRequest.update({
+            where: { id },
+            data: { contractPdfUrl }
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Erro ao atualizar contrato' });
+    }
+});
+

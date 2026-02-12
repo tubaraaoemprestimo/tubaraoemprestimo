@@ -59,7 +59,7 @@ import {
   MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload, Search
 } from 'lucide-react';
 import { Logo } from './components/Logo';
-import { supabaseService } from './services/supabaseService';
+import { apiService } from './services/apiService';
 import { BrandProvider } from './contexts/BrandContext';
 import { firebasePushService } from './services/firebasePushService';
 import { themeService } from './services/themeService';
@@ -136,7 +136,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const isSearchMatch = targetSearch ? location.search === `?${targetSearch}` : !location.search;
     return isPathMatch && isSearchMatch ? 'text-[#D4AF37] bg-zinc-800' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
   };
-  const user = supabaseService.auth.getUser();
+  const user = apiService.auth.getUser();
   const [accessChecked, setAccessChecked] = useState(false);
 
   useEffect(() => {
@@ -148,9 +148,9 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         return;
       }
 
-      const hasAccess = await supabaseService.auth.hasManagedAccess(user.id);
+      const hasAccess = await apiService.auth.hasManagedAccess(user.id);
       if (!hasAccess) {
-        await supabaseService.auth.signOut();
+        await apiService.auth.signOut();
         navigate('/login', { replace: true });
         return;
       }
@@ -317,7 +317,7 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
       ? 'text-[#D4AF37] bg-zinc-800 font-bold'
       : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
 
-  const user = supabaseService.auth.getUser();
+  const user = apiService.auth.getUser();
   const [accessChecked, setAccessChecked] = useState(false);
 
   useEffect(() => {
@@ -329,9 +329,9 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
         return;
       }
 
-      const hasAccess = await supabaseService.auth.hasManagedAccess(user.id);
+      const hasAccess = await apiService.auth.hasManagedAccess(user.id);
       if (!hasAccess) {
-        await supabaseService.auth.signOut();
+        await apiService.auth.signOut();
         window.location.hash = '#/login';
         return;
       }

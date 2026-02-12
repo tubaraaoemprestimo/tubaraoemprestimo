@@ -305,10 +305,9 @@ export const notificationService = {
         return Notification.permission;
     },
 
-    // 📡 Escutar mudanças em tempo real
-    // TODO: Implement real-time via WebSocket or polling instead of Supabase channel
+    // 📡 Escutar mudanças em tempo real (Polling)
     subscribeToChanges: (callback: (notifications: Notification[]) => void): (() => void) => {
-        // Poll every 30 seconds as a replacement for Supabase real-time
+        // Poll every 30 seconds as a replacement for real-time channels
         const interval = setInterval(async () => {
             const notifications = await notificationService.getAll();
             callback(notifications);

@@ -321,3 +321,57 @@ whatsappStatusRouter.post('/post-now/:id', authenticate, requireAdmin, async (re
         res.status(500).json({ error: 'Erro ao postar status' });
     }
 });
+
+// POST /api/whatsapp/schedule-bulk - Agendar múltiplos status de uma vez (admin only)
+whatsappStatusRouter.post('/schedule-bulk', authenticate, requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const { records } = req.body;
+
+        if (!records || !Array.isArray(records) || records.length === 0) {
+            res.status(400).json({ error: 'records é obrigatório e deve ser um array' });
+            return;
+        }
+
+        if (records.length > 100) {
+            res.status(400).json({ error: 'Máximo de 100 registros por vez' });
+            return;
+        }
+
+        const created = await prisma.scheduledStatus.createMany({
+            data: records.map((r: any) => ({
+                imageUrl: r.image_url || r.imageUrl,
+                caption: r.caption || null,
+                status: 'PENDING',
+                scheduledAt: new Date(r.scheduled_at || r.scheduledAt)
+            }))
+        });
+
+        res.json({ success: true, count: created.count });
+    } catch (error: any) {
+        console.error('[WhatsApp Status] Erro no schedule-bulk:', error);
+        res.status(500).json({ error: 'Erro ao agendar status em massa' });
+    }
+});
+
+// DELETE /api/whatsapp/status-bulk - Deletar múltiplos status (admin only)
+whatsappStatusRouter.delete('/status-bulk', authenticate, requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const { ids } = req.body;
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            res.status(400).json({ error: 'ids é obrigatório e deve ser um array' });
+            return;
+        }
+
+        const { count } = await prisma.scheduledStatus.deleteMany({
+            where: {
+                id: { in: ids },
+                status: { not: 'POSTED' }
+            }
+        });
+
+        res.json({ success: true, deleted: count });
+    } catch {
+        res.status(500).json({ error: 'Erro ao deletar status em massa' });
+    }
+});

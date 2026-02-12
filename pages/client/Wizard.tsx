@@ -1058,7 +1058,7 @@ export const Wizard: React.FC = () => {
       // Gerar PDF do contrato assinado (silencioso - não bloqueia fluxo)
       (async () => {
         try {
-          const brandData = await supabaseService.getBrandSettings();
+          const brandData = await apiService.getBrandSettings() as any;
           const pdfUrl = await contractPdfService.generateAndUploadContract(
             profileType,
             {
@@ -1082,9 +1082,9 @@ export const Wizard: React.FC = () => {
           );
 
           // Buscar request mais recente do cliente para atualizar com o PDF URL
-          const latestReq = await supabaseService.getClientLatestRequest();
+          const latestReq = await apiService.getClientLatestRequest();
           if (latestReq?.id && pdfUrl) {
-            await supabaseService.updateContractPdfUrl(latestReq.id, pdfUrl);
+            await apiService.updateContractPdfUrl(latestReq.id, pdfUrl);
             console.log('✅ Contrato PDF salvo com sucesso!');
           }
         } catch (pdfErr) {
@@ -2708,7 +2708,7 @@ export const Wizard: React.FC = () => {
             <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading} disabled={!formData.signature}>
               {profileType === 'INVESTIDOR' ? 'QUERO SER INVESTIDOR' :
                 profileType === 'LIMPA_NOME' ? 'SOLICITAR SERVIÇO' :
-                profileType === 'MOTO' ? 'SOLICITAR FINANCIAMENTO' : 'SOLICITAR MEU EMPRÉSTIMO'}
+                  profileType === 'MOTO' ? 'SOLICITAR FINANCIAMENTO' : 'SOLICITAR MEU EMPRÉSTIMO'}
             </Button>
           )}
         </div>

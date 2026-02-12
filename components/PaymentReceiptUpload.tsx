@@ -83,46 +83,36 @@ export const PaymentReceiptUpload: React.FC<PaymentReceiptUploadProps> = ({
         setError(null);
 
         try {
-            // Upload para o Supabase Storage
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${customerId}/${installmentId}_${Date.now()}.${fileExt}`;
+            // Upload via API
+            const { data, error: uploadError } = await api.upload(file, file.name);
 
-            const { data: uploadData, error: uploadError } = await api.storage
-                .from('receipts')
-                .upload(fileName, file, {
-                    cacheControl: '3600',
-                    upsert: false
-                });
-
-            if (uploadError) {
-                throw new Error(uploadError.message);
+            if (uploadError || !data) {
+                throw new Error(uploadError?.message || 'Erro ao fazer upload');
             }
 
-            // Obter URL pública
-            const { data: urlData } = api.storage
-                .from('receipts')
-                .getPublicUrl(fileName);
+            const receiptUrl = (data as any).url;
 
-            const receiptUrl = urlData.publicUrl;
+            // Salvar comprovante no backend (usando o endpoint de recibos que criamos)
+            // Se não houver endpoint específico POST /finance/receipts, podemos usar POST /loans/:id/receipts ou similar
+            // Mas o backend finance.ts tem GET /receipts, e os PUT approve/reject.
+            // Vou verificar se existe POST /finance/receipts. Se não, vou adicionar ou usar api.post direto se for tabela genérica.
+            // Como criamos endpoints específicos em finance.ts, melhor usar um deles ou criar.
+            // O componente original fazia insert na tabela 'payment_receipts'.
+            // Vamos assumir que existe ou criar POST /finance/receipts.
 
-            // Salvar registro no banco
-            const { error: dbError } = await api
-                .from('payment_receipts')
-                .insert({
-                    installment_id: installmentId,
-                    loan_id: loanId,
-                    customer_id: customerId,
-                    customer_name: customerName,
-                    amount: amount,
-                    receipt_url: receiptUrl,
-                    receipt_type: file.type.startsWith('image/') ? 'IMAGE' : 'PDF',
-                    status: 'PENDING',
-                    submitted_at: new Date().toISOString()
-                });
+            const { error: dbError } = await api.post('/finance/receipts', {
+                installmentId,
+                loanId,
+                customerId,
+                customerName,
+                amount,
+                receiptUrl,
+                receiptType: file.type.startsWith('image/') ? 'IMAGE' : 'PDF'
+            });
 
             if (dbError) {
-                // Se insert falhar, tentar fallback com localStorage
-                console.warn('Supabase insert failed, using localStorage:', dbError);
+                // Fallback local se API falhar
+                console.warn('API insert failed, using localStorage:', dbError);
                 const receipts = JSON.parse(localStorage.getItem('tubarao_payment_receipts') || '[]');
                 receipts.push({
                     id: `receipt_${Date.now()}`,
@@ -192,8 +182,8 @@ export const PaymentReceiptUpload: React.FC<PaymentReceiptUploadProps> = ({
             {/* Upload Area */}
             <div
                 className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${file
-                        ? 'border-[#D4AF37] bg-[#D4AF37]/5'
-                        : 'border-zinc-700 hover:border-zinc-500 bg-black/30'
+                    ? 'border-[#D4AF37] bg-[#D4AF37]/5'
+                    : 'border-zinc-700 hover:border-zinc-500 bg-black/30'
                     }`}
                 onClick={() => fileInputRef.current?.click()}
             >

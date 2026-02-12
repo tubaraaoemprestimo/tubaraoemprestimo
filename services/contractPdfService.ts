@@ -4,21 +4,21 @@ import { SERVICE_TERMS } from '../constants/serviceTerms';
 
 // Generate hash for document verification
 const generateHash = (content: string): string => {
-    let hash = 0;
-    for (let i = 0; i < content.length; i++) {
-        const char = content.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 8);
-    return `TUB-${Math.abs(hash).toString(16).toUpperCase().padStart(8, '0')}-${timestamp}-${random}`.toUpperCase();
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 8);
+  return `TUB-${Math.abs(hash).toString(16).toUpperCase().padStart(8, '0')}-${timestamp}-${random}`.toUpperCase();
 };
 
 // Generate QR Code URL
 const generateQRCodeUrl = (data: string): string => {
-    const encoded = encodeURIComponent(data);
-    return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encoded}`;
+  const encoded = encodeURIComponent(data);
+  return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encoded}`;
 };
 
 // CSS compartilhado para o documento PDF (print-ready A4)
@@ -252,29 +252,29 @@ const getDocumentCSS = () => `
 // GERAR HTML DO CONTRATO LIMPA_NOME
 // =====================================================
 export function generateLimpaNomeContractHTML(
-    formData: { name: string; cpf: string; phone: string; email: string },
-    signatureUrl: string,
-    brandSettings?: { companyName?: string; cnpj?: string; logoUrl?: string | null }
+  formData: { name: string; cpf: string; phone: string; email: string },
+  signatureUrl: string,
+  brandSettings?: { companyName?: string; cnpj?: string; logoUrl?: string | null }
 ): string {
-    const companyName = brandSettings?.companyName || 'Tubarão Empréstimos';
-    const cnpj = brandSettings?.cnpj || '00.000.000/0001-00';
-    const logo = brandSettings?.logoUrl || '/Logo.png';
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('pt-BR');
-    const dateTimeStr = now.toLocaleString('pt-BR');
+  const companyName = brandSettings?.companyName || 'Tubarão Empréstimos';
+  const cnpj = brandSettings?.cnpj || '00.000.000/0001-00';
+  const logo = brandSettings?.logoUrl || '/Logo.png';
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('pt-BR');
+  const dateTimeStr = now.toLocaleString('pt-BR');
 
-    const hash = generateHash(formData.cpf + 'LIMPA_NOME' + now.toISOString());
-    const verificationUrl = `https://tubaraoemprestimos.com/verificar/${hash}`;
-    const qrCode = generateQRCodeUrl(verificationUrl);
+  const hash = generateHash(formData.cpf + 'LIMPA_NOME' + now.toISOString());
+  const verificationUrl = `https://tubaraoemprestimos.com/verificar/${hash}`;
+  const qrCode = generateQRCodeUrl(verificationUrl);
 
-    const contractText = SERVICE_TERMS.LIMPA_NOME.contractText
-        .replace(/\n/g, '<br>')
-        .replace(/•/g, '<li>')
-        .replace(/<li>/g, '</li><li>')
-        .replace(/<\/li><li>/, '<ul><li>')
-        + '</li></ul>';
+  const contractText = SERVICE_TERMS.LIMPA_NOME.contractText
+    .replace(/\n/g, '<br>')
+    .replace(/•/g, '<li>')
+    .replace(/<li>/g, '</li><li>')
+    .replace(/<\/li><li>/, '<ul><li>')
+    + '</li></ul>';
 
-    return `
+  return `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -359,46 +359,46 @@ export function generateLimpaNomeContractHTML(
 // GERAR HTML DO CONTRATO GENÉRICO (CLT, AUTONOMO, MOTO, GARANTIA)
 // =====================================================
 export function generateGenericContractHTML(
-    formData: {
-        name: string;
-        cpf: string;
-        phone: string;
-        email: string;
-        amount: number;
-        installments: number;
-        installmentValue: number;
-        interestRate: number;
-        totalAmount: number;
-        profileType: string;
-    },
-    signatureUrl: string,
-    brandSettings?: { companyName?: string; cnpj?: string; logoUrl?: string | null; address?: string }
+  formData: {
+    name: string;
+    cpf: string;
+    phone: string;
+    email: string;
+    amount: number;
+    installments: number;
+    installmentValue: number;
+    interestRate: number;
+    totalAmount: number;
+    profileType: string;
+  },
+  signatureUrl: string,
+  brandSettings?: { companyName?: string; cnpj?: string; logoUrl?: string | null; address?: string }
 ): string {
-    const companyName = brandSettings?.companyName || 'Tubarão Empréstimos';
-    const cnpj = brandSettings?.cnpj || '00.000.000/0001-00';
-    const logo = brandSettings?.logoUrl || '/Logo.png';
-    const companyAddress = brandSettings?.address || 'Av. Paulista, 1000 - São Paulo, SP';
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('pt-BR');
-    const dateTimeStr = now.toLocaleString('pt-BR');
+  const companyName = brandSettings?.companyName || 'Tubarão Empréstimos';
+  const cnpj = brandSettings?.cnpj || '00.000.000/0001-00';
+  const logo = brandSettings?.logoUrl || '/Logo.png';
+  const companyAddress = brandSettings?.address || 'Av. Paulista, 1000 - São Paulo, SP';
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('pt-BR');
+  const dateTimeStr = now.toLocaleString('pt-BR');
 
-    const hash = generateHash(formData.cpf + formData.profileType + formData.amount + now.toISOString());
-    const verificationUrl = `https://tubaraoemprestimos.com/verificar/${hash}`;
-    const qrCode = generateQRCodeUrl(verificationUrl);
+  const hash = generateHash(formData.cpf + formData.profileType + formData.amount + now.toISOString());
+  const verificationUrl = `https://tubaraoemprestimos.com/verificar/${hash}`;
+  const qrCode = generateQRCodeUrl(verificationUrl);
 
-    const profileLabels: Record<string, string> = {
-        CLT: 'Empréstimo Pessoal (CLT)',
-        AUTONOMO: 'Capital de Giro (Comércio)',
-        MOTO: 'Financiamento de Motocicleta',
-        GARANTIA: 'Empréstimo com Garantia',
-        GARANTIA_VEICULO: 'Empréstimo com Garantia',
-    };
-    const docTypeLabel = profileLabels[formData.profileType] || 'Contrato';
+  const profileLabels: Record<string, string> = {
+    CLT: 'Empréstimo Pessoal (CLT)',
+    AUTONOMO: 'Capital de Giro (Comércio)',
+    MOTO: 'Financiamento de Motocicleta',
+    GARANTIA: 'Empréstimo com Garantia',
+    GARANTIA_VEICULO: 'Empréstimo com Garantia',
+  };
+  const docTypeLabel = profileLabels[formData.profileType] || 'Contrato';
 
-    const terms = SERVICE_TERMS[formData.profileType as keyof typeof SERVICE_TERMS];
-    const conditions = terms?.conditions || [];
+  const terms = SERVICE_TERMS[formData.profileType as keyof typeof SERVICE_TERMS];
+  const conditions = terms?.conditions || [];
 
-    return `
+  return `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -493,149 +493,149 @@ export function generateGenericContractHTML(
 // CONVERTER HTML PARA PDF BLOB (usando html2pdf.js)
 // =====================================================
 export async function generatePdfFromHTML(html: string): Promise<Blob> {
-    // html2pdf.js é uma lib client-side, importa dinamicamente
-    const html2pdf = (await import('html2pdf.js')).default;
+  // html2pdf.js é uma lib client-side, importa dinamicamente
+  const html2pdf = (await import('html2pdf.js')).default;
 
-    // Criar um container temporário oculto
-    const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.left = '-9999px';
-    container.style.top = '0';
-    container.style.width = '800px';
-    container.innerHTML = html;
-    document.body.appendChild(container);
+  // Criar um container temporário oculto
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  container.style.width = '800px';
+  container.innerHTML = html;
+  document.body.appendChild(container);
 
-    // Aguardar imagens carregarem (QR code, logo, assinatura)
-    const images = container.querySelectorAll('img');
-    await Promise.all(
-        Array.from(images).map(img =>
-            new Promise<void>((resolve) => {
-                if (img.complete) return resolve();
-                img.onload = () => resolve();
-                img.onerror = () => resolve(); // não bloquear se imagem falhar
-            })
-        )
-    );
+  // Aguardar imagens carregarem (QR code, logo, assinatura)
+  const images = container.querySelectorAll('img');
+  await Promise.all(
+    Array.from(images).map(img =>
+      new Promise<void>((resolve) => {
+        if (img.complete) return resolve();
+        img.onload = () => resolve();
+        img.onerror = () => resolve(); // não bloquear se imagem falhar
+      })
+    )
+  );
 
-    // Pequeno delay para renderização
-    await new Promise(resolve => setTimeout(resolve, 500));
+  // Pequeno delay para renderização
+  await new Promise(resolve => setTimeout(resolve, 500));
 
-    try {
-        const pdfBlob: Blob = await html2pdf()
-            .set({
-                margin: 0,
-                filename: 'contrato.pdf',
-                image: { type: 'jpeg', quality: 0.95 },
-                html2canvas: {
-                    scale: 2,
-                    useCORS: true,
-                    allowTaint: true,
-                    logging: false,
-                },
-                jsPDF: {
-                    unit: 'mm',
-                    format: 'a4',
-                    orientation: 'portrait',
-                },
-            })
-            .from(container.querySelector('.document-container') || container)
-            .outputPdf('blob');
+  try {
+    const pdfBlob: Blob = await html2pdf()
+      .set({
+        margin: 0,
+        filename: 'contrato.pdf',
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+        },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait',
+        },
+      })
+      .from((container.querySelector('.document-container') as HTMLElement) || container)
+      .outputPdf('blob');
 
-        return pdfBlob;
-    } finally {
-        document.body.removeChild(container);
-    }
+    return pdfBlob;
+  } finally {
+    document.body.removeChild(container);
+  }
 }
 
 // =====================================================
 // UPLOAD DO PDF VIA API BACKEND
 // =====================================================
 export async function uploadContractPdf(pdfBlob: Blob, cpf: string, profileType: string): Promise<string> {
-    const cleanCpf = cpf.replace(/\D/g, '');
-    const timestamp = Date.now();
-    const fileName = `contrato_${cleanCpf}_${profileType.toLowerCase()}_${timestamp}.pdf`;
+  const cleanCpf = cpf.replace(/\D/g, '');
+  const timestamp = Date.now();
+  const fileName = `contrato_${cleanCpf}_${profileType.toLowerCase()}_${timestamp}.pdf`;
 
-    const file = new File([pdfBlob], `contrato_${profileType.toLowerCase()}_${timestamp}.pdf`, {
-        type: 'application/pdf',
-    });
+  const file = new File([pdfBlob], `contrato_${profileType.toLowerCase()}_${timestamp}.pdf`, {
+    type: 'application/pdf',
+  });
 
-    const { data, error } = await api.upload(file, fileName);
+  const { data, error } = await api.upload(file, fileName);
 
-    if (error) {
-        console.error('Erro no upload do PDF:', error?.message || error);
-        throw error;
-    }
+  if (error) {
+    console.error('Erro no upload do PDF:', error?.message || error);
+    throw error;
+  }
 
-    const pdfUrl = data?.url;
-    if (!pdfUrl) {
-        throw new Error('Upload concluido sem URL de retorno.');
-    }
+  const pdfUrl = data?.url;
+  if (!pdfUrl) {
+    throw new Error('Upload concluido sem URL de retorno.');
+  }
 
-    console.log('PDF do contrato enviado:', pdfUrl);
-    return pdfUrl;
+  console.log('PDF do contrato enviado:', pdfUrl);
+  return pdfUrl;
 }
 
 // =====================================================
 // ORQUESTRADOR: Gera HTML > PDF > Upload > Retorna URL
 // =====================================================
 export async function generateAndUploadContract(
-    profileType: string,
-    formData: {
-        name: string;
-        cpf: string;
-        phone: string;
-        email: string;
-        amount?: number;
-        installments?: number;
-        installmentValue?: number;
-        interestRate?: number;
-        totalAmount?: number;
-    },
-    signatureUrl: string,
-    brandSettings?: { companyName?: string; cnpj?: string; logoUrl?: string | null; address?: string }
+  profileType: string,
+  formData: {
+    name: string;
+    cpf: string;
+    phone: string;
+    email: string;
+    amount?: number;
+    installments?: number;
+    installmentValue?: number;
+    interestRate?: number;
+    totalAmount?: number;
+  },
+  signatureUrl: string,
+  brandSettings?: { companyName?: string; cnpj?: string; logoUrl?: string | null; address?: string }
 ): Promise<string> {
-    console.log(`📄 Gerando PDF do contrato (${profileType})...`);
+  console.log(`📄 Gerando PDF do contrato (${profileType})...`);
 
-    // 1. Gerar HTML
-    let html: string;
-    if (profileType === 'LIMPA_NOME') {
-        html = generateLimpaNomeContractHTML(formData, signatureUrl, brandSettings);
-    } else {
-        html = generateGenericContractHTML(
-            {
-                name: formData.name,
-                cpf: formData.cpf,
-                phone: formData.phone,
-                email: formData.email,
-                amount: formData.amount || 0,
-                installments: formData.installments || 1,
-                installmentValue: formData.installmentValue || 0,
-                interestRate: formData.interestRate || 0,
-                totalAmount: formData.totalAmount || 0,
-                profileType,
-            },
-            signatureUrl,
-            brandSettings
-        );
-    }
+  // 1. Gerar HTML
+  let html: string;
+  if (profileType === 'LIMPA_NOME') {
+    html = generateLimpaNomeContractHTML(formData, signatureUrl, brandSettings);
+  } else {
+    html = generateGenericContractHTML(
+      {
+        name: formData.name,
+        cpf: formData.cpf,
+        phone: formData.phone,
+        email: formData.email,
+        amount: formData.amount || 0,
+        installments: formData.installments || 1,
+        installmentValue: formData.installmentValue || 0,
+        interestRate: formData.interestRate || 0,
+        totalAmount: formData.totalAmount || 0,
+        profileType,
+      },
+      signatureUrl,
+      brandSettings
+    );
+  }
 
-    // 2. Converter para PDF
-    const pdfBlob = await generatePdfFromHTML(html);
-    console.log(`✅ PDF gerado: ${(pdfBlob.size / 1024).toFixed(1)} KB`);
+  // 2. Converter para PDF
+  const pdfBlob = await generatePdfFromHTML(html);
+  console.log(`✅ PDF gerado: ${(pdfBlob.size / 1024).toFixed(1)} KB`);
 
-    // 3. Upload para Supabase Storage
-    const pdfUrl = await uploadContractPdf(pdfBlob, formData.cpf, profileType);
-    console.log(`✅ PDF uploaded: ${pdfUrl}`);
+  // 3. Upload via API
+  const pdfUrl = await uploadContractPdf(pdfBlob, formData.cpf, profileType);
+  console.log(`✅ PDF uploaded: ${pdfUrl}`);
 
-    return pdfUrl;
+  return pdfUrl;
 }
 
 export const contractPdfService = {
-    generateLimpaNomeContractHTML,
-    generateGenericContractHTML,
-    generatePdfFromHTML,
-    uploadContractPdf,
-    generateAndUploadContract,
+  generateLimpaNomeContractHTML,
+  generateGenericContractHTML,
+  generatePdfFromHTML,
+  uploadContractPdf,
+  generateAndUploadContract,
 };
 
 export default contractPdfService;

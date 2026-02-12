@@ -120,16 +120,12 @@ export const AIHub: React.FC = () => {
                 setConfig(configData);
             }
 
-            // Load conversations
-            const { data: historyData } = await supabase
-                .from('chatbot_history')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(500);
+            // Load conversations via API
+            const { data: historyData } = await api.get('/chatbot/history-all');
 
             if (historyData) {
                 const grouped: Record<string, ChatHistoryItem[]> = {};
-                historyData.forEach((item: ChatHistoryItem) => {
+                (historyData as any[]).forEach((item: ChatHistoryItem) => {
                     if (!grouped[item.phone]) grouped[item.phone] = [];
                     grouped[item.phone].push(item);
                 });
@@ -187,14 +183,15 @@ export const AIHub: React.FC = () => {
     const handleClearHistory = async (phone?: string) => {
         if (!confirm(phone ? `Limpar histórico de ${phone}?` : 'Limpar todo o histórico?')) return;
 
-        if (phone) {
-            await supabase.from('chatbot_history').delete().eq('phone', phone);
-        } else {
-            await supabase.from('chatbot_history').delete().neq('id', '');
+        try {
+            const url = phone ? `/chatbot/history?phone=${encodeURIComponent(phone)}` : '/chatbot/history';
+            await api.delete(url);
+            addToast('Histórico limpo!', 'success');
+            setSelectedConversation(null);
+            loadAllData();
+        } catch {
+            addToast('Erro ao limpar histórico', 'error');
         }
-        addToast('Histórico limpo!', 'success');
-        setSelectedConversation(null);
-        loadAllData();
     };
 
     // Format helpers

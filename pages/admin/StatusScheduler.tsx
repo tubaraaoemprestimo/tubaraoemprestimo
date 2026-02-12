@@ -80,14 +80,24 @@ export const StatusScheduler: React.FC = () => {
 
     const loadScheduledStatus = async () => {
         setLoading(true);
-        const { data, error } = await supabase
-            .from('scheduled_status')
-            .select('*')
-            .order('scheduled_at', { ascending: false })
-            .limit(50);
+        const { data } = await api.get('/whatsapp/status-queue?limit=50');
 
-        if (!error && data) {
-            setScheduledStatus(data);
+        if (data) {
+            const resp = data as any;
+            // The API returns { statuses, summary } format
+            const statuses = resp.statuses || resp;
+            if (Array.isArray(statuses)) {
+                setScheduledStatus(statuses.map((s: any) => ({
+                    id: s.id,
+                    image_url: s.imageUrl || s.image_url,
+                    caption: s.caption || null,
+                    scheduled_at: s.scheduledAt || s.scheduled_at,
+                    status: s.status,
+                    error_message: s.errorMessage || s.error_message || null,
+                    posted_at: s.postedAt || s.posted_at || null,
+                    created_at: s.createdAt || s.created_at
+                })));
+            }
         }
         setLoading(false);
     };
@@ -109,25 +119,16 @@ export const StatusScheduler: React.FC = () => {
         setUploading(true);
 
         try {
-            const fileName = `status_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${file.name.split('.').pop()}`;
+            // Upload via API
+            const { data, error } = await api.upload(file, file.name);
 
-            const { data, error } = await supabase.storage
-                .from('status-images')
-                .upload(fileName, file, { cacheControl: '3600', upsert: false });
-
-            if (error) {
-                if (error.message.includes('not found')) {
-                    addToast('Bucket de imagens não configurado. Configure o Storage.', 'error');
-                } else {
-                    throw error;
-                }
+            if (error || !data) {
+                addToast('Erro ao fazer upload da imagem', 'error');
                 setUploading(false);
                 return;
             }
 
-            const { data: { publicUrl } } = supabase.storage
-                .from('status-images')
-                .getPublicUrl(fileName);
+            const publicUrl = (data as any).url;
 
             if (isEdit) {
                 setEditFormData({ ...editFormData, image_url: publicUrl });
@@ -235,7 +236,7 @@ export const StatusScheduler: React.FC = () => {
                 return;
             }
 
-            // Criar registros para todas as datas
+            // Criar registros para todas as datas via API
             const records = dates.map(date => ({
                 image_url: formData.image_url,
                 caption: formData.caption || null,
@@ -243,11 +244,19 @@ export const StatusScheduler: React.FC = () => {
                 status: 'PENDING'
             }));
 
-            const { error } = await supabase
-                .from('scheduled_status')
-                .insert(records);
-
-            if (error) throw error;
+            if (records.length === 1) {
+                // Single schedule
+                const { error } = await api.post('/whatsapp/schedule-status', {
+                    imageUrl: records[0].image_url,
+                    caption: records[0].caption,
+                    scheduledAt: records[0].scheduled_at
+                });
+                if (error) throw new Error('Erro ao agendar status');
+            } else {
+                // Bulk schedule
+                const { error } = await api.post('/whatsapp/schedule-bulk', { records });
+                if (error) throw new Error('Erro ao agendar status em massa');
+            }
 
             addToast(`${records.length} status agendado(s) com sucesso!`, 'success');
             setIsModalOpen(false);
@@ -292,16 +301,13 @@ export const StatusScheduler: React.FC = () => {
         try {
             const scheduledAt = new Date(`${editFormData.scheduled_date}T${editFormData.scheduled_time}:00`);
 
-            const { error } = await supabase
-                .from('scheduled_status')
-                .update({
-                    image_url: editFormData.image_url,
-                    caption: editFormData.caption || null,
-                    scheduled_at: scheduledAt.toISOString()
-                })
-                .eq('id', editingStatus.id);
+            const { error } = await api.put(`/whatsapp/status/${editingStatus.id}`, {
+                imageUrl: editFormData.image_url,
+                caption: editFormData.caption || null,
+                scheduledAt: scheduledAt.toISOString()
+            });
 
-            if (error) throw error;
+            if (error) throw new Error('Erro ao atualizar');
 
             addToast('Status atualizado com sucesso!', 'success');
             setIsEditModalOpen(false);
@@ -318,10 +324,7 @@ export const StatusScheduler: React.FC = () => {
     const handleDelete = async (id: string) => {
         if (!confirm('Excluir este agendamento?')) return;
 
-        const { error } = await supabase
-            .from('scheduled_status')
-            .delete()
-            .eq('id', id);
+        const { error } = await api.delete(`/whatsapp/status/${id}`);
 
         if (!error) {
             addToast('Agendamento excluído.', 'info');
@@ -334,57 +337,31 @@ export const StatusScheduler: React.FC = () => {
     const handlePostNow = async (id: string) => {
         if (!confirm('Postar este status agora?')) return;
 
-        const { error } = await supabase
-            .from('scheduled_status')
-            .update({ scheduled_at: new Date().toISOString() })
-            .eq('id', id);
+        const { error } = await api.post(`/whatsapp/post-now/${id}`, {});
 
         if (!error) {
-            addToast('Status será postado em instantes!', 'success');
-
-            try {
-                const response = await fetch('https://cwhiujeragsethxjekkb.supabase.co/functions/v1/post-status', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ'
-                    }
-                });
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.error || 'Erro ao postar');
-                console.log('Post Status Result:', data);
-            } catch (e) {
-                console.error('Error invoking post-status:', e);
-                addToast('Erro ao invocar função de postagem (ver console)', 'error');
-            }
-
-            setTimeout(() => loadScheduledStatus(), 3000);
+            addToast('Status postado com sucesso!', 'success');
+            setTimeout(() => loadScheduledStatus(), 2000);
+        } else {
+            addToast('Erro ao postar status', 'error');
         }
     };
 
     const handleRetry = async (id: string) => {
-        const { error } = await supabase
-            .from('scheduled_status')
-            .update({
-                status: 'PENDING',
-                scheduled_at: new Date().toISOString(),
-                error_message: null
-            })
-            .eq('id', id);
+        const { error } = await api.put(`/whatsapp/status/${id}`, {
+            status: 'PENDING',
+            scheduledAt: new Date().toISOString(),
+            errorMessage: null
+        });
 
         if (!error) {
             addToast('Tentando novamente...', 'info');
 
+            // Trigger the queue processor
             try {
-                await fetch('https://cwhiujeragsethxjekkb.supabase.co/functions/v1/post-status', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aGl1amVyYWdzZXRoeGpla2tiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTMyNTQsImV4cCI6MjA1MDM4OTI1NH0.S1v7GGqx67lMplBGKMTfXGfqBP1o10R7FMitcqK1XEQ'
-                    }
-                });
-            } catch (e) {
-                console.log('Function triggered');
+                await api.post('/whatsapp/process-queue', {});
+            } catch {
+                console.log('Queue process triggered');
             }
 
             setTimeout(() => loadScheduledStatus(), 3000);
@@ -481,12 +458,9 @@ export const StatusScheduler: React.FC = () => {
         setIsDeleting(true);
 
         try {
-            const { error } = await supabase
-                .from('scheduled_status')
-                .delete()
-                .in('id', Array.from(selectedIds));
+            const { error } = await api.delete('/whatsapp/status-bulk', { data: { ids: Array.from(selectedIds) } });
 
-            if (error) throw error;
+            if (error) throw new Error('Erro ao excluir');
 
             addToast(`${selectedIds.size} agendamento(s) excluído(s).`, 'success');
             setSelectedIds(new Set());
@@ -647,8 +621,8 @@ export const StatusScheduler: React.FC = () => {
                                 <button
                                     onClick={() => toggleSelect(item.id)}
                                     className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${selectedIds.has(item.id)
-                                            ? 'bg-yellow-500 border-yellow-500 text-black'
-                                            : 'border-zinc-600 hover:border-yellow-500'
+                                        ? 'bg-yellow-500 border-yellow-500 text-black'
+                                        : 'border-zinc-600 hover:border-yellow-500'
                                         }`}
                                 >
                                     {selectedIds.has(item.id) && <CheckCircle size={14} />}

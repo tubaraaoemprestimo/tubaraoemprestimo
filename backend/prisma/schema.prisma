@@ -133,6 +133,7 @@ model LoanRequest {
   accuracy              Float?
   // Contrato
   contractAccepted      Boolean  @default(false) @map("contract_accepted")
+  contractPdfUrl        String?  @map("contract_pdf_url")
   // Banco
   bankName              String?  @map("bank_name")
   bankAgency            String?  @map("bank_agency")

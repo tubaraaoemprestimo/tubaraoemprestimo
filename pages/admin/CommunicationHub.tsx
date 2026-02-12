@@ -90,48 +90,29 @@ export const CommunicationHub: React.FC = () => {
             const customersData = await apiService.getCustomers();
             setCustomers(customersData);
 
-            // Templates
-            const { data: templatesData } = await supabase
-                .from('message_templates')
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (templatesData) setTemplates(templatesData);
+            // Templates via API
+            const { data: templatesData } = await api.get('/communication/templates');
+            if (templatesData) setTemplates(templatesData as any[]);
 
-            // Campaigns
-            const { data: campaignsData } = await supabase
-                .from('campaigns')
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (campaignsData) setCampaigns(campaignsData);
+            // Campaigns via API
+            const { data: campaignsData } = await api.get('/campaigns');
+            if (campaignsData) setCampaigns(campaignsData as any[]);
 
-            // Coupons
-            const { data: couponsData } = await supabase
-                .from('coupons')
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (couponsData) setCoupons(couponsData);
+            // Coupons via API
+            const { data: couponsData } = await api.get('/communication/coupons');
+            if (couponsData) setCoupons(couponsData as any[]);
 
-            // Status
-            const { data: statusData } = await supabase
-                .from('scheduled_status')
-                .select('*')
-                .order('scheduled_at', { ascending: true });
-            if (statusData) setScheduledStatus(statusData);
+            // Status via API
+            const { data: statusData } = await api.get('/communication/scheduled-status');
+            if (statusData) setScheduledStatus(statusData as any[]);
 
-            // Referrals
-            const { data: referralsData } = await supabase
-                .from('referrals')
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (referralsData) setReferrals(referralsData);
+            // Referrals via API
+            const { data: referralsData } = await api.get('/referrals');
+            if (referralsData) setReferrals(referralsData as any[]);
 
-            // Bonus config
-            const { data: configData } = await supabase
-                .from('settings')
-                .select('value')
-                .eq('key', 'referral_bonus')
-                .single();
-            if (configData) setBonusValue(parseFloat(configData.value) || 50);
+            // Bonus config via API
+            const { data: configData } = await api.get('/communication/referral-bonus');
+            if (configData) setBonusValue(parseFloat((configData as any).value) || 50);
 
         } catch (error) {
             console.error('Error loading data:', error);
@@ -146,21 +127,24 @@ export const CommunicationHub: React.FC = () => {
             return;
         }
 
-        const { error } = editingTemplate.id
-            ? await supabase.from('message_templates').update(editingTemplate).eq('id', editingTemplate.id)
-            : await supabase.from('message_templates').insert([editingTemplate]);
-
-        if (!error) {
+        try {
+            if (editingTemplate.id) {
+                await api.put(`/communication/templates/${editingTemplate.id}`, editingTemplate);
+            } else {
+                await api.post('/communication/templates', editingTemplate);
+            }
             addToast('Template salvo!', 'success');
             setIsTemplateModalOpen(false);
             setEditingTemplate({});
             loadAllData();
+        } catch {
+            addToast('Erro ao salvar template', 'error');
         }
     };
 
     const handleDeleteTemplate = async (id: string) => {
         if (!confirm('Excluir template?')) return;
-        await supabase.from('message_templates').delete().eq('id', id);
+        await api.delete(`/communication/templates/${id}`);
         addToast('Template excluído', 'success');
         loadAllData();
     };
@@ -168,13 +152,13 @@ export const CommunicationHub: React.FC = () => {
     // Status handlers
     const handleDeleteStatus = async (id: string) => {
         if (!confirm('Excluir agendamento?')) return;
-        await supabase.from('scheduled_status').delete().eq('id', id);
+        await api.delete(`/communication/scheduled-status/${id}`);
         addToast('Agendamento excluído', 'success');
         loadAllData();
     };
 
     const handlePostStatusNow = async (id: string) => {
-        const { error } = await supabase.functions.invoke('post-status', { body: { statusId: id } });
+        const { error } = await api.post(`/whatsapp/post-now/${id}`, {});
         if (!error) {
             addToast('Status postado!', 'success');
             loadAllData();
@@ -183,19 +167,19 @@ export const CommunicationHub: React.FC = () => {
 
     // Referral handlers
     const handleApproveReferral = async (referral: Referral) => {
-        await supabase.from('referrals').update({ status: 'APPROVED', approved_at: new Date().toISOString() }).eq('id', referral.id);
+        await api.put(`/referrals/${referral.id}`, { status: 'APPROVED', approved_at: new Date().toISOString() });
         addToast('Indicação aprovada!', 'success');
         loadAllData();
     };
 
     const handleRejectReferral = async (referral: Referral) => {
-        await supabase.from('referrals').update({ status: 'REJECTED' }).eq('id', referral.id);
+        await api.put(`/referrals/${referral.id}`, { status: 'REJECTED' });
         addToast('Indicação rejeitada', 'info');
         loadAllData();
     };
 
     const handlePayBonus = async (referral: Referral) => {
-        await supabase.from('referrals').update({ status: 'PAID', paid_at: new Date().toISOString() }).eq('id', referral.id);
+        await api.put(`/referrals/${referral.id}`, { status: 'PAID', paid_at: new Date().toISOString() });
         addToast(`Bônus de R$ ${bonusValue} pago!`, 'success');
         loadAllData();
     };

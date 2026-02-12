@@ -502,3 +502,42 @@ chatbotRouter.get('/conversations', authenticate, requireAdmin, async (_req: Req
         res.status(500).json({ error: 'Erro ao buscar conversas' });
     }
 });
+
+// GET /api/chatbot/history-all - Bulk history list (all phones)
+chatbotRouter.get('/history-all', authenticate, requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const limit = parseInt(String(req.query.limit || '500'));
+        const history = await prisma.aiChatHistory.findMany({
+            orderBy: { createdAt: 'desc' },
+            take: limit
+        });
+
+        // Map to frontend format
+        res.json(history.map(h => ({
+            id: h.id,
+            phone: h.phone,
+            customer_id: (h.metadata as any)?.customer_id || null,
+            role: h.role,
+            message: h.content,
+            created_at: h.createdAt.toISOString()
+        })));
+    } catch {
+        res.status(500).json({ error: 'Erro ao buscar histórico' });
+    }
+});
+
+// DELETE /api/chatbot/history - Clear history (all or by phone)
+chatbotRouter.delete('/history', authenticate, requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const phone = String(req.query.phone || '');
+        if (phone) {
+            await prisma.aiChatHistory.deleteMany({ where: { phone } });
+        } else {
+            await prisma.aiChatHistory.deleteMany();
+        }
+        res.json({ success: true });
+    } catch {
+        res.status(500).json({ error: 'Erro ao limpar histórico' });
+    }
+});
+

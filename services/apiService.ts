@@ -314,6 +314,12 @@ export const apiService = {
         return data;
     },
 
+    async updateContractPdfUrl(id: string, contractPdfUrl: string) {
+        const { data, error } = await api.put(`/loan-requests/${id}/contract`, { contractPdfUrl });
+        if (error) throw new Error(error.error || 'Erro ao atualizar contrato');
+        return data;
+    },
+
     async uploadSupplementalDoc(id: string, docUrl: string) {
         const { data, error } = await api.put(`/loan-requests/${id}/supplemental-upload`, { docUrl });
         if (error) throw new Error(error.error || 'Erro');
@@ -365,7 +371,13 @@ export const apiService = {
     async getClientPendingRequest() {
         const { data, error } = await api.get('/loan-requests/pending');
         if (error) return null;
-        return data;
+        return data as any;
+    },
+
+    async getClientLatestRequest() {
+        const { data, error } = await api.get('/loan-requests/latest');
+        if (error) return null;
+        return data as any;
     },
 
     async uploadPaymentProof(loanId: string, installmentId: string, proofUrl: string) {

@@ -126,17 +126,13 @@ export const AntiFraudMonitor: React.FC = () => {
     const loadAllData = async () => {
         setLoading(true);
         try {
-            // Logs de risco
-            const { data, error } = await supabase
-                .from('risk_logs')
-                .select('*')
-                .gte('created_at', `${dateRange.start}T00:00:00`)
-                .lte('created_at', `${dateRange.end}T23:59:59`)
-                .order('created_at', { ascending: false })
-                .limit(200);
+            // Logs de risco via API
+            const { data: riskLogs, error: riskError } = await api.get<RiskLog[]>(
+                `/antifraud/risk-logs?start=${dateRange.start}T00:00:00&end=${dateRange.end}T23:59:59&limit=200`
+            );
 
-            if (error) throw error;
-            setLogs(data || []);
+            if (riskError) throw new Error(riskError);
+            setLogs((riskLogs as RiskLog[]) || []);
 
             // Bloqueios e Alertas
             const blocks = await deviceSecurityService.getPendingBlocks();
@@ -541,9 +537,9 @@ export const AntiFraudMonitor: React.FC = () => {
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className={`px-2 py-0.5 rounded text-xs font-bold ${alert.severity === 'critical' ? 'bg-red-900/50 text-red-400' :
-                                                    alert.severity === 'high' ? 'bg-orange-900/50 text-orange-400' :
-                                                        alert.severity === 'medium' ? 'bg-yellow-900/50 text-yellow-400' :
-                                                            'bg-blue-900/50 text-blue-400'
+                                                alert.severity === 'high' ? 'bg-orange-900/50 text-orange-400' :
+                                                    alert.severity === 'medium' ? 'bg-yellow-900/50 text-yellow-400' :
+                                                        'bg-blue-900/50 text-blue-400'
                                                 }`}>
                                                 {alert.severity.toUpperCase()}
                                             </span>

@@ -85,9 +85,9 @@ export const ClientDashboard: React.FC = () => {
   const loadDashboardData = async () => {
     setLoading(true);
     const user = apiService.auth.getUser();
-    const loans = await apiService.getClientLoans();
+    const loans = await apiService.getClientLoans() as any[];
     const pendingReq = await apiService.getClientPendingRequest();
-    const campaigns = await apiService.getActiveCampaigns();
+    const campaigns = await apiService.getActiveCampaigns() as any[];
     const preApproved = await apiService.getPreApproval();
 
     // Buscar oferta de parcelamento e cupons
@@ -131,7 +131,7 @@ export const ClientDashboard: React.FC = () => {
 
     // Buscar URL do contrato PDF (se existir)
     try {
-      const latestReq = await supabaseService.getClientLatestRequest();
+      const latestReq = await apiService.getClientLatestRequest();
       if (latestReq) {
         // Tentar campo dedicado primeiro, depois fallback para supplemental_description
         let pdfUrl = latestReq.contract_pdf_url;

@@ -79,12 +79,8 @@ export const SecurityHub: React.FC = () => {
     const loadAllData = async () => {
         setLoading(true);
         try {
-            // Risk logs
-            const { data: logsData } = await supabase
-                .from('risk_logs')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(100);
+            // Risk logs via API
+            const { data: logsData } = await api.get('/finance/risk-logs');
             if (logsData) setRiskLogs(logsData);
 
             // Blacklist
@@ -95,40 +91,17 @@ export const SecurityHub: React.FC = () => {
             const usersData = await apiService.getUsers();
             setUsers(usersData);
 
-            // Mapa de biometria por usuário (WebAuthn)
-            const { data: biometricRows } = await supabase
-                .from('webauthn_credentials')
-                .select('user_id');
+            // Mapa de biometria por usuário (WebAuthn) via API
+            const { data: biometricMap } = await api.get('/finance/biometrics');
+            setBiometricCountByUser(biometricMap || {});
 
-            const biometricMap: Record<string, number> = {};
-            (biometricRows || []).forEach((row: any) => {
-                const uid = row.user_id as string;
-                biometricMap[uid] = (biometricMap[uid] || 0) + 1;
-            });
-            setBiometricCountByUser(biometricMap);
+            // Mapa de customers por email via API
+            const { data: customersMap } = await api.get('/finance/customers-map');
+            setCustomerByEmail(customersMap || {});
 
-            const { data: customersData } = await supabase
-                .from('customers')
-                .select('email');
-
-            const customersMap: Record<string, boolean> = {};
-            (customersData || []).forEach((row: any) => {
-                const email = String(row.email || '').toLowerCase();
-                if (email) customersMap[email] = true;
-            });
-            setCustomerByEmail(customersMap);
-
-            const { data: requestsData } = await supabase
-                .from('loan_requests')
-                .select('email');
-
-            const requestsMap: Record<string, number> = {};
-            (requestsData || []).forEach((row: any) => {
-                const email = String(row.email || '').toLowerCase();
-                if (!email) return;
-                requestsMap[email] = (requestsMap[email] || 0) + 1;
-            });
-            setRequestCountByEmail(requestsMap);
+            // Mapa de requests por email via API
+            const { data: requestsMap } = await api.get('/finance/requests-map');
+            setRequestCountByEmail(requestsMap || {});
         } catch (error) {
             console.error('Error loading data:', error);
         }
@@ -253,34 +226,17 @@ export const SecurityHub: React.FC = () => {
     const handleResetUserBiometrics = async (userId: string) => {
         if (!confirm('Remover todas as credenciais biométricas deste usuário? Ele terá que cadastrar novamente no próximo acesso.')) return;
 
-        const { error } = await supabase
-            .from('webauthn_credentials')
-            .delete()
-            .eq('user_id', userId);
-
-        if (error) {
+        try {
+            const { error } = await api.delete(`/finance/biometrics/${userId}`);
+            if (error) {
+                addToast('Erro ao resetar biometria do usuário', 'error');
+                return;
+            }
+            addToast('Biometria resetada. Novo cadastro será exigido no próximo login.', 'success');
+            loadAllData();
+        } catch {
             addToast('Erro ao resetar biometria do usuário', 'error');
-            return;
         }
-
-        await supabase
-            .from('risk_logs')
-            .insert({
-                user_id: userId,
-                session_id: `admin_${Date.now()}`,
-                ip: 'admin-panel',
-                user_agent: navigator.userAgent,
-                platform: navigator.platform || 'web',
-                screen_resolution: `${window.screen.width}x${window.screen.height}`,
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                action: 'BIOMETRIC_ADMIN_RESET',
-                risk_score: 0,
-                risk_factors: ['RESET_BY_ADMIN'],
-                additional_data: { source: 'SECURITY_HUB' },
-            });
-
-        addToast('Biometria resetada. Novo cadastro será exigido no próximo login.', 'success');
-        loadAllData();
     };
 
     const handleDeleteUser = async (id: string) => {

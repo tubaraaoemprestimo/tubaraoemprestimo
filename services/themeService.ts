@@ -130,8 +130,7 @@ export const themeService = {
         await themeService.getTheme();
     },
 
-    // Escutar mudanças em tempo real
-    // TODO: Implement real-time via WebSocket or polling instead of Supabase channel
+    // Escutar mudanças em tempo real (Polling)
     subscribeToChanges: (callback: (theme: ThemeColors) => void): (() => void) => {
         // Poll every 60 seconds as a replacement for Supabase real-time
         const interval = setInterval(async () => {
