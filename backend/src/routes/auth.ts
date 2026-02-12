@@ -10,6 +10,7 @@ export const authRouter = Router();
 
 // ============================================
 // POST /api/auth/register — Criar conta
+// Login fix applied (v2)
 // ============================================
 authRouter.post('/register', async (req: Request, res: Response) => {
     try {
@@ -45,19 +46,30 @@ authRouter.post('/register', async (req: Request, res: Response) => {
 
         // Garante cliente vinculado para aparecer em Clientes/Acessos/Antifraude
         if ((user.role || 'CLIENT') === 'CLIENT') {
-            const existingCustomer = await prisma.customer.findFirst({ where: { OR: [{ userId: user.id }, { email: user.email }] } });
-            if (!existingCustomer) {
-                await prisma.customer.create({
-                    data: {
-                        userId: user.id,
-                        name: user.name,
-                        email: user.email,
-                        phone: user.phone || '',
-                        cpf: `REG_${user.id.replace(/-/g, '').slice(0, 11)}`,
-                        status: 'ACTIVE',
-                        source: 'MANUAL'
-                    }
-                });
+            try {
+                const existingCustomer = await prisma.customer.findFirst({ where: { OR: [{ userId: user.id }, { email: user.email }] } });
+                if (!existingCustomer) {
+                    await prisma.customer.create({
+                        data: {
+                            userId: user.id,
+                            name: user.name,
+                            email: user.email,
+                            phone: user.phone || '',
+                            cpf: `REG_${user.id.replace(/-/g, '').slice(0, 11)}`,
+                            status: 'ACTIVE',
+                            source: 'MANUAL'
+                        }
+                    });
+                } else {
+                    // Update userId if it's missing or different (re-linking)
+                    await prisma.customer.update({
+                        where: { id: existingCustomer.id },
+                        data: { userId: user.id }
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to link customer in register:', err);
+                // Non-critical, continue
             }
         }
 
@@ -111,21 +123,27 @@ authRouter.post('/login', async (req: Request, res: Response) => {
 
         // Backfill de customer para contas antigas migradas sem registro em customers
         if ((user.role || '').toUpperCase() === 'CLIENT') {
-            const existingCustomer = await prisma.customer.findFirst({ where: { OR: [{ userId: user.id }, { email: user.email }] } });
-            if (!existingCustomer) {
-                await prisma.customer.create({
-                    data: {
-                        userId: user.id,
-                        name: user.name,
-                        email: user.email,
-                        phone: user.phone || '',
-                        cpf: `MIG_${user.id.replace(/-/g, '').slice(0, 11)}`,
-                        status: 'ACTIVE',
-                        source: 'MANUAL'
-                    }
-                });
-            } else if (!existingCustomer.userId) {
-                await prisma.customer.update({ where: { id: existingCustomer.id }, data: { userId: user.id } });
+            try {
+                const existingCustomer = await prisma.customer.findFirst({ where: { OR: [{ userId: user.id }, { email: user.email }] } });
+                if (!existingCustomer) {
+                    await prisma.customer.create({
+                        data: {
+                            userId: user.id,
+                            name: user.name,
+                            email: user.email,
+                            phone: user.phone || '',
+                            cpf: `MIG_${user.id.replace(/-/g, '').slice(0, 11)}`,
+                            status: 'ACTIVE',
+                            source: 'MANUAL'
+                        }
+                    });
+                } else if (!existingCustomer.userId || existingCustomer.userId !== user.id) {
+                    // Link correct userId if missing or different
+                    await prisma.customer.update({ where: { id: existingCustomer.id }, data: { userId: user.id } });
+                }
+            } catch (err) {
+                console.error('Failed to backfill customer in login:', err);
+                // Continue login even if backfill fails
             }
         }
 

@@ -50,16 +50,28 @@ usersRouter.post('/', requireAdmin, async (req: Request, res: Response) => {
 
         // Cria Customer associado se for CLIENT
         if (user.role === 'CLIENT') {
-            await prisma.customer.create({
-                data: {
-                    userId: user.id,
-                    name: user.name,
-                    email: user.email,
-                    phone: user.phone || '',
-                    cpf: `ADMIN_${user.id.substring(0, 8)}`,
-                    status: 'ACTIVE'
+            try {
+                const existingCustomer = await prisma.customer.findFirst({ where: { email: user.email } });
+                if (existingCustomer) {
+                    await prisma.customer.update({
+                        where: { id: existingCustomer.id },
+                        data: { userId: user.id }
+                    });
+                } else {
+                    await prisma.customer.create({
+                        data: {
+                            userId: user.id,
+                            name: user.name,
+                            email: user.email,
+                            phone: user.phone || '',
+                            cpf: `ADMIN_${user.id.substring(0, 8)}`,
+                            status: 'ACTIVE'
+                        }
+                    });
                 }
-            });
+            } catch (err) {
+                console.error('Failed to sync customer on user create:', err);
+            }
         }
 
         res.status(201).json({ success: true, user: { id: user.id, name: user.name, email: user.email } });
