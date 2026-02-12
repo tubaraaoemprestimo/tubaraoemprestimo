@@ -1,5 +1,5 @@
-// 📄 Contract PDF Service - Gera PDF real do contrato assinado e faz upload para Supabase Storage
-import { supabase } from './supabaseClient';
+// Contract PDF Service - gera PDF real do contrato assinado e faz upload via API backend
+import { api } from './apiClient';
 import { SERVICE_TERMS } from '../constants/serviceTerms';
 
 // Generate hash for document verification
@@ -548,35 +548,31 @@ export async function generatePdfFromHTML(html: string): Promise<Blob> {
 }
 
 // =====================================================
-// UPLOAD DO PDF PARA SUPABASE STORAGE
+// UPLOAD DO PDF VIA API BACKEND
 // =====================================================
 export async function uploadContractPdf(pdfBlob: Blob, cpf: string, profileType: string): Promise<string> {
     const cleanCpf = cpf.replace(/\D/g, '');
     const timestamp = Date.now();
-    const fileName = `contracts/${cleanCpf}/contrato_${profileType.toLowerCase()}_${timestamp}.pdf`;
+    const fileName = `contrato_${cleanCpf}_${profileType.toLowerCase()}_${timestamp}.pdf`;
 
     const file = new File([pdfBlob], `contrato_${profileType.toLowerCase()}_${timestamp}.pdf`, {
         type: 'application/pdf',
     });
 
-    const { data, error } = await supabase.storage
-        .from('documents')
-        .upload(fileName, file, {
-            cacheControl: '3600',
-            upsert: true,
-        });
+    const { data, error } = await api.upload(file, fileName);
 
     if (error) {
-        console.error('❌ Erro no upload do PDF:', error.message);
+        console.error('Erro no upload do PDF:', error?.message || error);
         throw error;
     }
 
-    const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(data.path);
+    const pdfUrl = data?.url;
+    if (!pdfUrl) {
+        throw new Error('Upload concluido sem URL de retorno.');
+    }
 
-    console.log('✅ PDF do contrato uploaded:', urlData.publicUrl);
-    return urlData.publicUrl;
+    console.log('PDF do contrato enviado:', pdfUrl);
+    return pdfUrl;
 }
 
 // =====================================================
