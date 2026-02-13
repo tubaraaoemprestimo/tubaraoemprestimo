@@ -8,6 +8,7 @@ import { useBrand } from '../../contexts/BrandContext';
 import { themeService, ThemeColors } from '../../services/themeService';
 import { LoanPackage, SystemSettings, CollectionRule, CollectionRuleType, WhatsappConfig, GoalsSettings } from '../../types';
 import { useToast } from '../../components/Toast';
+import { PIXSettings } from './PIXSettings';
 
 const inputStyle = "w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none transition-colors";
 
@@ -243,7 +244,7 @@ export const Settings: React.FC = () => {
     const success = await emailService.sendCustomEmail(
       testEmail,
       'Teste de Configuração - Tubarão',
-      '<h1>Configuração Validada! ✅</h1><p>Se você recebeu este email, o sistema de envio está funcionando perfeitamente via Resend para tubaraoemprestimo.com.br.</p>'
+      '<h1>Configuração Validada! ?</h1><p>Se você recebeu este email, o sistema de envio está funcionando perfeitamente via Resend para tubaraoemprestimo.com.br.</p>'
     );
 
     setTestingEmail(false);
@@ -1076,7 +1077,7 @@ export const Settings: React.FC = () => {
         {/* Preview */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
           <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            👁️ Preview em Tempo Real
+            ??? Preview em Tempo Real
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-4 rounded-xl" style={{ backgroundColor: themeColors.cardColor }}>
@@ -1120,7 +1121,7 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-8 bg-zinc-900/50 p-1 rounded-xl w-fit border border-zinc-800">
-        {['FINANCIAL', 'GOALS', 'AUTOMATION', 'INTEGRATION', 'BRANDING', 'TEMA'].map((tab) => (
+        {['FINANCIAL', 'GOALS', 'AUTOMATION', 'INTEGRATION', 'BRANDING', 'TEMA', 'PAYMENTS'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab as any)}
@@ -1133,7 +1134,7 @@ export const Settings: React.FC = () => {
               tab === 'GOALS' ? 'Metas' :
                 tab === 'AUTOMATION' ? 'Automação' :
                   tab === 'INTEGRATION' ? 'Integrações' :
-                    tab === 'BRANDING' ? 'Identidade Visual' : '🎨 Cores'}
+                    tab === 'BRANDING' ? 'Identidade Visual' : '?? Cores'}
           </button>
         ))}
       </div>
@@ -1143,7 +1144,8 @@ export const Settings: React.FC = () => {
       {activeTab === 'AUTOMATION' && renderAutomationTab()}
       {activeTab === 'INTEGRATION' && renderIntegrationTab()}
       {activeTab === 'BRANDING' && renderBrandingTab()}
-      {activeTab === 'TEMA' && renderThemeTab()}
+        {activeTab === 'TEMA' && renderThemeTab()}
+      {activeTab === 'PAYMENTS' && <PIXSettings settings={settings} onUpdate={loadData} />}
 
       {/* Modals */}
       {isPkgModalOpen && (
@@ -1242,3 +1244,9 @@ const Modal = ({ title, onClose, children }: any) => (
     </div>
   </div>
 );
+
+
+
+
+
+
