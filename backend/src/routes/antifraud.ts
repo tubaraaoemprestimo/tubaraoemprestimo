@@ -363,12 +363,29 @@ antifraudRouter.post('/device/check', authenticate, async (req: Request, res: Re
         const maxDevicesSetting = await prisma.systemSetting.findUnique({
             where: { key: 'max_devices_per_user' }
         });
-        const maxDevices = maxDevicesSetting ? parseInt(maxDevicesSetting.value) : 2;
+        // Política de segurança obrigatória: máximo 2 dispositivos
+        const configuredMax = maxDevicesSetting ? parseInt(maxDevicesSetting.value) : 2;
+        const maxDevices = Number.isFinite(configuredMax) && configuredMax > 0 ? Math.min(configuredMax, 2) : 2;
 
         if (deviceCount >= maxDevices) {
             res.status(403).json({
                 error: 'Limite de dispositivos excedido',
                 message: `Você atingiu o limite de ${maxDevices} dispositivos. Remova um dispositivo antigo para acessar neste novo.`
+            });
+            return;
+        }
+
+        // Limite de IPs por usuário (máx 2 IPs distintos entre dispositivos confiáveis)
+        const devices = await prisma.trustedDevice.findMany({
+            where: { userId: req.user!.id },
+            select: { lastIp: true }
+        });
+        const knownIps = new Set((devices || []).map((d: any) => d.lastIp).filter(Boolean));
+        const currentIp = req.ip || null;
+        if (currentIp && !knownIps.has(currentIp) && knownIps.size >= 2) {
+            res.status(403).json({
+                error: 'Limite de IPs excedido',
+                message: 'Detectamos acesso por um 3º IP diferente. Por segurança, o acesso foi bloqueado.'
             });
             return;
         }

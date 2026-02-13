@@ -256,6 +256,15 @@ export const Wizard: React.FC = () => {
       antifraudService.initSession();
       antifraudService.logRiskEvent('wizard_start').catch(() => { });
 
+      // Verifica limite de dispositivos antes de iniciar o fluxo
+      const deviceCheck = await antifraudService.checkDevice();
+      if (!deviceCheck.allowed) {
+        addToast(deviceCheck.message || 'Acesso bloqueado por segurança do dispositivo.', 'error');
+        navigate('/client/dashboard');
+        setLoadingSettings(false);
+        return;
+      }
+
       const data = await loanSettingsService.getSettings();
       setSettings(data);
       setLoadingSettings(false);

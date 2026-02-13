@@ -103,6 +103,14 @@
   - endpoint `/api/customers/location` ajustado para salvar latitude/longitude/cidade/estado/endereço com SQL compatível com schema real.
   - endpoints de listagem de localização (`/api/customers/locations` e `/api/customers/locations/:email`) ajustados para leitura consistente.
 
+### 8. Antifraude reforçado (13/02/2026)
+- **Login**: verificação de dispositivo executada após autenticação de cliente (`antifraudService.checkDevice()`).
+- **Wizard**: validação de dispositivo executada no início do fluxo; bloqueia acesso e redireciona ao dashboard quando violar regra.
+- **Backend `/api/antifraud/device/check`**:
+  - limite de dispositivos forçado para **máximo 2**;
+  - regra adicional de **máximo 2 IPs distintos** por usuário confiável;
+  - retorno de bloqueio com mensagem explícita de segurança.
+
 ---
 
 ## 📂 Estrutura do Projeto

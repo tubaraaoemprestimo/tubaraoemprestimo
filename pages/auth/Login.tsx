@@ -82,6 +82,17 @@ export const Login: React.FC = () => {
           locationCaptured: locationData
         });
 
+        // Verificação de dispositivo (limite 2 por usuário)
+        if (result.user.role !== 'ADMIN') {
+          const deviceCheck = await antifraudService.checkDevice();
+          if (!deviceCheck.allowed) {
+            setError(deviceCheck.message || 'Acesso bloqueado por segurança do dispositivo.');
+            apiService.auth.signOut();
+            setLoading(false);
+            return;
+          }
+        }
+
         // 🔐 Biometria: salvar credenciais e tentar cadastrar se disponível
         if (biometricAvailable && result.user.role !== 'ADMIN') {
           try {
