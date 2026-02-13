@@ -319,7 +319,7 @@ antifraudRouter.put('/device/:id/set-primary', authenticate, async (req: Request
 // POST /api/antifraud/device/check - Verificar novo dispositivo (logado)
 antifraudRouter.post('/device/check', authenticate, async (req: Request, res: Response) => {
     try {
-        const { fingerprint } = req.body;
+        const { fingerprint, latitude, longitude } = req.body;
 
         const trusted = await prisma.trustedDevice.findFirst({
             where: {
@@ -331,7 +331,12 @@ antifraudRouter.post('/device/check', authenticate, async (req: Request, res: Re
         if (trusted) {
             await prisma.trustedDevice.update({
                 where: { id: trusted.id },
-                data: { lastSeenAt: new Date(), lastIp: req.ip }
+                data: {
+                    lastSeenAt: new Date(),
+                    lastIp: req.ip,
+                    lastLocationLat: latitude || trusted.lastLocationLat,
+                    lastLocationLng: longitude || trusted.lastLocationLng
+                }
             });
             res.json({ trusted: true });
             return;
@@ -347,6 +352,24 @@ antifraudRouter.post('/device/check', authenticate, async (req: Request, res: Re
 
         if (blocked) {
             res.status(403).json({ error: 'Dispositivo bloqueado', reason: blocked.blockReason });
+            return;
+        }
+
+        // Check Max Devices Limit
+        const deviceCount = await prisma.trustedDevice.count({
+            where: { userId: req.user!.id }
+        });
+
+        const maxDevicesSetting = await prisma.systemSetting.findUnique({
+            where: { key: 'max_devices_per_user' }
+        });
+        const maxDevices = maxDevicesSetting ? parseInt(maxDevicesSetting.value) : 2;
+
+        if (deviceCount >= maxDevices) {
+            res.status(403).json({
+                error: 'Limite de dispositivos excedido',
+                message: `Você atingiu o limite de ${maxDevices} dispositivos. Remova um dispositivo antigo para acessar neste novo.`
+            });
             return;
         }
 

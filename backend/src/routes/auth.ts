@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../services/prisma';
 import { authenticate, generateAccessToken, generateRefreshToken } from '../middleware/auth';
 import { emailService } from '../services/email';
+import { sendWhatsAppMessage } from '../services/whatsapp';
 
 export const authRouter = Router();
 
@@ -66,6 +67,16 @@ authRouter.post('/register', async (req: Request, res: Response) => {
                         }
                     });
                     customerId = newCustomer.id;
+
+                    // Notify Admins about new client
+                    try {
+                        const admins = await prisma.user.findMany({ where: { role: 'ADMIN', phone: { not: null } } });
+                        for (const admin of admins) {
+                            if (admin.phone) {
+                                await sendWhatsAppMessage(admin.phone, `🦈 *Novo Cliente!*\nNome: ${user.name}\nEmail: ${user.email}\nTelefone: ${user.phone || 'Não informado'}`);
+                            }
+                        }
+                    } catch (e) { console.error('Error notifying admins via WhatsApp:', e); }
                 } else {
                     // Update userId if it's missing or different (re-linking)
                     await prisma.customer.update({

@@ -26,6 +26,16 @@
   - Adicionado campo `locationUpdatedAt` no `Customer` para registrar o momento exato da captura.
   - API `/locations` ajustada para retornar a data real da atualização, permitindo que o Admin veja "última localização em X minutos atrás" corretamente.
 
+### 3. Antifraude & Comunicação (Checkpoint Tarde)
+- **Segurança**:
+  - Limite de 2 dispositivos por usuário (`POST /device/check`).
+  - Captura de localização a cada acesso ao Dashboard.
+- **Notificações**:
+  - Suporte a Web Push (VAPID) para usuários (Backend + Frontend).
+  - Alerta automático no WhatsApp dos Admins quando novo cliente se cadastra.
+- **WhatsApp**:
+  - Backend pronto para agendamento de Status (`whatsappStatusRouter`).
+
 ---
 
 ## 📂 Estrutura do Projeto

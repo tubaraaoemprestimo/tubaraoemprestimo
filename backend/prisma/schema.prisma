@@ -84,8 +84,23 @@ model Customer {
   coupons           Coupon[]
   referralsMade     Referral[] @relation("ReferralsMade")
   referralReceived  Referral?  @relation("ReferralsReceived")
+  pushSubscriptions PushSubscription[]
 
   @@map("customers")
+}
+
+model PushSubscription {
+  id         String   @id @default(uuid())
+  customerId String   @map("customer_id")
+  endpoint   String   @unique
+  keys       Json     // { p256dh: string, auth: string }
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("push_subscriptions")
 }
 
 // ============= REFERRALS =============

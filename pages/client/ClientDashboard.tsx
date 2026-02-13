@@ -12,10 +12,12 @@ import { MarketingPopup } from '../../components/MarketingPopup';
 import { Logo } from '../../components/Logo';
 import { referralService } from '../../services/referralService';
 import { locationTrackingService } from '../../services/locationTrackingService';
+import { antifraudService } from '../../services/antifraudService';
 
 export const ClientDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  // ... state declarations ...
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isRenegotiateOpen, setIsRenegotiateOpen] = useState(false);
@@ -25,7 +27,7 @@ export const ClientDashboard: React.FC = () => {
   const [preApprovedAmount, setPreApprovedAmount] = useState<number | null>(null);
   const [referralCode, setReferralCode] = useState<string>('');
 
-  // Propostas e Cupons
+  // ... other states ...
   const [installmentOffer, setInstallmentOffer] = useState<{
     amount: number;
     installments: number;
@@ -37,23 +39,19 @@ export const ClientDashboard: React.FC = () => {
   const [coupons, setCoupons] = useState<{ code: string; discount: number; description: string; expiresAt: string }[]>([]);
   const [realNotifications, setRealNotifications] = useState<{ id: string; title: string; message: string; type: string; created_at: string; read: boolean }[]>([]);
 
-  // Modais separados para Campanhas, Cupons e Ofertas
+  // ... modals ...
   const [isCampaignsModalOpen, setIsCampaignsModalOpen] = useState(false);
   const [isCouponsModalOpen, setIsCouponsModalOpen] = useState(false);
   const [isOffersModalOpen, setIsOffersModalOpen] = useState(false);
-
-  // Upload Modal for Waiting Docs
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
-
-  // Contract PDF
   const [contractPdfUrl, setContractPdfUrl] = useState<string | null>(null);
 
-  // Renegotiation State
+  // ... renegotiation ...
   const [renegotiateInstallments, setRenegotiateInstallments] = useState(12);
   const [simulationResult, setSimulationResult] = useState({ monthly: 0, total: 0 });
 
-  // Dynamic Data State
+  // ... userData ...
   const [userData, setUserData] = useState({
     name: '',
     balance: 0,
@@ -66,6 +64,22 @@ export const ClientDashboard: React.FC = () => {
 
     // Capturar localização do cliente em background (silencioso)
     locationTrackingService.captureAndSave().catch(() => { });
+
+    // Verificar se dispositivo é permitido (max 2 devices)
+    antifraudService.checkDevice().then(({ allowed, message }) => {
+      if (!allowed) {
+        addToast(message || 'Acesso bloqueado: Limite de dispositivos atingido.', 'error');
+        setTimeout(() => {
+          apiService.auth.signOut().then(() => navigate('/login'));
+        }, 3000);
+      }
+    });
+
+    // Subscribe to Web Push Notifications
+    import('../../services/webPushService').then(({ webPushService }) => {
+      webPushService.subscribe();
+    });
+
   }, []);
 
   // Recalculate simulation when balance or installments change

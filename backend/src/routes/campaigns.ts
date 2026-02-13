@@ -3,6 +3,16 @@ import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import axios from 'axios';
 import { emailService } from '../services/email';
+import webpush from 'web-push';
+
+// Configure Web Push (Singleton)
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(
+        process.env.VAPID_SUBJECT || 'mailto:admin@tubarao.com',
+        process.env.VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY
+    );
+}
 
 export const campaignsRouter = Router();
 campaignsRouter.use(authenticate);
@@ -133,8 +143,8 @@ campaignsRouter.post('/send', requireAdmin, async (req: Request, res: Response) 
 
         // 2. Busca clientes ativos com telefone
         const customers = await prisma.customer.findMany({
-            where: { status: 'ACTIVE', phone: { not: '' } },
-            select: { id: true, name: true, phone: true, email: true }
+            where: { status: 'ACTIVE' },
+            select: { id: true, name: true, phone: true, email: true, pushSubscriptions: true }
         });
 
         if (customers.length === 0) {
@@ -221,6 +231,20 @@ campaignsRouter.post('/send', requireAdmin, async (req: Request, res: Response) 
                         const emailSent = await sendEmail(customer.email, emailSubject, message);
                         if (emailSent) emailsSent++;
                     } catch { /* email falhou, continua */ }
+                }
+
+                // Web Push
+                if (customer.pushSubscriptions && customer.pushSubscriptions.length > 0) {
+                    for (const sub of customer.pushSubscriptions) {
+                        try {
+                            const payload = JSON.stringify({
+                                title: type === 'campaign' ? '🦈 Nova Promoção!' : '🎁 Novo Cupom!',
+                                body: type === 'campaign' ? 'Confira as novidades no app!' : `Desconto exclusivo: ${message.substring(0, 50)}...`,
+                                url: '/client/dashboard'
+                            });
+                            await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys as any }, payload);
+                        } catch (e) { console.error('Push failed for user', customer.email, e); }
+                    }
                 }
             }
 

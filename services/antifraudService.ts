@@ -645,9 +645,6 @@ export const antifraudService = {
         return score >= 30 && score < 50;
     },
 
-    /**
-     * 🚫 Verifica se o CPF está em período de cooldown após reprovação
-     */
     async checkRejectionCooldown(cpf: string): Promise<{
         blocked: boolean;
         daysRemaining: number;
@@ -689,6 +686,36 @@ export const antifraudService = {
             return { blocked: false, daysRemaining: 0 };
         }
     },
+
+    /**
+     * Verifica e valida o dispositivo atual no backend
+     */
+    async checkDevice(): Promise<{ allowed: boolean; message?: string }> {
+        try {
+            const fingerprint = await this.collectFingerprint();
+            // Create a consistent fingerprint string
+            const fingerprintStr = `${fingerprint.deviceModel}|${fingerprint.platform}|${fingerprint.screenResolution}|${fingerprint.userAgent.length}`;
+
+            const location = await this.requestLocation();
+
+            const { error } = await api.post('/antifraud/device/check', {
+                fingerprint: fingerprintStr,
+                latitude: location?.latitude,
+                longitude: location?.longitude
+            });
+
+            if (error) {
+                // Return the error message from backend
+                return { allowed: false, message: (error as any).message || (error as any).error || 'Dispositivo bloqueado' };
+            }
+            return { allowed: true };
+        } catch (e) {
+            console.error('Check device failed:', e);
+            // In case of network error, we might decide to allow or block. 
+            // Blocking might be too aggressive if offline. Allowing for now.
+            return { allowed: true };
+        }
+    }
 };
 
 export default antifraudService;
