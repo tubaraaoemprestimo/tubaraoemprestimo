@@ -13,6 +13,7 @@ import { Profile } from './pages/client/Profile';
 import { Statement } from './pages/client/Statement';
 import { HelpCenter } from './pages/client/HelpCenter';
 import { MyDocuments } from './pages/client/MyDocuments';
+import { ReferralsPage } from './pages/client/ReferralsPage';
 
 // Pages - Admin Core
 import { Dashboard } from './pages/admin/Dashboard';
@@ -474,6 +475,7 @@ function App() {
             <Route path="/client/statement" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Statement /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/help" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><HelpCenter /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/documents" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><MyDocuments /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/referrals" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><ReferralsPage /></ClientLayout></PermissionGate></BiometricAccessGate>} />
 
             {/* Admin Protected - Core */}
             <Route path="/admin" element={<AdminLayout><Dashboard /></AdminLayout>} />

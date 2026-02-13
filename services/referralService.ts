@@ -1,8 +1,8 @@
 // 🤝 Referral Service - Sistema de Indicações
-// Migrado para Supabase
+// Inclui gamificação com pontos e recompensas
 
 import { api } from './apiClient';
-import { ReferralCode, ReferralUsage, Customer } from '../types';
+import { ReferralCode, ReferralUsage, CustomerPoints, PointsTransaction, REFERRAL_REWARD_RULES } from '../types';
 
 const STORAGE_KEYS = {
     REFERRAL_CODES: 'tubarao_referral_codes',
@@ -28,10 +28,111 @@ function saveToStorage(key: string, data: any): void {
 }
 
 export const referralService = {
-    // Generate or get existing referral code for a user
+    // ==========================================
+    // GAMIFICAÇÃO - PONTOS E RECOMPENSAS
+    // ==========================================
+
+    async getCustomerPoints(customerId: string): Promise<CustomerPoints> {
+        try {
+            const { data } = await api.get<any>(`/customers/${customerId}/points`);
+            return data as CustomerPoints;
+        } catch (e) {
+            const key = `points_${customerId}`;
+            const stored = loadFromStorage<CustomerPoints>(key, {
+                customerId,
+                totalPoints: 0,
+                availablePoints: 0,
+                usedPoints: 0,
+                referredCount: 0,
+                approvedReferrals: 0,
+                lastUpdated: new Date().toISOString()
+            });
+            return stored;
+        }
+    },
+
+    async awardPointsForReferral(referrerId: string, referredId: string, loanAmount: number = 0): Promise<void> {
+        let rule = REFERRAL_REWARD_RULES[0];
+        for (const r of REFERRAL_REWARD_RULES) {
+            if (loanAmount >= r.minLoanAmount) {
+                rule = r;
+            }
+        }
+
+        try {
+            await api.post('/referrals/points', {
+                customer_id: referrerId,
+                points: rule.rewardValue,
+                type: 'EARNED',
+                reason: `Indicação aprovada${loanAmount > 0 ? ` (R$ ${loanAmount.toLocaleString()})` : ''}`,
+                related_referral_id: referredId
+            });
+        } catch (e) {
+            const key = `points_${referrerId}`;
+            const points = loadFromStorage<CustomerPoints>(key, {
+                customerId: referrerId,
+                totalPoints: 0,
+                availablePoints: 0,
+                usedPoints: 0,
+                referredCount: 0,
+                approvedReferrals: 0,
+                lastUpdated: new Date().toISOString()
+            });
+
+            points.totalPoints += rule.rewardValue;
+            points.availablePoints += rule.rewardValue;
+            points.referredCount++;
+            points.approvedReferrals++;
+            points.lastUpdated = new Date().toISOString();
+            saveToStorage(key, points);
+
+            const txKey = `points_tx_${referrerId}`;
+            const txs = loadFromStorage<any[]>(txKey, []);
+            txs.push({
+                id: Date.now().toString(),
+                customerId: referrerId,
+                points: rule.rewardValue,
+                type: 'EARNED',
+                reason: rule.description,
+                relatedReferralId: referredId,
+                createdAt: new Date().toISOString()
+            });
+            saveToStorage(txKey, txs);
+        }
+    },
+
+    async getPointsHistory(customerId: string): Promise<PointsTransaction[]> {
+        try {
+            const { data } = await api.get<any[]>(`/customers/${customerId}/points/history`);
+            return data as PointsTransaction[];
+        } catch (e) {
+            const txKey = `points_tx_${customerId}`;
+            return loadFromStorage<PointsTransaction[]>(txKey, []);
+        }
+    },
+
+    async getAllCustomersPoints(): Promise<any[]> {
+        try {
+            const { data } = await api.get<any[]>('/referrals/points/all');
+            return data;
+        } catch (e) {
+            const customers = await apiService.getCustomers();
+            const result: any[] = [];
+
+            for (const cust of customers) {
+                const points = await this.getCustomerPoints(cust.id);
+                result.push({ customer: cust, points });
+            }
+            return result;
+        }
+    },
+
+    // ==========================================
+    // FUNÇÕES ORIGINAIS
+    // ==========================================
+
     getOrCreateCode: async (userId: string, userName: string): Promise<ReferralCode> => {
         try {
-            // Check if code already exists
             const { data: existing } = await api.get<any[]>(`/referrals?referrer_customer_id=${userId}&limit=1`);
 
             if (existing && existing.length > 0) {
@@ -47,10 +148,9 @@ export const referralService = {
                 };
             }
 
-            // Generate new code
             const firstName = userName.split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '');
             const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-            const newCode: ReferralCode = {
+            return {
                 id: Date.now().toString(),
                 userId,
                 userName,
@@ -59,13 +159,9 @@ export const referralService = {
                 status: 'ACTIVE',
                 usageCount: 0
             };
-
-            return newCode;
         } catch (e) {
-            // Fallback
             const codes = loadFromStorage<ReferralCode[]>(STORAGE_KEYS.REFERRAL_CODES, []);
             const existing = codes.find(c => c.userId === userId);
-
             if (existing) return existing;
 
             const firstName = userName.split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '');
@@ -79,17 +175,14 @@ export const referralService = {
                 status: 'ACTIVE',
                 usageCount: 0
             };
-
             codes.push(newCode);
             saveToStorage(STORAGE_KEYS.REFERRAL_CODES, codes);
             return newCode;
         }
     },
 
-    // Get code by code string
     getByCode: async (code: string): Promise<ReferralCode | undefined> => {
         try {
-            // Parse code to find referral
             const codes = loadFromStorage<ReferralCode[]>(STORAGE_KEYS.REFERRAL_CODES, []);
             return codes.find(c => c.code === code && c.status === 'ACTIVE');
         } catch {
@@ -97,18 +190,14 @@ export const referralService = {
         }
     },
 
-    // Register usage of a referral code (when a new user signs up)
     registerUsage: async (code: string, newUserId: string, newUserName: string): Promise<void> => {
         const referralCode = await referralService.getByCode(code);
-        if (!referralCode || referralCode.userId === newUserId) return; // Can't self-refer
+        if (!referralCode || referralCode.userId === newUserId) return;
 
         try {
-            // Check if already referred
             const { data: existing } = await api.get<any[]>(`/referrals?referred_cpf=${newUserId}&limit=1`);
-
             if (existing && existing.length > 0) return;
 
-            // Create referral via API
             await api.post('/referrals', {
                 referrer_customer_id: referralCode.userId,
                 referrer_name: referralCode.userName,
@@ -118,7 +207,6 @@ export const referralService = {
                 reward_amount: 50.00
             });
         } catch (e) {
-            // Fallback
             const usages = loadFromStorage<ReferralUsage[]>(STORAGE_KEYS.REFERRAL_USAGES, []);
             const codes = loadFromStorage<ReferralCode[]>(STORAGE_KEYS.REFERRAL_CODES, []);
 
@@ -146,11 +234,9 @@ export const referralService = {
         }
     },
 
-    // Admin: Get all usages
     getAllUsages: async (): Promise<ReferralUsage[]> => {
         try {
             const { data, error } = await api.get<any[]>('/referrals');
-
             if (error || !data) throw error;
 
             return data.map(r => ({
@@ -169,11 +255,9 @@ export const referralService = {
         }
     },
 
-    // Admin: Validate usage (Anti-fraud check)
     validateUsage: async (usageId: string, action: 'VALIDATE' | 'REJECT' | 'FRAUD', reason?: string): Promise<void> => {
         try {
             const newStatus = action === 'VALIDATE' ? 'CONVERTED' : action === 'FRAUD' ? 'REJECTED' : 'REJECTED';
-
             await api.put(`/referrals/${usageId}`, {
                 status: newStatus,
                 converted_at: new Date().toISOString(),
@@ -187,13 +271,11 @@ export const referralService = {
                 usages[index].status = action === 'VALIDATE' ? 'VALIDATED' : action === 'FRAUD' ? 'FRAUD_SUSPECTED' : 'REJECTED';
                 usages[index].validatedAt = new Date().toISOString();
                 if (reason) usages[index].fraudReason = reason;
-
                 saveToStorage(STORAGE_KEYS.REFERRAL_USAGES, usages);
             }
         }
     },
 
-    // Anti-fraud detection logic
     checkFraudIndicators: (usage: ReferralUsage, customers: Customer[]): string[] => {
         const risks: string[] = [];
         const referrer = customers.find(c => c.id === usage.referrerId);
@@ -201,18 +283,15 @@ export const referralService = {
 
         if (!referrer || !referred) return ['Usuário não encontrado'];
 
-        // 2. Similar Name patterns
         if (referrer.name.split(' ')[1] === referred.name.split(' ')[1]) {
             risks.push('Sobrenome idêntico - Possível parente (verificar regras)');
         }
 
-        // 3. Very close creation time
         const timeDiff = Math.abs(new Date(referred.joinedAt).getTime() - new Date(referrer.joinedAt).getTime());
-        if (timeDiff < 1000 * 60 * 60) { // 1 hour
+        if (timeDiff < 1000 * 60 * 60) {
             risks.push('Contas criadas com menos de 1h de diferença');
         }
 
-        // 4. Sequential CPFs (Mock logic)
         const cpf1 = referrer.cpf.replace(/\D/g, '');
         const cpf2 = referred.cpf.replace(/\D/g, '');
         if (Math.abs(Number(cpf1) - Number(cpf2)) < 100) {

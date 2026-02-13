@@ -724,3 +724,80 @@ export interface ClientContractFile {
   createdAt: string;
   contractPdfUrl: string;
 }
+
+// ==========================================
+// SISTEMA DE INDICAÇÃO E GAMIFICAÇÃO
+// ==========================================
+
+export interface ReferralCode {
+  id: string;
+  userId: string;
+  userName: string;
+  code: string;
+  createdAt: string;
+  status: 'ACTIVE' | 'USED' | 'EXPIRED';
+  usageCount: number;
+}
+
+export interface ReferralUsage {
+  id: string;
+  referralCode: string;
+  referrerId: string;
+  referredId: string;
+  referredName: string;
+  status: 'PENDING' | 'VALIDATED' | 'FRAUD_SUSPECTED' | 'REJECTED';
+  rewardAmount: number;
+  createdAt: string;
+  validatedAt?: string;
+  fraudReason?: string;
+}
+
+export interface ReferralRewardRule {
+  minLoanAmount: number;      // Valor mínimo do empréstimo do indicado
+  rewardType: 'POINTS' | 'CASH' | 'DISCOUNT';
+  rewardValue: number;        // Pontos ou R$ ou % de desconto
+  description: string;
+}
+
+export interface CustomerPoints {
+  customerId: string;
+  totalPoints: number;
+  availablePoints: number;
+  usedPoints: number;
+  referredCount: number;
+  approvedReferrals: number;
+  lastUpdated: string;
+}
+
+export interface PointsTransaction {
+  id: string;
+  customerId: string;
+  points: number;
+  type: 'EARNED' | 'REDEEMED' | 'EXPIRE';
+  reason: string;
+  relatedReferralId?: string;
+  createdAt: string;
+  expiresAt?: string;
+}
+
+// Regras de recompensa por indicação (configurável no admin)
+export const REFERRAL_REWARD_RULES: ReferralRewardRule[] = [
+  {
+    minLoanAmount: 0,
+    rewardType: 'POINTS',
+    rewardValue: 100, // 100 pontos por indicado que fizer solicitação
+    description: '100 pontos por indicação (solicitação aprovada)'
+  },
+  {
+    minLoanAmount: 5000,
+    rewardType: 'CASH',
+    rewardValue: 50, // R$ 50 de bônus
+    description: 'R$ 50 de bônus por indicação com empréstimo >= R$ 5.000'
+  },
+  {
+    minLoanAmount: 10000,
+    rewardType: 'CASH',
+    rewardValue: 100, // R$ 100 de bônus
+    description: 'R$ 100 de bônus por indicação com empréstimo >= R$ 10.000'
+  }
+];

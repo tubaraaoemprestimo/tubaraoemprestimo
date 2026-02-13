@@ -400,6 +400,7 @@ export const ClientDashboard: React.FC = () => {
           <ActionButton icon={FileText} label="Contratos" onClick={() => navigate('/client/contracts')} />
           <ActionButton icon={TrendingUp} label="Extrato" onClick={() => navigate('/client/statement')} />
           <ActionButton icon={Percent} label="Renegociar" onClick={() => setIsRenegotiateOpen(true)} disabled={userData.balance === 0} />
+          <ActionButton icon={Gift} label="Indicações" onClick={() => navigate('/client/referrals')} />
         </div>
 
         {/* Cards de Acesso: Ofertas, Cupons, Campanhas */}
@@ -441,18 +442,6 @@ export const ClientDashboard: React.FC = () => {
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-black text-xs font-bold rounded-full flex items-center justify-center">{activeCampaigns.length}</span>
             )}
           </button>
-        </div>
-
-        {/* Refer a Friend Banner */}
-        <div onClick={handleShare} className="bg-gradient-to-r from-zinc-900 to-black border border-zinc-800 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-[#D4AF37]/30 transition-colors active:scale-95">
-          <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37] shrink-0">
-            <Gift size={24} />
-          </div>
-          <div>
-            <h3 className="font-bold text-white text-sm">Indique e Ganhe</h3>
-            <p className="text-xs text-zinc-500">Ganhe descontos indicando amigos.</p>
-          </div>
-          <ChevronRight size={16} className="text-zinc-600 ml-auto" />
         </div>
 
         {/* FAB - Solicitar Serviço */}
