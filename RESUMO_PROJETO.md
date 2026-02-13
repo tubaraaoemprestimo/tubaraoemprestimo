@@ -50,23 +50,34 @@
   - Captura localização automaticamente após autenticação (background)
 - **Resultado**: Admin agora visualiza localizações reais em `/admin/geolocation`
 
-### 3. Correções e Melhorias Diversas
+### 3. PIX Automático (Configuração Admin)
+- **Nova página**: `pages/admin/PIXSettings.tsx`
+  - Admin configura chave PIX do sistema
+  - Suporta tipos: CPF, CNPJ, Email, Telefone, Aleatória
+  - Prévia do QR Code em tempo real
+  - Botão copiar chave
+  - Validação antes de salvar
+- **Integração**: Adicionada aba "PAYMENTS" no Settings.tsx
+- **Backend**: Configurações salvas via `apiService.updateSettings()` nos campos:
+  - `pixKey`, `pixKeyType`, `pixReceiverName`
+
+### 4. Correções e Melhorias Diversas
 - **Clientes no Admin**: Filtro padrão `statusFilter = 'ALL'` garantindo que todos apareçam
 - **Antifraude**:
   - Backend recebe e salva `sessionId`, `riskScore`, `riskFactors` do frontend
   - Cooldown de 30 dias após reprovação implementado (verifica CPF)
 - **Build**: TypeScript compila sem erros críticos
 
-### 4. Checklist de Itens Solicitados (Progresso)
+### 5. Checklist de Itens Solicitados (Progresso)
 - [x] Status WhatsApp agendado (backend pronto, falta frontend)
 - [x] Geolocalização funcional (captura + salvamento)
 - [x] Código de indicação no cadastro
 - [x] Gamificação (pontos, recompensas)
+- [x] PIX QR code automático (admin configurado)
 - [ ] Todos campos obrigatórios em TODOS fluxos (auditoria pendente)
 - [ ] OpenFinance API oficial (mock atual, integrar real se API disponível)
-- [ ] PIX QR code automático (admin settings + cliente)
 - [ ] Emails de vencimento (3 dias e no dia) - cron jobs
-- [ ] Notificações pushconsistentes (Firebase + Web Push implementados, faltam triggers)
+- [ ] Notificações push consistentes (Firebase + Web Push implementados, faltam triggers)
 - [ ] Antifraude 100%: limite 2 dispositivos/IPs (parcialmente feito)
 - [ ] Anexar comprovante e admin confirmar (já existe, precisa de fluxo completo)
 
