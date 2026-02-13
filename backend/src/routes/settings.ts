@@ -40,7 +40,7 @@ settingsRouter.put('/', authenticate, requireAdmin, async (req: Request, res: Re
 // GET /api/settings/brand
 settingsRouter.get('/brand', async (_req: Request, res: Response) => {
     try {
-        const brand = await prisma.brandSetting.findFirst();
+        const brand = await prisma.brandSettings.findFirst();
         res.json(brand || {
             systemName: 'TUBARÃO EMPRÉSTIMO',
             primaryColor: '#FF0000',
@@ -56,11 +56,11 @@ settingsRouter.get('/brand', async (_req: Request, res: Response) => {
 settingsRouter.put('/brand', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         const data = req.body;
-        const existing = await prisma.brandSetting.findFirst();
+        const existing = await prisma.brandSettings.findFirst();
         if (existing) {
-            await prisma.brandSetting.update({ where: { id: existing.id }, data });
+            await prisma.brandSettings.update({ where: { id: existing.id }, data });
         } else {
-            await prisma.brandSetting.create({ data });
+            await prisma.brandSettings.create({ data });
         }
         res.json({ success: true });
     } catch (error) {

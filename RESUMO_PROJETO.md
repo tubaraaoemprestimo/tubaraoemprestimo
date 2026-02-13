@@ -522,3 +522,9 @@ Migração completa do frontend para deixar de depender do SDK do Supabase e pas
 
 5. **Real-time:**
    - Substituído Supabase Realtime por **Polling** (30s-60s) para notificações e status.
+
+6. **Correções Críticas Backend (13/02/2026):**
+   - **Fix 500 Internal Server Error**: Correção de mapeamento de alias do Prisma Client (`brandSetting` -> `brandSettings`, `risk_events` -> `riskEvent`).
+   - **Schema Update**: Adicionado `@default(uuid())` e `@updatedAt` em modelos críticos (`BrandSettings`, `RiskEvent`, `TrustedDevice`, `AuditLog`, `SystemSetting`) que causavam falha na criação de registros por falta de ID.
+   - **Build Script**: Atualizado `package.json` para rodar `prisma generate` automaticamente no build e install.
+

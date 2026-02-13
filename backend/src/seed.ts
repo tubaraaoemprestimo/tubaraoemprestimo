@@ -29,15 +29,16 @@ async function main() {
     }
 
     // 2. Criar Configurações Iniciais (Brand)
-    const brand = await prisma.brandSetting.findFirst();
+    const brand = await prisma.brandSettings.findFirst();
     if (!brand) {
-        await prisma.brandSetting.create({
+        await prisma.brandSettings.create({
             data: {
                 systemName: 'TUBARÃO EMPRÉSTIMO',
                 companyName: 'Tubarão Financeira S.A.',
                 primaryColor: '#FF0000',
                 secondaryColor: '#D4AF37',
-                backgroundColor: '#000000'
+                backgroundColor: '#000000',
+                updatedAt: new Date()
             }
         });
         console.log('✅ Brand settings created');

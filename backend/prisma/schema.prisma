@@ -34,7 +34,7 @@ model AiChatbotConfig {
 }
 
 model AuditLog {
-  id        String   @id
+  id        String   @id @default(uuid())
   userId    String   @map("user_id")
   userName  String   @map("user_name")
   action    String
@@ -60,7 +60,7 @@ model Blacklist {
 }
 
 model BrandSettings {
-  id              String   @id
+  id              String   @id @default(uuid())
   systemName      String   @map("system_name")
   logoUrl         String?  @map("logo_url")
   primaryColor    String   @default("#FF0000") @map("primary_color")
@@ -70,7 +70,7 @@ model BrandSettings {
   cnpj            String   @default("")
   address         String   @default("")
   phone           String   @default("")
-  updatedAt       DateTime @map("updated_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("brand_settings")
 }
@@ -362,7 +362,7 @@ model PushSubscription {
 }
 
 model RiskEvent {
-  id        String   @id
+  id        String   @id @default(uuid())
   userId    String?  @map("user_id")
   eventType String   @map("event_type")
   riskLevel String?  @map("risk_level")
@@ -428,10 +428,10 @@ model SecurityBlock {
 }
 
 model SystemSetting {
-  id        String   @id
+  id        String   @id @default(uuid())
   key       String   @unique
   value     String
-  updatedAt DateTime @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_settings")
 }
@@ -463,7 +463,7 @@ model Transaction {
 }
 
 model TrustedDevice {
-  id                String   @id
+  id                String   @id @default(uuid())
   userId            String   @map("user_id")
   deviceFingerprint String   @map("device_fingerprint")
   deviceName        String   @map("device_name")

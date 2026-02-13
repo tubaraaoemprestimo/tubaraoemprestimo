@@ -7,36 +7,47 @@ const base = globalForPrisma.prisma ?? new PrismaClient({
 });
 
 // Compat layer: código legado camelCase/singular -> schema atual snake_case/plural
+// Compat layer: código legado camelCase/singular -> schema atual Prisma Client camelCase
 const aliases: Record<string, string> = {
-    user: 'users',
-    customer: 'customers',
-    loanRequest: 'loan_requests',
-    loan: 'loans',
-    installment: 'installments',
-    loanPackage: 'loan_packages',
-    notification: 'notifications',
-    notificationLog: 'notification_logs',
-    messageTemplate: 'message_templates',
-    pushSubscription: 'push_subscriptions',
-    riskEvent: 'risk_events',
-    trustedDevice: 'trusted_devices',
-    securityBlock: 'security_blocks',
-    securityAlert: 'security_alerts',
-    temporaryLink: 'temporary_links',
-    contractSignature: 'contract_signatures',
-    brandSetting: 'brand_settings',
-    goalSetting: 'goals_settings',
-    goalsSetting: 'goals_settings',
-    systemSetting: 'system_settings',
-    whatsappConfig: 'whatsapp_config',
-    collectionRule: 'collection_rules',
-    campaign: 'campaigns',
-    coupon: 'coupons',
-    aiChatbotConfig: 'ai_chatbot_config',
-    aiChatHistory: 'ai_chat_history',
-    webauthnCredential: 'webauthn_credentials',
-    transaction: 'transactions',
-    auditLog: 'audit_logs'
+    // Singular -> Singular mappings (redundant if property exists, but safe)
+    user: 'user',
+    customer: 'customer',
+    loanRequest: 'loanRequest',
+    loan: 'loan',
+    installment: 'installment',
+    loanPackage: 'loanPackage',
+    notification: 'notification',
+    notificationLog: 'notificationLog',
+    messageTemplate: 'messageTemplate',
+    pushSubscription: 'pushSubscription',
+    riskEvent: 'riskEvent',
+    trustedDevice: 'trustedDevice',
+    securityBlock: 'securityBlock',
+    securityAlert: 'securityAlert',
+    temporaryLink: 'temporaryLink',
+    contractSignature: 'contractSignature',
+
+    // Legacy singular -> Actual Model Property (Plural names in schema -> Plural properties in client)
+    brandSetting: 'brandSettings', // Model BrandSettings
+    goalsSetting: 'goalsSettings', // Model GoalsSettings
+    goalSetting: 'goalsSettings',  // Alias variant
+
+    // Other mappings
+    systemSetting: 'systemSetting',
+    whatsappConfig: 'whatsappConfig',
+    collectionRule: 'collectionRule',
+    campaign: 'campaign',
+    coupon: 'coupon',
+    aiChatbotConfig: 'aiChatbotConfig',
+    aiChatHistory: 'aiChatHistory',
+    webauthnCredential: 'webauthnCredential',
+    transaction: 'transaction',
+    auditLog: 'auditLog',
+    paymentReceipt: 'paymentReceipt',
+    referral: 'referral',
+    creditScore: 'creditScore',
+    incomeAnalysis: 'incomeAnalysis',
+    openFinanceConsent: 'openFinanceConsent'
 };
 
 export const prisma: any = new Proxy(base as any, {
