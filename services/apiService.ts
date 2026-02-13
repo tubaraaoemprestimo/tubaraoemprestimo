@@ -171,12 +171,14 @@ export const apiService = {
             };
         },
 
-        async signUp(creds: { email: string; password: string; name?: string; phone?: string }) {
-            const { data, error } = await api.auth.signUp({
+        async signUp(creds: { email: string; password: string; name?: string; phone?: string; referralCode?: string }) {
+            const payload = {
                 ...creds,
                 email: normalizeEmail(creds.email)
-            });
-            return { data, error };
+            };
+            const { data, error } = await api.post('/auth/register', payload);
+            if (error) return { data: null, error: error };
+            return { data, error: null };
         },
 
         async signOut() {
@@ -561,6 +563,18 @@ export const apiService = {
         const { data, error } = await api.get('/campaigns/active');
         if (error) return [];
         return data || [];
+    },
+
+    async sendCampaign(id: string) {
+        const { data, error } = await api.post('/campaigns/send', { type: 'campaign', id });
+        if (error) throw new Error(error.error || 'Erro ao disparar campanha');
+        return data;
+    },
+
+    async sendCouponNotification(id: string) {
+        const { data, error } = await api.post('/campaigns/send', { type: 'coupon', id });
+        if (error) throw new Error(error.error || 'Erro ao disparar cupom');
+        return data;
     },
 
     // ============= GOALS =============

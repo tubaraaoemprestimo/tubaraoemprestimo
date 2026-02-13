@@ -11,8 +11,29 @@ customersRouter.get('/', async (req: Request, res: Response) => {
         const customers = await prisma.customer.findMany({
             orderBy: { joinedAt: 'desc' }
         });
-        res.json(customers);
+
+        // Map to Frontend Interface (Customer type)
+        const mapped = customers.map(c => ({
+            ...c,
+            // Map flat fields to nested objects
+            preApprovedOffer: c.preApprovedAmount ? {
+                amount: c.preApprovedAmount,
+                createdAt: c.preApprovedAt || new Date().toISOString()
+            } : undefined,
+            customRates: (c.monthlyInterestRate || c.lateFixedFee || c.lateInterestDaily || c.lateInterestMonthly) ? {
+                monthlyInterestRate: c.monthlyInterestRate,
+                lateFixedFee: c.lateFixedFee,
+                lateInterestDaily: c.lateInterestDaily,
+                lateInterestMonthly: c.lateInterestMonthly
+            } : undefined,
+            // Ensure numbers are numbers
+            latitude: c.latitude ? Number(c.latitude) : undefined,
+            longitude: c.longitude ? Number(c.longitude) : undefined,
+        }));
+
+        res.json(mapped);
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Erro ao buscar clientes' });
     }
 });
@@ -41,7 +62,8 @@ customersRouter.put('/location', async (req: Request, res: Response) => {
                 longitude: req.body?.longitude ?? null,
                 city: req.body?.city ?? customer.city,
                 state: req.body?.state ?? customer.state,
-                address: req.body?.address ?? customer.address
+                address: req.body?.address ?? customer.address,
+                locationUpdatedAt: new Date()
             }
         });
 
@@ -66,7 +88,9 @@ customersRouter.get('/locations', requireAdmin, async (_req: Request, res: Respo
                 longitude: true,
                 city: true,
                 state: true,
-                address: true
+                address: true,
+                phone: true,
+                locationUpdatedAt: true
             },
             orderBy: { joinedAt: 'desc' }
         });
@@ -74,12 +98,13 @@ customersRouter.get('/locations', requireAdmin, async (_req: Request, res: Respo
         res.json(rows.map((r) => ({
             customer_email: r.email,
             customer_name: r.name,
+            phone: r.phone,
             latitude: r.latitude,
             longitude: r.longitude,
             city: r.city,
             state: r.state,
             address: r.address,
-            updated_at: new Date().toISOString()
+            updated_at: r.locationUpdatedAt || new Date().toISOString()
         })));
     } catch {
         res.status(500).json({ error: 'Erro ao buscar localizacoes' });
@@ -98,12 +123,13 @@ customersRouter.get('/locations/:email', requireAdmin, async (req: Request, res:
         res.json({
             customer_email: customer.email,
             customer_name: customer.name,
+            phone: customer.phone,
             latitude: customer.latitude,
             longitude: customer.longitude,
             city: customer.city,
             state: customer.state,
             address: customer.address,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString() // Placeholder
         });
     } catch {
         res.status(500).json({ error: 'Erro ao buscar localizacao' });

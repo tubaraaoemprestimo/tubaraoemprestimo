@@ -74,14 +74,41 @@ model Customer {
   installmentOffer     Json?   @map("installment_offer")
   joinedAt          DateTime  @default(now()) @map("joined_at")
 
+  locationUpdatedAt DateTime? @map("location_updated_at")
+
   // Relations
   user              User?      @relation(fields: [userId], references: [id])
   loanRequests      LoanRequest[]
   loans             Loan[]
   notifications     Notification[]
   coupons           Coupon[]
+  referralsMade     Referral[] @relation("ReferralsMade")
+  referralReceived  Referral?  @relation("ReferralsReceived")
 
   @@map("customers")
+}
+
+// ============= REFERRALS =============
+
+model Referral {
+  id                 String   @id @default(uuid())
+  referrerCustomerId String   @map("referrer_customer_id")
+  referrerCode       String   @map("referrer_code")
+  referredCustomerId String   @map("referred_customer_id")
+  referredName       String   @map("referred_name")
+  referredCpf        String?  @map("referred_cpf")
+  referredPhone      String   @map("referred_phone")
+  status             String   @default("PENDING") // PENDING | APPROVED | REJECTED | BONUS_PAID
+  bonusAmount        Float    @default(0) @map("bonus_amount")
+  bonusPaidAt        DateTime? @map("bonus_paid_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  approvedAt         DateTime? @map("approved_at")
+  approvedBy         String?  @map("approved_by")
+
+  referrer           Customer @relation("ReferralsMade", fields: [referrerCustomerId], references: [id])
+  referred           Customer @relation("ReferralsReceived", fields: [referredCustomerId], references: [id])
+
+  @@map("referrals")
 }
 
 // ============= LOAN REQUESTS =============

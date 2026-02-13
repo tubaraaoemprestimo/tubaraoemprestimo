@@ -183,17 +183,17 @@ export const autoNotificationService = {
                 customer.phone,
                 isLimpaNome
                     ? `📝 *SOLICITAÇÃO RECEBIDA!*\n\n` +
-                      `Olá ${customer.name.split(' ')[0]}!\n\n` +
-                      `Recebemos sua solicitação do serviço *Limpa Nome*.\n\n` +
-                      `⏳ Nossa equipe está analisando e em breve você receberá uma resposta.\n\n` +
-                      `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
-                      `_Tubarão Empréstimos 🦈_`
+                    `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                    `Recebemos sua solicitação do serviço *Limpa Nome*.\n\n` +
+                    `⏳ Nossa equipe está analisando e em breve você receberá uma resposta.\n\n` +
+                    `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                    `_Tubarão Empréstimos 🦈_`
                     : `📝 *SOLICITAÇÃO RECEBIDA!*\n\n` +
-                      `Olá ${customer.name.split(' ')[0]}!\n\n` +
-                      `Recebemos sua solicitação de empréstimo no valor de *R$ ${formattedAmount}*.\n\n` +
-                      `⏳ Nossa equipe está analisando e em breve você receberá uma resposta.\n\n` +
-                      `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
-                      `_Tubarão Empréstimos 🦈_`
+                    `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                    `Recebemos sua solicitação de empréstimo no valor de *R$ ${formattedAmount}*.\n\n` +
+                    `⏳ Nossa equipe está analisando e em breve você receberá uma resposta.\n\n` +
+                    `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                    `_Tubarão Empréstimos 🦈_`
             ).catch(console.error);
         }
 
@@ -583,17 +583,15 @@ export const autoNotificationService = {
     // ============================================
 
     /**
-     * Envia uma campanha para todos os clientes via WhatsApp
-     */
-    /**
-     * Dispara automação de CAMPANHA (WhatsApp + Email + Push)
+     * Dispara automação de CAMPANHA (WhatsApp + Email)
+     * Usa o novo endpoint /campaigns/send do backend
      */
     triggerManualCampaign: async (campaignId: string): Promise<{ success: boolean; results?: any; error?: string }> => {
         try {
-            const { data, error } = await api.post<any>('/auto-notifications/campaign', { campaignId });
+            const { data, error } = await api.post<any>('/campaigns/send', { type: 'campaign', id: campaignId });
 
             if (error) throw error;
-            return { success: true, results: data?.results };
+            return { success: true, results: { campaigns: data } };
         } catch (error: any) {
             console.error('[Auto] Campaign error:', error);
             return { success: false, error: error.message || 'Erro ao processar campanha' };
@@ -601,14 +599,15 @@ export const autoNotificationService = {
     },
 
     /**
-     * Dispara automação de CUPOM (WhatsApp + Email + Push)
+     * Dispara automação de CUPOM (WhatsApp + Email)
+     * Usa o novo endpoint /campaigns/send do backend
      */
     triggerManualCoupon: async (couponId: string): Promise<{ success: boolean; results?: any; error?: string }> => {
         try {
-            const { data, error } = await api.post<any>('/auto-notifications/coupon', { couponId });
+            const { data, error } = await api.post<any>('/campaigns/send', { type: 'coupon', id: couponId });
 
             if (error) throw error;
-            return { success: true, results: data?.results };
+            return { success: true, results: { coupons: data } };
         } catch (error: any) {
             console.error('[Auto] Coupon error:', error);
             return { success: false, error: error.message || 'Erro ao processar cupom' };

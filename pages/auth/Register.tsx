@@ -21,6 +21,7 @@ const Register: React.FC = () => {
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [referralCode, setReferralCode] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -66,7 +67,8 @@ const Register: React.FC = () => {
                 email,
                 password,
                 name,
-                phone: cleanPhone
+                phone: cleanPhone,
+                referralCode
             });
 
             if (error) {
@@ -209,6 +211,23 @@ const Register: React.FC = () => {
                         {confirmPassword.length > 0 && password !== confirmPassword && (
                             <p className="text-red-400 text-xs mt-1">As senhas não conferem</p>
                         )}
+                    </div>
+
+                    {/* Código de Indicação (Opcional) */}
+                    <div>
+                        <label className="block text-sm font-bold text-zinc-400 mb-1">Código de Indicação (Opcional)</label>
+                        <div className="relative">
+                            <ShieldCheck size={18} className="text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="text"
+                                autoComplete="off"
+                                value={referralCode}
+                                onChange={e => setReferralCode(e.target.value.toUpperCase())}
+                                placeholder="Código do amigo que te indicou"
+                                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-600 focus:border-[#D4AF37] outline-none transition-all uppercase"
+                            />
+                        </div>
+                        <p className="text-zinc-600 text-xs mt-1">Insira o código para ganhar benefícios exclusivos.</p>
                     </div>
 
                     {/* Botão Registrar */}

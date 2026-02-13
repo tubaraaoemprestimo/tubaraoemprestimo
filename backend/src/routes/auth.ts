@@ -14,7 +14,7 @@ export const authRouter = Router();
 // ============================================
 authRouter.post('/register', async (req: Request, res: Response) => {
     try {
-        const { email, password, name, phone, role } = req.body;
+        const { email, password, name, phone, role, referralCode } = req.body;
 
         if (!email || !password || !name) {
             res.status(400).json({ error: 'Email, senha e nome são obrigatórios' });
@@ -48,8 +48,10 @@ authRouter.post('/register', async (req: Request, res: Response) => {
         if ((user.role || 'CLIENT') === 'CLIENT') {
             try {
                 const existingCustomer = await prisma.customer.findFirst({ where: { OR: [{ userId: user.id }, { email: user.email }] } });
+                let customerId = existingCustomer?.id;
+
                 if (!existingCustomer) {
-                    await prisma.customer.create({
+                    const newCustomer = await prisma.customer.create({
                         data: {
                             userId: user.id,
                             name: user.name,
@@ -58,9 +60,12 @@ authRouter.post('/register', async (req: Request, res: Response) => {
                             // Fix: Add random suffix to prevent unique constraint violation on CPF tests
                             cpf: `REG_${user.id.substring(0, 8)}_${Date.now().toString().slice(-4)}`,
                             status: 'ACTIVE',
-                            source: 'MANUAL'
+                            source: 'MANUAL',
+                            // Generate own referral code: First name + random 4 digits
+                            referralCode: `${user.name.split(' ')[0].toUpperCase()}${Math.floor(1000 + Math.random() * 9000)}`
                         }
                     });
+                    customerId = newCustomer.id;
                 } else {
                     // Update userId if it's missing or different (re-linking)
                     await prisma.customer.update({
@@ -68,6 +73,27 @@ authRouter.post('/register', async (req: Request, res: Response) => {
                         data: { userId: user.id }
                     });
                 }
+
+                // Handle Referral Code if provided
+                if (referralCode && customerId) {
+                    const referrer = await prisma.customer.findFirst({
+                        where: { referralCode: referralCode }
+                    });
+
+                    if (referrer) {
+                        await prisma.referral.create({
+                            data: {
+                                referrerCustomerId: referrer.id,
+                                referrerCode: referralCode,
+                                referredCustomerId: customerId,
+                                referredName: user.name,
+                                referredPhone: user.phone || '',
+                                status: 'PENDING'
+                            }
+                        });
+                    }
+                }
+
             } catch (err) {
                 console.error('Failed to link customer in register:', err);
                 // Non-critical, continue

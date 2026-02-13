@@ -1,6 +1,44 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
+import { emailService } from '../services/email';
+import axios from 'axios';
+
+// ============ Helpers ============
+
+async function sendWhatsAppNotification(phone: string, message: string) {
+    try {
+        const config = await prisma.whatsappConfig.findFirst();
+        if (!config || !config.isConnected) return;
+
+        let number = phone.replace(/\D/g, '');
+        if (!number.startsWith('55') && number.length >= 10) number = '55' + number;
+
+        await axios.post(`${config.apiUrl}/message/sendText/${config.instanceName}`, {
+            number,
+            options: { delay: 1200, presence: 'composing', linkPreview: false },
+            textMessage: { text: message }
+        }, { headers: { apikey: config.apiKey }, timeout: 15000 });
+    } catch (e: any) {
+        console.error('[LoanRequests] WhatsApp notification failed:', e.message);
+    }
+}
+
+function brandedEmailHtml(body: string): string {
+    return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #000; color: #fff; padding: 30px; border-radius: 12px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <h1 style="color: #D4AF37; font-size: 24px;">🦈 Tubarão Empréstimos</h1>
+        </div>
+        <div style="color: #ccc; font-size: 15px; line-height: 1.6;">
+            ${body}
+        </div>
+        <hr style="border-color: #333; margin: 25px 0;" />
+        <p style="color: #666; font-size: 12px; text-align: center;">
+            Tubarão Empréstimos — Plataforma de Crédito Premium
+        </p>
+    </div>`;
+}
 
 export const loanRequestsRouter = Router();
 loanRequestsRouter.use(authenticate);
@@ -217,6 +255,53 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
             });
         }
 
+        // ====== NOTIFICAÇÕES AUTOMÁTICAS ======
+        const amountFormatted = request.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // Email de aprovação
+        if (request.email) {
+            const html = brandedEmailHtml(`
+                <h2 style="color: #4CAF50;">✅ Empréstimo Aprovado!</h2>
+                <p>Olá, <strong>${request.clientName}</strong>!</p>
+                <p>Seu pedido de empréstimo foi <strong style="color: #4CAF50;">APROVADO</strong>!</p>
+                <div style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Valor:</strong> ${amountFormatted}</p>
+                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Parcelas:</strong> ${request.installments}x</p>
+                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Tipo:</strong> ${request.profileType || 'Empréstimo'}</p>
+                </div>
+                <p>Acesse o aplicativo para ver os detalhes e acompanhar suas parcelas.</p>
+                <div style="text-align: center; margin: 20px 0;">
+                    <a href="https://www.tubaraoemprestimo.com.br" style="background: #D4AF37; color: #000; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Acessar App</a>
+                </div>
+            `);
+            emailService.send(request.email, '✅ Empréstimo Aprovado — Tubarão Empréstimos', html).catch(() => { });
+        }
+
+        // WhatsApp de aprovação
+        if (request.phone) {
+            const waMsg = `✅ *EMPRÉSTIMO APROVADO!*\n\n` +
+                `Olá, ${request.clientName}!\n\n` +
+                `Seu pedido de empréstimo foi *APROVADO*! 🎉\n\n` +
+                `💰 *Valor:* ${amountFormatted}\n` +
+                `📊 *Parcelas:* ${request.installments}x\n\n` +
+                `Acesse o app para mais detalhes:\nhttps://www.tubaraoemprestimo.com.br\n\n` +
+                `_Tubarão Empréstimos 🦈_`;
+            sendWhatsAppNotification(request.phone, waMsg);
+        }
+
+        // Notificação no sistema
+        if (request.customerId) {
+            await prisma.notification.create({
+                data: {
+                    customerId: request.customerId,
+                    customerEmail: request.email,
+                    title: '✅ Empréstimo Aprovado',
+                    message: `Seu empréstimo de ${amountFormatted} em ${request.installments}x foi aprovado!`,
+                    type: 'SUCCESS'
+                }
+            }).catch(() => { });
+        }
+
         res.json({ success: true });
     } catch (error: any) {
         console.error('[LoanRequests] Approve error:', error);
@@ -227,10 +312,49 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
 // PUT /api/loan-requests/:id/reject — Rejeitar
 loanRequestsRouter.put('/:id/reject', requireAdmin, async (req: Request, res: Response) => {
     try {
-        await prisma.loanRequest.update({
+        const loanRequest = await prisma.loanRequest.update({
             where: { id: req.params.id as string },
             data: { status: 'REJECTED' }
         });
+
+        // ====== NOTIFICAÇÕES AUTOMÁTICAS ======
+
+        // Email de rejeição
+        if (loanRequest.email) {
+            const html = brandedEmailHtml(`
+                <h2 style="color: #FF6B6B;">Solicitação Não Aprovada</h2>
+                <p>Olá, <strong>${loanRequest.clientName}</strong>.</p>
+                <p>Infelizmente sua solicitação de empréstimo não foi aprovada neste momento.</p>
+                <p style="color: #aaa;">Isso pode acontecer por diversos motivos. Você pode tentar novamente após 30 dias ou entrar em contato conosco para mais informações.</p>
+                <div style="text-align: center; margin: 20px 0;">
+                    <a href="https://www.tubaraoemprestimo.com.br" style="background: #D4AF37; color: #000; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Acessar App</a>
+                </div>
+            `);
+            emailService.send(loanRequest.email, 'Atualização sobre sua solicitação — Tubarão Empréstimos', html).catch(() => { });
+        }
+
+        // WhatsApp de rejeição
+        if (loanRequest.phone) {
+            const waMsg = `Olá, ${loanRequest.clientName}.\n\n` +
+                `Informamos que sua solicitação de empréstimo não foi aprovada neste momento.\n\n` +
+                `Você pode tentar novamente após 30 dias ou entrar em contato conosco para mais informações.\n\n` +
+                `_Tubarão Empréstimos 🦈_`;
+            sendWhatsAppNotification(loanRequest.phone, waMsg);
+        }
+
+        // Notificação no sistema
+        if (loanRequest.customerId) {
+            await prisma.notification.create({
+                data: {
+                    customerId: loanRequest.customerId,
+                    customerEmail: loanRequest.email,
+                    title: 'Solicitação Atualizada',
+                    message: 'Sua solicitação de empréstimo foi atualizada. Acesse o app para mais detalhes.',
+                    type: 'INFO'
+                }
+            }).catch(() => { });
+        }
+
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Erro ao rejeitar' });

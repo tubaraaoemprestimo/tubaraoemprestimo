@@ -1,10 +1,30 @@
 # 🦈 Tubarão Empréstimos — Resumo do Projeto
 
-> **Última atualização:** 2026-02-10 (v2)
+> **Última atualização:** 2026-02-12 (v3 - feature/referral-geo-fixes)
 > **Repositório:** https://github.com/tubaraaoemprestimo/tubaraoemprestimo.git
 > **Produção:** https://www.tubaraoemprestimo.com.br
-> **Stack:** React + TypeScript + Vite + Supabase
-> **Deploy:** Vercel (conectado ao GitHub, branch `main`)
+> **Stack:** React + TypeScript + Vite + Node.js (Express/Prisma)
+> **Deploy:** Vercel (Front) + Oracle Cloud (Back)
+
+---
+
+## 📝 Últimas Alterações (12/02/2026)
+
+### 1. Sistema de Indicações & Gamificação
+- **Backend**:
+  - Novo modelo `Referral` no Prisma Schema para rastrear indicações.
+  - Atualização no endpoint `POST /register`: aceita `referralCode` e cria registro `Referral` com status `PENDING`.
+  - Atualização no `Customer`: campo `referralCode` (gerado automaticamente no cadastro) e relações com `Referral`.
+- **Frontend**:
+  - Tela de Registro (`Register.tsx`) agora inclui campo "Código de Indicação" (opcional).
+  - `apiService.signUp` atualizado para enviar `referralCode`.
+
+### 2. Correções Críticas & Melhorias
+- **Admin / Clientes**:
+  - Corrigido `GET /api/customers`: o backend agora mapeia os campos do Prisma para a estrutura aninhada que o frontend espera (`preApprovedOffer`, `customRates`). Isso corrige a lista de clientes vazia ou quebrada no Admin.
+- **Geolocalização**:
+  - Adicionado campo `locationUpdatedAt` no `Customer` para registrar o momento exato da captura.
+  - API `/locations` ajustada para retornar a data real da atualização, permitindo que o Admin veja "última localização em X minutos atrás" corretamente.
 
 ---
 
