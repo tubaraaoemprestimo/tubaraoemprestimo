@@ -97,6 +97,12 @@
   - Frontend `npm run build` ✅
   - Backend `npm run build` ✅
 
+### 7. Garantias solicitadas (13/02/2026)
+- **Aba Clientes**: endpoint `/api/customers` ajustado para consulta SQL direta na tabela real (`customers`) com mapeamento para o formato esperado no frontend.
+- **Geolocalização**:
+  - endpoint `/api/customers/location` ajustado para salvar latitude/longitude/cidade/estado/endereço com SQL compatível com schema real.
+  - endpoints de listagem de localização (`/api/customers/locations` e `/api/customers/locations/:email`) ajustados para leitura consistente.
+
 ---
 
 ## 📂 Estrutura do Projeto
