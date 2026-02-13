@@ -491,10 +491,10 @@ Sem essa migration, o sistema ainda funciona (fallback legado), mas a separaçã
 
 ---
 
-## 🔄 Migração Supabase -> API Própria (2026-02-12)
+## 🔄 Migração Supabase -> API Própria (12/02/2026 - 13/02/2026)
 
 ### Visão Geral
-Migração completa do frontend para deixar de depender do SDK do Supabase e passar a utilizar a API própria (Node.js + Prisma + PostgreSQL) hospedada na VPS Oracle.
+Migração completa do frontend para deixar de depender do SDK do Supabase e passar a utilizar a API própria (Node.js + Prisma + PostgreSQL) hospedada na VPS Oracle. Otimizações de performance no frontend com Tailwind CSS CLI e correções de infraestrutura backend.
 
 ### Alterações Principais
 1. **Frontend Desacoplado:**
@@ -502,19 +502,23 @@ Migração completa do frontend para deixar de depender do SDK do Supabase e pas
    - Substituição de `supabaseService.ts` por `apiService.ts` (100% via `apiClient`).
    - Todos os serviços (`auth`, `storage`, `db`) agora passam pela API.
 
-2. **Upload de Arquivos:**
-   - Migrado de Supabase Storage para Endpoint Local/S3 via API (`POST /upload`).
-   - `PaymentReceiptUpload`, `contractPdfService`, `Wizard` e `StatusScheduler` atualizados.
+2. **Performance Frontend (Tailwind CSS):**
+   - Migração do Tailwind CSS CDN para **Tailwind CSS CLI** (Build-time).
+   - Remoção de scripts bloqueantes no `<head>`.
+   - Criação de `tailwind.config.js`, `postcss.config.js` e `index.css`.
+   - Melhoria significativa no tempo de carregamento e eliminação do FOUC (Flash of Unstyled Content).
 
-3. **Contratos PDF:**
+3. **Backend & Infraestrutura (VPS Oracle):**
+   - Correção de crash loop no backend devido a dependência faltante (`cron`).
+   - Sincronização do esquema do banco de dados (`npx prisma db push`).
+   - Serviço API restabelecido e estável em `app-api.tubaraoemprestimo.com.br` (produção).
+   - Configuração de CORS ajustada para permitir requisições do novo domínio.
+
+4. **Upload de Arquivos & Contratos:**
+   - Migrado de Supabase Storage para Endpoint Local via API (`POST /upload`).
+   - `PaymentReceiptUpload`, `contractPdfService`, `Wizard` e `StatusScheduler` atualizados.
    - Novo endpoint `PUT /api/loan-requests/:id/contract` para salvar URL do PDF.
-   - Novo endpoint `GET /api/loan-requests/latest` para buscar última solicitação.
    - Schema do banco atualizado com campo `contractPdfUrl`.
 
-4. **Real-time:**
-   - Substituído Supabase Realtime por **Polling** (30s-60s) em `themeService` e `notificationService`.
-
-5. **Backend (VPS Oracle):**
-   - Banco de dados PostgreSQL rodando via Docker.
-   - API Node.js atualizada com novos endpoints.
-   - Schema Prisma sincronizado (`contractPdfUrl` adicionado).
+5. **Real-time:**
+   - Substituído Supabase Realtime por **Polling** (30s-60s) para notificações e status.
