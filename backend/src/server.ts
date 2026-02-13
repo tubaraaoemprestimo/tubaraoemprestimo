@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -27,6 +27,7 @@ import { whatsappStatusRouter } from './routes/whatsappStatus';
 import { referralsRouter } from './routes/referrals';
 import { communicationRouter } from './routes/communication';
 import { adminRouter } from './routes/admin';
+import { initCronJobs } from './cron/installmentReminders';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -83,7 +84,7 @@ app.get('/api/health', (_req, res) => {
 
 // 404
 app.use((_req, res) => {
-    res.status(404).json({ error: 'Rota não encontrada' });
+    res.status(404).json({ error: 'Rota nÃ£o encontrada' });
 });
 
 // Error handler
@@ -97,10 +98,13 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 // ============= START =============
 
+initCronJobs();
+
 app.listen(PORT, () => {
-    console.log(`🦈 Tubarão Backend rodando na porta ${PORT}`);
-    console.log(`📍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🌐 CORS: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
+    console.log(`ðŸ¦ˆ TubarÃ£o Backend rodando na porta ${PORT}`);
+    console.log(`ðŸ“ Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`ðŸŒ CORS: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
 });
 
 export default app;
+

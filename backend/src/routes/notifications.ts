@@ -31,7 +31,7 @@ notificationsRouter.get('/', async (req: Request, res: Response) => {
 
         const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
         const sql = `SELECT id, title, message, type, is_read, created_at, customer_email FROM notifications ${where} ORDER BY created_at DESC LIMIT ${Number.isFinite(limit) ? limit : 50}`;
-        const rows = await prisma.$queryRawUnsafe<any[]>(sql);
+        const rows = await prisma.$queryRawUnsafe(sql);
 
         const payload = (rows || []).map((n: any) => ({
             id: n.id,
@@ -68,7 +68,7 @@ notificationsRouter.get('/count', async (req: Request, res: Response) => {
 
         const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
         const sql = `SELECT COUNT(*)::int AS count FROM notifications ${where}`;
-        const rows = await prisma.$queryRawUnsafe<any[]>(sql);
+        const rows = await prisma.$queryRawUnsafe(sql);
         res.json({ count: rows?.[0]?.count || 0 });
     } catch {
         res.json({ count: 0 });
@@ -215,3 +215,4 @@ notificationsRouter.delete('/coupons/:id', requireAdmin, async (req: Request, re
         res.status(500).json({ error: 'Erro ao deletar cupom' });
     }
 });
+

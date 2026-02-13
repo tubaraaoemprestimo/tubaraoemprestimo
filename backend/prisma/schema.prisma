@@ -1,643 +1,465 @@
-// Prisma Schema — Tubarão Empréstimos
-// Migração completa do Supabase PostgreSQL
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://postgres:tubarao123@localhost:5432/tubarao_db"
 }
 
-// ============= AUTH & USERS =============
-
-model User {
-  id         String   @id @default(uuid())
-  authId     String?  @unique @map("auth_id")
-  name       String
-  email      String   @unique
-  password   String   // bcrypt hash
-  role       String   @default("CLIENT") // ADMIN | CLIENT
-  phone      String?
-  address    String?
-  city       String?
-  neighborhood String?
-  avatarUrl  String?  @map("avatar_url")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  // Relations
-  customers       Customer[]
-  loanRequests    LoanRequest[]
-  riskEvents      RiskEvent[]
-  trustedDevices  TrustedDevice[]
-  securityBlocks  SecurityBlock[]
-  webauthnCreds   WebauthnCredential[]
-  pushSubs        PushSubscription[]
-
-  @@map("users")
+model ai_chat_history {
+  id         String   @id
+  phone      String
+  role       String
+  content    String
+  metadata   Json?
+  created_at DateTime @default(now())
 }
 
-// ============= CUSTOMERS / CRM =============
-
-model Customer {
-  id                String    @id @default(uuid())
-  userId            String?   @map("user_id")
-  name              String
-  cpf               String    @unique
-  email             String
-  phone             String
-  status            String    @default("ACTIVE") // ACTIVE | BLOCKED
-  internalScore     Int       @default(0) @map("internal_score")
-  totalDebt         Float     @default(0) @map("total_debt")
-  activeLoansCount  Int       @default(0) @map("active_loans_count")
-  address           String?
-  neighborhood      String?
-  city              String?
-  state             String?
-  zipCode           String?   @map("zip_code")
-  latitude          Float?
-  longitude         Float?
-  monthlyIncome     Float?    @map("monthly_income")
-  preApprovedAmount Float?    @map("pre_approved_amount")
-  preApprovedAt     DateTime? @map("pre_approved_at")
-  instagram         String?
-  source            String?   @default("MANUAL") // MANUAL | WHATSAPP | IMPORT
-  profilePic        String?   @map("profile_pic")
-  birthDate         String?   @map("birth_date")
-  // Rates personalizados
-  monthlyInterestRate  Float?  @map("monthly_interest_rate")
-  lateFixedFee         Float?  @map("late_fixed_fee")
-  lateInterestDaily    Float?  @map("late_interest_daily")
-  lateInterestMonthly  Float?  @map("late_interest_monthly")
-  // Oferta parcelamento
-  installmentOffer     Json?   @map("installment_offer")
-  joinedAt          DateTime  @default(now()) @map("joined_at")
-
-  locationUpdatedAt DateTime? @map("location_updated_at")
-
-  // Relations
-  user              User?      @relation(fields: [userId], references: [id])
-  loanRequests      LoanRequest[]
-  loans             Loan[]
-  notifications     Notification[]
-  coupons           Coupon[]
-  referralsMade     Referral[] @relation("ReferralsMade")
-  referralReceived  Referral?  @relation("ReferralsReceived")
-  pushSubscriptions PushSubscription[]
-
-  @@map("customers")
+model ai_chatbot_config {
+  id                  String   @id
+  enabled             Boolean  @default(false)
+  provider            String   @default("gemini")
+  api_key             String   @default("")
+  system_prompt       String   @default("")
+  auto_reply_enabled  Boolean  @default(true)
+  working_hours_start String   @default("08:00")
+  working_hours_end   String   @default("18:00")
+  transfer_keywords   String[] @default(["atendente", "humano", "pessoa"])
+  updated_at          DateTime
 }
 
-model PushSubscription {
-  id         String   @id @default(uuid())
-  customerId String   @map("customer_id")
-  endpoint   String   @unique
-  keys       Json     // { p256dh: string, auth: string }
-  userAgent  String?  @map("user_agent")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@map("push_subscriptions")
+model audit_logs {
+  id         String   @id
+  user_id    String
+  user_name  String
+  action     String
+  entity     String
+  entity_id  String?
+  details    String?
+  ip_address String?
+  timestamp  DateTime @default(now())
 }
 
-// ============= REFERRALS =============
-
-model Referral {
-  id                 String   @id @default(uuid())
-  referrerCustomerId String   @map("referrer_customer_id")
-  referrerCode       String   @map("referrer_code")
-  referredCustomerId String   @map("referred_customer_id")
-  referredName       String   @map("referred_name")
-  referredCpf        String?  @map("referred_cpf")
-  referredPhone      String   @map("referred_phone")
-  status             String   @default("PENDING") // PENDING | APPROVED | REJECTED | BONUS_PAID
-  bonusAmount        Float    @default(0) @map("bonus_amount")
-  bonusPaidAt        DateTime? @map("bonus_paid_at")
-  createdAt          DateTime @default(now()) @map("created_at")
-  approvedAt         DateTime? @map("approved_at")
-  approvedBy         String?  @map("approved_by")
-
-  referrer           Customer @relation("ReferralsMade", fields: [referrerCustomerId], references: [id])
-  referred           Customer @relation("ReferralsReceived", fields: [referredCustomerId], references: [id])
-
-  @@map("referrals")
+model blacklist {
+  id       String   @id
+  cpf      String   @unique
+  name     String
+  reason   String
+  added_by String
+  active   Boolean  @default(true)
+  added_at DateTime @default(now())
 }
 
-// ============= LOAN REQUESTS =============
+model brand_settings {
+  id               String   @id
+  system_name      String
+  logo_url         String?
+  primary_color    String   @default("#FF0000")
+  secondary_color  String   @default("#D4AF37")
+  background_color String   @default("#000000")
+  company_name     String   @default("")
+  cnpj             String   @default("")
+  address          String   @default("")
+  phone            String   @default("")
+  updated_at       DateTime
+}
 
-model LoanRequest {
-  id                    String   @id @default(uuid())
-  customerId            String?  @map("customer_id")
-  userId                String?  @map("user_id")
-  clientName            String   @map("client_name")
-  cpf                   String
+model campaigns {
+  id          String   @id
+  title       String
+  description String
+  image_url   String?
+  link        String?
+  start_date  DateTime
+  end_date    DateTime
+  frequency   String   @default("ONCE")
+  active      Boolean  @default(true)
+  priority    Int      @default(0)
+  created_at  DateTime @default(now())
+}
+
+model collection_rules {
+  id               String   @id
+  days_offset      Int
+  type             String
+  message_template String
+  active           Boolean  @default(true)
+  created_at       DateTime @default(now())
+}
+
+model contract_signatures {
+  id              String   @id
+  loan_request_id String
+  signature_url   String
+  ip_address      String?
+  user_agent      String?
+  signed_at       DateTime @default(now())
+}
+
+model coupons {
+  id             String     @id
+  code           String     @unique
+  discount       Float
+  description    String
+  customer_id    String?
+  customer_email String?
+  expires_at     DateTime
+  active         Boolean    @default(true)
+  used_at        DateTime?
+  created_at     DateTime   @default(now())
+  customers      customers? @relation(fields: [customer_id], references: [id])
+}
+
+model customers {
+  id                    String          @id
+  user_id               String?
+  name                  String
+  cpf                   String          @unique
   email                 String
   phone                 String
-  amount                Float    @default(0)
-  installments          Int      @default(1)
-  status                String   @default("PENDING") // PENDING | WAITING_DOCS | APPROVED | REJECTED
-  profileType           String?  @map("profile_type") // CLT | AUTONOMO | MOTO | GARANTIA | LIMPA_NOME | INVESTIDOR
-  referralCode          String?  @map("referral_code")
-  fatherPhone           String?  @map("father_phone")
-  motherPhone           String?  @map("mother_phone")
-  spousePhone           String?  @map("spouse_phone")
+  status                String          @default("ACTIVE")
+  internal_score        Int             @default(0)
+  total_debt            Float           @default(0)
+  active_loans_count    Int             @default(0)
   address               String?
   neighborhood          String?
   city                  String?
   state                 String?
-  zipCode               String?  @map("zip_code")
-  birthDate             String?  @map("birth_date")
-  preferredDueDay       Int?     @map("preferred_due_day")
-  instagram             String?
-  monthlyIncome         Float?   @map("monthly_income")
-  // Documentos
-  selfieUrl             String?  @map("selfie_url")
-  idCardUrl             String?  @map("id_card_url")
-  idCardBackUrl         String?  @map("id_card_back_url")
-  proofOfAddressUrl     String?  @map("proof_of_address_url")
-  proofIncomeUrl        String?  @map("proof_income_url")
-  vehicleUrl            String?  @map("vehicle_url")
-  videoSelfieUrl        String?  @map("video_selfie_url")
-  videoHouseUrl         String?  @map("video_house_url")
-  videoVehicleUrl       String?  @map("video_vehicle_url")
-  signatureUrl          String?  @map("signature_url")
-  workCardUrl           String?  @map("work_card_url")
-  // Suplementar
-  supplementalDescription String?  @map("supplemental_description")
-  supplementalDocUrl      String?  @map("supplemental_doc_url")
-  supplementalRequestedAt DateTime? @map("supplemental_requested_at")
-  supplementalUploadedAt  DateTime? @map("supplemental_uploaded_at")
-  // Geolocalização
+  zip_code              String?
   latitude              Float?
   longitude             Float?
-  accuracy              Float?
-  // Contrato
-  contractAccepted      Boolean  @default(false) @map("contract_accepted")
-  contractPdfUrl        String?  @map("contract_pdf_url")
-  // Banco
-  bankName              String?  @map("bank_name")
-  bankAgency            String?  @map("bank_agency")
-  bankAccount           String?  @map("bank_account")
-  bankAccountType       String?  @map("bank_account_type")
-  pixKey                String?  @map("pix_key")
-  pixKeyType            String?  @map("pix_key_type")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  customer              Customer? @relation(fields: [customerId], references: [id])
-  user                  User?     @relation(fields: [userId], references: [id])
-  loan                  Loan?
-
-  @@map("loan_requests")
+  monthly_income        Float?
+  pre_approved_amount   Float?
+  pre_approved_at       DateTime?
+  instagram             String?
+  source                String?         @default("MANUAL")
+  profile_pic           String?
+  birth_date            String?
+  monthly_interest_rate Float?
+  late_fixed_fee        Float?
+  late_interest_daily   Float?
+  late_interest_monthly Float?
+  installment_offer     Json?
+  joined_at             DateTime        @default(now())
+  coupons               coupons[]
+  users                 users?          @relation(fields: [user_id], references: [id])
+  loan_requests         loan_requests[]
+  loans                 loans[]
+  notifications         notifications[]
 }
 
-// ============= LOANS =============
-
-model Loan {
-  id                String   @id @default(uuid())
-  customerId        String   @map("customer_id")
-  requestId         String   @unique @map("request_id")
-  amount            Float
-  installmentsCount Int      @map("installments_count")
-  remainingAmount   Float    @map("remaining_amount")
-  status            String   @default("APPROVED") // APPROVED | PAID | DEFAULTED
-  startDate         DateTime @map("start_date")
-  createdAt         DateTime @default(now()) @map("created_at")
-
-  // Relations
-  customer          Customer     @relation(fields: [customerId], references: [id])
-  request           LoanRequest  @relation(fields: [requestId], references: [id])
-  installments      Installment[]
-
-  @@map("loans")
+model goals_settings {
+  id                         String   @id
+  monthly_loan_goal          Float    @default(0)
+  monthly_client_goal        Int      @default(0)
+  monthly_approval_rate_goal Float    @default(0)
+  projections                Json?
+  expected_growth_rate       Float    @default(0)
+  goal_period                String   @default("")
+  updated_at                 DateTime
 }
 
-// ============= INSTALLMENTS =============
-
-model Installment {
-  id        String    @id @default(uuid())
-  loanId    String    @map("loan_id")
-  dueDate   DateTime  @map("due_date")
-  amount    Float
-  status    String    @default("OPEN") // OPEN | PAID | LATE
-  pixCode   String?   @map("pix_code")
-  proofUrl  String?   @map("proof_url")
-  paidAt    DateTime? @map("paid_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-
-  // Relations
-  loan      Loan @relation(fields: [loanId], references: [id])
-
-  @@map("installments")
+model installments {
+  id         String    @id
+  loan_id    String
+  due_date   DateTime
+  amount     Float
+  status     String    @default("OPEN")
+  pix_code   String?
+  proof_url  String?
+  paid_at    DateTime?
+  created_at DateTime  @default(now())
+  loans      loans     @relation(fields: [loan_id], references: [id])
 }
 
-// ============= TRANSACTIONS =============
-
-model Transaction {
-  id          String   @id @default(uuid())
-  type        String   // IN | OUT
-  description String
-  amount      Float
-  category    String   // LOAN | PAYMENT | FEE
-  date        DateTime
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  @@map("transactions")
+model loan_packages {
+  id               String   @id
+  name             String
+  min_value        Float
+  max_value        Float
+  min_installments Int
+  max_installments Int
+  interest_rate    Float
+  created_at       DateTime @default(now())
 }
 
-// ============= ANTIFRAUDE =============
-
-model RiskEvent {
-  id          String   @id @default(uuid())
-  userId      String?  @map("user_id")
-  eventType   String   @map("event_type")
-  riskLevel   String?  @map("risk_level")
-  details     Json?
-  ipAddress   String?  @map("ip_address")
-  userAgent   String?  @map("user_agent")
-  latitude    Float?
-  longitude   Float?
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  user        User?    @relation(fields: [userId], references: [id])
-
-  @@map("risk_events")
+model loan_requests {
+  id                        String     @id
+  customer_id               String?
+  user_id                   String?
+  client_name               String
+  cpf                       String
+  email                     String
+  phone                     String
+  amount                    Float      @default(0)
+  installments              Int        @default(1)
+  status                    String     @default("PENDING")
+  profile_type              String?
+  father_phone              String?
+  mother_phone              String?
+  spouse_phone              String?
+  address                   String?
+  neighborhood              String?
+  city                      String?
+  state                     String?
+  zip_code                  String?
+  birth_date                String?
+  preferred_due_day         Int?
+  instagram                 String?
+  monthly_income            Float?
+  selfie_url                String?
+  id_card_url               String?
+  id_card_back_url          String?
+  proof_of_address_url      String?
+  proof_income_url          String?
+  vehicle_url               String?
+  video_selfie_url          String?
+  video_house_url           String?
+  video_vehicle_url         String?
+  signature_url             String?
+  work_card_url             String?
+  supplemental_description  String?
+  supplemental_doc_url      String?
+  supplemental_requested_at DateTime?
+  supplemental_uploaded_at  DateTime?
+  latitude                  Float?
+  longitude                 Float?
+  accuracy                  Float?
+  contract_accepted         Boolean    @default(false)
+  bank_name                 String?
+  bank_agency               String?
+  bank_account              String?
+  bank_account_type         String?
+  pix_key                   String?
+  pix_key_type              String?
+  created_at                DateTime   @default(now())
+  updated_at                DateTime
+  contract_pdf_url          String?
+  customers                 customers? @relation(fields: [customer_id], references: [id])
+  users                     users?     @relation(fields: [user_id], references: [id])
+  loans                     loans?
 }
 
-model Blacklist {
-  id       String   @id @default(uuid())
-  cpf      String   @unique
-  name     String
-  reason   String
-  addedBy  String   @map("added_by")
-  active   Boolean  @default(true)
-  addedAt  DateTime @default(now()) @map("added_at")
-
-  @@map("blacklist")
+model loans {
+  id                 String         @id
+  customer_id        String
+  request_id         String         @unique
+  amount             Float
+  installments_count Int
+  remaining_amount   Float
+  status             String         @default("APPROVED")
+  start_date         DateTime
+  created_at         DateTime       @default(now())
+  installments       installments[]
+  customers          customers      @relation(fields: [customer_id], references: [id])
+  loan_requests      loan_requests  @relation(fields: [request_id], references: [id])
 }
 
-model TrustedDevice {
-  id                String   @id @default(uuid())
-  userId            String   @map("user_id")
-  deviceFingerprint String   @map("device_fingerprint")
-  deviceName        String   @map("device_name")
-  deviceModel       String?  @map("device_model")
-  platform          String?
-  browser           String?
-  screenResolution  String?  @map("screen_resolution")
-  lastIp            String?  @map("last_ip")
-  lastLocationLat   Float?   @map("last_location_lat")
-  lastLocationLng   Float?   @map("last_location_lng")
-  isVerified        Boolean  @default(false) @map("is_verified")
-  isPrimary         Boolean  @default(false) @map("is_primary")
-  trustScore        Int      @default(0) @map("trust_score")
-  loginCount        Int      @default(0) @map("login_count")
-  firstSeenAt       DateTime @default(now()) @map("first_seen_at")
-  lastSeenAt        DateTime @default(now()) @map("last_seen_at")
-
-  user              User     @relation(fields: [userId], references: [id])
-
-  @@map("trusted_devices")
+model message_templates {
+  id         String   @id
+  name       String
+  category   String
+  content    String
+  variables  String[]
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
 }
 
-model SecurityBlock {
-  id                String    @id @default(uuid())
-  userId            String    @map("user_id")
-  blockType         String    @map("block_type")
-  blockReason       String    @map("block_reason")
-  deviceFingerprint String?   @map("device_fingerprint")
-  ipAddress         String?   @map("ip_address")
-  deviceInfo        Json?     @map("device_info")
-  isResolved        Boolean   @default(false) @map("is_resolved")
-  resolvedAt        DateTime? @map("resolved_at")
-  resolvedBy        String?   @map("resolved_by")
-  resolutionNotes   String?   @map("resolution_notes")
-  expiresAt         DateTime? @map("expires_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
-
-  user              User      @relation(fields: [userId], references: [id])
-
-  @@map("security_blocks")
+model notification_logs {
+  id            String   @id
+  type          String
+  recipient     String
+  subject       String?
+  content       String?
+  status        String   @default("SENT")
+  error_message String?
+  metadata      Json?
+  created_at    DateTime @default(now())
 }
 
-model SecurityAlert {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  userName    String   @map("user_name")
-  userEmail   String   @map("user_email")
-  alertType   String   @map("alert_type")
+model notifications {
+  id             String     @id
+  customer_email String?
+  title          String
+  message        String
+  type           String     @default("INFO")
+  created_at     DateTime   @default(now())
+  customer_id    String?
+  is_read        Boolean    @default(false)
+  customers      customers? @relation(fields: [customer_id], references: [id])
+}
+
+model otp_codes {
+  id         String   @id
+  email      String
+  code       String
+  type       String   @default("EMAIL_VERIFY")
+  used       Boolean  @default(false)
+  expires_at DateTime
+  created_at DateTime @default(now())
+}
+
+model push_subscriptions {
+  id         String   @id
+  user_id    String
+  endpoint   String
+  p256dh     String
+  auth       String
+  user_agent String?
+  created_at DateTime @default(now())
+  users      users    @relation(fields: [user_id], references: [id])
+}
+
+model risk_events {
+  id         String   @id
+  user_id    String?
+  event_type String
+  risk_level String?
+  details    Json?
+  ip_address String?
+  user_agent String?
+  latitude   Float?
+  longitude  Float?
+  created_at DateTime @default(now())
+  users      users?   @relation(fields: [user_id], references: [id])
+}
+
+model scheduled_status {
+  id            String    @id
+  image_url     String
+  caption       String?
+  status        String    @default("PENDING")
+  error_message String?
+  scheduled_at  DateTime  @default(now())
+  posted_at     DateTime?
+  created_at    DateTime  @default(now())
+}
+
+model security_alerts {
+  id          String   @id
+  user_id     String
+  user_name   String
+  user_email  String
+  alert_type  String
   severity    String
   title       String
   description String
-  deviceInfo  Json?    @map("device_info")
-  ipAddress   String?  @map("ip_address")
+  device_info Json?
+  ip_address  String?
   location    Json?
-  isRead      Boolean  @default(false) @map("is_read")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  @@map("security_alerts")
+  is_read     Boolean  @default(false)
+  created_at  DateTime @default(now())
 }
 
-// ============= BIOMETRIA (WebAuthn) =============
-
-model WebauthnCredential {
-  id                String    @id @default(uuid())
-  userId            String    @map("user_id")
-  userEmail         String    @map("user_email")
-  credentialId      String    @unique @map("credential_id")
-  publicKey         String?   @map("public_key")
-  attestationObject String?   @map("attestation_object")
-  deviceName        String?   @map("device_name")
-  signCount         Int       @default(0) @map("sign_count")
-  lastUsedAt        DateTime? @map("last_used_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
-
-  user              User      @relation(fields: [userId], references: [id])
-
-  @@map("webauthn_credentials")
+model security_blocks {
+  id                 String    @id
+  user_id            String
+  block_type         String
+  block_reason       String
+  device_fingerprint String?
+  ip_address         String?
+  device_info        Json?
+  is_resolved        Boolean   @default(false)
+  resolved_at        DateTime?
+  resolved_by        String?
+  resolution_notes   String?
+  expires_at         DateTime?
+  created_at         DateTime  @default(now())
+  users              users     @relation(fields: [user_id], references: [id])
 }
 
-// ============= PUSH NOTIFICATIONS =============
-
-model PushSubscription {
-  id           String   @id @default(uuid())
-  userId       String   @map("user_id")
-  endpoint     String
-  p256dh       String
-  auth         String
-  userAgent    String?  @map("user_agent")
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  user         User     @relation(fields: [userId], references: [id])
-
-  @@map("push_subscriptions")
+model system_settings {
+  id         String   @id
+  key        String   @unique
+  value      String
+  updated_at DateTime
 }
 
-// ============= SETTINGS =============
-
-model SystemSetting {
-  id        String   @id @default(uuid())
-  key       String   @unique
-  value     String
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("system_settings")
+model temporary_links {
+  id         String   @id
+  token      String   @unique
+  type       String
+  user_id    String?
+  email      String?
+  metadata   Json?
+  used       Boolean  @default(false)
+  expires_at DateTime
+  created_at DateTime @default(now())
 }
 
-model BrandSetting {
-  id              String   @id @default(uuid())
-  systemName      String   @map("system_name")
-  logoUrl         String?  @map("logo_url")
-  primaryColor    String   @default("#FF0000") @map("primary_color")
-  secondaryColor  String   @default("#D4AF37") @map("secondary_color")
-  backgroundColor String   @default("#000000") @map("background_color")
-  companyName     String   @default("") @map("company_name")
-  cnpj            String   @default("")
-  address         String   @default("")
-  phone           String   @default("")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  @@map("brand_settings")
-}
-
-model WhatsappConfig {
-  id            String   @id @default(uuid())
-  apiUrl        String   @map("api_url")
-  apiKey        String   @map("api_key")
-  instanceName  String   @map("instance_name")
-  isConnected   Boolean  @default(false) @map("is_connected")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  @@map("whatsapp_config")
-}
-
-model GoalsSetting {
-  id                     String   @id @default(uuid())
-  monthlyLoanGoal        Float    @default(0) @map("monthly_loan_goal")
-  monthlyClientGoal      Int      @default(0) @map("monthly_client_goal")
-  monthlyApprovalRateGoal Float   @default(0) @map("monthly_approval_rate_goal")
-  projections            Json?
-  expectedGrowthRate     Float    @default(0) @map("expected_growth_rate")
-  goalPeriod             String   @default("") @map("goal_period")
-  updatedAt              DateTime @updatedAt @map("updated_at")
-
-  @@map("goals_settings")
-}
-
-// ============= PACKAGES =============
-
-model LoanPackage {
-  id              String   @id @default(uuid())
-  name            String
-  minValue        Float    @map("min_value")
-  maxValue        Float    @map("max_value")
-  minInstallments Int      @map("min_installments")
-  maxInstallments Int      @map("max_installments")
-  interestRate    Float    @map("interest_rate")
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  @@map("loan_packages")
-}
-
-// ============= COLLECTION RULES =============
-
-model CollectionRule {
-  id              String   @id @default(uuid())
-  daysOffset      Int      @map("days_offset")
-  type            String   // WHATSAPP | EMAIL | SMS
-  messageTemplate String   @map("message_template")
-  active          Boolean  @default(true)
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  @@map("collection_rules")
-}
-
-// ============= CAMPAIGNS =============
-
-model Campaign {
-  id          String   @id @default(uuid())
-  title       String
+model transactions {
+  id          String   @id
+  type        String
   description String
-  imageUrl    String?  @map("image_url")
-  link        String?
-  startDate   DateTime @map("start_date")
-  endDate     DateTime @map("end_date")
-  frequency   String   @default("ONCE") // ONCE | DAILY | ALWAYS
-  active      Boolean  @default(true)
-  priority    Int      @default(0)
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  @@map("campaigns")
+  amount      Float
+  category    String
+  date        DateTime
+  created_at  DateTime @default(now())
 }
 
-// ============= NOTIFICATIONS =============
-
-model Notification {
-  id          String   @id @default(uuid())
-  customerId  String?  @map("customer_id")
-  customerEmail String? @map("customer_email")
-  title       String
-  message     String
-  type        String   @default("INFO") // INFO | WARNING | ALERT | SUCCESS
-  isRead      Boolean  @default(false) @map("is_read")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  customer    Customer? @relation(fields: [customerId], references: [id])
-
-  @@map("notifications")
+model trusted_devices {
+  id                 String   @id
+  user_id            String
+  device_fingerprint String
+  device_name        String
+  device_model       String?
+  platform           String?
+  browser            String?
+  screen_resolution  String?
+  last_ip            String?
+  last_location_lat  Float?
+  last_location_lng  Float?
+  is_verified        Boolean  @default(false)
+  is_primary         Boolean  @default(false)
+  trust_score        Int      @default(0)
+  login_count        Int      @default(0)
+  first_seen_at      DateTime @default(now())
+  last_seen_at       DateTime @default(now())
+  users              users    @relation(fields: [user_id], references: [id])
 }
 
-// ============= COUPONS =============
-
-model Coupon {
-  id            String    @id @default(uuid())
-  code          String    @unique
-  discount      Float
-  description   String
-  customerId    String?   @map("customer_id")
-  customerEmail String?   @map("customer_email")
-  expiresAt     DateTime  @map("expires_at")
-  active        Boolean   @default(true)
-  usedAt        DateTime? @map("used_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-
-  customer      Customer? @relation(fields: [customerId], references: [id])
-
-  @@map("coupons")
+model users {
+  id                   String                 @id
+  auth_id              String?                @unique
+  name                 String
+  email                String                 @unique
+  password             String
+  role                 String                 @default("CLIENT")
+  phone                String?
+  address              String?
+  city                 String?
+  neighborhood         String?
+  avatar_url           String?
+  created_at           DateTime               @default(now())
+  customers            customers[]
+  loan_requests        loan_requests[]
+  push_subscriptions   push_subscriptions[]
+  risk_events          risk_events[]
+  security_blocks      security_blocks[]
+  trusted_devices      trusted_devices[]
+  webauthn_credentials webauthn_credentials[]
 }
 
-// ============= AUDIT LOGS =============
-
-model AuditLog {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  userName  String   @map("user_name")
-  action    String
-  entity    String
-  entityId  String?  @map("entity_id")
-  details   String?
-  ipAddress String?  @map("ip_address")
-  timestamp DateTime @default(now())
-
-  @@map("audit_logs")
+model webauthn_credentials {
+  id                 String    @id
+  user_id            String
+  user_email         String
+  credential_id      String    @unique
+  public_key         String?
+  attestation_object String?
+  device_name        String?
+  sign_count         Int       @default(0)
+  last_used_at       DateTime?
+  created_at         DateTime  @default(now())
+  users              users     @relation(fields: [user_id], references: [id])
 }
 
-// ============= MESSAGE TEMPLATES =============
-
-model MessageTemplate {
-  id        String   @id @default(uuid())
-  name      String
-  category  String   // REMINDER | COLLECTION | WELCOME | APPROVAL | REJECTION | PAYMENT | CUSTOM
-  content   String
-  variables String[]
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("message_templates")
-}
-
-// ============= AI CHATBOT =============
-
-model AiChatbotConfig {
-  id                  String   @id @default(uuid())
-  enabled             Boolean  @default(false)
-  provider            String   @default("gemini") // gemini | perplexity
-  apiKey              String   @default("") @map("api_key")
-  systemPrompt        String   @default("") @map("system_prompt")
-  autoReplyEnabled    Boolean  @default(true) @map("auto_reply_enabled")
-  workingHoursStart   String   @default("08:00") @map("working_hours_start")
-  workingHoursEnd     String   @default("18:00") @map("working_hours_end")
-  transferKeywords    String[] @default(["atendente", "humano", "pessoa"]) @map("transfer_keywords")
-  updatedAt           DateTime @updatedAt @map("updated_at")
-
-  @@map("ai_chatbot_config")
-}
-
-model AiChatHistory {
-  id        String   @id @default(uuid())
-  phone     String
-  role      String   // user | assistant | system
-  content   String
-  metadata  Json?
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("ai_chat_history")
-}
-
-// ============= SCHEDULED WHATSAPP STATUS =============
-
-model ScheduledStatus {
-  id           String    @id @default(uuid())
-  imageUrl     String    @map("image_url")
-  caption      String?
-  status       String    @default("PENDING") // PENDING | POSTED | FAILED
-  errorMessage String?   @map("error_message")
-  scheduledAt  DateTime  @default(now()) @map("scheduled_at")
-  postedAt     DateTime? @map("posted_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-
-  @@map("scheduled_status")
-}
-
-// ============= NOTIFICATION LOGS =============
-
-model NotificationLog {
-  id           String   @id @default(uuid())
-  type         String   // WHATSAPP | EMAIL | PUSH
-  recipient    String
-  subject      String?
-  content      String?
-  status       String   @default("SENT") // SENT | FAILED | PENDING
-  errorMessage String?  @map("error_message")
-  metadata     Json?
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  @@map("notification_logs")
-}
-
-// ============= OTP CODES =============
-
-model OtpCode {
-  id        String   @id @default(uuid())
-  email     String
-  code      String
-  type      String   @default("EMAIL_VERIFY") // EMAIL_VERIFY | PASSWORD_RESET | LOGIN
-  used      Boolean  @default(false)
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("otp_codes")
-}
-
-// ============= TEMPORARY LINKS =============
-
-model TemporaryLink {
-  id        String   @id @default(uuid())
-  token     String   @unique
-  type      String   // PASSWORD_RESET | EMAIL_CONFIRM | INVITE
-  userId    String?  @map("user_id")
-  email     String?
-  metadata  Json?
-  used      Boolean  @default(false)
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("temporary_links")
-}
-
-// ============= CONTRACT SIGNATURES =============
-
-model ContractSignature {
-  id            String   @id @default(uuid())
-  loanRequestId String   @map("loan_request_id")
-  signatureUrl  String   @map("signature_url")
-  ipAddress     String?  @map("ip_address")
-  userAgent     String?  @map("user_agent")
-  signedAt      DateTime @default(now()) @map("signed_at")
-
-  @@map("contract_signatures")
+model whatsapp_config {
+  id            String   @id
+  api_url       String
+  api_key       String
+  instance_name String
+  is_connected  Boolean  @default(false)
+  updated_at    DateTime
 }

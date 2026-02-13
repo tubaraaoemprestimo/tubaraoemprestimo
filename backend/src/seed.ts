@@ -1,11 +1,9 @@
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
+import { prisma } from './services/prisma';
 
 // Carregar variáveis de ambiente
 dotenv.config();
-
-const prisma = new PrismaClient();
 
 async function main() {
     console.log('🌱 Starting seed...');
