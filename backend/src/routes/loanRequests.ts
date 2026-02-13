@@ -113,24 +113,42 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                     monthlyIncome: data.monthlyIncome,
                     birthDate: data.birthDate,
                     instagram: data.instagram,
-                    status: 'ACTIVE'
+                    status: 'ACTIVE',
+                    // Geocalização
+                    latitude: data.latitude,
+                    longitude: data.longitude,
+                    locationUpdatedAt: data.locationCapturedAt ? new Date(data.locationCapturedAt) : null
                 }
             });
         } else {
             // Atualiza dados do customer
+            // Preparar atualização do customer
+            const customerUpdateData: any = {
+                userId: req.user!.id,
+                name: data.clientName || req.user!.name,
+                phone: data.phone,
+                address: data.address,
+                neighborhood: data.neighborhood,
+                city: data.city,
+                state: data.state,
+                zipCode: data.zipCode,
+                monthlyIncome: data.monthlyIncome
+            };
+
+            // Atualizar geolocalização apenas se novos dados foram capturados
+            if (data.latitude !== undefined && data.latitude !== null) {
+                customerUpdateData.latitude = data.latitude;
+            }
+            if (data.longitude !== undefined && data.longitude !== null) {
+                customerUpdateData.longitude = data.longitude;
+            }
+            if (data.locationCapturedAt) {
+                customerUpdateData.locationUpdatedAt = new Date(data.locationCapturedAt);
+            }
+
             await prisma.customer.update({
                 where: { id: customer.id },
-                data: {
-                    userId: req.user!.id,
-                    name: data.clientName || req.user!.name,
-                    phone: data.phone,
-                    address: data.address,
-                    neighborhood: data.neighborhood,
-                    city: data.city,
-                    state: data.state,
-                    zipCode: data.zipCode,
-                    monthlyIncome: data.monthlyIncome
-                }
+                data: customerUpdateData
             });
         }
 

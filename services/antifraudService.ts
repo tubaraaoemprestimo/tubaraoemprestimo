@@ -507,6 +507,22 @@ export const antifraudService = {
                 },
             });
 
+            // 🔥 Se temos userId E localização, salvar também no perfil do cliente
+            if (userId && location && location.latitude && location.longitude) {
+                try {
+                    await api.put('/customers/location', {
+                        latitude: location.latitude,
+                        longitude: location.longitude,
+                        city: location.city,
+                        state: location.state,
+                        address: location.address
+                    });
+                    console.log('[Antifraud] Customer location updated:', userId);
+                } catch (locErr) {
+                    console.warn('[Antifraud] Failed to update customer location:', locErr);
+                }
+            }
+
             if (shouldNotifyAdmin) {
                 const severity = score >= 70 ? 'ERROR' : score >= 50 ? 'WARNING' : 'INFO';
                 const payload: any = {

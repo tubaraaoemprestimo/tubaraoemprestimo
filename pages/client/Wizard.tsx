@@ -981,9 +981,12 @@ export const Wizard: React.FC = () => {
         needsGuarantee && guarantee.video ? uploadToStorage(guarantee.video, 'guarantee_video') : Promise.resolve('')
       ]);
 
+      // Separar location para enviar como campos separados ao backend
+      const { location, ...formDataWithoutLocation } = formData;
+
       // Atualizar dados com URLs do Storage
       const uploadedData = {
-        ...formData,
+        ...formDataWithoutLocation,
         selfie: selfieUrl,
         idCardFront: idCardFrontUrls,
         idCardBack: idCardBackUrls,
@@ -997,13 +1000,19 @@ export const Wizard: React.FC = () => {
         videoHouse: videoHouseUrl,
         housePhotos: housePhotosUrls,
         billInName: billInNameUrls,
+        // Enviar localização como campos planos
+        latitude: location?.latitude ?? null,
+        longitude: location?.longitude ?? null,
+        accuracy: location?.accuracy ?? null,
+        locationCapturedAt: location ? new Date().toISOString() : null,
       };
 
       // Atualizar garantia se houver
       const uploadedGuarantee = needsGuarantee ? { ...guarantee, photos: guaranteePhotos, video: guaranteeVideoUrl } : null;
 
       // Registrar evento de submissão (antifraude)
-      const riskData = await antifraudService.logRiskEvent('form_submit', undefined, {
+      const user = apiService.auth.getUser();
+      const riskData = await antifraudService.logRiskEvent('form_submit', user?.id || undefined, {
         amount: getAmount(),
         hasGuarantee: needsGuarantee,
       });

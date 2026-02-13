@@ -7,6 +7,7 @@ import { apiService } from '../../services/apiService';
 import { InstallPwaButton } from '../../components/InstallPwaButton';
 import { biometricService } from '../../services/biometricService';
 import { antifraudService } from '../../services/antifraudService';
+import { locationTrackingService } from '../../services/locationTrackingService';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -113,6 +114,8 @@ export const Login: React.FC = () => {
         if (result.user.role === 'ADMIN') {
           navigate('/admin');
         } else {
+          // Salvar localização do cliente após login (background)
+          locationTrackingService.captureAndSave().catch(() => { });
           navigate('/client/dashboard');
         }
       } else {

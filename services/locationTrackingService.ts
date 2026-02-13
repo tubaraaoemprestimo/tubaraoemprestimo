@@ -83,16 +83,14 @@ export const locationTrackingService = {
                     const geoData = await reverseGeocode(latitude, longitude);
 
                     // Salvar no banco (upsert)
+                    // A rota usa o email do token, então não enviar customer_email no body
                     const { error } = await api.put('/customers/location', {
-                        customer_email: user.email,
-                        customer_name: user.name,
                         latitude,
                         longitude,
                         accuracy,
                         address: geoData?.address || null,
                         city: geoData?.city || null,
-                        state: geoData?.state || null,
-                        updated_at: new Date().toISOString()
+                        state: geoData?.state || null
                     });
 
                     if (error) {
