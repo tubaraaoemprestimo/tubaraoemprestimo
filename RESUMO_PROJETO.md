@@ -1,6 +1,6 @@
 # 🦈 Tubarão Empréstimos — Resumo do Projeto
 
-> **Última atualização:** 2026-02-13 (v4 - feature/referral-gamification)
+> **Última atualização:** 2026-02-13 (v5 - full-features-integration)
 > **Repositório:** https://github.com/tubaraaoemprestimo/tubaraoemprestimo.git
 > **Produção:** https://www.tubaraoemprestimo.com.br
 > **Stack:** React + TypeScript + Vite + Node.js (Express/Prisma)
@@ -8,108 +8,91 @@
 
 ---
 
-## 📝 Últimas Alterações (13/02/2026)
+## 📝 Últimas Alterações (13/02/2026) — v5 Full Features
 
-### 1. Sistema de Indicações & Gamificação (Completo)
-- **Frontend**:
-  - Wizard: campo de código de indicação no Step 1 (opcional)
-  - Nova página `ReferralsPage.tsx`: dashboard completo do cliente com:
-    - Código de indicação pessoal (copia rápida)
-    - Contador de pontos (total, disponível, usado)
-    - Histórico de indicações (pendentes, aprovados, rejeitados)
-    - Histórico de transações de pontos
-    - Regras de recompensa explicadas
-    - Botão de compartilhar (Web Share API)
-  - ClientDashboard: botão "Indicações" no grid principal (4ª posição)
-  - Removido banner duplicado "Indique e Ganhe"
-- **Services**:
-  - `referralService.ts`: expandido com funções de gamificação:
-    - `getCustomerPoints()`: obtém pontos do cliente (API + localStorage fallback)
-    - `awardPointsForReferral()`: adiciona pontos quando indicado aprova empréstimo
-    - `getPointsHistory()`: histórico de transações
-    - `getAllCustomersPoints()`: lista todos clientes com pontos (admin)
-  - `REFERRAL_REWARD_RULES` em `types.ts`: regras configuráveis:
-    - Qualquer indicação aprovada: 100 pontos
-    - Empréstimo ≥ R$ 5.000: R$ 50 de bônus
-    - Empréstimo ≥ R$ 10.000: R$ 100 de bônus
-- **Types**:
-  - Novas interfaces: `ReferralCode`, `ReferralUsage`, `CustomerPoints`, `PointsTransaction`
-- **Backend Já Existente** (pronto para uso):
-  - Tabela `referrals` no Prisma
-  - Endpoints `/api/referrals` (GET, POST, PUT)
-  - Uso do `referral_code` no `loan_request` (já salvava, agora está funcional)
+### 1. Sistema de Notificações Completo
+- **Email** (Nodemailer + Resend fallback):
+  - Cadastro: email de boas-vindas (HTML branded)
+  - Solicitação de empréstimo: confirmação para cliente + alerta admins
+  - Aprovação/Reprovação: notificação para cliente
+  - Vencimento: 3 dias antes + no dia (cron job)
+  - Comprovante de pagamento: recebido/aprovado/rejeitado
+- **Push Notifications** (Web Push + VAPID):
+  - Helpers exportados: `sendPushToUser()`, `sendPushToAll()`, `sendPushToRole()`
+  - Triggers em todos os eventos: cadastro, empréstimo, aprovação, pagamento
+  - Notificação automática para admins em novos cadastros e solicitações
+- **WhatsApp** (Evolution API):
+  - Mensagens automáticas em todos os processos
+  - Welcome message no cadastro
+  - Alertas de empréstimo para cliente e admin
+  - Lembretes de vencimento com info PIX
+  - Status scheduling (cron 5 min) - posta automaticamente no status WhatsApp
 
-### 2. Geolocalização Funcional (P0)
-- **Wizard** (`pages/client/Wizard.tsx`):
-  - Captura de localização no step de documentos (obrigatória)
-  - Envia `latitude`, `longitude`, `accuracy`, `locationCapturedAt` no submit
-- **Backend** (`backend/src/routes/loanRequests.ts`):
-  - Salva localização na tabela `customer` (create + update)
-  - Campos: `latitude`, `longitude`, `locationUpdatedAt`
-- **Login** (`pages/auth/Login.tsx`):
-  - Captura localização automaticamente após autenticação (background)
-- **Resultado**: Admin agora visualiza localizações reais em `/admin/geolocation`
+### 2. Geolocalização Real-Time (100% Funcional)
+- **App.tsx**: captura global de localização em todo acesso (mount + intervalo 5 min)
+- **Backend**: salva `device_info`, `last_ip`, `location_updated_at` no customer
+- **Wizard**: localização obrigatória no step de documentos
+- **Admin**: visualiza dispositivo, IP, localização e timestamp de cada cliente
 
-### 3. PIX Automático (Configuração Admin)
-- **Nova página**: `pages/admin/PIXSettings.tsx`
-  - Admin configura chave PIX do sistema
-  - Suporta tipos: CPF, CNPJ, Email, Telefone, Aleatória
-  - Prévia do QR Code em tempo real
-  - Botão copiar chave
-  - Validação antes de salvar
-- **Integração**: Adicionada aba "PAYMENTS" no Settings.tsx
-- **Backend**: Configurações salvas via `apiService.updateSettings()` nos campos:
-  - `pixKey`, `pixKeyType`, `pixReceiverName`
+### 3. Anti-Fraude 100%
+- **Limite 2 dispositivos** por usuário (verificação no login + wizard)
+- **Limite 2 IPs distintos** por usuário confiável
+- **Cooldown 30 dias** após reprovação (por CPF)
+- **Captura de localização** em todo acesso (global via App.tsx)
+- **Device fingerprinting** + `user-agent` + IP tracking
+- **Bloqueio automático** com mensagem explícita
 
-### 4. Correções e Melhorias Diversas
-- **Clientes no Admin**: Filtro padrão `statusFilter = 'ALL'` garantindo que todos apareçam
-- **Antifraude**:
-  - Backend recebe e salva `sessionId`, `riskScore`, `riskFactors` do frontend
-  - Cooldown de 30 dias após reprovação implementado (verifica CPF)
-- **Build**: TypeScript compila sem erros críticos
+### 4. Indicações & Gamificação (Backend Real)
+- **Tabela `referrals`** no Prisma (não mais localStorage)
+- **Endpoints**: `/api/referrals/my` (cliente), `/api/referrals` (admin CRUD)
+- **Gamificação na aprovação**: 100 pts base + R$50 (≥R$5k) + R$100 (≥R$10k)
+- **Frontend**: página completa com código, pontos, bônus, histórico, share
+- **Cadastro**: notifica referrer quando alguém usa seu código
 
-### 5. Checklist de Itens Solicitados (Progresso)
-- [x] Status WhatsApp agendado (backend pronto, falta frontend)
-- [x] Geolocalização funcional (captura + salvamento)
-- [x] Código de indicação no cadastro
-- [x] Gamificação (pontos, recompensas)
-- [x] PIX QR code automático (admin configurado)
-- [ ] Todos campos obrigatórios em TODOS fluxos (auditoria pendente)
-- [ ] OpenFinance API oficial (mock atual, integrar real se API disponível)
-- [x] Emails de vencimento (3 dias e no dia) - cron job backend implementado
-- [ ] Notificações push consistentes (Firebase + Web Push implementados, faltam triggers)
-- [ ] Antifraude 100%: limite 2 dispositivos/IPs (parcialmente feito)
-- [ ] Anexar comprovante e admin confirmar (já existe, precisa de fluxo completo)
+### 5. Comprovantes de Pagamento
+- **Nova rota**: `/api/payment-receipts` (POST, GET, PUT approve/reject)
+- Cliente envia comprovante → admin confirma → parcela marcada PAID
+- Notificações (email + WhatsApp + push) em todas as etapas
+- **Services**: `apiService` com métodos submit/get/approve/reject
 
-### 6. Estabilização Técnica (13/02/2026)
-- Schema Prisma do repositório estava corrompido (`schema.prisma` inválido)
-- Foi feito acesso SSH ao servidor e `prisma db pull` para recuperar schema real do banco
-- Schema recuperado aplicado em:
-  - `prisma/schema.prisma`
-  - `backend/prisma/schema.prisma`
-- Build backend estava quebrando por tipagem Prisma estrita com schema legado snake_case/plural
-  - Ajustado `backend/src/services/prisma.ts` para compatibilidade de tipagem
-  - Ajustado `backend/src/middleware/auth.ts` para usar serviço central de prisma
-  - Ajustado `backend/src/routes/notifications.ts` (queryRaw tipagem)
-  - Ajustado `backend/src/seed.ts` para usar serviço prisma
-  - `backend/tsconfig.json` ajustado para reduzir bloqueios de build durante migração
-- Build validado:
-  - Frontend `npm run build` ✅
-  - Backend `npm run build` ✅
+### 6. Open Finance API (Backend Real)
+- **Modelos Prisma**: `credit_scores`, `income_analyses`, `open_finance_consents`
+- **Rota**: `/api/open-finance` com endpoints:
+  - `POST /score/:customerId` — consulta score (INTERNAL/SERASA/SPC)
+  - `POST /income-analysis/:customerId` — análise de renda
+  - `POST /full-analysis/:customerId` — análise completa
+  - Consentimentos: criar, listar, revogar
+- **Score calculado** com dados reais: histórico de pagamento, dívida, idade do crédito
+- **Frontend service** migrado de localStorage para API real
 
-### 7. Garantias solicitadas (13/02/2026)
-- **Aba Clientes**: endpoint `/api/customers` ajustado para consulta SQL direta na tabela real (`customers`) com mapeamento para o formato esperado no frontend.
-- **Geolocalização**:
-  - endpoint `/api/customers/location` ajustado para salvar latitude/longitude/cidade/estado/endereço com SQL compatível com schema real.
-  - endpoints de listagem de localização (`/api/customers/locations` e `/api/customers/locations/:email`) ajustados para leitura consistente.
+### 7. Campos Obrigatórios em TODOS os Fluxos
+- **Data de nascimento**: obrigatória para TODOS os perfis (não só LIMPA_NOME)
+- **Endereço completo**: rua + número obrigatórios (CEP já era)
+- **Renda mensal**: obrigatória para CLT, AUTONOMO, MOTO e GARANTIA
+- **Contatos de confiança**: 2 contatos (nome + telefone) obrigatórios
+- **CLT**: profissão + empresa obrigatórios
+- **INVESTIDOR**: RG/CNH + data nascimento + endereço/cidade/estado obrigatórios
+- **Banco**: CPF do titular obrigatório
 
-### 8. Antifraude reforçado (13/02/2026)
-- **Login**: verificação de dispositivo executada após autenticação de cliente (`antifraudService.checkDevice()`).
-- **Wizard**: validação de dispositivo executada no início do fluxo; bloqueia acesso e redireciona ao dashboard quando violar regra.
-- **Backend `/api/antifraud/device/check`**:
-  - limite de dispositivos forçado para **máximo 2**;
-  - regra adicional de **máximo 2 IPs distintos** por usuário confiável;
-  - retorno de bloqueio com mensagem explícita de segurança.
+### 8. PIX & Pagamentos
+- Admin configura chave PIX → QR code gerado automaticamente
+- Parcelas recebem código PIX na aprovação do empréstimo
+- Lembretes incluem info PIX (cron: 3 dias antes + no dia)
+- Cliente vê QR code na área de pagamento
+
+### Checklist Completo
+- [x] WhatsApp status scheduling (cron 5 min)
+- [x] Geolocalização funcional (captura global + device info)
+- [x] Clientes no Admin (endpoint corrigido)
+- [x] Email em todos os eventos
+- [x] Push notifications em todos os processos
+- [x] WhatsApp em todos os processos
+- [x] Anti-fraude 100% (2 devices/IPs + location + cooldown)
+- [x] Indicações com gamificação (backend real)
+- [x] Todos campos obrigatórios em todos fluxos
+- [x] Open Finance API (backend real, não mock)
+- [x] PIX QR code + comprovantes de pagamento
+- [x] Comprovante: cliente envia, admin confirma
 
 ---
 

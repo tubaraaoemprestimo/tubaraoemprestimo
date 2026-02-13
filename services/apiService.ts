@@ -633,6 +633,33 @@ export const apiService = {
         const { data, error } = await api.delete('/customers/bulk', { data: { ids } });
         if (error) throw new Error(error.error || 'Erro ao deletar');
         return data;
+    },
+
+    // ============= PAYMENT RECEIPTS =============
+
+    async submitPaymentReceipt(installmentId: string, receiptUrl: string, amount?: number) {
+        const { data, error } = await api.post('/payment-receipts', { installmentId, receiptUrl, amount });
+        if (error) throw new Error((error as any).error || 'Erro ao enviar comprovante');
+        return data;
+    },
+
+    async getPaymentReceipts(status?: string) {
+        const query = status ? `?status=${status}` : '';
+        const { data, error } = await api.get(`/payment-receipts${query}`);
+        if (error) return [];
+        return data || [];
+    },
+
+    async approvePaymentReceipt(id: string, notes?: string) {
+        const { data, error } = await api.put(`/payment-receipts/${id}/approve`, { notes });
+        if (error) throw new Error((error as any).error || 'Erro ao aprovar');
+        return data;
+    },
+
+    async rejectPaymentReceipt(id: string, notes?: string) {
+        const { data, error } = await api.put(`/payment-receipts/${id}/reject`, { notes });
+        if (error) throw new Error((error as any).error || 'Erro ao rejeitar');
+        return data;
     }
 };
 

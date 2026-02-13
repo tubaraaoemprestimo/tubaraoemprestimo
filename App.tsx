@@ -66,6 +66,7 @@ import { firebasePushService } from './services/firebasePushService';
 import { themeService } from './services/themeService';
 import { PermissionGate } from './components/PermissionGate';
 import { BiometricAccessGate } from './components/BiometricAccessGate';
+import { locationTrackingService } from './services/locationTrackingService';
 
 // --- Expandable Menu Item ---
 interface ExpandableMenuProps {
@@ -435,6 +436,22 @@ function App() {
 
     // Initialize theme service
     themeService.init().catch(console.error);
+
+    // Capturar localização em cada acesso (se usuário logado)
+    const user = localStorage.getItem('tubarao_user');
+    if (user) {
+      locationTrackingService.captureAndSave().catch(() => {});
+    }
+
+    // Recapturar a cada 5 minutos enquanto o app está aberto
+    const locationInterval = setInterval(() => {
+      const u = localStorage.getItem('tubarao_user');
+      if (u) {
+        locationTrackingService.captureAndSave().catch(() => {});
+      }
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(locationInterval);
   }, []);
 
   useEffect(() => {

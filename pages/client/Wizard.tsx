@@ -433,12 +433,17 @@ export const Wizard: React.FC = () => {
         if (!cpfCnpjDigits || (cpfCnpjDigits.length !== 11 && cpfCnpjDigits.length !== 14)) {
           addToast("Informe um CPF ou CNPJ válido.", 'warning'); return;
         }
+        if (!investorData.rgCnh.trim()) { addToast("Informe seu RG ou CNH.", 'warning'); return; }
+        if (!investorData.birthDate) { addToast("Informe sua data de nascimento.", 'warning'); return; }
         if (!investorData.phone || investorData.phone.replace(/\D/g, '').length < 10) {
           addToast("Informe seu telefone.", 'warning'); return;
         }
         if (!investorData.email.trim() || !investorData.email.includes('@')) {
           addToast("Informe um email válido.", 'warning'); return;
         }
+        if (!investorData.address.trim()) { addToast("Informe seu endereço.", 'warning'); return; }
+        if (!investorData.city.trim()) { addToast("Informe sua cidade.", 'warning'); return; }
+        if (!investorData.state.trim()) { addToast("Informe seu estado.", 'warning'); return; }
       }
       // Step 4: Investimento (valor, modalidade)
       if (currentStep === 4) {
@@ -551,28 +556,70 @@ export const Wizard: React.FC = () => {
         return;
       }
 
-      // LIMPA_NOME: validar data de nascimento, sem endereço
-      if (profileType === 'LIMPA_NOME') {
-        if (!formData.birthDate) {
-          addToast("Informe sua data de nascimento.", 'warning');
-          return;
-        }
-      } else {
-        // Endereço obrigatório para outros perfis
+      // Data de nascimento obrigatória para TODOS os perfis
+      if (!formData.birthDate) {
+        addToast("Informe sua data de nascimento.", 'warning');
+        return;
+      }
+
+      // LIMPA_NOME não precisa de endereço
+      if (profileType !== 'LIMPA_NOME') {
+        // Endereço obrigatório
         if (!formData.cep || formData.cep.replace(/\D/g, '').length !== 8) {
           addToast("Informe seu CEP.", 'warning');
           return;
         }
+        if (!formData.address.trim()) {
+          addToast("Informe seu endereço (rua/avenida).", 'warning');
+          return;
+        }
+        if (!formData.number.trim()) {
+          addToast("Informe o número da residência.", 'warning');
+          return;
+        }
       }
 
-      // Específico por perfil
-      if (profileType === 'CLT') {
+      // Renda obrigatória para CLT, AUTONOMO, MOTO e GARANTIA
+      if (profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'MOTO' || profileType === 'GARANTIA') {
         if (!formData.income.trim()) {
           addToast("Informe sua renda mensal.", 'warning');
           return;
         }
       }
 
+      // Contatos de confiança obrigatórios (exceto LIMPA_NOME)
+      if (profileType !== 'LIMPA_NOME') {
+        if (!formData.contactTrust1Name.trim()) {
+          addToast("Informe o nome do 1º contato de confiança.", 'warning');
+          return;
+        }
+        if (!formData.contactTrust1 || formData.contactTrust1.replace(/\D/g, '').length < 10) {
+          addToast("Informe o telefone do 1º contato de confiança.", 'warning');
+          return;
+        }
+        if (!formData.contactTrust2Name.trim()) {
+          addToast("Informe o nome do 2º contato de confiança.", 'warning');
+          return;
+        }
+        if (!formData.contactTrust2 || formData.contactTrust2.replace(/\D/g, '').length < 10) {
+          addToast("Informe o telefone do 2º contato de confiança.", 'warning');
+          return;
+        }
+      }
+
+      // Específico por perfil - CLT
+      if (profileType === 'CLT') {
+        if (!formData.occupation.trim()) {
+          addToast("Informe sua profissão/cargo.", 'warning');
+          return;
+        }
+        if (!formData.companyName.trim()) {
+          addToast("Informe o nome da empresa onde trabalha.", 'warning');
+          return;
+        }
+      }
+
+      // Específico por perfil - AUTONOMO
       if (profileType === 'AUTONOMO') {
         if (!formData.cnpj) {
           addToast("Informe seu CPF ou CNPJ do negócio.", 'warning');
@@ -580,13 +627,6 @@ export const Wizard: React.FC = () => {
         }
         if (!formData.businessAddress.trim()) {
           addToast("Informe o endereço do seu comércio.", 'warning');
-          return;
-        }
-      }
-
-      if (profileType === 'MOTO') {
-        if (!formData.income.trim()) {
-          addToast("Informe sua renda mensal.", 'warning');
           return;
         }
       }
@@ -761,6 +801,10 @@ export const Wizard: React.FC = () => {
       }
       if (!formData.accountHolderName.trim()) {
         addToast("Informe o nome do titular da conta.", 'warning');
+        return;
+      }
+      if (!formData.accountHolderCpf || formData.accountHolderCpf.replace(/\D/g, '').length !== 11) {
+        addToast("Informe o CPF do titular da conta.", 'warning');
         return;
       }
     }

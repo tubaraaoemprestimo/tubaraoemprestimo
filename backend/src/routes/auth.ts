@@ -6,6 +6,7 @@ import { prisma } from '../services/prisma';
 import { authenticate, generateAccessToken, generateRefreshToken } from '../middleware/auth';
 import { emailService } from '../services/email';
 import { sendWhatsAppMessage } from '../services/whatsapp';
+import { sendPushToRole } from './push';
 
 export const authRouter = Router();
 
@@ -52,33 +53,39 @@ authRouter.post('/register', async (req: Request, res: Response) => {
                 let customerId = existingCustomer?.id;
 
                 if (!existingCustomer) {
+                    const refCode = `${user.name.split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '')}${Math.floor(1000 + Math.random() * 9000)}`;
                     const newCustomer = await prisma.customer.create({
                         data: {
                             userId: user.id,
                             name: user.name,
                             email: user.email,
                             phone: user.phone || '',
-                            // Fix: Add random suffix to prevent unique constraint violation on CPF tests
                             cpf: `REG_${user.id.substring(0, 8)}_${Date.now().toString().slice(-4)}`,
                             status: 'ACTIVE',
                             source: 'MANUAL',
-                            // Generate own referral code: First name + random 4 digits
-                            referralCode: `${user.name.split(' ')[0].toUpperCase()}${Math.floor(1000 + Math.random() * 9000)}`
+                            referralCode: refCode
                         }
                     });
                     customerId = newCustomer.id;
 
-                    // Notify Admins about new client
+                    // Notify Admins about new client via WhatsApp + Email + Push
                     try {
-                        const admins = await prisma.user.findMany({ where: { role: 'ADMIN', phone: { not: null } } });
+                        const admins = await prisma.user.findMany({ where: { role: 'ADMIN' } });
                         for (const admin of admins) {
                             if (admin.phone) {
-                                await sendWhatsAppMessage(admin.phone, `🦈 *Novo Cliente!*\nNome: ${user.name}\nEmail: ${user.email}\nTelefone: ${user.phone || 'Não informado'}`);
+                                await sendWhatsAppMessage(admin.phone, `🦈 *Novo Cliente Cadastrado!*\nNome: ${user.name}\nEmail: ${user.email}\nTelefone: ${user.phone || 'Não informado'}\nData: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`);
                             }
+                            // Notificação interna para admin
+                            await prisma.notification.create({
+                                data: {
+                                    title: '👤 Novo Cliente Cadastrado',
+                                    message: `${user.name} (${user.email}) acabou de se cadastrar na plataforma.`,
+                                    type: 'INFO'
+                                }
+                            }).catch(() => {});
                         }
-                    } catch (e) { console.error('Error notifying admins via WhatsApp:', e); }
+                    } catch (e) { console.error('Error notifying admins:', e); }
                 } else {
-                    // Update userId if it's missing or different (re-linking)
                     await prisma.customer.update({
                         where: { id: existingCustomer.id },
                         data: { userId: user.id }
@@ -87,27 +94,87 @@ authRouter.post('/register', async (req: Request, res: Response) => {
 
                 // Handle Referral Code if provided
                 if (referralCode && customerId) {
-                    const referrer = await prisma.customer.findFirst({
-                        where: { referralCode: referralCode }
-                    });
-
-                    if (referrer) {
-                        await prisma.referral.create({
-                            data: {
-                                referrerCustomerId: referrer.id,
-                                referrerCode: referralCode,
-                                referredCustomerId: customerId,
-                                referredName: user.name,
-                                referredPhone: user.phone || '',
-                                status: 'PENDING'
-                            }
+                    try {
+                        const referrer = await prisma.customer.findFirst({
+                            where: { referralCode: referralCode }
                         });
+
+                        if (referrer) {
+                            await prisma.referral.create({
+                                data: {
+                                    referrerCustomerId: referrer.id,
+                                    referrerCode: referralCode,
+                                    referredCustomerId: customerId,
+                                    referredName: user.name,
+                                    referredPhone: user.phone || '',
+                                    status: 'PENDING'
+                                }
+                            });
+                            // Notificar quem indicou
+                            if (referrer.phone) {
+                                await sendWhatsAppMessage(referrer.phone,
+                                    `🎉 *Indicação recebida!*\n\n${user.name} se cadastrou usando seu código de indicação!\n\nQuando o empréstimo for aprovado, você receberá pontos e bônus. 🦈`
+                                );
+                            }
+                            if (referrer.email) {
+                                await emailService.send(referrer.email, '🎉 Alguém usou seu código de indicação!',
+                                    `<div style="font-family:Arial;max-width:600px;margin:0 auto;background:#000;color:#fff;padding:30px;border-radius:12px;">
+                                    <h1 style="color:#D4AF37;text-align:center;">🦈 Tubarão Empréstimos</h1>
+                                    <h2 style="color:#4CAF50;">Nova Indicação!</h2>
+                                    <p style="color:#ccc;">${user.name} se cadastrou usando seu código <strong style="color:#D4AF37;">${referralCode}</strong>.</p>
+                                    <p style="color:#ccc;">Quando o empréstimo for aprovado, você receberá pontos e bônus!</p>
+                                    </div>`
+                                );
+                            }
+                        }
+                    } catch (refErr) {
+                        console.error('Failed to process referral:', refErr);
                     }
                 }
 
             } catch (err) {
                 console.error('Failed to link customer in register:', err);
-                // Non-critical, continue
+            }
+        }
+
+        // ====== EMAIL DE BOAS-VINDAS ======
+        try {
+            await emailService.send(user.email, '🦈 Bem-vindo ao Tubarão Empréstimos!',
+                `<div style="font-family:Arial;max-width:600px;margin:0 auto;background:#000;color:#fff;padding:30px;border-radius:12px;">
+                <div style="text-align:center;margin-bottom:20px;">
+                    <h1 style="color:#D4AF37;font-size:28px;">🦈 Tubarão Empréstimos</h1>
+                </div>
+                <h2 style="color:#fff;">Olá, ${user.name}! 👋</h2>
+                <p style="color:#ccc;font-size:16px;line-height:1.6;">
+                    Sua conta foi criada com sucesso! Agora você pode solicitar empréstimos, acompanhar pagamentos e muito mais.
+                </p>
+                <div style="background:#111;border:1px solid #333;border-radius:8px;padding:15px;margin:15px 0;">
+                    <p style="margin:5px 0;color:#ccc;"><strong style="color:#D4AF37;">Email:</strong> ${user.email}</p>
+                    <p style="margin:5px 0;color:#ccc;"><strong style="color:#D4AF37;">Telefone:</strong> ${user.phone || 'Não informado'}</p>
+                </div>
+                <div style="text-align:center;margin:25px 0;">
+                    <a href="https://www.tubaraoemprestimo.com.br" style="background:#D4AF37;color:#000;padding:14px 40px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:16px;display:inline-block;">Acessar Plataforma</a>
+                </div>
+                <hr style="border-color:#333;margin:20px 0;" />
+                <p style="color:#666;font-size:12px;text-align:center;">Tubarão Empréstimos — Plataforma de Crédito Premium</p>
+                </div>`
+            );
+        } catch (emailErr) {
+            console.error('Welcome email failed:', emailErr);
+        }
+
+        // Push notification para admins
+        sendPushToRole('ADMIN', '👤 Novo Cliente', `${user.name} acabou de se cadastrar`).catch(() => {});
+
+        // WhatsApp de boas-vindas
+        if (phone) {
+            try {
+                const cleanPhone = phone.replace(/\D/g, '');
+                await sendWhatsAppMessage(cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`,
+                    `🦈 *Bem-vindo ao Tubarão Empréstimos!*\n\nOlá, ${user.name}! Sua conta foi criada com sucesso.\n\nAcesse a plataforma para solicitar empréstimos e serviços:\nhttps://www.tubaraoemprestimo.com.br\n\n_Tubarão Empréstimos — Crédito Premium_`
+                );
+            } catch (waErr) {
+                console.error('Welcome WhatsApp failed:', waErr);
             }
         }
 

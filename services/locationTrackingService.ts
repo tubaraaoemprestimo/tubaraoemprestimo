@@ -6,12 +6,15 @@ import { api } from './apiClient';
 export interface CustomerLocation {
     customerEmail: string;
     customerName?: string;
+    phone?: string;
     latitude: number;
     longitude: number;
     accuracy?: number;
     address?: string;
     city?: string;
     state?: string;
+    deviceInfo?: string;
+    lastIp?: string;
     updatedAt?: string;
 }
 
@@ -123,12 +126,15 @@ export const locationTrackingService = {
         return data.map((loc: any) => ({
             customerEmail: loc.customer_email,
             customerName: loc.customer_name,
+            phone: loc.phone,
             latitude: loc.latitude,
             longitude: loc.longitude,
             accuracy: loc.accuracy,
             address: loc.address,
             city: loc.city,
             state: loc.state,
+            deviceInfo: loc.device_info,
+            lastIp: loc.last_ip,
             updatedAt: loc.updated_at
         }));
     },

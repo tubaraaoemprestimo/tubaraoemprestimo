@@ -129,6 +129,9 @@ model customers {
   zip_code              String?
   latitude              Float?
   longitude             Float?
+  location_updated_at   DateTime?
+  device_info           String?
+  last_ip               String?
   monthly_income        Float?
   pre_approved_amount   Float?
   pre_approved_at       DateTime?
@@ -141,12 +144,16 @@ model customers {
   late_interest_daily   Float?
   late_interest_monthly Float?
   installment_offer     Json?
+  referral_code         String?         @unique
+  referral_points       Int             @default(0)
   joined_at             DateTime        @default(now())
   coupons               coupons[]
   users                 users?          @relation(fields: [user_id], references: [id])
   loan_requests         loan_requests[]
   loans                 loans[]
   notifications         notifications[]
+  referrals_given       referrals[]     @relation("ReferrerCustomer")
+  referrals_received    referrals[]     @relation("ReferredCustomer")
 }
 
 model goals_settings {
@@ -236,6 +243,7 @@ model loan_requests {
   created_at                DateTime   @default(now())
   updated_at                DateTime
   contract_pdf_url          String?
+  referral_code             String?
   customers                 customers? @relation(fields: [customer_id], references: [id])
   users                     users?     @relation(fields: [user_id], references: [id])
   loans                     loans?
@@ -462,4 +470,68 @@ model whatsapp_config {
   instance_name String
   is_connected  Boolean  @default(false)
   updated_at    DateTime
+}
+
+model referrals {
+  id                    String     @id
+  referrer_customer_id  String
+  referrer_code         String
+  referred_customer_id  String?
+  referred_name         String
+  referred_phone        String?
+  status                String     @default("PENDING")
+  points_awarded        Int        @default(0)
+  bonus_amount          Float      @default(0)
+  created_at            DateTime   @default(now())
+  approved_at           DateTime?
+  referrer              customers  @relation("ReferrerCustomer", fields: [referrer_customer_id], references: [id])
+  referred              customers? @relation("ReferredCustomer", fields: [referred_customer_id], references: [id])
+}
+
+model payment_receipts {
+  id              String    @id
+  installment_id  String
+  customer_id     String
+  receipt_url     String
+  amount          Float?
+  status          String    @default("PENDING")
+  notes           String?
+  reviewed_by     String?
+  reviewed_at     DateTime?
+  created_at      DateTime  @default(now())
+}
+
+model credit_scores {
+  id              String    @id
+  customer_id     String
+  score           Int
+  classification  String
+  source          String    @default("INTERNAL")
+  factors         Json?
+  restrictions    Json?
+  consulted_at    DateTime  @default(now())
+}
+
+model income_analyses {
+  id                      String    @id
+  customer_id             String
+  monthly_income          Float
+  average_balance         Float?
+  income_source           String?
+  stability               String?
+  current_commitment      Float?
+  available_commitment    Float?
+  max_loan_amount         Float?
+  recommendation          String?
+  analyzed_at             DateTime  @default(now())
+}
+
+model open_finance_consents {
+  id              String    @id
+  customer_id     String
+  scope           String[]
+  status          String    @default("ACTIVE")
+  granted_at      DateTime  @default(now())
+  expires_at      DateTime?
+  revoked_at      DateTime?
 }

@@ -58,6 +58,73 @@ async function sendPushToSubscription(
     }
 }
 
+// ============ Exported Helper: Send push to a user ============
+
+export async function sendPushToUser(userId: string, title: string, body: string, data?: Record<string, any>) {
+    if (!vapidPublicKey || !vapidPrivateKey) return;
+    try {
+        const subs = await prisma.pushSubscription.findMany({
+            where: { userId },
+            select: { id: true, endpoint: true, p256dh: true, auth: true }
+        });
+        const expiredIds: string[] = [];
+        for (const sub of subs) {
+            const result = await sendPushToSubscription(sub, { title, body, data });
+            if (!result.success && result.error === 'SUBSCRIPTION_EXPIRED') {
+                expiredIds.push(sub.id);
+            }
+        }
+        if (expiredIds.length > 0) {
+            await prisma.pushSubscription.deleteMany({ where: { id: { in: expiredIds } } });
+        }
+    } catch (e) {
+        console.error('[Push] sendPushToUser error:', e);
+    }
+}
+
+export async function sendPushToAll(title: string, body: string, data?: Record<string, any>) {
+    if (!vapidPublicKey || !vapidPrivateKey) return;
+    try {
+        const subs = await prisma.pushSubscription.findMany({
+            select: { id: true, endpoint: true, p256dh: true, auth: true }
+        });
+        const expiredIds: string[] = [];
+        for (const sub of subs) {
+            const result = await sendPushToSubscription(sub, { title, body, data });
+            if (!result.success && result.error === 'SUBSCRIPTION_EXPIRED') {
+                expiredIds.push(sub.id);
+            }
+        }
+        if (expiredIds.length > 0) {
+            await prisma.pushSubscription.deleteMany({ where: { id: { in: expiredIds } } });
+        }
+    } catch (e) {
+        console.error('[Push] sendPushToAll error:', e);
+    }
+}
+
+export async function sendPushToRole(role: string, title: string, body: string, data?: Record<string, any>) {
+    if (!vapidPublicKey || !vapidPrivateKey) return;
+    try {
+        const subs = await prisma.pushSubscription.findMany({
+            where: { user: { role } },
+            select: { id: true, endpoint: true, p256dh: true, auth: true }
+        });
+        const expiredIds: string[] = [];
+        for (const sub of subs) {
+            const result = await sendPushToSubscription(sub, { title, body, data });
+            if (!result.success && result.error === 'SUBSCRIPTION_EXPIRED') {
+                expiredIds.push(sub.id);
+            }
+        }
+        if (expiredIds.length > 0) {
+            await prisma.pushSubscription.deleteMany({ where: { id: { in: expiredIds } } });
+        }
+    } catch (e) {
+        console.error('[Push] sendPushToRole error:', e);
+    }
+}
+
 // ============ ROUTES ============
 
 // POST /api/push/register - Registrar token/subscription do dispositivo

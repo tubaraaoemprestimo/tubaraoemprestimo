@@ -45,8 +45,6 @@ export const OpenFinancePage: React.FC = () => {
                 monthlyIncome: c.monthlyIncome || (2000 + Math.random() * 8000)
             }));
             setCustomers(customersWithIncome);
-            setHistoricalScores(openFinanceService.getScores());
-            setHistoricalAnalyses(openFinanceService.getAnalyses());
         } catch (error) {
             console.error('Error loading data:', error);
             addToast('Erro ao carregar dados', 'error');
@@ -66,17 +64,17 @@ export const OpenFinancePage: React.FC = () => {
 
         setIsAnalyzing(true);
         try {
-            // Update customer income if declared
-            const customerToAnalyze = declaredIncome
-                ? { ...selectedCustomer, monthlyIncome: parseFloat(declaredIncome) }
-                : selectedCustomer;
-
-            const result = await openFinanceService.performFullAnalysis(customerToAnalyze);
+            const income = declaredIncome ? parseFloat(declaredIncome) : undefined;
+            const result = await openFinanceService.performFullAnalysis(selectedCustomer, income);
             setCurrentAnalysis(result);
 
-            // Reload historical data
-            setHistoricalScores(openFinanceService.getScores());
-            setHistoricalAnalyses(openFinanceService.getAnalyses());
+            // Reload historical data from API
+            const [scores, analyses] = await Promise.all([
+                openFinanceService.getScores(selectedCustomer.id),
+                openFinanceService.getAnalyses(selectedCustomer.id)
+            ]);
+            setHistoricalScores(scores);
+            setHistoricalAnalyses(analyses);
 
             addToast('Análise concluída com sucesso!', 'success');
         } catch (error) {

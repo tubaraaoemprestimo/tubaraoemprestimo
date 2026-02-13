@@ -27,6 +27,8 @@ import { whatsappStatusRouter } from './routes/whatsappStatus';
 import { referralsRouter } from './routes/referrals';
 import { communicationRouter } from './routes/communication';
 import { adminRouter } from './routes/admin';
+import { paymentReceiptsRouter } from './routes/paymentReceipts';
+import { openFinanceRouter } from './routes/openFinance';
 import { initCronJobs } from './cron/installmentReminders';
 
 const app = express();
@@ -71,6 +73,8 @@ app.use('/api/whatsapp', whatsappStatusRouter);
 app.use('/api/referrals', referralsRouter);
 app.use('/api/communication', communicationRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/payment-receipts', paymentReceiptsRouter);
+app.use('/api/open-finance', openFinanceRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {

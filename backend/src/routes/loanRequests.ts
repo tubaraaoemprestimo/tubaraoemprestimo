@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { emailService } from '../services/email';
+import { sendWhatsAppMessage } from '../services/whatsapp';
+import { sendPushToUser, sendPushToRole } from './push';
 import axios from 'axios';
 
 // ============ Helpers ============
@@ -205,6 +207,69 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
             }
         });
 
+        // ====== NOTIFICAÇÕES DE NOVA SOLICITAÇÃO ======
+        const amtFmt = (request.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // Email para o cliente confirmando recebimento
+        if (req.user!.email) {
+            const clientHtml = brandedEmailHtml(`
+                <h2 style="color: #D4AF37;">📋 Solicitação Recebida!</h2>
+                <p>Olá, <strong>${data.clientName || req.user!.name}</strong>!</p>
+                <p>Recebemos sua solicitação de empréstimo e ela está em análise.</p>
+                <div style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Valor:</strong> ${amtFmt}</p>
+                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Parcelas:</strong> ${request.installments}x</p>
+                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Tipo:</strong> ${request.profileType || 'Empréstimo'}</p>
+                </div>
+                <p>Acompanhe o status pelo aplicativo. Você receberá uma notificação assim que tivermos novidades.</p>
+                <div style="text-align: center; margin: 20px 0;">
+                    <a href="https://www.tubaraoemprestimo.com.br" style="background: #D4AF37; color: #000; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Acessar App</a>
+                </div>
+            `);
+            emailService.send(req.user!.email, '📋 Solicitação Recebida — Tubarão Empréstimos', clientHtml).catch(() => {});
+        }
+
+        // WhatsApp para o cliente
+        if (data.phone) {
+            sendWhatsAppNotification(data.phone,
+                `📋 *Solicitação Recebida!*\n\nOlá, ${(data.clientName || req.user!.name).split(' ')[0]}!\n\nSua solicitação de ${amtFmt} em ${request.installments}x foi recebida e está em análise.\n\nAcompanhe pelo app:\nhttps://www.tubaraoemprestimo.com.br\n\n_Tubarão Empréstimos 🦈_`
+            );
+        }
+
+        // Notificar admin via WhatsApp e notificação interna
+        try {
+            const admins = await prisma.user.findMany({ where: { role: 'ADMIN' } });
+            for (const admin of admins) {
+                if (admin.phone) {
+                    await sendWhatsAppNotification(admin.phone,
+                        `🦈 *Nova Solicitação!*\n\nCliente: ${data.clientName || req.user!.name}\nValor: ${amtFmt}\nParcelas: ${request.installments}x\nTipo: ${request.profileType || 'Empréstimo'}\n\nAcesse o painel para avaliar.`
+                    );
+                }
+            }
+            await prisma.notification.create({
+                data: {
+                    title: '📋 Nova Solicitação de Empréstimo',
+                    message: `${data.clientName || req.user!.name} solicitou ${amtFmt} em ${request.installments}x (${request.profileType || 'Empréstimo'})`,
+                    type: 'INFO'
+                }
+            }).catch(() => {});
+        } catch (notifErr) {
+            console.error('[LoanRequests] Notification error:', notifErr);
+        }
+
+        // Notificação interna para o cliente
+        if (customer?.id) {
+            await prisma.notification.create({
+                data: {
+                    customerId: customer.id,
+                    customerEmail: req.user!.email,
+                    title: '📋 Solicitação Enviada',
+                    message: `Sua solicitação de ${amtFmt} está em análise.`,
+                    type: 'INFO'
+                }
+            }).catch(() => {});
+        }
+
         res.status(201).json({ success: true, id: request.id });
     } catch (error: any) {
         console.error('[LoanRequests] Submit error:', error);
@@ -273,6 +338,77 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
             });
         }
 
+        // ====== GAMIFICAÇÃO DE INDICAÇÃO ======
+        try {
+            if (request.customerId) {
+                const pendingReferral = await prisma.referral.findFirst({
+                    where: { referredCustomerId: request.customerId, status: 'PENDING' },
+                    include: { referrer: true }
+                });
+                if (pendingReferral) {
+                    let points = 100;
+                    let bonus = 0;
+                    if (request.amount >= 10000) { bonus = 100; }
+                    else if (request.amount >= 5000) { bonus = 50; }
+
+                    await prisma.referral.update({
+                        where: { id: pendingReferral.id },
+                        data: { status: 'APPROVED', pointsAwarded: points, bonusAmount: bonus, approvedAt: new Date() }
+                    });
+
+                    await prisma.customer.update({
+                        where: { id: pendingReferral.referrerCustomerId },
+                        data: { referralPoints: { increment: points } }
+                    });
+
+                    // Notificar quem indicou
+                    const referrer = pendingReferral.referrer;
+                    if (referrer?.phone) {
+                        sendWhatsAppNotification(referrer.phone,
+                            `🎉 *Indicação Aprovada!*\n\nO empréstimo de ${request.clientName} foi aprovado!\n\nVocê ganhou *${points} pontos*${bonus > 0 ? ` e um bônus de R$ ${bonus}` : ''}! 🦈`
+                        );
+                    }
+                    if (referrer?.email) {
+                        emailService.send(referrer.email, '🎉 Indicação Aprovada — Tubarão Empréstimos',
+                            brandedEmailHtml(`
+                                <h2 style="color:#4CAF50;">Indicação Aprovada!</h2>
+                                <p>O empréstimo de <strong>${request.clientName}</strong> foi aprovado!</p>
+                                <p>Você ganhou <strong style="color:#D4AF37;">${points} pontos</strong>${bonus > 0 ? ` e um bônus de <strong style="color:#4CAF50;">R$ ${bonus}</strong>` : ''}!</p>
+                            `)
+                        ).catch(() => {});
+                    }
+                }
+            }
+        } catch (refErr) {
+            console.error('[LoanRequests] Referral reward error:', refErr);
+        }
+
+        // ====== GERAR PIX PARA PARCELAS ======
+        try {
+            const settings = await prisma.systemSettings.findFirst({ where: { key: 'pix_key' } });
+            if (settings?.value) {
+                const pixKey = settings.value;
+                const pixKeyTypeSetting = await prisma.systemSettings.findFirst({ where: { key: 'pix_key_type' } });
+                const pixReceiverSetting = await prisma.systemSettings.findFirst({ where: { key: 'pix_receiver_name' } });
+                const pixKeyType = pixKeyTypeSetting?.value || 'CPF';
+                const pixReceiver = pixReceiverSetting?.value || 'Tubarao Emprestimos';
+
+                // Atualizar parcelas com código PIX
+                const loan = await prisma.loan.findFirst({ where: { requestId: request.id }, include: { installments: true } });
+                if (loan) {
+                    for (const inst of loan.installments) {
+                        const pixCode = `00020126${String(4 + pixKey.length).padStart(2, '0')}0014BR.GOV.BCB.PIX01${String(pixKey.length).padStart(2, '0')}${pixKey}5204000053039865406${inst.amount.toFixed(2)}5802BR5913${pixReceiver.substring(0, 13)}6008SAOPAULO62070503***6304`;
+                        await prisma.installment.update({
+                            where: { id: inst.id },
+                            data: { pixCode }
+                        });
+                    }
+                }
+            }
+        } catch (pixErr) {
+            console.error('[LoanRequests] PIX generation error:', pixErr);
+        }
+
         // ====== NOTIFICAÇÕES AUTOMÁTICAS ======
         const amountFormatted = request.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -318,6 +454,11 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
                     type: 'SUCCESS'
                 }
             }).catch(() => { });
+        }
+
+        // Push notification para o cliente
+        if (request.userId) {
+            sendPushToUser(request.userId, '✅ Empréstimo Aprovado!', `Seu empréstimo de ${amountFormatted} foi aprovado!`).catch(() => {});
         }
 
         res.json({ success: true });
@@ -371,6 +512,11 @@ loanRequestsRouter.put('/:id/reject', requireAdmin, async (req: Request, res: Re
                     type: 'INFO'
                 }
             }).catch(() => { });
+        }
+
+        // Push notification para o cliente
+        if (loanRequest.userId) {
+            sendPushToUser(loanRequest.userId, 'Solicitação Atualizada', 'Sua solicitação foi atualizada. Acesse o app.').catch(() => {});
         }
 
         res.json({ success: true });

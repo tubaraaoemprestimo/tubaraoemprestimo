@@ -13,11 +13,12 @@ customersRouter.get('/', async (_req: Request, res: Response) => {
               id, user_id, name, cpf, email, phone, status,
               internal_score, total_debt, active_loans_count,
               address, neighborhood, city, state, zip_code,
-              latitude, longitude, monthly_income,
+              latitude, longitude, location_updated_at, device_info, last_ip,
+              monthly_income,
               pre_approved_amount, pre_approved_at,
               instagram, source, profile_pic, birth_date,
               monthly_interest_rate, late_fixed_fee, late_interest_daily, late_interest_monthly,
-              installment_offer, joined_at
+              installment_offer, referral_code, referral_points, joined_at
             FROM customers
             ORDER BY joined_at DESC
         `);
@@ -52,6 +53,11 @@ customersRouter.get('/', async (_req: Request, res: Response) => {
             lateInterestDaily: c.late_interest_daily,
             lateInterestMonthly: c.late_interest_monthly,
             installmentOffer: c.installment_offer,
+            referralCode: c.referral_code,
+            referralPoints: c.referral_points,
+            locationUpdatedAt: c.location_updated_at,
+            deviceInfo: c.device_info,
+            lastIp: c.last_ip,
             joinedAt: c.joined_at,
             preApprovedOffer: c.pre_approved_amount ? {
                 amount: c.pre_approved_amount,
@@ -73,7 +79,7 @@ customersRouter.get('/', async (_req: Request, res: Response) => {
 });
 
 
-// PUT /api/customers/location — Salvar localizacao do usuario atual
+// PUT /api/customers/location — Salvar localizacao do usuario atual (chamado em cada acesso)
 customersRouter.put('/location', async (req: Request, res: Response) => {
     try {
         const email = String(req.body?.customer_email || req.user?.email || '').trim().toLowerCase();
@@ -82,12 +88,18 @@ customersRouter.put('/location', async (req: Request, res: Response) => {
             return;
         }
 
+        const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || '';
+        const userAgent = req.headers['user-agent'] || '';
+
         await prisma.$executeRawUnsafe(`
             UPDATE customers
             SET latitude = $1, longitude = $2,
                 city = COALESCE($3, city),
                 state = COALESCE($4, state),
-                address = COALESCE($5, address)
+                address = COALESCE($5, address),
+                location_updated_at = NOW(),
+                device_info = $7,
+                last_ip = $8
             WHERE LOWER(email) = LOWER($6)
         `,
             req.body?.latitude ?? null,
@@ -95,7 +107,9 @@ customersRouter.put('/location', async (req: Request, res: Response) => {
             req.body?.city ?? null,
             req.body?.state ?? null,
             req.body?.address ?? null,
-            email
+            email,
+            userAgent.substring(0, 500),
+            String(ip).substring(0, 100)
         );
 
         res.json({ success: true });
@@ -109,10 +123,11 @@ customersRouter.put('/location', async (req: Request, res: Response) => {
 customersRouter.get('/locations', requireAdmin, async (_req: Request, res: Response) => {
     try {
         const rows = await prisma.$queryRawUnsafe(`
-            SELECT email, name, phone, latitude, longitude, city, state, address, joined_at
+            SELECT email, name, phone, latitude, longitude, city, state, address,
+                   device_info, last_ip, location_updated_at, joined_at
             FROM customers
             WHERE latitude IS NOT NULL AND longitude IS NOT NULL
-            ORDER BY joined_at DESC
+            ORDER BY location_updated_at DESC NULLS LAST, joined_at DESC
         `);
 
         res.json((rows || []).map((r: any) => ({
@@ -124,7 +139,9 @@ customersRouter.get('/locations', requireAdmin, async (_req: Request, res: Respo
             city: r.city,
             state: r.state,
             address: r.address,
-            updated_at: r.joined_at || new Date().toISOString()
+            device_info: r.device_info,
+            last_ip: r.last_ip,
+            updated_at: r.location_updated_at || r.joined_at || new Date().toISOString()
         })));
     } catch (e) {
         console.error('[Customers] locations error:', e);
