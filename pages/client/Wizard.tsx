@@ -5,7 +5,7 @@ import {
   AlertCircle, FileText, ScanFace, X, Plus, Loader2,
   Phone, Users, Video, DollarSign, Shield, Clock, Landmark, CheckCircle2, FileCheck, Percent,
   Car, Smartphone, Tv, Home, Package, Camera as CameraIcon,
-  Briefcase, Store, Bike, Banknote, Rocket, CreditCard, FileSignature, Scale
+  Briefcase, Store, Bike, Banknote, Rocket, CreditCard, FileSignature, Scale, Gift
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Camera } from '../../components/Camera';
@@ -209,6 +209,8 @@ export const Wizard: React.FC = () => {
     contactTrust2: '', contactTrust2Name: '',
     instagram: '',
     occupation: '', companyName: '', companyAddress: '', workTime: '',
+    // Indicação
+    referredByCode: '',
     // Autônomo
     cnpj: '', businessAddress: '',
     cep: '', address: '', number: '', income: '',
@@ -1054,6 +1056,8 @@ export const Wizard: React.FC = () => {
         // Cliente recorrente
         isReturningClient: isReturningClient === 'sim',
         returningClientNote: isReturningClient === 'sim' ? returningClientNote : '',
+        // Código de indicação
+        referralCode: formData.referredByCode || undefined,
         // Dados antifraude
         sessionId: antifraudService.getSessionId(),
         riskScore: riskData?.riskScore || 0,
@@ -1236,6 +1240,28 @@ export const Wizard: React.FC = () => {
                   );
                 })}
               </div>
+
+              {/* Campo de Código de Indicação */}
+              {profileType && (
+                <div className="mt-6 p-5 bg-gradient-to-r from-emerald-900/30 to-zinc-900/50 rounded-2xl border border-emerald-700/50 animate-in fade-in slide-in-from-bottom-2">
+                  <h3 className="font-bold text-emerald-400 mb-3 flex items-center gap-2">
+                    <Gift size={18} />
+                    Código de Indicação (Opcional)
+                  </h3>
+                  <p className="text-sm text-zinc-400 mb-3">
+                    Se você foi indicado por alguém, digite o código para ganhar pontos e descontos!
+                  </p>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.referredByCode}
+                      onChange={(e) => setFormData({ ...formData, referredByCode: e.target.value.toUpperCase() })}
+                      placeholder="Ex: IND-JOAO-1234"
+                      className="w-full bg-black border border-emerald-700 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:border-emerald-500 outline-none uppercase"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Pergunta sobre cliente recorrente - apenas CLT, AUTONOMO e GARANTIA */}
               {profileType && profileType !== 'MOTO' && profileType !== 'LIMPA_NOME' && profileType !== 'INVESTIDOR' && (
