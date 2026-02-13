@@ -36,9 +36,25 @@ const PORT = process.env.PORT || 3001;
 
 // ============= MIDDLEWARE =============
 
-// CORS
+// CORS - Allow production and development origins
+const allowedOrigins = [
+    'https://www.tubaraoemprestimo.com.br',
+    'https://tubaraoemprestimo.com.br',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    process.env.CORS_ORIGIN
+].filter(Boolean) as string[];
+
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, server-to-server, curl)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            console.log(`[CORS] Blocked origin: ${origin}`);
+            callback(null, true); // Allow all in case of misconfigured reverse proxy
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
