@@ -1,6 +1,6 @@
 # 🦈 Tubarão Empréstimos — Resumo do Projeto
 
-> **Última atualização:** 2026-02-12 (v3 - feature/referral-geo-fixes)
+> **Última atualização:** 2026-02-13 (v4 - feature/referral-gamification)
 > **Repositório:** https://github.com/tubaraaoemprestimo/tubaraoemprestimo.git
 > **Produção:** https://www.tubaraoemprestimo.com.br
 > **Stack:** React + TypeScript + Vite + Node.js (Express/Prisma)
@@ -8,33 +8,71 @@
 
 ---
 
-## 📝 Últimas Alterações (12/02/2026)
+## 📝 Últimas Alterações (13/02/2026)
 
-### 1. Sistema de Indicações & Gamificação
-- **Backend**:
-  - Novo modelo `Referral` no Prisma Schema para rastrear indicações.
-  - Atualização no endpoint `POST /register`: aceita `referralCode` e cria registro `Referral` com status `PENDING`.
-  - Atualização no `Customer`: campo `referralCode` (gerado automaticamente no cadastro) e relações com `Referral`.
+### 1. Sistema de Indicações & Gamificação (Completo)
 - **Frontend**:
-  - Tela de Registro (`Register.tsx`) agora inclui campo "Código de Indicação" (opcional).
-  - `apiService.signUp` atualizado para enviar `referralCode`.
+  - Wizard: campo de código de indicação no Step 1 (opcional)
+  - Nova página `ReferralsPage.tsx`: dashboard completo do cliente com:
+    - Código de indicação pessoal (copia rápida)
+    - Contador de pontos (total, disponível, usado)
+    - Histórico de indicações (pendentes, aprovados, rejeitados)
+    - Histórico de transações de pontos
+    - Regras de recompensa explicadas
+    - Botão de compartilhar (Web Share API)
+  - ClientDashboard: botão "Indicações" no grid principal (4ª posição)
+  - Removido banner duplicado "Indique e Ganhe"
+- **Services**:
+  - `referralService.ts`: expandido com funções de gamificação:
+    - `getCustomerPoints()`: obtém pontos do cliente (API + localStorage fallback)
+    - `awardPointsForReferral()`: adiciona pontos quando indicado aprova empréstimo
+    - `getPointsHistory()`: histórico de transações
+    - `getAllCustomersPoints()`: lista todos clientes com pontos (admin)
+  - `REFERRAL_REWARD_RULES` em `types.ts`: regras configuráveis:
+    - Qualquer indicação aprovada: 100 pontos
+    - Empréstimo ≥ R$ 5.000: R$ 50 de bônus
+    - Empréstimo ≥ R$ 10.000: R$ 100 de bônus
+- **Types**:
+  - Novas interfaces: `ReferralCode`, `ReferralUsage`, `CustomerPoints`, `PointsTransaction`
+- **Backend Já Existente** (pronto para uso):
+  - Tabela `referrals` no Prisma
+  - Endpoints `/api/referrals` (GET, POST, PUT)
+  - Uso do `referral_code` no `loan_request` (já salvava, agora está funcional)
 
-### 2. Correções Críticas & Melhorias
-- **Admin / Clientes**:
-  - Corrigido `GET /api/customers`: o backend agora mapeia os campos do Prisma para a estrutura aninhada que o frontend espera (`preApprovedOffer`, `customRates`). Isso corrige a lista de clientes vazia ou quebrada no Admin.
-- **Geolocalização**:
-  - Adicionado campo `locationUpdatedAt` no `Customer` para registrar o momento exato da captura.
-  - API `/locations` ajustada para retornar a data real da atualização, permitindo que o Admin veja "última localização em X minutos atrás" corretamente.
+### 2. Geolocalização Funcional (P0)
+- **Wizard** (`pages/client/Wizard.tsx`):
+  - Captura de localização no step de documentos (obrigatória)
+  - Envia `latitude`, `longitude`, `accuracy`, `locationCapturedAt` no submit
+- **Backend** (`backend/src/routes/loanRequests.ts`):
+  - Salva localização na tabela `customer` (create + update)
+  - Campos: `latitude`, `longitude`, `locationUpdatedAt`
+- **Login** (`pages/auth/Login.tsx`):
+  - Captura localização automaticamente após autenticação (background)
+- **Resultado**: Admin agora visualiza localizações reais em `/admin/geolocation`
 
-### 3. Antifraude & Comunicação (Checkpoint Tarde)
-- **Segurança**:
-  - Limite de 2 dispositivos por usuário (`POST /device/check`).
-  - Captura de localização a cada acesso ao Dashboard.
-- **Notificações**:
-  - Suporte a Web Push (VAPID) para usuários (Backend + Frontend).
-  - Alerta automático no WhatsApp dos Admins quando novo cliente se cadastra.
-- **WhatsApp**:
-  - Backend pronto para agendamento de Status (`whatsappStatusRouter`).
+### 3. Correções e Melhorias Diversas
+- **Clientes no Admin**: Filtro padrão `statusFilter = 'ALL'` garantindo que todos apareçam
+- **Antifraude**:
+  - Backend recebe e salva `sessionId`, `riskScore`, `riskFactors` do frontend
+  - Cooldown de 30 dias após reprovação implementado (verifica CPF)
+- **Build**: TypeScript compila sem erros críticos
+
+### 4. Checklist de Itens Solicitados (Progresso)
+- [x] Status WhatsApp agendado (backend pronto, falta frontend)
+- [x] Geolocalização funcional (captura + salvamento)
+- [x] Código de indicação no cadastro
+- [x] Gamificação (pontos, recompensas)
+- [ ] Todos campos obrigatórios em TODOS fluxos (auditoria pendente)
+- [ ] OpenFinance API oficial (mock atual, integrar real se API disponível)
+- [ ] PIX QR code automático (admin settings + cliente)
+- [ ] Emails de vencimento (3 dias e no dia) - cron jobs
+- [ ] Notificações pushconsistentes (Firebase + Web Push implementados, faltam triggers)
+- [ ] Antifraude 100%: limite 2 dispositivos/IPs (parcialmente feito)
+- [ ] Anexar comprovante e admin confirmar (já existe, precisa de fluxo completo)
+
+---
+
+## 📂 Estrutura do Projeto
 
 ---
 
