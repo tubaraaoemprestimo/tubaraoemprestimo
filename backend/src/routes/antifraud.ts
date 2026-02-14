@@ -878,3 +878,166 @@ antifraudRouter.post('/contract-signature', authenticate, async (req: Request, r
         res.status(500).json({ error: 'Erro ao registrar assinatura' });
     }
 });
+
+// =============================================
+// BIOMETRIC (WebAuthn) ROUTES
+// =============================================
+
+// GET /api/antifraud/biometric/check?user_id=xxx — Check if user has biometric credentials
+antifraudRouter.get('/biometric/check', async (req: Request, res: Response) => {
+    try {
+        const userId = String(req.query.user_id || '').trim();
+        if (!userId) {
+            res.json([]);
+            return;
+        }
+        const credentials = await prisma.webAuthnCredential.findMany({
+            where: { userId },
+            select: { id: true, credentialId: true, deviceName: true, createdAt: true }
+        });
+        res.json(credentials);
+    } catch (err: any) {
+        console.error('[Biometric] check error:', err);
+        res.json([]);
+    }
+});
+
+// GET /api/antifraud/biometric/credentials?user_id=xxx — List credential IDs for a user
+antifraudRouter.get('/biometric/credentials', async (req: Request, res: Response) => {
+    try {
+        const userId = String(req.query.user_id || '').trim();
+        if (!userId) {
+            res.json([]);
+            return;
+        }
+        const credentials = await prisma.webAuthnCredential.findMany({
+            where: { userId },
+            select: { id: true, credentialId: true, deviceName: true, signCount: true, createdAt: true }
+        });
+        // Return with snake_case field names as the frontend biometricService expects
+        res.json(credentials.map((c: any) => ({
+            id: c.id,
+            credential_id: c.credentialId,
+            device_name: c.deviceName,
+            sign_count: c.signCount,
+            created_at: c.createdAt
+        })));
+    } catch (err: any) {
+        console.error('[Biometric] credentials error:', err);
+        res.json([]);
+    }
+});
+
+// POST /api/antifraud/biometric — Save a new biometric credential
+antifraudRouter.post('/biometric', async (req: Request, res: Response) => {
+    try {
+        const { user_id, user_email, credential_id, public_key, attestation_object, device_name, sign_count } = req.body;
+
+        if (!user_id || !credential_id) {
+            res.status(400).json({ error: 'user_id e credential_id são obrigatórios' });
+            return;
+        }
+
+        const credential = await prisma.webAuthnCredential.create({
+            data: {
+                userId: user_id,
+                userEmail: user_email || '',
+                credentialId: credential_id,
+                publicKey: public_key || '',
+                attestationObject: attestation_object || '',
+                deviceName: device_name || 'Desconhecido',
+                signCount: sign_count || 0,
+            }
+        });
+
+        res.json({ success: true, id: credential.id });
+    } catch (err: any) {
+        console.error('[Biometric] save error:', err);
+        res.status(500).json({ error: 'Erro ao salvar credencial biométrica' });
+    }
+});
+
+// GET /api/antifraud/biometric/verify?credential_id=xxx — Verify/lookup a credential
+antifraudRouter.get('/biometric/verify', async (req: Request, res: Response) => {
+    try {
+        const credentialId = String(req.query.credential_id || '').trim();
+        if (!credentialId) {
+            res.status(400).json({ error: 'credential_id é obrigatório' });
+            return;
+        }
+
+        const credential = await prisma.webAuthnCredential.findFirst({
+            where: { credentialId }
+        });
+
+        if (!credential) {
+            res.status(404).json({ error: 'Credencial não encontrada' });
+            return;
+        }
+
+        res.json({
+            id: credential.id,
+            user_id: credential.userId,
+            user_email: credential.userEmail,
+            credential_id: credential.credentialId,
+            public_key: credential.publicKey,
+            sign_count: credential.signCount,
+            device_name: credential.deviceName,
+            created_at: credential.createdAt
+        });
+    } catch (err: any) {
+        console.error('[Biometric] verify error:', err);
+        res.status(500).json({ error: 'Erro ao verificar credencial' });
+    }
+});
+
+// PUT /api/antifraud/biometric/update-count — Update sign count after authentication
+antifraudRouter.put('/biometric/update-count', async (req: Request, res: Response) => {
+    try {
+        const { credential_id, sign_count, last_used_at } = req.body;
+        if (!credential_id) {
+            res.status(400).json({ error: 'credential_id é obrigatório' });
+            return;
+        }
+
+        const credential = await prisma.webAuthnCredential.findFirst({
+            where: { credentialId: credential_id }
+        });
+
+        if (!credential) {
+            res.status(404).json({ error: 'Credencial não encontrada' });
+            return;
+        }
+
+        await prisma.webAuthnCredential.update({
+            where: { id: credential.id },
+            data: {
+                signCount: sign_count || (credential.signCount || 0) + 1,
+                lastUsedAt: last_used_at ? new Date(last_used_at) : new Date()
+            }
+        });
+
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error('[Biometric] update-count error:', err);
+        res.status(500).json({ error: 'Erro ao atualizar contagem' });
+    }
+});
+
+// DELETE /api/antifraud/biometric?user_id=xxx — Remove all biometric credentials for a user
+antifraudRouter.delete('/biometric', async (req: Request, res: Response) => {
+    try {
+        const userId = String(req.query.user_id || '').trim();
+        if (!userId) {
+            res.status(400).json({ error: 'user_id é obrigatório' });
+            return;
+        }
+
+        await prisma.webAuthnCredential.deleteMany({ where: { userId } });
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error('[Biometric] delete error:', err);
+        res.status(500).json({ error: 'Erro ao remover credenciais' });
+    }
+});
+

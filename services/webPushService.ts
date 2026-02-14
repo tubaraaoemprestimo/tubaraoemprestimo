@@ -35,7 +35,7 @@ export const webPushService = {
             // Get VAPID key from backend
             const { data: vapidData, error: vapidError } = await api.get<{ publicKey: string }>('/push/vapid-key');
             if (vapidError || !vapidData?.publicKey) {
-                console.error('Failed to get VAPID key');
+                console.log('[WebPush] VAPID key not configured, skipping push subscription');
                 return;
             }
 

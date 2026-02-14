@@ -321,7 +321,8 @@ pushRouter.delete('/subscriptions/:id', async (req: Request, res: Response) => {
 pushRouter.get('/vapid-key', async (_req: Request, res: Response) => {
     try {
         if (!vapidPublicKey) {
-            res.status(500).json({ error: 'VAPID public key não configurada' });
+            // Return 200 with null key instead of 500 to avoid noisy console errors
+            res.json({ publicKey: null, message: 'VAPID keys não configuradas' });
             return;
         }
         res.json({ publicKey: vapidPublicKey });
@@ -329,3 +330,4 @@ pushRouter.get('/vapid-key', async (_req: Request, res: Response) => {
         res.status(500).json({ error: 'Erro ao buscar VAPID key' });
     }
 });
+
