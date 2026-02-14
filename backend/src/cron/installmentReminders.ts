@@ -34,40 +34,40 @@ export const scheduleInstallmentReminders = () => {
       const end0 = new Date(now); end0.setHours(23, 59, 59, 999);
 
       // Parcelas que vencem em 3 dias
-      const dueIn3 = await prisma.installments.findMany({
-        where: { status: 'OPEN', due_date: { gte: start3, lte: end3 } },
-        include: { loans: { include: { customers: true } } }
+      const dueIn3 = await prisma.installment.findMany({
+        where: { status: 'OPEN', dueDate: { gte: start3, lte: end3 } },
+        include: { loan: { include: { customer: true } } }
       });
 
       // Parcelas que vencem hoje
-      const dueToday = await prisma.installments.findMany({
-        where: { status: 'OPEN', due_date: { gte: start0, lte: end0 } },
-        include: { loans: { include: { customers: true } } }
+      const dueToday = await prisma.installment.findMany({
+        where: { status: 'OPEN', dueDate: { gte: start0, lte: end0 } },
+        include: { loan: { include: { customer: true } } }
       });
 
       // PIX settings
       let pixKey = '';
       try {
-        const pk = await prisma.systemSettings.findFirst({ where: { key: 'pix_key' } });
+        const pk = await prisma.systemSetting.findFirst({ where: { key: 'pix_key' } });
         if (pk?.value) pixKey = pk.value;
-      } catch {}
+      } catch { }
 
       // Lembrete 3 dias antes
       for (const inst of dueIn3) {
-        const c = inst.loans?.customers;
+        const c = inst.loan?.customer;
         if (!c) continue;
 
         const amtFmt = `R$ ${Number(inst.amount).toFixed(2)}`;
-        const pixInfo = inst.pix_code ? `\n\n📱 *PIX Copia e Cola:*\n${inst.pix_code}` : (pixKey ? `\n\n📱 *Chave PIX:* ${pixKey}` : '');
+        const pixInfo = inst.pixCode ? `\n\n📱 *PIX Copia e Cola:*\n${inst.pixCode}` : (pixKey ? `\n\n📱 *Chave PIX:* ${pixKey}` : '');
 
         if (c.email) {
           const html = brandedHtml(`
             <h2 style="color:#FFD700;">⏰ Lembrete de Pagamento</h2>
             <p>Olá, <strong>${c.name}</strong>!</p>
-            <p>Sua parcela de <strong style="color:#D4AF37;">${amtFmt}</strong> vence em <strong>${brDate(inst.due_date)}</strong> (3 dias).</p>
+            <p>Sua parcela de <strong style="color:#D4AF37;">${amtFmt}</strong> vence em <strong>${brDate(inst.dueDate)}</strong> (3 dias).</p>
             ${pixKey ? `<div style="background:#111;border:1px solid #333;border-radius:8px;padding:15px;margin:15px 0;">
               <p style="margin:5px 0;color:#ccc;"><strong style="color:#D4AF37;">Chave PIX:</strong> ${pixKey}</p>
-              ${inst.pix_code ? `<p style="margin:5px 0;color:#ccc;word-break:break-all;"><strong style="color:#D4AF37;">PIX Copia e Cola:</strong> ${inst.pix_code}</p>` : ''}
+              ${inst.pixCode ? `<p style="margin:5px 0;color:#ccc;word-break:break-all;"><strong style="color:#D4AF37;">PIX Copia e Cola:</strong> ${inst.pixCode}</p>` : ''}
             </div>` : ''}
             <div style="text-align:center;margin:20px 0;">
               <a href="https://www.tubaraoemprestimo.com.br" style="background:#D4AF37;color:#000;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:bold;">Acessar App</a>
@@ -78,12 +78,12 @@ export const scheduleInstallmentReminders = () => {
 
         if (c.phone) {
           await sendWhatsAppMessage(c.phone,
-            `⏰ *Lembrete de Pagamento*\n\nOlá, ${c.name.split(' ')[0]}!\n\nSua parcela de *${amtFmt}* vence em *${brDate(inst.due_date)}* (3 dias).${pixInfo}\n\nAcesse o app para mais detalhes.\n\n_Tubarão Empréstimos 🦈_`
+            `⏰ *Lembrete de Pagamento*\n\nOlá, ${c.name.split(' ')[0]}!\n\nSua parcela de *${amtFmt}* vence em *${brDate(inst.dueDate)}* (3 dias).${pixInfo}\n\nAcesse o app para mais detalhes.\n\n_Tubarão Empréstimos 🦈_`
           );
         }
 
         if (c.userId) {
-          sendPushToUser(c.userId, '⏰ Parcela vence em 3 dias', `Sua parcela de ${amtFmt} vence em ${brDate(inst.due_date)}`).catch(() => {});
+          sendPushToUser(c.userId, '⏰ Parcela vence em 3 dias', `Sua parcela de ${amtFmt} vence em ${brDate(inst.dueDate)}`).catch(() => { });
         }
 
         // Notificação interna
@@ -92,19 +92,19 @@ export const scheduleInstallmentReminders = () => {
             customerId: c.id,
             customerEmail: c.email,
             title: '⏰ Parcela vence em 3 dias',
-            message: `Sua parcela de ${amtFmt} vence em ${brDate(inst.due_date)}.`,
+            message: `Sua parcela de ${amtFmt} vence em ${brDate(inst.dueDate)}.`,
             type: 'WARNING'
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       // Lembrete no dia
       for (const inst of dueToday) {
-        const c = inst.loans?.customers;
+        const c = inst.loan?.customer;
         if (!c) continue;
 
         const amtFmt = `R$ ${Number(inst.amount).toFixed(2)}`;
-        const pixInfo = inst.pix_code ? `\n\n📱 *PIX Copia e Cola:*\n${inst.pix_code}` : (pixKey ? `\n\n📱 *Chave PIX:* ${pixKey}` : '');
+        const pixInfo = inst.pixCode ? `\n\n📱 *PIX Copia e Cola:*\n${inst.pixCode}` : (pixKey ? `\n\n📱 *Chave PIX:* ${pixKey}` : '');
 
         if (c.email) {
           const html = brandedHtml(`
@@ -113,7 +113,7 @@ export const scheduleInstallmentReminders = () => {
             <p>Sua parcela de <strong style="color:#FF6B6B;">${amtFmt}</strong> vence <strong>HOJE</strong>.</p>
             ${pixKey ? `<div style="background:#111;border:1px solid #333;border-radius:8px;padding:15px;margin:15px 0;">
               <p style="margin:5px 0;color:#ccc;"><strong style="color:#D4AF37;">Chave PIX:</strong> ${pixKey}</p>
-              ${inst.pix_code ? `<p style="margin:5px 0;color:#ccc;word-break:break-all;"><strong style="color:#D4AF37;">PIX Copia e Cola:</strong> ${inst.pix_code}</p>` : ''}
+              ${inst.pixCode ? `<p style="margin:5px 0;color:#ccc;word-break:break-all;"><strong style="color:#D4AF37;">PIX Copia e Cola:</strong> ${inst.pixCode}</p>` : ''}
             </div>` : ''}
             <p style="color:#aaa;">Evite juros e multas pagando em dia.</p>
             <div style="text-align:center;margin:20px 0;">
@@ -130,7 +130,7 @@ export const scheduleInstallmentReminders = () => {
         }
 
         if (c.userId) {
-          sendPushToUser(c.userId, '⚠️ Parcela vence HOJE', `Sua parcela de ${amtFmt} vence hoje!`).catch(() => {});
+          sendPushToUser(c.userId, '⚠️ Parcela vence HOJE', `Sua parcela de ${amtFmt} vence hoje!`).catch(() => { });
         }
 
         await prisma.notification.create({
@@ -141,7 +141,7 @@ export const scheduleInstallmentReminders = () => {
             message: `Sua parcela de ${amtFmt} vence hoje. Evite juros!`,
             type: 'WARNING'
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       console.log(`[Cron] reminders ok: +3d=${dueIn3.length}, today=${dueToday.length}`);

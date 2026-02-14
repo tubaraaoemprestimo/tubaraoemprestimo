@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate } from '../middleware/auth';
-import crypto from 'crypto';
 
 export const openFinanceRouter = Router();
 
@@ -50,8 +49,8 @@ openFinanceRouter.post('/score/:customerId', authenticate, async (req: Request, 
         const creditAge = Math.min(100, accountAge * 20);
 
         // Recent inquiries factor (20%)
-        const recentScores = await prisma.credit_scores.count({
-            where: { customer_id: customerId, consulted_at: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }
+        const recentScores = await prisma.creditScore.count({
+            where: { customerId, consultedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }
         });
         const recentInquiries = Math.max(0, 100 - recentScores * 10);
 
@@ -77,10 +76,9 @@ openFinanceRouter.post('/score/:customerId', authenticate, async (req: Request, 
             origin: source === 'SERASA' ? 'Serasa Experian' : source === 'SPC' ? 'SPC Brasil' : 'Sistema Interno'
         } : null;
 
-        const creditScore = await prisma.credit_scores.create({
+        const creditScore = await prisma.creditScore.create({
             data: {
-                id: crypto.randomUUID(),
-                customer_id: customerId,
+                customerId,
                 score,
                 classification: getScoreClassification(score),
                 source: source || 'INTERNAL',
@@ -91,11 +89,11 @@ openFinanceRouter.post('/score/:customerId', authenticate, async (req: Request, 
 
         res.json({
             id: creditScore.id,
-            customerId: creditScore.customer_id,
+            customerId: creditScore.customerId,
             score: creditScore.score,
             classification: creditScore.classification,
             source: creditScore.source,
-            consultedAt: creditScore.consulted_at,
+            consultedAt: creditScore.consultedAt,
             factors: creditScore.factors,
             restrictions: creditScore.restrictions
         });
@@ -108,19 +106,19 @@ openFinanceRouter.post('/score/:customerId', authenticate, async (req: Request, 
 // GET /api/open-finance/scores/:customerId — Histórico de scores
 openFinanceRouter.get('/scores/:customerId', authenticate, async (req: Request, res: Response) => {
     try {
-        const scores = await prisma.credit_scores.findMany({
-            where: { customer_id: req.params.customerId },
-            orderBy: { consulted_at: 'desc' },
+        const scores = await prisma.creditScore.findMany({
+            where: { customerId: req.params.customerId },
+            orderBy: { consultedAt: 'desc' },
             take: 20
         });
 
         res.json(scores.map((s: any) => ({
             id: s.id,
-            customerId: s.customer_id,
+            customerId: s.customerId,
             score: s.score,
             classification: s.classification,
             source: s.source,
-            consultedAt: s.consulted_at,
+            consultedAt: s.consultedAt,
             factors: s.factors,
             restrictions: s.restrictions
         })));
@@ -164,32 +162,31 @@ openFinanceRouter.post('/income-analysis/:customerId', authenticate, async (req:
         else if (availableCommitment >= 10) recommendation = 'REVIEW';
         else recommendation = 'DENY';
 
-        const analysis = await prisma.income_analyses.create({
+        const analysis = await prisma.incomeAnalysis.create({
             data: {
-                id: crypto.randomUUID(),
-                customer_id: customerId,
-                monthly_income: monthlyIncome,
-                average_balance: Math.round(averageBalance),
-                income_source: incomeSource,
+                customerId,
+                monthlyIncome,
+                averageBalance: Math.round(averageBalance),
+                incomeSource,
                 stability,
-                current_commitment: Math.round(currentCommitment * 10) / 10,
-                available_commitment: Math.round(availableCommitment * 10) / 10,
-                max_loan_amount: Math.round(maxLoanAmount),
+                currentCommitment: Math.round(currentCommitment * 10) / 10,
+                availableCommitment: Math.round(availableCommitment * 10) / 10,
+                maxLoanAmount: Math.round(maxLoanAmount),
                 recommendation
             }
         });
 
         res.json({
             id: analysis.id,
-            customerId: analysis.customer_id,
-            analyzedAt: analysis.analyzed_at,
-            monthlyIncome: analysis.monthly_income,
-            averageBalance: analysis.average_balance,
-            incomeSource: analysis.income_source,
+            customerId: analysis.customerId,
+            analyzedAt: analysis.analyzedAt,
+            monthlyIncome: analysis.monthlyIncome,
+            averageBalance: analysis.averageBalance,
+            incomeSource: analysis.incomeSource,
             stability: analysis.stability,
-            currentCommitment: analysis.current_commitment,
-            availableCommitment: analysis.available_commitment,
-            maxLoanAmount: analysis.max_loan_amount,
+            currentCommitment: analysis.currentCommitment,
+            availableCommitment: analysis.availableCommitment,
+            maxLoanAmount: analysis.maxLoanAmount,
             recommendation: analysis.recommendation
         });
     } catch (error) {
@@ -201,23 +198,23 @@ openFinanceRouter.post('/income-analysis/:customerId', authenticate, async (req:
 // GET /api/open-finance/analyses/:customerId — Histórico de análises
 openFinanceRouter.get('/analyses/:customerId', authenticate, async (req: Request, res: Response) => {
     try {
-        const analyses = await prisma.income_analyses.findMany({
-            where: { customer_id: req.params.customerId },
-            orderBy: { analyzed_at: 'desc' },
+        const analyses = await prisma.incomeAnalysis.findMany({
+            where: { customerId: req.params.customerId },
+            orderBy: { analyzedAt: 'desc' },
             take: 20
         });
 
         res.json(analyses.map((a: any) => ({
             id: a.id,
-            customerId: a.customer_id,
-            analyzedAt: a.analyzed_at,
-            monthlyIncome: a.monthly_income,
-            averageBalance: a.average_balance,
-            incomeSource: a.income_source,
+            customerId: a.customerId,
+            analyzedAt: a.analyzedAt,
+            monthlyIncome: a.monthlyIncome,
+            averageBalance: a.averageBalance,
+            incomeSource: a.incomeSource,
             stability: a.stability,
-            currentCommitment: a.current_commitment,
-            availableCommitment: a.available_commitment,
-            maxLoanAmount: a.max_loan_amount,
+            currentCommitment: a.currentCommitment,
+            availableCommitment: a.availableCommitment,
+            maxLoanAmount: a.maxLoanAmount,
             recommendation: a.recommendation
         })));
     } catch (error) {
@@ -288,23 +285,22 @@ openFinanceRouter.post('/consent', authenticate, async (req: Request, res: Respo
     try {
         const { customerId, scope } = req.body;
 
-        const consent = await prisma.open_finance_consents.create({
+        const consent = await prisma.openFinanceConsent.create({
             data: {
-                id: crypto.randomUUID(),
-                customer_id: customerId,
+                customerId,
                 scope: scope || ['CREDIT_SCORE', 'INCOME', 'ACCOUNTS'],
                 status: 'ACTIVE',
-                expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
+                expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
             }
         });
 
         res.json({
             id: consent.id,
-            customerId: consent.customer_id,
+            customerId: consent.customerId,
             scope: consent.scope,
             status: consent.status,
-            grantedAt: consent.granted_at,
-            expiresAt: consent.expires_at
+            grantedAt: consent.grantedAt,
+            expiresAt: consent.expiresAt
         });
     } catch (error) {
         console.error('[OpenFinance] consent error:', error);
@@ -315,19 +311,19 @@ openFinanceRouter.post('/consent', authenticate, async (req: Request, res: Respo
 // GET /api/open-finance/consents/:customerId — Listar consentimentos
 openFinanceRouter.get('/consents/:customerId', authenticate, async (req: Request, res: Response) => {
     try {
-        const consents = await prisma.open_finance_consents.findMany({
-            where: { customer_id: req.params.customerId },
-            orderBy: { granted_at: 'desc' }
+        const consents = await prisma.openFinanceConsent.findMany({
+            where: { customerId: req.params.customerId },
+            orderBy: { grantedAt: 'desc' }
         });
 
         res.json(consents.map((c: any) => ({
             id: c.id,
-            customerId: c.customer_id,
+            customerId: c.customerId,
             scope: c.scope,
             status: c.status,
-            grantedAt: c.granted_at,
-            expiresAt: c.expires_at,
-            revokedAt: c.revoked_at
+            grantedAt: c.grantedAt,
+            expiresAt: c.expiresAt,
+            revokedAt: c.revokedAt
         })));
     } catch (error) {
         console.error('[OpenFinance] consents error:', error);
@@ -338,9 +334,9 @@ openFinanceRouter.get('/consents/:customerId', authenticate, async (req: Request
 // PUT /api/open-finance/consent/:id/revoke — Revogar consentimento
 openFinanceRouter.put('/consent/:id/revoke', authenticate, async (req: Request, res: Response) => {
     try {
-        await prisma.open_finance_consents.update({
+        await prisma.openFinanceConsent.update({
             where: { id: req.params.id },
-            data: { status: 'REVOKED', revoked_at: new Date() }
+            data: { status: 'REVOKED', revokedAt: new Date() }
         });
         res.json({ success: true });
     } catch (error) {

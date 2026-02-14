@@ -32,6 +32,45 @@ const aliases: Record<string, string> = {
     goalsSetting: 'goalsSettings', // Model GoalsSettings
     goalSetting: 'goalsSettings',  // Alias variant
 
+    // Plural aliases -> Singular Prisma properties (used in cron, routes)
+    installments: 'installment',
+    notifications: 'notification',
+    loans: 'loan',
+    customers: 'customer',
+    users: 'user',
+
+    // Snake_case aliases -> camelCase Prisma properties (used in openFinance)
+    credit_scores: 'creditScore',
+    income_analyses: 'incomeAnalysis',
+    open_finance_consents: 'openFinanceConsent',
+    system_settings: 'systemSetting',
+    risk_events: 'riskEvent',
+    trusted_devices: 'trustedDevice',
+    security_blocks: 'securityBlock',
+    security_alerts: 'securityAlert',
+    notification_logs: 'notificationLog',
+    push_subscriptions: 'pushSubscription',
+    loan_requests: 'loanRequest',
+    loan_packages: 'loanPackage',
+    collection_rules: 'collectionRule',
+    message_templates: 'messageTemplate',
+    contract_signatures: 'contractSignature',
+    temporary_links: 'temporaryLink',
+    scheduled_status: 'scheduledStatus',
+    payment_receipts: 'paymentReceipt',
+    ai_chat_history: 'aiChatHistory',
+    ai_chatbot_config: 'aiChatbotConfig',
+    webauthn_credentials: 'webauthnCredential',
+    whatsapp_config: 'whatsappConfig',
+
+    // CamelCase plural aliases
+    systemSettings: 'systemSetting',
+    loanRequests: 'loanRequest',
+    riskEvents: 'riskEvent',
+    trustedDevices: 'trustedDevice',
+    securityBlocks: 'securityBlock',
+    securityAlerts: 'securityAlert',
+
     // Other mappings
     systemSetting: 'systemSetting',
     whatsappConfig: 'whatsappConfig',
@@ -47,7 +86,10 @@ const aliases: Record<string, string> = {
     referral: 'referral',
     creditScore: 'creditScore',
     incomeAnalysis: 'incomeAnalysis',
-    openFinanceConsent: 'openFinanceConsent'
+    openFinanceConsent: 'openFinanceConsent',
+    blacklist: 'blacklist',
+    otpCode: 'otpCode',
+    scheduledStatus: 'scheduledStatus'
 };
 
 export const prisma: any = new Proxy(base as any, {
