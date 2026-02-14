@@ -9,8 +9,7 @@ interface VideoUploadProps {
   subtitle?: string;
 }
 
-const MIN_RECORDING_TIME = 60; // Mínimo 60 segundos
-const MAX_RECORDING_TIME = 60; // Máximo 60 segundos
+const MIN_RECORDING_TIME = 30; // Mínimo 30 segundos
 
 // Detectar plataforma
 const isIOS = (): boolean => {
@@ -267,9 +266,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
       recordingTimeRef.current += 1;
       setRecordingTime(recordingTimeRef.current);
 
-      if (recordingTimeRef.current >= MAX_RECORDING_TIME) {
-        finishRecording();
-      }
+      // Sem limite máximo - gravação continua até o usuário parar
     }, 1000);
   };
 
@@ -412,18 +409,20 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
               <>
                 <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse flex-shrink-0"></div>
                 <span className="text-white text-sm font-mono">
-                  {recordingTime}s / {MAX_RECORDING_TIME}s
-                  {recordingTime < MIN_RECORDING_TIME && (
+                  {recordingTime}s
+                  {recordingTime < MIN_RECORDING_TIME ? (
                     <span className="text-yellow-400 ml-1">
-                      (falta: {MIN_RECORDING_TIME - recordingTime}s)
+                      (mín: {MIN_RECORDING_TIME - recordingTime}s)
                     </span>
+                  ) : (
+                    <span className="text-green-400 ml-1">✓</span>
                   )}
                 </span>
               </>
             ) : cameraReady ? (
               <>
                 <div className="w-3 h-3 bg-green-500 rounded-full flex-shrink-0"></div>
-                <span className="text-white text-sm">Pronta - Grave {MIN_RECORDING_TIME}s</span>
+                <span className="text-white text-sm">Pronta - Mín. {MIN_RECORDING_TIME}s</span>
               </>
             ) : (
               <>
@@ -440,7 +439,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
                 className={`h-full transition-all duration-1000 ${
                   recordingTime < MIN_RECORDING_TIME ? 'bg-yellow-500' : 'bg-green-500'
                 }`}
-                style={{ width: `${(recordingTime / MAX_RECORDING_TIME) * 100}%` }}
+                style={{ width: `${Math.min((recordingTime / MIN_RECORDING_TIME) * 100, 100)}%` }}
               ></div>
             </div>
           )}

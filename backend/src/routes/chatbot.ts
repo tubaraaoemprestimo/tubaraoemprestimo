@@ -44,24 +44,21 @@ async function callGeminiAPI(
     conversationHistory: { role: string; content: string }[],
     userMessage: string
 ): Promise<string> {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-    // Monta o histórico no formato Gemini
     const contents: any[] = [];
 
-    // System instruction
     if (systemPrompt) {
         contents.push({
             role: 'user',
-            parts: [{ text: `[Instrução do Sistema]: ${systemPrompt}` }]
+            parts: [{ text: systemPrompt }]
         });
         contents.push({
             role: 'model',
-            parts: [{ text: 'Entendido. Vou seguir essas instruções.' }]
+            parts: [{ text: 'Entendido.' }]
         });
     }
 
-    // Histórico de conversa (últimas 20 mensagens)
     const recentHistory = conversationHistory.slice(-20);
     for (const msg of recentHistory) {
         contents.push({
@@ -70,7 +67,6 @@ async function callGeminiAPI(
         });
     }
 
-    // Mensagem atual
     contents.push({
         role: 'user',
         parts: [{ text: userMessage }]
@@ -80,16 +76,8 @@ async function callGeminiAPI(
         contents,
         generationConfig: {
             temperature: 0.7,
-            topP: 0.95,
-            topK: 40,
             maxOutputTokens: 1024
-        },
-        safetySettings: [
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
-        ]
+        }
     }, {
         headers: { 'Content-Type': 'application/json' },
         timeout: 30000
@@ -101,6 +89,191 @@ async function callGeminiAPI(
     }
 
     return candidate.content.parts[0].text;
+}
+
+/**
+ * Chama a API do OpenAI
+ */
+async function callOpenAIAPI(
+    apiKey: string,
+    systemPrompt: string,
+    conversationHistory: { role: string; content: string }[],
+    userMessage: string
+): Promise<string> {
+    const messages: any[] = [{ role: 'system', content: systemPrompt }];
+
+    const recentHistory = conversationHistory.slice(-20);
+    for (const msg of recentHistory) {
+        messages.push({
+            role: msg.role === 'assistant' ? 'assistant' : 'user',
+            content: msg.content
+        });
+    }
+
+    messages.push({ role: 'user', content: userMessage });
+
+    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+        model: 'gpt-4o-mini',
+        messages,
+        temperature: 0.7,
+        max_tokens: 1024
+    }, {
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+        },
+        timeout: 30000
+    });
+
+    const content = response.data?.choices?.[0]?.message?.content;
+    if (!content) {
+        throw new Error('Resposta vazia do OpenAI');
+    }
+
+    return content;
+}
+
+/**
+ * Chama a API do OpenRouter (aggregador de múltiplos modelos)
+ */
+async function callOpenRouterAPI(
+    apiKey: string,
+    systemPrompt: string,
+    conversationHistory: { role: string; content: string }[],
+    userMessage: string
+): Promise<string> {
+    const messages: any[] = [];
+
+    if (systemPrompt) {
+        messages.push({ role: 'system', content: systemPrompt });
+    }
+
+    const recentHistory = conversationHistory.slice(-20);
+    for (const msg of recentHistory) {
+        messages.push({
+            role: msg.role === 'assistant' ? 'assistant' : 'user',
+            content: msg.content
+        });
+    }
+
+    messages.push({ role: 'user', content: userMessage });
+
+    const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+        model: 'google/gemini-2.0-flash-exp:free',
+        messages,
+        temperature: 0.7,
+        max_tokens: 1024
+    }, {
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+        },
+        timeout: 30000
+    });
+
+    const content = response.data?.choices?.[0]?.message?.content;
+    if (!content) {
+        throw new Error('Resposta vazia do OpenRouter');
+    }
+
+    return content;
+}
+
+/**
+ * Chama a API da Nvidia NIM (NVIDIA Inference Microservice)
+ */
+async function callNvidiaAPI(
+    apiKey: string,
+    systemPrompt: string,
+    conversationHistory: { role: string; content: string }[],
+    userMessage: string
+): Promise<string> {
+    const messages: any[] = [];
+
+    if (systemPrompt) {
+        messages.push({ role: 'system', content: systemPrompt });
+    }
+
+    const recentHistory = conversationHistory.slice(-20);
+    for (const msg of recentHistory) {
+        messages.push({
+            role: msg.role === 'assistant' ? 'assistant' : 'user',
+            content: msg.content
+        });
+    }
+
+    messages.push({ role: 'user', content: userMessage });
+
+    const response = await axios.post(
+        'https://integrate.api.nvidia.com/v1/chat/completions',
+        {
+            model: 'nvidia/llama-3.1-nemotron-70b-instruct',
+            messages,
+            temperature: 0.7,
+            max_tokens: 1024,
+            stream: false
+        },
+        {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 30000
+        }
+    );
+
+    const content = response.data?.choices?.[0]?.message?.content;
+    if (!content) {
+        throw new Error('Resposta vazia da Nvidia');
+    }
+
+    return content;
+}
+
+/**
+ * Chama a API do Z.AI (via Groq API compatível)
+ */
+async function callZaiAPI(
+    apiKey: string,
+    systemPrompt: string,
+    conversationHistory: { role: string; content: string }[],
+    userMessage: string
+): Promise<string> {
+    const messages: any[] = [];
+
+    if (systemPrompt) {
+        messages.push({ role: 'system', content: systemPrompt });
+    }
+
+    const recentHistory = conversationHistory.slice(-20);
+    for (const msg of recentHistory) {
+        messages.push({
+            role: msg.role === 'assistant' ? 'assistant' : 'user',
+            content: msg.content
+        });
+    }
+
+    messages.push({ role: 'user', content: userMessage });
+
+    const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+        model: 'llama-3.1-70b-versatile',
+        messages,
+        temperature: 0.7,
+        max_tokens: 1024
+    }, {
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+        },
+        timeout: 30000
+    });
+
+    const content = response.data?.choices?.[0]?.message?.content;
+    if (!content) {
+        throw new Error('Resposta vazia do Z.AI');
+    }
+
+    return content;
 }
 
 /**
@@ -348,13 +521,27 @@ chatbotRouter.post('/message', authenticate, async (req: Request, res: Response)
             systemPrompt += `\n\nContexto do cliente:\n${JSON.stringify(customerContext)}`;
         }
 
-        // 7. Chama a IA (Gemini ou Perplexity)
+        // 7. Chama a IA (Gemini, Perplexity, OpenAI, OpenRouter, Nvidia, Z.AI)
         let aiResponse: string;
 
-        if (config.provider === 'perplexity') {
-            aiResponse = await callPerplexityAPI(config.apiKey, systemPrompt, conversationHistory, message);
-        } else {
-            aiResponse = await callGeminiAPI(config.apiKey, systemPrompt, conversationHistory, message);
+        switch (config.provider) {
+            case 'perplexity':
+                aiResponse = await callPerplexityAPI(config.apiKey, systemPrompt, conversationHistory, message);
+                break;
+            case 'openai':
+                aiResponse = await callOpenAIAPI(config.openaiApiKey || config.apiKey, systemPrompt, conversationHistory, message);
+                break;
+            case 'openrouter':
+                aiResponse = await callOpenRouterAPI(config.openrouterApiKey || config.apiKey, systemPrompt, conversationHistory, message);
+                break;
+            case 'nvidia':
+                aiResponse = await callNvidiaAPI(config.nvidiaApiKey || config.apiKey, systemPrompt, conversationHistory, message);
+                break;
+            case 'zai':
+                aiResponse = await callZaiAPI(config.zaiApiKey || config.apiKey, systemPrompt, conversationHistory, message);
+                break;
+            default:
+                aiResponse = await callGeminiAPI(config.geminiApiKey || config.apiKey, systemPrompt, conversationHistory, message);
         }
 
         // 8. Salva mensagem do usuário e resposta da IA

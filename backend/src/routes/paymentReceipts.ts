@@ -200,6 +200,26 @@ paymentReceiptsRouter.put('/:id/reject', requireAdmin, async (req: Request, res:
                 }
             }).catch(() => {});
 
+            // Email de rejeição de comprovante
+            if (customer.email) {
+                const reasonText = req.body.notes || 'Envie um novo comprovante.';
+                const html = `
+                <div style="font-family:Arial;max-width:600px;margin:0 auto;background:#000;color:#fff;padding:30px;border-radius:12px;">
+                    <div style="text-align:center;margin-bottom:20px;"><h1 style="color:#D4AF37;font-size:24px;">🦈 Tubarão Empréstimos</h1></div>
+                    <h2 style="color:#FF6B6B;">⚠️ Comprovante Não Aceito</h2>
+                    <p>Olá, <strong>${customer.name}</strong>!</p>
+                    <p>Seu comprovante de pagamento não foi aceito.</p>
+                    <p><strong>Motivo:</strong> ${reasonText}</p>
+                    <p style="color:#aaa;">Acesse o app e envie um novo comprovante.</p>
+                    <div style="text-align:center;margin:20px 0;">
+                        <a href="https://www.tubaraoemprestimo.com.br" style="background:#D4AF37;color:#000;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:bold;">Enviar Novo Comprovante</a>
+                    </div>
+                    <hr style="border-color:#333;margin:25px 0;" />
+                    <p style="color:#666;font-size:12px;text-align:center;">Tubarão Empréstimos — Plataforma de Crédito Premium</p>
+                </div>`;
+                emailService.send(customer.email, '⚠️ Comprovante Não Aceito — Tubarão Empréstimos', html).catch(err => console.error('[PaymentReceipts] Email rejection failed:', err.message));
+            }
+
             if (customer.phone) {
                 sendWhatsAppMessage(customer.phone,
                     `⚠️ *Comprovante Não Aceito*\n\nOlá, ${customer.name.split(' ')[0]}.\n\nSeu comprovante de pagamento não foi aceito.\nMotivo: ${req.body.notes || 'Envie um novo comprovante.'}\n\nAcesse o app para enviar novamente.\n\n_Tubarão Empréstimos 🦈_`

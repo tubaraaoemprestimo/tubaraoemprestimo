@@ -1,23 +1,46 @@
 import { prisma } from './prisma';
 import axios from 'axios';
 
-export async function sendWhatsAppMessage(to: string, message: string) {
+/**
+ * Normaliza telefone BR para formato internacional (55DDXXXXXXXXX)
+ */
+export function normalizePhoneBR(phone: string): string {
+    let number = phone.replace(/\D/g, '');
+    // Remove leading zeros
+    while (number.startsWith('0')) number = number.substring(1);
+    // Handle operator codes (13-digit numbers)
+    if (!number.startsWith('55')) {
+        if (number.length === 13) {
+            number = number.slice(-11);
+        } else if (number.length === 12) {
+            number = number.slice(-10);
+        }
+        if (number.length >= 10 && number.length <= 11) {
+            number = '55' + number;
+        }
+    }
+    return number;
+}
+
+export async function sendWhatsAppMessage(to: string, message: string): Promise<boolean> {
     try {
         const config = await prisma.whatsappConfig.findFirst();
         if (!config || !config.isConnected) {
             console.log('[WhatsApp] Config not found or disconnected');
-            return;
+            return false;
         }
 
-        // Clean number
-        const number = to.replace(/\D/g, '');
-        if (number.length < 10) return;
+        const number = normalizePhoneBR(to);
+        if (number.length < 12) {
+            console.log(`[WhatsApp] Invalid number after normalization: ${number}`);
+            return false;
+        }
 
         const url = `${config.apiUrl}/message/sendText/${config.instanceName}`;
         await axios.post(url, {
-            number: number,
-            options: { delay: 1200, presence: "composing", linkPreview: false },
-            textMessage: { text: message }
+            number,
+            text: message,
+            options: { delay: 1200, presence: 'composing', linkPreview: false }
         }, {
             headers: {
                 apikey: config.apiKey,
@@ -25,8 +48,10 @@ export async function sendWhatsAppMessage(to: string, message: string) {
             }
         });
         console.log(`[WhatsApp] Message sent to ${number}`);
+        return true;
     } catch (error: any) {
-        console.error('[WhatsApp] Send failed:', error.message);
+        console.error('[WhatsApp] Send failed:', error?.response?.data?.message || error.message);
+        return false;
     }
 }
 

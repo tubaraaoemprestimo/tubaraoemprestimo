@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
 import axios from 'axios';
+import { sendWhatsAppMessage } from '../services/whatsapp';
+import { sendPushToRole } from './push';
 
 export const webhookRouter = Router();
 
@@ -97,12 +99,12 @@ async function sendWhatsAppReply(
         const url = `${config.apiUrl}/message/sendText/${config.instanceName}`;
         await axios.post(url, {
             number: phone,
-            options: { delay: 1200, presence: 'composing', linkPreview: false },
-            textMessage: { text }
+            text,
+            options: { delay: 1200, presence: 'composing', linkPreview: false }
         }, { headers: { apikey: config.apiKey }, timeout: 15000 });
         return true;
     } catch (error: any) {
-        console.error(`[WhatsApp] Erro ao enviar para ${phone}:`, error.message);
+        console.error(`[WhatsApp] Erro ao enviar para ${phone}:`, error?.response?.data?.message || error.message);
         return false;
     }
 }
@@ -180,6 +182,30 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
             }).catch(() => { });
         }
 
+        // 2.5. Alertar admins de TODA mensagem recebida via WhatsApp + Push
+        const senderName = customer?.name || phone;
+        // Notificação no sistema para admin
+        await prisma.notification.create({
+            data: {
+                title: `📩 Mensagem WhatsApp: ${senderName}`,
+                message: `${content.substring(0, 200)}`,
+                type: 'INFO'
+            }
+        }).catch(() => {});
+        // Push para admins
+        sendPushToRole('ADMIN', `📩 WhatsApp: ${senderName}`, content.substring(0, 100)).catch(() => {});
+        // WhatsApp para admins (encaminhar mensagem do cliente)
+        try {
+            const admins = await prisma.user.findMany({ where: { role: 'ADMIN' } });
+            for (const admin of admins) {
+                if (admin.phone && admin.phone !== phone) {
+                    sendWhatsAppMessage(admin.phone,
+                        `📩 *Mensagem de Cliente*\n\nDe: ${senderName} (${phone})\n\n"${content.substring(0, 300)}"\n\n_Encaminhado automaticamente_`
+                    ).catch(() => {});
+                }
+            }
+        } catch {}
+
         // 3. Busca config do chatbot IA
         const chatConfig = await prisma.aiChatbotConfig.findFirst();
         if (!chatConfig || !chatConfig.enabled || !chatConfig.apiKey) {
@@ -214,6 +240,28 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
             const transferMsg = 'Entendido! Estou transferindo você para um atendente humano. Aguarde um momento, por favor. 🙋';
             await prisma.aiChatHistory.create({ data: { phone, role: 'assistant', content: transferMsg, metadata: { autoReply: true, reason: 'TRANSFER' } } });
             await sendWhatsAppReply(waConfig, phone, transferMsg);
+
+            // Alertar TODOS admins via Push + WhatsApp + Notificação
+            const clientName = customer?.name || phone;
+            sendPushToRole('ADMIN', '🤖 Cliente quer falar com humano', `${clientName} solicitou transferência. Msg: "${content.substring(0, 80)}"`).catch(() => {});
+            await prisma.notification.create({
+                data: {
+                    title: '🤖 Transferência Chatbot',
+                    message: `${clientName} (${phone}) solicitou atendimento humano. Mensagem: "${content.substring(0, 200)}"`,
+                    type: 'ALERT'
+                }
+            }).catch(() => {});
+            // WhatsApp para admins
+            try {
+                const admins = await prisma.user.findMany({ where: { role: 'ADMIN' } });
+                for (const admin of admins) {
+                    if (admin.phone) {
+                        sendWhatsAppMessage(admin.phone,
+                            `🤖 *Transferência Chatbot*\n\nCliente: ${clientName}\nTel: ${phone}\nMsg: "${content.substring(0, 150)}"\n\nResponda diretamente ou acesse o painel.`
+                        ).catch(() => {});
+                    }
+                }
+            } catch {}
             return;
         }
 

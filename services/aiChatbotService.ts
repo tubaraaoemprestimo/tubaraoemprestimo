@@ -4,9 +4,14 @@ import { api } from './apiClient';
 interface AIChatbotConfig {
     id: string;
     enabled: boolean;
-    provider: 'gemini' | 'perplexity' | 'openai';
+    provider: 'gemini' | 'perplexity' | 'openai' | 'openrouter' | 'nvidia' | 'zai';
+    apiKey: string | null;
     geminiApiKey: string | null;
     perplexityApiKey: string | null;
+    openaiApiKey: string | null;
+    openrouterApiKey: string | null;
+    nvidiaApiKey: string | null;
+    zaiApiKey: string | null;
     systemPrompt: string;
     welcomeMessage: string;
     fallbackMessage: string;
@@ -27,8 +32,13 @@ const DEFAULT_CONFIG: AIChatbotConfig = {
     id: '',
     enabled: false,
     provider: 'gemini',
+    apiKey: null,
     geminiApiKey: null,
     perplexityApiKey: null,
+    openaiApiKey: null,
+    openrouterApiKey: null,
+    nvidiaApiKey: null,
+    zaiApiKey: null,
     systemPrompt: `Você é o Assistente Virtual inteligente do Tubarão Empréstimos. Sua missão é ajudar clientes com informações sobre empréstimos, pagamentos e dúvidas gerais.
 
 ⚠️ IMPORTANTE:
@@ -60,7 +70,7 @@ Todos os tipos de notificações enviadas no Whatsaap envie o Link do APP: https
 - Respostas curtas.
 - Aguarde o cliente.
 - Link final: https://tubaraoemprestimo.com.br`,
-    welcomeMessage: 'Olá! 👋 Sou o assistente virtual da TUBARÃO EMPRÉSTIMOS. Como posso ajudar você hoje?',
+    welcomeMessage: 'Olá! 👋 Sou o assistente virtual da TUBARÃO EMPRESTIMOS. Como posso ajudar você hoje?',
     fallbackMessage: 'Desculpe, não entendi sua pergunta. Um de nossos atendentes irá responder em breve.',
     transferKeywords: 'atendente,humano,pessoa,falar com alguém',
     autoReplyEnabled: true,
@@ -86,8 +96,13 @@ export const aiChatbotService = {
                 id: d.id,
                 enabled: d.enabled,
                 provider: d.provider,
+                apiKey: d.api_key || d.apiKey,
                 geminiApiKey: d.gemini_api_key || d.geminiApiKey,
                 perplexityApiKey: d.perplexity_api_key || d.perplexityApiKey,
+                openaiApiKey: d.openai_api_key || d.openaiApiKey,
+                openrouterApiKey: d.openrouter_api_key || d.openrouterApiKey,
+                nvidiaApiKey: d.nvidia_api_key || d.nvidiaApiKey,
+                zaiApiKey: d.zai_api_key || d.zaiApiKey,
                 systemPrompt: d.system_prompt || d.systemPrompt || DEFAULT_CONFIG.systemPrompt,
                 welcomeMessage: d.welcome_message || d.welcomeMessage || DEFAULT_CONFIG.welcomeMessage,
                 fallbackMessage: d.fallback_message || d.fallbackMessage || DEFAULT_CONFIG.fallbackMessage,
@@ -111,8 +126,13 @@ export const aiChatbotService = {
                 id: config.id || 'b0000000-0000-0000-0000-000000000001',
                 enabled: config.enabled,
                 provider: config.provider,
+                api_key: config.apiKey || config.geminiApiKey,
                 gemini_api_key: config.geminiApiKey,
                 perplexity_api_key: config.perplexityApiKey,
+                openai_api_key: config.openaiApiKey,
+                openrouter_api_key: config.openrouterApiKey,
+                nvidia_api_key: config.nvidiaApiKey,
+                zai_api_key: config.zaiApiKey,
                 system_prompt: config.systemPrompt,
                 welcome_message: config.welcomeMessage,
                 fallback_message: config.fallbackMessage,
@@ -232,6 +252,187 @@ export const aiChatbotService = {
         }
     },
 
+    // Gerar resposta com OpenAI
+    generateResponseOpenAI: async (
+        messages: ChatMessage[],
+        systemPrompt: string,
+        apiKey: string,
+        customerContext?: string
+    ): Promise<string> => {
+        try {
+            const formattedMessages: any[] = [
+                { role: 'system', content: customerContext ? `${systemPrompt}\n\nContexto do cliente:\n${customerContext}` : systemPrompt },
+                ...messages.slice(-10).map(m => ({
+                    role: m.role === 'assistant' ? 'assistant' : 'user',
+                    content: m.content
+                }))
+            ];
+
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: formattedMessages,
+                    temperature: 0.7,
+                    max_tokens: 500
+                })
+            });
+
+            if (!response.ok) {
+                console.error('[AI Chatbot] OpenAI API error:', await response.text());
+                return '';
+            }
+
+            const data = await response.json();
+            return data.choices?.[0]?.message?.content || '';
+        } catch (err) {
+            console.error('[AI Chatbot] OpenAI exception:', err);
+            return '';
+        }
+    },
+
+    // Gerar resposta com OpenRouter
+    generateResponseOpenRouter: async (
+        messages: ChatMessage[],
+        systemPrompt: string,
+        apiKey: string,
+        customerContext?: string
+    ): Promise<string> => {
+        try {
+            const formattedMessages: any[] = [];
+
+            if (systemPrompt) {
+                formattedMessages.push({ role: 'system', content: customerContext ? `${systemPrompt}\n\nContexto do cliente:\n${customerContext}` : systemPrompt });
+            }
+
+            formattedMessages.push(...messages.slice(-10).map(m => ({
+                role: m.role === 'assistant' ? 'assistant' : 'user',
+                content: m.content
+            })));
+
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'google/gemini-2.0-flash-exp:free',
+                    messages: formattedMessages,
+                    temperature: 0.7,
+                    max_tokens: 500
+                })
+            });
+
+            if (!response.ok) {
+                console.error('[AI Chatbot] OpenRouter API error:', await response.text());
+                return '';
+            }
+
+            const data = await response.json();
+            return data.choices?.[0]?.message?.content || '';
+        } catch (err) {
+            console.error('[AI Chatbot] OpenRouter exception:', err);
+            return '';
+        }
+    },
+
+    // Gerar resposta com Nvidia
+    generateResponseNvidia: async (
+        messages: ChatMessage[],
+        systemPrompt: string,
+        apiKey: string,
+        customerContext?: string
+    ): Promise<string> => {
+        try {
+            const formattedMessages: any[] = [];
+
+            if (systemPrompt) {
+                formattedMessages.push({ role: 'system', content: customerContext ? `${systemPrompt}\n\nContexto do cliente:\n${customerContext}` : systemPrompt });
+            }
+
+            formattedMessages.push(...messages.slice(-10).map(m => ({
+                role: m.role === 'assistant' ? 'assistant' : 'user',
+                content: m.content
+            })));
+
+            const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'nvidia/llama-3.1-nemotron-70b-instruct',
+                    messages: formattedMessages,
+                    temperature: 0.7,
+                    max_tokens: 500
+                })
+            });
+
+            if (!response.ok) {
+                console.error('[AI Chatbot] Nvidia API error:', await response.text());
+                return '';
+            }
+
+            const data = await response.json();
+            return data.choices?.[0]?.message?.content || '';
+        } catch (err) {
+            console.error('[AI Chatbot] Nvidia exception:', err);
+            return '';
+        }
+    },
+
+    // Gerar resposta com Z.AI (Groq API)
+    generateResponseZai: async (
+        messages: ChatMessage[],
+        systemPrompt: string,
+        apiKey: string,
+        customerContext?: string
+    ): Promise<string> => {
+        try {
+            const formattedMessages: any[] = [];
+
+            if (systemPrompt) {
+                formattedMessages.push({ role: 'system', content: customerContext ? `${systemPrompt}\n\nContexto do cliente:\n${customerContext}` : systemPrompt });
+            }
+
+            formattedMessages.push(...messages.slice(-10).map(m => ({
+                role: m.role === 'assistant' ? 'assistant' : 'user',
+                content: m.content
+            })));
+
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'llama-3.1-70b-versatile',
+                    messages: formattedMessages,
+                    temperature: 0.7,
+                    max_tokens: 500
+                })
+            });
+
+            if (!response.ok) {
+                console.error('[AI Chatbot] Z.AI API error:', await response.text());
+                return '';
+            }
+
+            const data = await response.json();
+            return data.choices?.[0]?.message?.content || '';
+        } catch (err) {
+            console.error('[AI Chatbot] Z.AI exception:', err);
+            return '';
+        }
+    },
+
     // Gerar resposta com Perplexity
     generateResponsePerplexity: async (
         messages: ChatMessage[],
@@ -255,13 +456,10 @@ export const aiChatbotService = {
             let url = 'https://api.perplexity.ai/chat/completions';
             let model = 'llama-3.1-sonar-large-128k-online';
 
-            // Smart Router based on API Key prefix
             if (apiKey.trim().startsWith('gsk_')) {
-                // Groq
                 url = 'https://api.groq.com/openai/v1/chat/completions';
                 model = 'llama-3.1-8b-instant';
             } else if (apiKey.trim().startsWith('sk-')) {
-                // OpenAI
                 url = 'https://api.openai.com/v1/chat/completions';
                 model = 'gpt-3.5-turbo';
             }
@@ -341,27 +539,50 @@ Empréstimos Ativos: ${customer.active_loans_count || 0}`;
 
         // Gerar resposta
         let response = '';
-        const apiKey = config.provider === 'gemini' ? config.geminiApiKey : config.perplexityApiKey;
 
-        if (!apiKey) {
-            console.error('[AI Chatbot] No API key configured');
-            return config.fallbackMessage;
+        let apiKey: string | null = null;
+        switch (config.provider) {
+            case 'gemini':
+                apiKey = config.geminiApiKey || config.apiKey;
+                if (apiKey) {
+                    response = await aiChatbotService.generateResponseGemini(history, config.systemPrompt, apiKey, customerContext);
+                }
+                break;
+            case 'perplexity':
+                apiKey = config.perplexityApiResponseKey || config.apiKey;
+                if (apiKey) {
+                    response = await aiChatbotService.generateResponsePerplexity(history, config.systemPrompt, apiKey, customerContext);
+                }
+                break;
+            case 'openai':
+                apiKey = config.openaiApiKey || config.apiKey;
+                if (apiKey) {
+                    response = await aiChatbotService.generateResponseOpenAI(history, config.systemPrompt, apiKey, customerContext);
+                }
+                break;
+            case 'openrouter':
+                apiKey = config.openrouterApiKey || config.apiKey;
+                if (apiKey) {
+                    response = await aiChatbotService.generateResponseOpenRouter(history, config.systemPrompt, apiKey, customerContext);
+                }
+                break;
+            case 'nvidia':
+                apiKey = config.nvidiaApiKey || config.apiKey;
+                if (apiKey) {
+                    response = await aiChatbotService.generateResponseNvidia(history, config.systemPrompt, apiKey, customerContext);
+                }
+                break;
+            case 'zai':
+                apiKey = config.zaiApiKey || config.apiKey;
+                if (apiKey) {
+                    response = await aiChatbotService.generateResponseZai(history, config.systemPrompt, apiKey, customerContext);
+                }
+                break;
         }
 
-        if (config.provider === 'gemini') {
-            response = await aiChatbotService.generateResponseGemini(
-                history,
-                config.systemPrompt,
-                apiKey,
-                customerContext
-            );
-        } else if (config.provider === 'perplexity') {
-            response = await aiChatbotService.generateResponsePerplexity(
-                history,
-                config.systemPrompt,
-                apiKey,
-                customerContext
-            );
+        if (!apiKey) {
+            console.error('[AI Chatbot] No API key configured for provider:', config.provider);
+            return config.fallbackMessage;
         }
 
         if (!response) {
@@ -376,14 +597,35 @@ Empréstimos Ativos: ${customer.active_loans_count || 0}`;
     // Gerar resposta (Wrapper para uso geral/teste)
     generateResponse: async (message: string, history: ChatMessage[] = []): Promise<string> => {
         const config = await aiChatbotService.getConfig();
-        const apiKey = config.provider === 'gemini' ? config.geminiApiKey : config.perplexityApiKey;
 
-        if (!apiKey) return "Erro: API Key não configurada.";
-
-        if (config.provider === 'gemini') {
-            return aiChatbotService.generateResponseGemini(history, config.systemPrompt, apiKey);
-        } else {
-            return aiChatbotService.generateResponsePerplexity(history, config.systemPrompt, apiKey);
+        let apiKey: string | null = null;
+        switch (config.provider) {
+            case 'gemini':
+                apiKey = config.geminiApiKey || config.apiKey;
+                if (apiKey) return aiChatbotService.generateResponseGemini(history, config.systemPrompt, apiKey);
+                break;
+            case 'perplexity':
+                apiKey = config.perplexityApiResponseKey || config.apiKey;
+                if (apiKey) return aiChatbotService.generateResponsePerplexity(history, config.systemPrompt, apiKey);
+                break;
+            case 'openai':
+                apiKey = config.openaiApiKey || config.apiKey;
+                if (apiKey) return aiChatbotService.generateResponseOpenAI(history, config.systemPrompt, apiKey);
+                break;
+            case 'openrouter':
+                apiKey = config.openrouterApiKey || config.apiKey;
+                if (apiKey) return aiChatbotService.generateResponseOpenRouter(history, config.systemPrompt, apiKey);
+                break;
+            case 'nvidia':
+                apiKey = config.nvidiaApiKey || config.apiKey;
+                if (apiKey) return aiChatbotService.generateResponseNvidia(history, config.systemPrompt, apiKey);
+                break;
+            case 'zai':
+                apiKey = config.zaiApiKey || config.apiKey;
+                if (apiKey) return aiChatbotService.generateResponseZai(history, config.systemPrompt, apiKey);
+                break;
         }
+
+        return "Erro: API Key não configurada.";
     }
 };

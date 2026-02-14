@@ -13,16 +13,17 @@ async function sendWhatsAppNotification(phone: string, message: string) {
         const config = await prisma.whatsappConfig.findFirst();
         if (!config || !config.isConnected) return;
 
-        let number = phone.replace(/\D/g, '');
-        if (!number.startsWith('55') && number.length >= 10) number = '55' + number;
+        const { normalizePhoneBR } = await import('../services/whatsapp');
+        const number = normalizePhoneBR(phone);
+        if (number.length < 12) return;
 
         await axios.post(`${config.apiUrl}/message/sendText/${config.instanceName}`, {
             number,
-            options: { delay: 1200, presence: 'composing', linkPreview: false },
-            textMessage: { text: message }
+            text: message,
+            options: { delay: 1200, presence: 'composing', linkPreview: false }
         }, { headers: { apikey: config.apiKey }, timeout: 15000 });
     } catch (e: any) {
-        console.error('[LoanRequests] WhatsApp notification failed:', e.message);
+        console.error('[LoanRequests] WhatsApp notification failed:', e?.response?.data?.message || e.message);
     }
 }
 
@@ -385,23 +386,22 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
 
         // ====== GERAR PIX PARA PARCELAS ======
         try {
-            const settings = await prisma.systemSettings.findFirst({ where: { key: 'pix_key' } });
-            if (settings?.value) {
-                const pixKey = settings.value;
-                const pixKeyTypeSetting = await prisma.systemSettings.findFirst({ where: { key: 'pix_key_type' } });
-                const pixReceiverSetting = await prisma.systemSettings.findFirst({ where: { key: 'pix_receiver_name' } });
-                const pixKeyType = pixKeyTypeSetting?.value || 'CPF';
-                const pixReceiver = pixReceiverSetting?.value || 'Tubarao Emprestimos';
-
-                // Atualizar parcelas com código PIX
-                const loan = await prisma.loan.findFirst({ where: { requestId: request.id }, include: { installments: true } });
+            const pixSetting = await prisma.systemSetting.findFirst({ where: { key: 'pix_key' } });
+            if (pixSetting?.value) {
+                const loan = await prisma.loan.findFirst({ where: { requestId: request.id }, include: { installments: true, customer: true } });
                 if (loan) {
-                    for (const inst of loan.installments) {
-                        const pixCode = `00020126${String(4 + pixKey.length).padStart(2, '0')}0014BR.GOV.BCB.PIX01${String(pixKey.length).padStart(2, '0')}${pixKey}5204000053039865406${inst.amount.toFixed(2)}5802BR5913${pixReceiver.substring(0, 13)}6008SAOPAULO62070503***6304`;
-                        await prisma.installment.update({
-                            where: { id: inst.id },
-                            data: { pixCode }
-                        });
+                    const { generateInstallmentPixData, saveInstallmentQRCode } = await import('../services/pix');
+                    for (const [index, inst] of loan.installments.entries()) {
+                        const installmentNum = index + 1;
+                        const { pixCode, qrCodeBuffer } = await generateInstallmentPixData(
+                            pixSetting.value,
+                            Number(inst.amount),
+                            loan.customer.name,
+                            loan.customer.city || 'SAO PAULO',
+                            installmentNum,
+                            loan.id
+                        );
+                        await saveInstallmentQRCode(prisma, inst.id, qrCodeBuffer, pixCode);
                     }
                 }
             }
@@ -543,7 +543,7 @@ loanRequestsRouter.put('/:id/values', requireAdmin, async (req: Request, res: Re
 loanRequestsRouter.put('/:id/supplemental', requireAdmin, async (req: Request, res: Response) => {
     try {
         const { description } = req.body;
-        await prisma.loanRequest.update({
+        const loanRequest = await prisma.loanRequest.update({
             where: { id: req.params.id as string },
             data: {
                 status: 'WAITING_DOCS',
@@ -551,6 +551,47 @@ loanRequestsRouter.put('/:id/supplemental', requireAdmin, async (req: Request, r
                 supplementalRequestedAt: new Date()
             }
         });
+
+        // ====== NOTIFICAÇÕES - Documentos Pendentes ======
+        if (loanRequest.email) {
+            const html = brandedEmailHtml(`
+                <h2 style="color: #FFD700;">📄 Documentos Solicitados</h2>
+                <p>Olá, <strong>${loanRequest.clientName}</strong>!</p>
+                <p>Precisamos de documentos adicionais para dar andamento à sua solicitação:</p>
+                <div style="background:#111;border:1px solid #333;border-radius:8px;padding:15px;margin:15px 0;">
+                    <p style="color:#D4AF37;font-weight:bold;">Documentos necessários:</p>
+                    <p style="color:#ccc;">${description || 'Acesse o app para ver os detalhes.'}</p>
+                </div>
+                <p style="color: #aaa;">Envie os documentos o mais breve possível para agilizar a análise.</p>
+                <div style="text-align: center; margin: 20px 0;">
+                    <a href="https://www.tubaraoemprestimo.com.br" style="background: #D4AF37; color: #000; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Enviar Documentos</a>
+                </div>
+            `);
+            emailService.send(loanRequest.email, '📄 Documentos Solicitados — Tubarão Empréstimos', html).catch(err => console.error('[Supplemental] Email failed:', err.message));
+        }
+
+        if (loanRequest.phone) {
+            sendWhatsAppNotification(loanRequest.phone,
+                `📄 *Documentos Solicitados*\n\nOlá, ${loanRequest.clientName?.split(' ')[0]}!\n\nPrecisamos de documentos adicionais para sua solicitação:\n\n${description || 'Acesse o app para detalhes.'}\n\nEnvie pelo app o mais rápido possível.\n\n_Tubarão Empréstimos 🦈_`
+            );
+        }
+
+        if (loanRequest.customerId) {
+            await prisma.notification.create({
+                data: {
+                    customerId: loanRequest.customerId,
+                    customerEmail: loanRequest.email,
+                    title: '📄 Documentos Solicitados',
+                    message: `Precisamos de documentos adicionais: ${description || 'Acesse o app.'}`,
+                    type: 'WARNING'
+                }
+            }).catch(() => {});
+        }
+
+        if (loanRequest.userId) {
+            sendPushToUser(loanRequest.userId, '📄 Documentos Solicitados', 'Precisamos de documentos adicionais. Acesse o app.').catch(() => {});
+        }
+
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Erro' });

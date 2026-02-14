@@ -41,8 +41,8 @@ async function sendWhatsApp(
         const url = `${config.apiUrl}/message/sendText/${config.instanceName}`;
         await axios.post(url, {
             number: normalizePhone(phone),
-            options: { delay: 1500, presence: 'composing', linkPreview: false },
-            textMessage: { text }
+            text,
+            options: { delay: 1500, presence: 'composing', linkPreview: false }
         }, { headers: { apikey: config.apiKey }, timeout: 15000 });
         return true;
     } catch {

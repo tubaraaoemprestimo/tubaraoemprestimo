@@ -2,7 +2,7 @@ import { CronJob } from 'cron';
 import { prisma } from '../services/prisma';
 import { emailService } from '../services/email';
 import { sendWhatsAppMessage } from '../services/whatsapp';
-import { sendPushToUser } from '../routes/push';
+import { sendPushToUser, sendPushToRole } from '../routes/push';
 
 function brDate(d: Date | string) {
   return new Date(d).toLocaleDateString('pt-BR');
@@ -20,8 +20,24 @@ function brandedHtml(body: string): string {
   </div>`;
 }
 
+async function getPixKey(): Promise<string> {
+  try {
+    const pk = await (prisma as any).systemSettings?.findFirst?.({ where: { key: 'pix_key' } })
+      || await (prisma as any).systemSetting?.findFirst?.({ where: { key: 'pix_key' } });
+    return pk?.value || '';
+  } catch {
+    try {
+      // Fallback: tenta o outro nome
+      const pk = await (prisma as any).systemSetting?.findFirst?.({ where: { key: 'pix_key' } });
+      return pk?.value || '';
+    } catch {
+      return '';
+    }
+  }
+}
+
+// ============ CRON 1: Lembretes de parcelas (3 dias antes + no dia) ============
 export const scheduleInstallmentReminders = () => {
-  // Roda todo dia às 8h
   const job = new CronJob('0 8 * * *', async () => {
     try {
       const now = new Date();
@@ -33,24 +49,17 @@ export const scheduleInstallmentReminders = () => {
       const start0 = new Date(now); start0.setHours(0, 0, 0, 0);
       const end0 = new Date(now); end0.setHours(23, 59, 59, 999);
 
-      // Parcelas que vencem em 3 dias
       const dueIn3 = await prisma.installment.findMany({
         where: { status: 'OPEN', dueDate: { gte: start3, lte: end3 } },
         include: { loan: { include: { customer: true } } }
       });
 
-      // Parcelas que vencem hoje
       const dueToday = await prisma.installment.findMany({
         where: { status: 'OPEN', dueDate: { gte: start0, lte: end0 } },
         include: { loan: { include: { customer: true } } }
       });
 
-      // PIX settings
-      let pixKey = '';
-      try {
-        const pk = await prisma.systemSetting.findFirst({ where: { key: 'pix_key' } });
-        if (pk?.value) pixKey = pk.value;
-      } catch { }
+      const pixKey = await getPixKey();
 
       // Lembrete 3 dias antes
       for (const inst of dueIn3) {
@@ -73,20 +82,19 @@ export const scheduleInstallmentReminders = () => {
               <a href="https://www.tubaraoemprestimo.com.br" style="background:#D4AF37;color:#000;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:bold;">Acessar App</a>
             </div>
           `);
-          await emailService.send(c.email, `⏰ Parcela vence em 3 dias — ${amtFmt}`, html);
+          emailService.send(c.email, `⏰ Parcela vence em 3 dias — ${amtFmt}`, html).catch(err => console.error('[Cron] Email 3d failed:', err.message));
         }
 
         if (c.phone) {
-          await sendWhatsAppMessage(c.phone,
+          sendWhatsAppMessage(c.phone,
             `⏰ *Lembrete de Pagamento*\n\nOlá, ${c.name.split(' ')[0]}!\n\nSua parcela de *${amtFmt}* vence em *${brDate(inst.dueDate)}* (3 dias).${pixInfo}\n\nAcesse o app para mais detalhes.\n\n_Tubarão Empréstimos 🦈_`
-          );
+          ).catch(err => console.error('[Cron] WA 3d failed:', err));
         }
 
         if (c.userId) {
-          sendPushToUser(c.userId, '⏰ Parcela vence em 3 dias', `Sua parcela de ${amtFmt} vence em ${brDate(inst.dueDate)}`).catch(() => { });
+          sendPushToUser(c.userId, '⏰ Parcela vence em 3 dias', `Sua parcela de ${amtFmt} vence em ${brDate(inst.dueDate)}`).catch(() => {});
         }
 
-        // Notificação interna
         await prisma.notification.create({
           data: {
             customerId: c.id,
@@ -95,7 +103,7 @@ export const scheduleInstallmentReminders = () => {
             message: `Sua parcela de ${amtFmt} vence em ${brDate(inst.dueDate)}.`,
             type: 'WARNING'
           }
-        }).catch(() => { });
+        }).catch(() => {});
       }
 
       // Lembrete no dia
@@ -120,17 +128,17 @@ export const scheduleInstallmentReminders = () => {
               <a href="https://www.tubaraoemprestimo.com.br" style="background:#D4AF37;color:#000;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:bold;">Pagar Agora</a>
             </div>
           `);
-          await emailService.send(c.email, `⚠️ Parcela vence HOJE — ${amtFmt}`, html);
+          emailService.send(c.email, `⚠️ Parcela vence HOJE — ${amtFmt}`, html).catch(err => console.error('[Cron] Email today failed:', err.message));
         }
 
         if (c.phone) {
-          await sendWhatsAppMessage(c.phone,
+          sendWhatsAppMessage(c.phone,
             `⚠️ *PARCELA VENCE HOJE!*\n\nOlá, ${c.name.split(' ')[0]}!\n\nSua parcela de *${amtFmt}* vence *HOJE*.${pixInfo}\n\nEvite juros e multas pagando em dia.\n\nAcesse o app para mais detalhes.\n\n_Tubarão Empréstimos 🦈_`
-          );
+          ).catch(err => console.error('[Cron] WA today failed:', err));
         }
 
         if (c.userId) {
-          sendPushToUser(c.userId, '⚠️ Parcela vence HOJE', `Sua parcela de ${amtFmt} vence hoje!`).catch(() => { });
+          sendPushToUser(c.userId, '⚠️ Parcela vence HOJE', `Sua parcela de ${amtFmt} vence hoje!`).catch(() => {});
         }
 
         await prisma.notification.create({
@@ -141,7 +149,7 @@ export const scheduleInstallmentReminders = () => {
             message: `Sua parcela de ${amtFmt} vence hoje. Evite juros!`,
             type: 'WARNING'
           }
-        }).catch(() => { });
+        }).catch(() => {});
       }
 
       console.log(`[Cron] reminders ok: +3d=${dueIn3.length}, today=${dueToday.length}`);
@@ -153,7 +161,123 @@ export const scheduleInstallmentReminders = () => {
   job.start();
 };
 
-// Cron para postar WhatsApp Status agendado
+// ============ CRON 2: Detecção de parcelas ATRASADAS ============
+export const scheduleLatePaymentDetection = () => {
+  // Roda todo dia às 9h (1h após lembretes)
+  const job = new CronJob('0 9 * * *', async () => {
+    try {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+
+      // Encontrar parcelas OPEN com vencimento no passado
+      const overdueInstallments = await prisma.installment.findMany({
+        where: {
+          status: 'OPEN',
+          dueDate: { lt: now }
+        },
+        include: { loan: { include: { customer: true } } }
+      });
+
+      if (overdueInstallments.length === 0) {
+        console.log('[Cron] No overdue installments found');
+        return;
+      }
+
+      const pixKey = await getPixKey();
+
+      for (const inst of overdueInstallments) {
+        const c = inst.loan?.customer;
+        if (!c) continue;
+
+        const daysOverdue = Math.floor((Date.now() - new Date(inst.dueDate).getTime()) / (1000 * 60 * 60 * 24));
+        const amtFmt = `R$ ${Number(inst.amount).toFixed(2)}`;
+        const pixInfo = inst.pixCode ? `\n\n📱 *PIX Copia e Cola:*\n${inst.pixCode}` : (pixKey ? `\n\n📱 *Chave PIX:* ${pixKey}` : '');
+
+        // Enviar apenas para atrasos de 1, 3, 7, 15, 30 dias (não bombardear diariamente)
+        if (![1, 3, 7, 15, 30].includes(daysOverdue)) continue;
+
+        // Email ao cliente
+        if (c.email) {
+          const urgency = daysOverdue >= 15 ? '#FF0000' : daysOverdue >= 7 ? '#FF4444' : '#FF6B6B';
+          const html = brandedHtml(`
+            <h2 style="color:${urgency};">🚨 Parcela ATRASADA — ${daysOverdue} dia${daysOverdue > 1 ? 's' : ''}</h2>
+            <p>Olá, <strong>${c.name}</strong>!</p>
+            <p>Sua parcela de <strong style="color:${urgency};">${amtFmt}</strong> venceu em <strong>${brDate(inst.dueDate)}</strong> e está com <strong>${daysOverdue} dia${daysOverdue > 1 ? 's' : ''} de atraso</strong>.</p>
+            <p style="color:#FF6B6B;"><strong>⚠️ Juros e multas estão sendo aplicados diariamente.</strong></p>
+            ${pixKey ? `<div style="background:#111;border:1px solid #333;border-radius:8px;padding:15px;margin:15px 0;">
+              <p style="margin:5px 0;color:#ccc;"><strong style="color:#D4AF37;">Chave PIX:</strong> ${pixKey}</p>
+              ${inst.pixCode ? `<p style="margin:5px 0;color:#ccc;word-break:break-all;"><strong style="color:#D4AF37;">PIX Copia e Cola:</strong> ${inst.pixCode}</p>` : ''}
+            </div>` : ''}
+            <p style="color:#aaa;">Entre em contato conosco se precisar renegociar.</p>
+            <div style="text-align:center;margin:20px 0;">
+              <a href="https://www.tubaraoemprestimo.com.br" style="background:#FF4444;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:bold;">Regularizar Agora</a>
+            </div>
+          `);
+          emailService.send(c.email, `🚨 Parcela ATRASADA (${daysOverdue} dias) — ${amtFmt}`, html).catch(err => console.error('[Cron] Late email failed:', err.message));
+        }
+
+        // WhatsApp ao cliente
+        if (c.phone) {
+          sendWhatsAppMessage(c.phone,
+            `🚨 *PARCELA ATRASADA*\n\nOlá, ${c.name.split(' ')[0]}!\n\nSua parcela de *${amtFmt}* venceu em *${brDate(inst.dueDate)}* (${daysOverdue} dia${daysOverdue > 1 ? 's' : ''} de atraso).${pixInfo}\n\n⚠️ Juros e multas estão sendo aplicados.\n\nRegularize pelo app ou entre em contato.\n\n_Tubarão Empréstimos 🦈_`
+          ).catch(err => console.error('[Cron] Late WA failed:', err));
+        }
+
+        // Push ao cliente
+        if (c.userId) {
+          sendPushToUser(c.userId, `🚨 Parcela ATRASADA (${daysOverdue}d)`, `Sua parcela de ${amtFmt} está ${daysOverdue} dia(s) atrasada.`).catch(() => {});
+        }
+
+        // Notificação interna
+        await prisma.notification.create({
+          data: {
+            customerId: c.id,
+            customerEmail: c.email,
+            title: `🚨 Parcela ATRASADA — ${daysOverdue} dias`,
+            message: `Parcela de ${amtFmt} vencida em ${brDate(inst.dueDate)}.`,
+            type: 'ALERT'
+          }
+        }).catch(() => {});
+      }
+
+      // Alerta para admin com resumo
+      const totalOverdue = overdueInstallments.length;
+      const totalAmount = overdueInstallments.reduce((sum, i) => sum + Number(i.amount), 0);
+
+      // Notificação admin
+      await prisma.notification.create({
+        data: {
+          title: `🚨 ${totalOverdue} parcela(s) em atraso`,
+          message: `Total em atraso: R$ ${totalAmount.toFixed(2)}. Verifique o painel de cobranças.`,
+          type: 'ALERT'
+        }
+      }).catch(() => {});
+
+      // Push para admins
+      sendPushToRole('ADMIN', `🚨 ${totalOverdue} parcela(s) em atraso`, `Total: R$ ${totalAmount.toFixed(2)}`).catch(() => {});
+
+      // WhatsApp para admins
+      try {
+        const admins = await prisma.user.findMany({ where: { role: 'ADMIN' } });
+        for (const admin of admins) {
+          if (admin.phone) {
+            sendWhatsAppMessage(admin.phone,
+              `🚨 *Resumo de Atrasos*\n\n${totalOverdue} parcela(s) em atraso\nTotal: R$ ${totalAmount.toFixed(2)}\n\nAcesse o painel para detalhes.`
+            ).catch(() => {});
+          }
+        }
+      } catch {}
+
+      console.log(`[Cron] late detection: ${totalOverdue} overdue, total R$ ${totalAmount.toFixed(2)}`);
+    } catch (e) {
+      console.error('[Cron] late payment detection error:', e);
+    }
+  });
+
+  job.start();
+};
+
+// ============ CRON 3: WhatsApp Status agendado ============
 export const scheduleWhatsAppStatus = () => {
   const job = new CronJob('*/5 * * * *', async () => {
     try {
@@ -191,8 +315,10 @@ export const scheduleWhatsAppStatus = () => {
   job.start();
 };
 
+// ============ INIT ============
 export const initCronJobs = () => {
   scheduleInstallmentReminders();
+  scheduleLatePaymentDetection();
   scheduleWhatsAppStatus();
-  console.log('[Cron] initialized (reminders + whatsapp status)');
+  console.log('[Cron] initialized (reminders + late detection + whatsapp status)');
 };

@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -29,6 +29,7 @@ import { communicationRouter } from './routes/communication';
 import { adminRouter } from './routes/admin';
 import { paymentReceiptsRouter } from './routes/paymentReceipts';
 import { openFinanceRouter } from './routes/openFinance';
+import { pixRouter } from './routes/pix';
 import { initCronJobs } from './cron/installmentReminders';
 
 const app = express();
@@ -91,6 +92,7 @@ app.use('/api/communication', communicationRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/payment-receipts', paymentReceiptsRouter);
 app.use('/api/open-finance', openFinanceRouter);
+app.use('/api/pix', pixRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
