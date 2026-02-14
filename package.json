@@ -1,5 +1,5 @@
 {
-  "name": "tubarão-empréstimos",
+  "name": "tubarao-emprestimos",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -26,6 +26,7 @@
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.24",
     "postcss": "^8.5.6",
+    "@tailwindcss/postcss": "^4.0.0",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
