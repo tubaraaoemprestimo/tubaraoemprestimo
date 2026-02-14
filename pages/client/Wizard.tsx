@@ -2234,6 +2234,7 @@ export const Wizard: React.FC = () => {
                     <div className="space-y-4">
                       <Input label="Nome Completo" name="name" value={formData.name} onChange={handleChange} placeholder="Como no documento" />
                       <Input label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00" error={errors.cpf} />
+                      <Input label="Data de Nascimento" type="date" name="birthDate" value={formData.birthDate} onChange={handleChange} />
                       <Input label="WhatsApp Principal" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
                       <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} />
                       <Input label="Cupom de Indicação (Opcional)" name="referralCode" value={formData.referralCode} onChange={handleChange} placeholder="Insira seu cupom aqui" />
