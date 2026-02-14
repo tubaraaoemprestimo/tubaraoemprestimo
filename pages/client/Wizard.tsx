@@ -513,7 +513,15 @@ export const Wizard: React.FC = () => {
     let dataStep = 4;
     if (profileType === 'MOTO' || profileType === 'LIMPA_NOME') dataStep = 3;
     if (profileType === 'GARANTIA') dataStep = 5;
-    if (currentStep === dataStep) {
+    // Validação Específica INVESTIDOR
+    if (profileType === 'INVESTIDOR' && currentStep === 3) {
+      if (!investorData.fullName.trim()) { addToast("Informe seu nome completo.", 'warning'); return; }
+      if (!investorData.cpfCnpj.trim()) { addToast("Informe seu CPF ou CNPJ.", 'warning'); return; }
+      if (!investorData.phone.trim()) { addToast("Informe seu telefone.", 'warning'); return; }
+      if (!investorData.email.trim()) { addToast("Informe seu email.", 'warning'); return; }
+    }
+
+    if (currentStep === dataStep && profileType !== 'INVESTIDOR') {
       // Dados pessoais básicos
       if (!formData.name.trim()) {
         addToast("Informe seu nome completo.", 'warning');
@@ -2251,10 +2259,13 @@ export const Wizard: React.FC = () => {
                       </div>
                     )}
 
-                    {(profileType === 'MOTO' || profileType === 'GARANTIA_VEICULO' || profileType === 'CLT') && (
+                    {(profileType === 'MOTO' || profileType === 'GARANTIA' || profileType === 'CLT') && (
                       <div className="pt-4 border-t border-zinc-800 space-y-4">
                         <h3 className="text-sm font-bold text-[#D4AF37]">Dados Profissionais</h3>
                         <Input label="Profissão" name="occupation" value={formData.occupation} onChange={handleChange} />
+                        {profileType === 'CLT' && (
+                          <Input label="Nome da Empresa" name="companyName" value={formData.companyName} onChange={handleChange} placeholder="Empresa onde trabalha" />
+                        )}
                         <div className="grid grid-cols-2 gap-4">
                           <Input label="Renda Mensal" name="income" value={formData.income} onChange={handleChange} />
                           <Input label="Dia Pagamento" name="workTime" value={formData.workTime} onChange={handleChange} placeholder="Dia 05" />
