@@ -8,7 +8,7 @@ datasource db {
 }
 
 model AiChatHistory {
-  id        String   @id
+  id        String   @id @default(uuid())
   phone     String
   role      String
   content   String
@@ -19,7 +19,7 @@ model AiChatHistory {
 }
 
 model AiChatbotConfig {
-  id                String   @id
+  id                String   @id @default(uuid())
   enabled           Boolean  @default(false)
   provider          String   @default("gemini")
   apiKey            String   @default("") @map("api_key")
@@ -28,7 +28,7 @@ model AiChatbotConfig {
   workingHoursStart String   @default("08:00") @map("working_hours_start")
   workingHoursEnd   String   @default("18:00") @map("working_hours_end")
   transferKeywords  String[] @default(["atendente", "humano", "pessoa"]) @map("transfer_keywords")
-  updatedAt         DateTime @map("updated_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("ai_chatbot_config")
 }
@@ -48,7 +48,7 @@ model AuditLog {
 }
 
 model Blacklist {
-  id      String   @id
+  id      String   @id @default(uuid())
   cpf     String   @unique
   name    String
   reason  String
@@ -76,7 +76,7 @@ model BrandSettings {
 }
 
 model Campaign {
-  id          String   @id
+  id          String   @id @default(uuid())
   title       String
   description String
   imageUrl    String?  @map("image_url")
@@ -92,7 +92,7 @@ model Campaign {
 }
 
 model CollectionRule {
-  id              String   @id
+  id              String   @id @default(uuid())
   daysOffset      Int      @map("days_offset")
   type            String
   messageTemplate String   @map("message_template")
@@ -103,7 +103,7 @@ model CollectionRule {
 }
 
 model ContractSignature {
-  id            String   @id
+  id            String   @id @default(uuid())
   loanRequestId String   @map("loan_request_id")
   signatureUrl  String   @map("signature_url")
   ipAddress     String?  @map("ip_address")
@@ -114,7 +114,7 @@ model ContractSignature {
 }
 
 model Coupon {
-  id            String    @id
+  id            String    @id @default(uuid())
   code          String    @unique
   discount      Float
   description   String
@@ -130,7 +130,7 @@ model Coupon {
 }
 
 model Customer {
-  id                  String         @id
+  id                  String         @id @default(uuid())
   userId              String?        @map("user_id")
   name                String
   cpf                 String         @unique
@@ -178,20 +178,20 @@ model Customer {
 }
 
 model GoalsSettings {
-  id                      String   @id
+  id                      String   @id @default(uuid())
   monthlyLoanGoal         Float    @default(0) @map("monthly_loan_goal")
   monthlyClientGoal       Int      @default(0) @map("monthly_client_goal")
   monthlyApprovalRateGoal Float    @default(0) @map("monthly_approval_rate_goal")
   projections             Json?
   expectedGrowthRate      Float    @default(0) @map("expected_growth_rate")
   goalPeriod              String   @default("") @map("goal_period")
-  updatedAt               DateTime @map("updated_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
 
   @@map("goals_settings")
 }
 
 model Installment {
-  id        String    @id
+  id        String    @id @default(uuid())
   loanId    String    @map("loan_id")
   dueDate   DateTime  @map("due_date")
   amount    Float
@@ -206,7 +206,7 @@ model Installment {
 }
 
 model LoanPackage {
-  id              String   @id
+  id              String   @id @default(uuid())
   name            String
   minValue        Float    @map("min_value")
   maxValue        Float    @map("max_value")
@@ -219,7 +219,7 @@ model LoanPackage {
 }
 
 model LoanRequest {
-  id                      String    @id
+  id                      String    @id @default(uuid())
   customerId              String?   @map("customer_id")
   userId                  String?   @map("user_id")
   clientName              String    @map("client_name")
@@ -268,7 +268,7 @@ model LoanRequest {
   pixKey                  String?   @map("pix_key")
   pixKeyType              String?   @map("pix_key_type")
   createdAt               DateTime  @default(now()) @map("created_at")
-  updatedAt               DateTime  @map("updated_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
   contractPdfUrl          String?   @map("contract_pdf_url")
   referralCode            String?   @map("referral_code")
   
@@ -280,7 +280,7 @@ model LoanRequest {
 }
 
 model Loan {
-  id                String        @id
+  id                String        @id @default(uuid())
   customerId        String        @map("customer_id")
   requestId         String        @unique @map("request_id")
   amount            Float
@@ -297,7 +297,7 @@ model Loan {
 }
 
 model MessageTemplate {
-  id        String   @id
+  id        String   @id @default(uuid())
   name      String
   category  String
   content   String
@@ -309,7 +309,7 @@ model MessageTemplate {
 }
 
 model NotificationLog {
-  id           String   @id
+  id           String   @id @default(uuid())
   type         String
   recipient    String
   subject      String?
@@ -323,7 +323,7 @@ model NotificationLog {
 }
 
 model Notification {
-  id            String    @id
+  id            String    @id @default(uuid())
   customerEmail String?   @map("customer_email")
   title         String
   message       String
@@ -337,7 +337,7 @@ model Notification {
 }
 
 model OtpCode {
-  id        String   @id
+  id        String   @id @default(uuid())
   email     String
   code      String
   type      String   @default("EMAIL_VERIFY")
@@ -349,7 +349,7 @@ model OtpCode {
 }
 
 model PushSubscription {
-  id        String   @id
+  id        String   @id @default(uuid())
   userId    String   @map("user_id")
   endpoint  String
   p256dh    String
@@ -378,7 +378,7 @@ model RiskEvent {
 }
 
 model ScheduledStatus {
-  id           String    @id
+  id           String    @id @default(uuid())
   imageUrl     String    @map("image_url")
   caption      String?
   status       String    @default("PENDING")
@@ -391,7 +391,7 @@ model ScheduledStatus {
 }
 
 model SecurityAlert {
-  id          String   @id
+  id          String   @id @default(uuid())
   userId      String   @map("user_id")
   userName    String   @map("user_name")
   userEmail   String   @map("user_email")
@@ -409,7 +409,7 @@ model SecurityAlert {
 }
 
 model SecurityBlock {
-  id                String    @id
+  id                String    @id @default(uuid())
   userId            String    @map("user_id")
   blockType         String    @map("block_type")
   blockReason       String    @map("block_reason")
@@ -437,7 +437,7 @@ model SystemSetting {
 }
 
 model TemporaryLink {
-  id        String   @id
+  id        String   @id @default(uuid())
   token     String   @unique
   type      String
   userId    String?  @map("user_id")
@@ -451,7 +451,7 @@ model TemporaryLink {
 }
 
 model Transaction {
-  id          String   @id
+  id          String   @id @default(uuid())
   type        String
   description String
   amount      Float
@@ -486,7 +486,7 @@ model TrustedDevice {
 }
 
 model User {
-  id                  String               @id
+  id                  String               @id @default(uuid())
   authId              String?              @unique @map("auth_id")
   name                String
   email               String               @unique
@@ -510,7 +510,7 @@ model User {
 }
 
 model WebAuthnCredential {
-  id                String    @id
+  id                String    @id @default(uuid())
   userId            String    @map("user_id")
   userEmail         String    @map("user_email")
   credentialId      String    @unique @map("credential_id")
@@ -526,18 +526,18 @@ model WebAuthnCredential {
 }
 
 model WhatsappConfig {
-  id           String   @id
+  id           String   @id @default(uuid())
   apiUrl       String   @map("api_url")
   apiKey       String   @map("api_key")
   instanceName String   @map("instance_name")
   isConnected  Boolean  @default(false) @map("is_connected")
-  updatedAt    DateTime @map("updated_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("whatsapp_config")
 }
 
 model Referral {
-  id                 String    @id
+  id                 String    @id @default(uuid())
   referrerCustomerId String    @map("referrer_customer_id")
   referrerCode       String    @map("referrer_code")
   referredCustomerId String?   @map("referred_customer_id")
@@ -555,7 +555,7 @@ model Referral {
 }
 
 model PaymentReceipt {
-  id            String    @id
+  id            String    @id @default(uuid())
   installmentId String    @map("installment_id")
   customerId    String    @map("customer_id")
   receiptUrl    String    @map("receipt_url")
@@ -570,7 +570,7 @@ model PaymentReceipt {
 }
 
 model CreditScore {
-  id             String   @id
+  id             String   @id @default(uuid())
   customerId     String   @map("customer_id")
   score          Int
   classification String
@@ -583,7 +583,7 @@ model CreditScore {
 }
 
 model IncomeAnalysis {
-  id                  String   @id
+  id                  String   @id @default(uuid())
   customerId          String   @map("customer_id")
   monthlyIncome       Float    @map("monthly_income")
   averageBalance      Float?   @map("average_balance")
@@ -599,7 +599,7 @@ model IncomeAnalysis {
 }
 
 model OpenFinanceConsent {
-  id         String    @id
+  id         String    @id @default(uuid())
   customerId String    @map("customer_id")
   scope      String[]
   status     String    @default("ACTIVE")
