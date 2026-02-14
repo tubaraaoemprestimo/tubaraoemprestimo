@@ -1,6 +1,6 @@
 # 🦈 Tubarão Empréstimos — Resumo do Projeto
 
-> **Última atualização:** 2026-02-13 (v5 - full-features-integration)
+> **Última atualização:** 2026-02-14 (v6 - ai-multi-provider + pix-real)
 > **Repositório:** https://github.com/tubaraaoemprestimo/tubaraoemprestimo.git
 > **Produção:** https://www.tubaraoemprestimo.com.br
 > **Stack:** React + TypeScript + Vite + Node.js (Express/Prisma)
@@ -8,7 +8,67 @@
 
 ---
 
-## 📝 Últimas Alterações (13/02/2026) — v5 Full Features
+## 🤖 Últimas Alterações (14/02/2026) — v6 AI Multi-Provider + Real PIX
+
+### 1. Suporte a Múltiplos Provedores de AI no Chatbot
+- **Novos provedores adicionados:**
+  - **OpenAI:** gpt-4o-mini (via API oficial)
+  - **OpenRouter:** google/gemini-2.0-flash-exp:free (via OpenRouter)
+  - **Nvidia:** nvidia/llama-3.1-nemotron-70b-instruct (via NIM API)
+  - **Z.AI:** llama-3.1-70b-versatile (via Groq API)
+- **Provedores anteriores mantidos:**
+  - Gemini 1.5 Flash (via API oficial)
+  - Perplexity AI (via API oficial)
+- **Total:** 6 provedores de AI configuráveis
+- **Backend:**
+  - Schema extended: `openaiApiKey`, `openrouterApiKey`, `nvidiaApiKey`, `zaiApiKey` em `AiChatbotConfig`
+  - Functions `callOpenAIAPI()`, `callOpenRouterAPI()`, `callNvidiaAPI()`, `callZaiAPI()` em `routes/chatbot.ts`
+  - Switch statement para roteamento automático ao provedor configurado
+- **Frontend:**
+  - Services extended: `aiChatbotService.ts` com novos tipos e funções de gerenciamento
+  - `getConfig()` e `saveConfig()` mapeiam todos os campos de API keys
+  - `processMessage()` roteia para o provedor correto baseado na configuração admin
+
+### 2. Geração Real de QR Code PIX (Padrão BSPC/Banco Central)
+- **Serviço PIX completo (`backend/src/services/pix.ts`):**
+  - `generatePixCode()` — Gera código Pix Copia e Cola (BSPC format)
+  - `generatePixQRCodeDataURL()` — Cria data URL base64 do QR Code
+  - `generatePixQRCodeBuffer()` — Cria Buffer PNG do QR Code
+  - `generateInstallmentPixData()` — Gera código + QR para parcela específica
+  - `saveInstallmentQRCode()` — Atualiza registro da parcela com código PIX
+- **Endpoints PIX (`backend/src/routes/pix.ts`):**
+  - `POST /api/pix/generate/:installmentId` — Gera PIX para parcela específica
+  - `GET /api/pix/key` — Obtém chave PIX pública do sistema
+  - `PUT /api/pix/key` — Configura/chave PIX (admin only)
+- **Integração no sistema:**
+  - Loan approval gera automaticamente PIX para todas as parcelas
+  - QR codes com cores customizáveis (preto/dourado da marca)
+  - Interface `PixPayload` com formato BSPC completo
+  - Suporte a tipos de chave: CPF, email, phone, random
+- **Dependência:** `qrcode` instalado com types `@types/qrcode`
+
+### 3. Infrastructure Improvements
+- **Server setup:** `pixRouter` registrado em `backend/src/server.ts`
+- **Loan approval flow:** Integração automática de geração de PIX ao aprovar empréstimo
+- **Build status:** TypeScript compilado sem erros após todas correções
+
+### Checklist Atualizado
+- [x] WhatsApp status scheduling (cron 5 min)
+- [x] Geolocalização funcional (captura global + device info)
+- [x] Clientes no Admin (endpoint corrigido)
+- [x] Email em todos os eventos
+- [x] Push notifications em todos os processos
+- [x] WhatsApp em todos os processos
+- [x] Anti-fraude 100% (2 devices/IPs + location + cooldown)
+- [x] Indicações com gamificação (backend real)
+- [x] Todos campos obrigatórios em todos fluxos
+- [x] Open Finance API (backend real, não mock)
+- [x] **PIX QR code real (BSPC Padrão Central)**
+- [x] **Chatbot com 6 provedores de AI (OpenAI, OpenRouter, Nvidia, Z.AI, Gemini, Perplexity)**
+
+---
+
+## 📝 Histórico Anterior (13/02/2026) — v5 Full Features
 
 ### 1. Sistema de Notificações Completo
 - **Email** (Nodemailer + Resend fallback):

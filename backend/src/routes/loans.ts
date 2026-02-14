@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
+import { sendWhatsAppMessage } from '../services/whatsapp';
 
 export const loansRouter = Router();
 loansRouter.use(authenticate);
@@ -70,6 +71,21 @@ loansRouter.put('/:loanId/installments/:installmentId/proof', async (req: Reques
                     date: new Date()
                 }
             });
+
+            // Notifica admins via WhatsApp sobre pagamento recebido
+            if (loan.customerId) {
+                const customer = await prisma.customer.findUnique({ where: { id: loan.customerId } });
+                if (customer) {
+                    const admins = await prisma.user.findMany({ where: { role: 'ADMIN' } });
+                    for (const admin of admins) {
+                        if (admin.phone) {
+                            await sendWhatsAppMessage(admin.phone,
+                                `💰 *Pagamento Recebido!*\n\nCliente: ${customer.name}\nValor: R$ ${installment.amount.toFixed(2)}\nParcela: ${installment.id.substring(0, 8)}\n\nVerifique e confirme no painel admin.`
+                            );
+                        }
+                    }
+                }
+            }
         }
 
         res.json({ success: true });
