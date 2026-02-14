@@ -528,3 +528,15 @@ Migração completa do frontend para deixar de depender do SDK do Supabase e pas
    - **Schema Update**: Adicionado `@default(uuid())` e `@updatedAt` em modelos críticos (`BrandSettings`, `RiskEvent`, `TrustedDevice`, `AuditLog`, `SystemSetting`) que causavam falha na criação de registros por falta de ID.
    - **Build Script**: Atualizado `package.json` para rodar `prisma generate` automaticamente no build e install.
 
+7. **Correções Completas Backend (14/02/2026):**
+   - **Schema: `@default(uuid())` em TODOS os 36 modelos** — Antes, apenas 5 modelos tinham sido corrigidos. Agora todos os modelos (User, Customer, LoanRequest, Loan, Installment, Notification, Campaign, Coupon, Referral, PaymentReceipt, CreditScore, IncomeAnalysis, OpenFinanceConsent, etc.) geram UUID automaticamente. Isso era a causa raiz de todos os erros "Argument `id` is missing".
+   - **Schema: `@updatedAt` em campos críticos** — Adicionado a AiChatbotConfig, GoalsSettings, LoanRequest, WhatsappConfig para auto-gerenciamento de timestamps.
+   - **prisma.ts: 40+ novos aliases adicionados** — Cobertura completa de:
+     - Plural -> Singular: `installments` -> `installment`, `notifications` -> `notification`, etc.
+     - Snake_case -> camelCase: `credit_scores` -> `creditScore`, `income_analyses` -> `incomeAnalysis`, etc.
+     - CamelCase plural -> singular: `systemSettings` -> `systemSetting`, `riskEvents` -> `riskEvent`, etc.
+   - **installmentReminders.ts: corrigido naming** — Campos snake_case (`due_date`, `pix_code`) convertidos para camelCase (`dueDate`, `pixCode`). Relações plurais (`inst.loans.customers`) para singular (`inst.loan.customer`). Query model corrigida (`prisma.installments` -> `prisma.installment`).
+   - **openFinance.ts: reescrito completo** — Todas referências snake_case de tabelas e campos corrigidas para camelCase Prisma. Removido `crypto.randomUUID()` manual (agora usa `@default(uuid())` do schema).
+   - **Resultado**: Build `tsc --noEmit` com 0 erros. Cron `[Cron] initialized` sem TypeError. Todos endpoints testados respondendo corretamente.
+   - **Commits**: `7ed725f` (schema uuid), `7f61174` (cron + openFinance + aliases)
+
