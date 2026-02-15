@@ -569,21 +569,21 @@ export const Requests: React.FC = () => {
                             )}
 
                             {/* Video Gallery - hide for LIMPA_NOME */}
-                            {selectedRequest.profileType !== 'LIMPA_NOME' && <div className="space-y-4">
+                            {selectedRequest.profileType !== 'LIMPA_NOME' && selectedRequest.documents && <div className="space-y-4">
                                 <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4 flex items-center gap-2">
                                     <Video size={16} /> Validação por Vídeo
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    {selectedRequest.documents.videoSelfieUrl && (
+                                    {selectedRequest.documents?.videoSelfieUrl && (
                                         <VideoCard title="Vídeo do Usuário" url={selectedRequest.documents.videoSelfieUrl} />
                                     )}
-                                    {selectedRequest.documents.videoHouseUrl && (
+                                    {selectedRequest.documents?.videoHouseUrl && (
                                         <VideoCard title="Vídeo da Casa" url={selectedRequest.documents.videoHouseUrl} />
                                     )}
-                                    {selectedRequest.documents.videoVehicleUrl && (
+                                    {selectedRequest.documents?.videoVehicleUrl && (
                                         <VideoCard title="Vídeo do Veículo" url={selectedRequest.documents.videoVehicleUrl} />
                                     )}
-                                    {!selectedRequest.documents.videoSelfieUrl && (
+                                    {!selectedRequest.documents?.videoSelfieUrl && (
                                         <div className="text-zinc-500 italic text-sm p-4">Nenhum vídeo anexado.</div>
                                     )}
                                 </div>
@@ -598,18 +598,18 @@ export const Requests: React.FC = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <DocCard
                                             title="Selfie (Prova de Vida)"
-                                            urls={ensureArray(selectedRequest.documents.selfieUrl)}
-                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.selfieUrl), title: "Selfie" })}
+                                            urls={ensureArray(selectedRequest.documents?.selfieUrl)}
+                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.selfieUrl), title: "Selfie" })}
                                         />
                                         <DocCard
                                             title="RG/CNH (Frente)"
-                                            urls={ensureArray(selectedRequest.documents.idCardUrl)}
-                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.idCardUrl), title: "RG/CNH Frente" })}
+                                            urls={ensureArray(selectedRequest.documents?.idCardUrl)}
+                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.idCardUrl), title: "RG/CNH Frente" })}
                                         />
                                         <DocCard
                                             title="RG/CNH (Verso)"
-                                            urls={ensureArray(selectedRequest.documents.idCardBackUrl || selectedRequest.documents.idCardUrl)}
-                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.idCardBackUrl || selectedRequest.documents.idCardUrl), title: "RG/CNH Verso" })}
+                                            urls={ensureArray(selectedRequest.documents?.idCardBackUrl || selectedRequest.documents?.idCardUrl)}
+                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.idCardBackUrl || selectedRequest.documents?.idCardUrl), title: "RG/CNH Verso" })}
                                         />
                                     </div>
                                 </div>
@@ -620,13 +620,13 @@ export const Requests: React.FC = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <DocCard
                                             title="Comp. Residência"
-                                            urls={ensureArray(selectedRequest.documents.proofOfAddressUrl)}
-                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.proofOfAddressUrl), title: "Comp. Residência" })}
+                                            urls={ensureArray(selectedRequest.documents?.proofOfAddressUrl)}
+                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.proofOfAddressUrl), title: "Comp. Residência" })}
                                         />
                                         <DocCard
                                             title="Comp. Renda"
-                                            urls={ensureArray(selectedRequest.documents.proofIncomeUrl)}
-                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.proofIncomeUrl), title: "Comp. Renda" })}
+                                            urls={ensureArray(selectedRequest.documents?.proofIncomeUrl)}
+                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.proofIncomeUrl), title: "Comp. Renda" })}
                                         />
                                         <DocCard
                                             title="Assinatura Digital"
@@ -638,14 +638,14 @@ export const Requests: React.FC = () => {
                                 </div>
 
                                 {/* Vehicle Documents (Conditional) */}
-                                {selectedRequest.documents.vehicleUrl && ensureArray(selectedRequest.documents.vehicleUrl).length > 0 && (
+                                {selectedRequest.documents?.vehicleUrl && ensureArray(selectedRequest.documents.vehicleUrl).length > 0 && (
                                     <div>
                                         <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4">Garantia Veicular</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                                             <DocCard
                                                 title="Veículo (Fotos)"
-                                                urls={ensureArray(selectedRequest.documents.vehicleUrl)}
-                                                onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.vehicleUrl), title: "Veículo (Galeria)" })}
+                                                urls={ensureArray(selectedRequest.documents?.vehicleUrl)}
+                                                onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.vehicleUrl), title: "Veículo (Galeria)" })}
                                             />
                                         </div>
                                     </div>

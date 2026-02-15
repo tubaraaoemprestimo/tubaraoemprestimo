@@ -407,13 +407,13 @@ export const Dashboard: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <DocCard
                         title="Selfie (Prova de Vida)"
-                        urls={ensureArray(selectedRequest.documents.selfieUrl)}
-                        onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.selfieUrl), title: "Selfie" })}
+                        urls={ensureArray(selectedRequest.documents?.selfieUrl)}
+                        onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.selfieUrl), title: "Selfie" })}
                       />
                       <DocCard
                         title="RG/CNH (Frente)"
-                        urls={ensureArray(selectedRequest.documents.idCardUrl)}
-                        onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.idCardUrl), title: "RG/CNH" })}
+                        urls={ensureArray(selectedRequest.documents?.idCardUrl)}
+                        onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.idCardUrl), title: "RG/CNH" })}
                       />
                       <DocCard
                         title="Assinatura"
@@ -423,14 +423,14 @@ export const Dashboard: React.FC = () => {
                       />
                     </div>
 
-                    {selectedRequest.documents.vehicleUrl && ensureArray(selectedRequest.documents.vehicleUrl).length > 0 && (
+                    {selectedRequest.documents?.vehicleUrl && ensureArray(selectedRequest.documents.vehicleUrl).length > 0 && (
                       <div className="mt-4">
                         <h4 className="text-zinc-400 text-sm mb-2 font-semibold">Garantia Veicular</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <DocCard
                             title="Veículo (Fotos)"
-                            urls={ensureArray(selectedRequest.documents.vehicleUrl)}
-                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.vehicleUrl), title: "Veículo" })}
+                            urls={ensureArray(selectedRequest.documents?.vehicleUrl)}
+                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.vehicleUrl), title: "Veículo" })}
                           />
                         </div>
                       </div>

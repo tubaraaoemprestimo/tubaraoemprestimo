@@ -1172,7 +1172,7 @@ export const Wizard: React.FC = () => {
         termsAccepted: true,
       }).catch(() => { });
 
-      // Enviar emails de notificação (silencioso)
+      // Enviar emails de notificação
       // Envia para admin E para o cliente automaticamente
       emailService.notifyNewRequest({
         clientName: formData.name,
@@ -1180,7 +1180,7 @@ export const Wizard: React.FC = () => {
         amount: getAmount(),
         installments: settings.defaultInstallments,
         profileType,
-      }).catch(() => { });
+      }).catch((err) => { console.error('Erro ao enviar email de notificação:', err); });
 
       // 📱 Enviar WhatsApp e Notificação automática (silencioso)
       autoNotificationService.onLoanRequested(

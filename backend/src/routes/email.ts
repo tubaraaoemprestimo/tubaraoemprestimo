@@ -49,7 +49,7 @@ async function sendViaResend(to: string, subject: string, html: string): Promise
 
     try {
         const response = await axios.post('https://api.resend.com/emails', {
-            from: process.env.RESEND_FROM || process.env.EMAIL_FROM || 'Tubarão Empréstimos <noreply@tubarao.com>',
+            from: process.env.RESEND_FROM || process.env.EMAIL_FROM || 'Tubarão Empréstimos <contato@tubaraoemprestimo.com.br>',
             to: [to],
             subject,
             html
@@ -72,7 +72,7 @@ async function sendViaResend(to: string, subject: string, html: string): Promise
 async function sendViaSMTP(to: string, subject: string, html: string, text?: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
         const info = await smtpTransporter.sendMail({
-            from: process.env.EMAIL_FROM || 'Tubarão Empréstimos <noreply@tubarao.com>',
+            from: process.env.EMAIL_FROM || 'Tubarão Empréstimos <contato@tubaraoemprestimo.com.br>',
             to,
             subject,
             html,
