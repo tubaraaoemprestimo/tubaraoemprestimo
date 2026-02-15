@@ -261,18 +261,60 @@ export const apiService = {
     async getRequests() {
         const { data, error } = await api.get('/loan-requests');
         if (error) return [];
-        return data || [];
+        // Transformar dados flat do backend em estrutura nested que o admin espera
+        return ((data || []) as any[]).map((req: any) => ({
+            ...req,
+            date: req.date || req.createdAt,
+            documents: req.documents || {
+                selfieUrl: req.selfieUrl,
+                idCardUrl: req.idCardUrl,
+                idCardBackUrl: req.idCardBackUrl,
+                proofOfAddressUrl: req.proofOfAddressUrl,
+                proofIncomeUrl: req.proofIncomeUrl,
+                vehicleUrl: req.vehicleUrl,
+                videoSelfieUrl: req.videoSelfieUrl,
+                videoHouseUrl: req.videoHouseUrl,
+                videoVehicleUrl: req.videoVehicleUrl,
+            },
+            references: req.references || {
+                fatherPhone: req.fatherPhone || '',
+                motherPhone: req.motherPhone || '',
+                spousePhone: req.spousePhone || '',
+            },
+            signatureUrl: req.signatureUrl,
+        }));
     },
 
     async submitRequest(requestData: any) {
-        // Upload de documentos base64 antes de enviar
+        const uploadedData = { ...requestData };
+
+        // Mapear nomes do wizard para nomes do backend
+        const fieldMap: Record<string, string> = {
+            selfie: 'selfieUrl',
+            idCardFront: 'idCardUrl',
+            idCardBack: 'idCardBackUrl',
+            proofAddress: 'proofOfAddressUrl',
+            proofIncome: 'proofIncomeUrl',
+            vehicleFront: 'vehicleUrl',
+            videoSelfie: 'videoSelfieUrl',
+            videoHouse: 'videoHouseUrl',
+            signature: 'signatureUrl',
+            workCard: 'workCardUrl',
+        };
+
+        for (const [wizardName, backendName] of Object.entries(fieldMap)) {
+            if (uploadedData[wizardName] !== undefined && uploadedData[backendName] === undefined) {
+                uploadedData[backendName] = uploadedData[wizardName];
+                delete uploadedData[wizardName];
+            }
+        }
+
+        // Upload de documentos base64 antes de enviar (caso ainda existam)
         const docFields = [
             'selfieUrl', 'idCardUrl', 'idCardBackUrl', 'proofOfAddressUrl',
             'proofIncomeUrl', 'vehicleUrl', 'videoSelfieUrl', 'videoHouseUrl',
             'videoVehicleUrl', 'signatureUrl', 'workCardUrl'
         ];
-
-        const uploadedData = { ...requestData };
 
         for (const field of docFields) {
             const value = uploadedData[field];
@@ -285,6 +327,11 @@ export const apiService = {
                 } catch (e) {
                     console.warn(`Falha ao fazer upload de ${field}, mantendo base64`);
                 }
+            }
+            // Arrays: pegar primeiro item ou converter para JSON string
+            if (Array.isArray(uploadedData[field])) {
+                const arr = uploadedData[field] as string[];
+                uploadedData[field] = arr.length === 1 ? arr[0] : arr.length > 0 ? JSON.stringify(arr) : null;
             }
         }
 
