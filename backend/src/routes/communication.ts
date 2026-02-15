@@ -79,6 +79,60 @@ communicationRouter.get('/coupons', async (_req: Request, res: Response) => {
     }
 });
 
+// POST /api/communication/coupons - Criar cupom
+communicationRouter.post('/coupons', async (req: Request, res: Response) => {
+    try {
+        const { code, discount_percent, description, expires_at, usage_limit, active, customerEmail } = req.body;
+        const coupon = await prisma.coupon.create({
+            data: {
+                code: code || `TUB${Date.now().toString(36).toUpperCase()}`,
+                discount: discount_percent || 10,
+                description: description || '',
+                expiresAt: expires_at ? new Date(expires_at) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                usageLimit: usage_limit || 100,
+                usageCount: 0,
+                active: active !== false,
+                customerEmail: customerEmail || null,
+            }
+        });
+        res.status(201).json(coupon);
+    } catch (err: any) {
+        console.error('[Communication] Erro ao criar cupom:', err);
+        res.status(500).json({ error: 'Erro ao criar cupom' });
+    }
+});
+
+// PUT /api/communication/coupons/:id - Atualizar cupom
+communicationRouter.put('/coupons/:id', async (req: Request, res: Response) => {
+    try {
+        const id = String(req.params.id);
+        const { code, discount_percent, description, expires_at, usage_limit, active } = req.body;
+        const data: any = {};
+        if (code !== undefined) data.code = code;
+        if (discount_percent !== undefined) data.discount = discount_percent;
+        if (description !== undefined) data.description = description;
+        if (expires_at !== undefined) data.expiresAt = new Date(expires_at);
+        if (usage_limit !== undefined) data.usageLimit = usage_limit;
+        if (active !== undefined) data.active = active;
+
+        const coupon = await prisma.coupon.update({ where: { id }, data });
+        res.json(coupon);
+    } catch {
+        res.status(500).json({ error: 'Erro ao atualizar cupom' });
+    }
+});
+
+// DELETE /api/communication/coupons/:id - Deletar cupom
+communicationRouter.delete('/coupons/:id', async (req: Request, res: Response) => {
+    try {
+        const id = String(req.params.id);
+        await prisma.coupon.delete({ where: { id } });
+        res.json({ success: true });
+    } catch {
+        res.status(500).json({ error: 'Erro ao deletar cupom' });
+    }
+});
+
 // ============ SCHEDULED STATUS ============
 
 // GET /api/communication/scheduled-status - Listar status agendados

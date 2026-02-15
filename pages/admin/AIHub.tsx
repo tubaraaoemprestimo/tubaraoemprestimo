@@ -1,4 +1,4 @@
-﻿// 🤖 Central de IA - Chatbot e Logs Unificados
+// 🤖 Central de IA - Chatbot e Logs Unificados
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -17,20 +17,27 @@ import { InteractionLog } from '../../types';
 type TabType = 'config' | 'conversations' | 'logs' | 'test';
 
 interface ChatbotConfig {
-    id: string;
-    enabled: boolean;
-    provider: 'gemini' | 'perplexity' | 'openai';
-    geminiApiKey: string;
-    perplexityApiKey: string;
-    systemPrompt: string;
-    welcomeMessage: string;
-    fallbackMessage: string;
-    transferKeywords: string;
-    autoReplyEnabled: boolean;
-    workingHoursOnly: boolean;
-    workingHoursStart: string;
-    workingHoursEnd: string;
-    maxMessagesPerChat: number;
+  id: string;
+  enabled: boolean;
+  provider: 'gemini' | 'perplexity' | 'openai' | 'anthropic' | 'groq' | 'grok' | 'nvidia' | 'zai' | 'openrouter';
+  geminiApiKey: string;
+  perplexityApiKey: string;
+  openaiApiKey: string;
+  anthropicApiKey: string;
+  groqApiKey: string;
+  grokApiKey: string;
+  nvidiaApiKey: string;
+  zaiApiKey: string;
+  openrouterApiKey: string;
+  systemPrompt: string;
+  welcomeMessage: string;
+  fallbackMessage: string;
+  transferKeywords: string;
+  autoReplyEnabled: boolean;
+  workingHoursOnly: boolean;
+  workingHoursStart: string;
+  workingHoursEnd: string;
+  maxMessagesPerChat: number;
 }
 
 interface ChatHistoryItem {
@@ -51,26 +58,33 @@ interface ConversationGroup {
 }
 
 const defaultConfig: ChatbotConfig = {
-    id: '',
-    enabled: false,
-    provider: 'gemini',
-    geminiApiKey: '',
-    perplexityApiKey: '',
-    systemPrompt: `Você é o assistente virtual da TUBARÃO EMPRÉSTIMOS, uma empresa de crédito com garantia de veículo.
+  id: '',
+  enabled: false,
+  provider: 'gemini',
+  geminiApiKey: '',
+  perplexityApiKey: '',
+  openaiApiKey: '',
+  anthropicApiKey: '',
+  groqApiKey: '',
+  grokApiKey: '',
+  nvidiaApiKey: '',
+  zaiApiKey: '',
+  openrouterApiKey: '',
+  systemPrompt: `Você é o assistente virtual da TUBARÃO EMPRÉSTIMOS, uma empresa de crédito com garantia de veículo.
 
 Regras:
 - Seja objetivo e profissional
 - Responda apenas o que foi perguntado
 - Se não souber, responda: [TRANSFERIR]
 - Português Brasil`,
-    welcomeMessage: 'Olá! 👋 Sou o assistente virtual da TUBARÃO EMPRÉSTIMOS. Como posso ajudar?',
-    fallbackMessage: 'Desculpe, não entendi. Vou transferir para um atendente.',
-    transferKeywords: 'atendente,humano,pessoa',
-    autoReplyEnabled: true,
-    workingHoursOnly: false,
-    workingHoursStart: '08:00',
-    workingHoursEnd: '18:00',
-    maxMessagesPerChat: 50
+  welcomeMessage: 'Olá! 👋 Sou o assistente virtual da TUBARÃO EMPRÉSTIMOS. Como posso ajudar?',
+  fallbackMessage: 'Desculpe, não entendi. Vou transferir para um atendente.',
+  transferKeywords: 'atendente,humano,pessoa',
+  autoReplyEnabled: true,
+  workingHoursOnly: false,
+  workingHoursStart: '08:00',
+  workingHoursEnd: '18:00',
+  maxMessagesPerChat: 50
 };
 
 const inputStyle = "w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none transition-colors";
@@ -350,36 +364,69 @@ export const AIHub: React.FC = () => {
                                 </button>
                             </div>
 
-                            {/* Provider */}
-                            <div>
-                                <label className="block text-sm text-zinc-400 mb-1">Provedor de IA</label>
-                                <select
-                                    value={config.provider}
-                                    onChange={e => setConfig(prev => ({ ...prev, provider: e.target.value as any }))}
-                                    className={inputStyle}
-                                >
-                                    <option value="gemini">Google Gemini</option>
-                                    <option value="perplexity">Perplexity</option>
-                                    <option value="openai">OpenAI</option>
-                                </select>
-                            </div>
+{/* Provider */}
+        <div>
+          <label className="block text-sm text-zinc-400 mb-1">Provedor de IA</label>
+          <select
+            value={config.provider}
+            onChange={e => setConfig(prev => ({ ...prev, provider: e.target.value as any }))}
+            className={inputStyle}
+          >
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="perplexity">Perplexity</option>
+            <option value="groq">Groq</option>
+            <option value="grok">Grok (xAI)</option>
+            <option value="nvidia">NVIDIA</option>
+            <option value="zai">Z.AI</option>
+            <option value="openrouter">OpenRouter</option>
+          </select>
+        </div>
 
-                            {/* API Key */}
-                            <div>
-                                <label className="block text-sm text-zinc-400 mb-1">
-                                    API Key ({config.provider})
-                                </label>
-                                <input
-                                    type="password"
-                                    value={config.provider === 'gemini' ? config.geminiApiKey : config.perplexityApiKey}
-                                    onChange={e => setConfig(prev => ({
-                                        ...prev,
-                                        [config.provider === 'gemini' ? 'geminiApiKey' : 'perplexityApiKey']: e.target.value
-                                    }))}
-                                    placeholder="sk-..."
-                                    className={inputStyle}
-                                />
-                            </div>
+        {/* API Key */}
+        <div>
+          <label className="block text-sm text-zinc-400 mb-1">
+            API Key ({config.provider})
+          </label>
+          <input
+            type="password"
+            value={(() => {
+              switch (config.provider) {
+                case 'gemini': return config.geminiApiKey;
+                case 'openai': return config.openaiApiKey;
+                case 'anthropic': return config.anthropicApiKey;
+                case 'perplexity': return config.perplexityApiKey;
+                case 'groq': return config.groqApiKey;
+                case 'grok': return config.grokApiKey;
+                case 'nvidia': return config.nvidiaApiKey;
+                case 'zai': return config.zaiApiKey;
+                case 'openrouter': return config.openrouterApiKey;
+                default: return '';
+              }
+            })()}
+            onChange={e => {
+              const value = e.target.value;
+              setConfig(prev => {
+                const updates: Partial<ChatbotConfig> = {};
+                switch (config.provider) {
+                  case 'gemini': updates.geminiApiKey = value; break;
+                  case 'openai': updates.openaiApiKey = value; break;
+                  case 'anthropic': updates.anthropicApiKey = value; break;
+                  case 'perplexity': updates.perplexityApiKey = value; break;
+                  case 'groq': updates.groqApiKey = value; break;
+                  case 'grok': updates.grokApiKey = value; break;
+                  case 'nvidia': updates.nvidiaApiKey = value; break;
+                  case 'zai': updates.zaiApiKey = value; break;
+                  case 'openrouter': updates.openrouterApiKey = value; break;
+                }
+                return { ...prev, ...updates };
+              });
+            }}
+            placeholder="sk-..."
+            className={inputStyle}
+          />
+        </div>
 
                             {/* Working Hours */}
                             <div className="flex items-center justify-between p-4 bg-black rounded-xl">

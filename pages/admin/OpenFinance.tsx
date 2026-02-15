@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Landmark, TrendingUp, Shield, AlertCircle, CheckCircle,
     Search, RefreshCw, FileText, DollarSign, PieChart,
@@ -36,54 +36,79 @@ export const OpenFinancePage: React.FC = () => {
         loadData();
     }, []);
 
-    const loadData = async () => {
-        try {
-            const customersData = await apiService.getCustomers();
-            // Add mock monthly income
-            const customersWithIncome = customersData.map(c => ({
-                ...c,
-                monthlyIncome: c.monthlyIncome || (2000 + Math.random() * 8000)
-            }));
-            setCustomers(customersWithIncome);
-        } catch (error) {
-            console.error('Error loading data:', error);
-            addToast('Erro ao carregar dados', 'error');
-        }
-    };
+const loadData = async () => {
+    try {
+      const customersData = await apiService.getCustomers();
+      if (!Array.isArray(customersData)) {
+        console.error('Invalid customers data:', customersData);
+        addToast('Erro ao carregar clientes: formato inválido', 'error');
+        return;
+      }
+      
+      // Add mock monthly income
+      const customersWithIncome = customersData.map(c => ({
+        ...c,
+        monthlyIncome: c.monthlyIncome || (2000 + Math.random() * 8000)
+      }));
+      setCustomers(customersWithIncome);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      addToast('Erro ao carregar dados', 'error');
+    }
+  };
 
     const filteredCustomers = customers.filter(c =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.cpf.includes(searchTerm)
     );
 
-    const handlePerformAnalysis = async () => {
-        if (!selectedCustomer) {
-            addToast('Selecione um cliente', 'warning');
-            return;
-        }
+const handlePerformAnalysis = async () => {
+    if (!selectedCustomer) {
+      addToast('Selecione um cliente', 'warning');
+      return;
+    }
 
-        setIsAnalyzing(true);
-        try {
-            const income = declaredIncome ? parseFloat(declaredIncome) : undefined;
-            const result = await openFinanceService.performFullAnalysis(selectedCustomer, income);
-            setCurrentAnalysis(result);
+    setIsAnalyzing(true);
+    setCurrentAnalysis(null);
+    
+    try {
+      const income = declaredIncome ? parseFloat(declaredIncome) : undefined;
+      
+      // Validar renda
+      if (income !== undefined && (isNaN(income) || income <= 0)) {
+        addToast('Renda inválida. Informe um valor numérico positivo.', 'warning');
+        setIsAnalyzing(false);
+        return;
+      }
+      
+      const result = await openFinanceService.performFullAnalysis(selectedCustomer, income);
+      
+      if (!result) {
+        throw new Error('Nenhum resultado retornado da análise');
+      }
+      
+      setCurrentAnalysis(result);
 
-            // Reload historical data from API
-            const [scores, analyses] = await Promise.all([
-                openFinanceService.getScores(selectedCustomer.id),
-                openFinanceService.getAnalyses(selectedCustomer.id)
-            ]);
-            setHistoricalScores(scores);
-            setHistoricalAnalyses(analyses);
+      // Reload historical data from API
+      const [scores, analyses] = await Promise.all([
+        openFinanceService.getScores(selectedCustomer.id),
+        openFinanceService.getAnalyses(selectedCustomer.id)
+      ]);
+      setHistoricalScores(scores || []);
+      setHistoricalAnalyses(analyses || []);
 
-            addToast('Análise concluída com sucesso!', 'success');
-        } catch (error) {
-            console.error('Error performing analysis:', error);
-            addToast('Erro ao realizar análise', 'error');
-        } finally {
-            setIsAnalyzing(false);
-        }
-    };
+      addToast('Análise concluída com sucesso!', 'success');
+    } catch (error: any) {
+      console.error('Error performing analysis:', error);
+      const errorMessage = error?.message || error?.error || 'Erro desconhecido';
+      addToast(`Erro ao realizar análise: ${errorMessage}`, 'error');
+      
+      // Reset analysis state on error
+      setCurrentAnalysis(null);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
     const getRecommendationBadge = (recommendation: 'APPROVE' | 'REVIEW' | 'DENY') => {
         const config = {

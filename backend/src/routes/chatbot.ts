@@ -325,6 +325,141 @@ async function callPerplexityAPI(
     return content;
 }
 
+/**
+ * Chama a API do Anthropic (Claude)
+ */
+async function callAnthropicAPI(
+    apiKey: string,
+    systemPrompt: string,
+    conversationHistory: { role: string; content: string }[],
+    userMessage: string
+): Promise<string> {
+    const messages: any[] = [];
+
+    const recentHistory = conversationHistory.slice(-20);
+    for (const msg of recentHistory) {
+        messages.push({
+            role: msg.role === 'assistant' ? 'assistant' : 'user',
+            content: msg.content
+        });
+    }
+
+    messages.push({ role: 'user', content: userMessage });
+
+    const response = await axios.post('https://api.anthropic.com/v1/messages', {
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 1024,
+        system: systemPrompt || undefined,
+        messages
+    }, {
+        headers: {
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json'
+        },
+        timeout: 30000
+    });
+
+    const content = response.data?.content?.[0]?.text;
+    if (!content) {
+        throw new Error('Resposta vazia do Anthropic');
+    }
+
+    return content;
+}
+
+/**
+ * Chama a API do Groq
+ */
+async function callGroqAPI(
+    apiKey: string,
+    systemPrompt: string,
+    conversationHistory: { role: string; content: string }[],
+    userMessage: string
+): Promise<string> {
+    const messages: any[] = [];
+
+    if (systemPrompt) {
+        messages.push({ role: 'system', content: systemPrompt });
+    }
+
+    const recentHistory = conversationHistory.slice(-20);
+    for (const msg of recentHistory) {
+        messages.push({
+            role: msg.role === 'assistant' ? 'assistant' : 'user',
+            content: msg.content
+        });
+    }
+
+    messages.push({ role: 'user', content: userMessage });
+
+    const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+        model: 'llama-3.3-70b-versatile',
+        messages,
+        temperature: 0.7,
+        max_tokens: 1024
+    }, {
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+        },
+        timeout: 30000
+    });
+
+    const content = response.data?.choices?.[0]?.message?.content;
+    if (!content) {
+        throw new Error('Resposta vazia do Groq');
+    }
+
+    return content;
+}
+
+/**
+ * Chama a API do Grok (xAI)
+ */
+async function callGrokAPI(
+    apiKey: string,
+    systemPrompt: string,
+    conversationHistory: { role: string; content: string }[],
+    userMessage: string
+): Promise<string> {
+    const messages: any[] = [];
+
+    if (systemPrompt) {
+        messages.push({ role: 'system', content: systemPrompt });
+    }
+
+    const recentHistory = conversationHistory.slice(-20);
+    for (const msg of recentHistory) {
+        messages.push({
+            role: msg.role === 'assistant' ? 'assistant' : 'user',
+            content: msg.content
+        });
+    }
+
+    messages.push({ role: 'user', content: userMessage });
+
+    const response = await axios.post('https://api.x.ai/v1/chat/completions', {
+        model: 'grok-2-latest',
+        messages,
+        temperature: 0.7,
+        max_tokens: 1024
+    }, {
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+        },
+        timeout: 30000
+    });
+
+    const content = response.data?.choices?.[0]?.message?.content;
+    if (!content) {
+        throw new Error('Resposta vazia do Grok');
+    }
+
+    return content;
+}
+
 // ============ ROUTES ============
 
 // GET /api/chatbot/config - Buscar configuração do chatbot
@@ -345,10 +480,20 @@ chatbotRouter.get('/config', authenticate, async (_req: Request, res: Response) 
             return;
         }
 
-        // Mascara a API key para não expor no frontend (mostra apenas últimos 4 chars)
+        // Mascara todas as API keys para não expor no frontend (mostra apenas últimos 4 chars)
+        const maskKey = (key: string) => key ? `****${key.slice(-4)}` : '';
         const maskedConfig = {
             ...config,
-            apiKey: config.apiKey ? `****${config.apiKey.slice(-4)}` : ''
+            apiKey: maskKey(config.apiKey),
+            geminiApiKey: maskKey(config.geminiApiKey),
+            perplexityApiKey: maskKey(config.perplexityApiKey),
+            openaiApiKey: maskKey(config.openaiApiKey),
+            openrouterApiKey: maskKey(config.openrouterApiKey),
+            nvidiaApiKey: maskKey(config.nvidiaApiKey),
+            zaiApiKey: maskKey(config.zaiApiKey),
+            anthropicApiKey: maskKey(config.anthropicApiKey),
+            groqApiKey: maskKey(config.groqApiKey),
+            grokApiKey: maskKey(config.grokApiKey),
         };
 
         res.json(maskedConfig);
@@ -364,6 +509,15 @@ chatbotRouter.put('/config', authenticate, requireAdmin, async (req: Request, re
             enabled,
             provider,
             apiKey,
+            geminiApiKey,
+            perplexityApiKey,
+            openaiApiKey,
+            openrouterApiKey,
+            nvidiaApiKey,
+            zaiApiKey,
+            anthropicApiKey,
+            groqApiKey,
+            grokApiKey,
             systemPrompt,
             autoReplyEnabled,
             workingHoursStart,
@@ -374,12 +528,19 @@ chatbotRouter.put('/config', authenticate, requireAdmin, async (req: Request, re
         const data: any = {};
         if (enabled !== undefined) data.enabled = enabled;
         if (provider !== undefined) data.provider = provider;
-        if (apiKey !== undefined && !apiKey.startsWith('****')) data.apiKey = apiKey; // Só atualiza se não for masked
         if (systemPrompt !== undefined) data.systemPrompt = systemPrompt;
         if (autoReplyEnabled !== undefined) data.autoReplyEnabled = autoReplyEnabled;
         if (workingHoursStart !== undefined) data.workingHoursStart = workingHoursStart;
         if (workingHoursEnd !== undefined) data.workingHoursEnd = workingHoursEnd;
         if (transferKeywords !== undefined) data.transferKeywords = transferKeywords;
+
+        // Per-provider API keys (só atualiza se não for masked)
+        const keyFields = { apiKey, geminiApiKey, perplexityApiKey, openaiApiKey, openrouterApiKey, nvidiaApiKey, zaiApiKey, anthropicApiKey, groqApiKey, grokApiKey };
+        for (const [field, value] of Object.entries(keyFields)) {
+            if (value !== undefined && typeof value === 'string' && !value.startsWith('****')) {
+                data[field] = value;
+            }
+        }
 
         const existing = await prisma.aiChatbotConfig.findFirst();
         if (existing) {
@@ -539,6 +700,15 @@ chatbotRouter.post('/message', authenticate, async (req: Request, res: Response)
                 break;
             case 'zai':
                 aiResponse = await callZaiAPI(config.zaiApiKey || config.apiKey, systemPrompt, conversationHistory, message);
+                break;
+            case 'anthropic':
+                aiResponse = await callAnthropicAPI(config.anthropicApiKey || config.apiKey, systemPrompt, conversationHistory, message);
+                break;
+            case 'groq':
+                aiResponse = await callGroqAPI(config.groqApiKey || config.apiKey, systemPrompt, conversationHistory, message);
+                break;
+            case 'grok':
+                aiResponse = await callGrokAPI(config.grokApiKey || config.apiKey, systemPrompt, conversationHistory, message);
                 break;
             default:
                 aiResponse = await callGeminiAPI(config.geminiApiKey || config.apiKey, systemPrompt, conversationHistory, message);

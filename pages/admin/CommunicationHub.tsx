@@ -1,4 +1,4 @@
-﻿// 📨 Central de Comunicação - Mensagens, Marketing, Status e Indicações Unificados
+// 📨 Central de Comunicação - Mensagens, Marketing, Status e Indicações Unificados
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -64,10 +64,16 @@ export const CommunicationHub: React.FC = () => {
     // Customers
     const [customers, setCustomers] = useState<Customer[]>([]);
 
-    // Modals
-    const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
-    const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-    const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+// Modals
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
+  
+  // Editing states
+  const [editingCampaign, setEditingCampaign] = useState<Partial<Campaign>>({});
+  const [editingCoupon, setEditingCoupon] = useState<Partial<Coupon>>({ discount_percent: 10, usage_limit: 100, active: true });
+  const [newStatus, setNewStatus] = useState({ imageUrl: '', caption: '', scheduledAt: '' });
 
     // Search
     const [searchTerm, setSearchTerm] = useState('');
@@ -160,8 +166,31 @@ export const CommunicationHub: React.FC = () => {
     const handlePostStatusNow = async (id: string) => {
         const { error } = await api.post(`/whatsapp/post-now/${id}`, {});
         if (!error) {
-            addToast('Status postado!', 'success');
+            addToast('Status postado via Evolution API!', 'success');
             loadAllData();
+        } else {
+            addToast('Erro ao postar status', 'error');
+        }
+    };
+
+    const handleScheduleStatus = async () => {
+        if (!newStatus.imageUrl) {
+            addToast('Informe a URL da imagem', 'warning');
+            return;
+        }
+        try {
+            const { error } = await api.post('/whatsapp/schedule-status', {
+                imageUrl: newStatus.imageUrl,
+                caption: newStatus.caption || null,
+                scheduledAt: newStatus.scheduledAt || new Date().toISOString(),
+            });
+            if (error) throw new Error();
+            addToast('Status agendado!', 'success');
+            setIsStatusModalOpen(false);
+            setNewStatus({ imageUrl: '', caption: '', scheduledAt: '' });
+            loadAllData();
+        } catch {
+            addToast('Erro ao agendar status', 'error');
         }
     };
 
@@ -184,21 +213,87 @@ export const CommunicationHub: React.FC = () => {
         loadAllData();
     };
 
-    // Send campaign
-    const handleSendCampaign = async (campaign: Campaign) => {
-        const activeCustomers = customers.filter(c => c.phone);
-        if (activeCustomers.length === 0) {
-            addToast('Nenhum cliente com telefone', 'warning');
-            return;
-        }
+// Send campaign
+  const handleSendCampaign = async (campaign: Campaign) => {
+    const activeCustomers = customers.filter(c => c.phone);
+    if (activeCustomers.length === 0) {
+      addToast('Nenhum cliente com telefone', 'warning');
+      return;
+    }
 
-        for (const customer of activeCustomers.slice(0, 10)) {
-            await whatsappService.sendMessage(customer.phone, campaign.description);
-        }
-        addToast(`Campanha enviada para ${Math.min(activeCustomers.length, 10)} clientes`, 'success');
-    };
+    for (const customer of activeCustomers.slice(0, 10)) {
+      await whatsappService.sendMessage(customer.phone, campaign.description);
+    }
+    addToast(`Campanha enviada para ${Math.min(activeCustomers.length, 10)} clientes`, 'success');
+  };
 
-    // Stats
+  // Campaign handlers
+  const handleSaveCampaign = async () => {
+    if (!editingCampaign.name || !editingCampaign.description) {
+      addToast('Preencha nome e descrição', 'warning');
+      return;
+    }
+
+    try {
+      if (editingCampaign.id) {
+        await api.put(`/campaigns/${editingCampaign.id}`, editingCampaign);
+      } else {
+        await api.post('/campaigns', editingCampaign);
+      }
+      addToast('Campanha salva!', 'success');
+      setIsCampaignModalOpen(false);
+      setEditingCampaign({});
+      loadAllData();
+    } catch {
+      addToast('Erro ao salvar campanha', 'error');
+    }
+  };
+
+  const handleDeleteCampaign = async (id: string) => {
+    if (!confirm('Excluir campanha?')) return;
+    try {
+      await api.delete(`/campaigns/${id}`);
+      addToast('Campanha excluída', 'success');
+      loadAllData();
+    } catch {
+      addToast('Erro ao excluir campanha', 'error');
+    }
+  };
+
+  // Coupon handlers
+  const handleSaveCoupon = async () => {
+    if (!editingCoupon.code || !editingCoupon.discount_percent) {
+      addToast('Preencha código e desconto', 'warning');
+      return;
+    }
+
+    try {
+      if (editingCoupon.id) {
+        await api.put(`/communication/coupons/${editingCoupon.id}`, editingCoupon);
+      } else {
+        await api.post('/communication/coupons', editingCoupon);
+      }
+      addToast('Cupom salvo!', 'success');
+      setIsCouponModalOpen(false);
+      setEditingCoupon({ discount_percent: 10, usage_limit: 100, active: true });
+      loadAllData();
+    } catch {
+      addToast('Erro ao salvar cupom', 'error');
+    }
+  };
+
+  const handleDeleteCoupon = async (id: string) => {
+    if (!confirm('Excluir cupom?')) return;
+    try {
+      await api.delete(`/communication/coupons/${id}`);
+      addToast('Cupom excluído', 'success');
+      loadAllData();
+    } catch {
+      addToast('Erro ao excluir cupom', 'error');
+    }
+  };
+
+  // Stats
     const stats = {
         totalTemplates: templates.length,
         activeCampaigns: campaigns.filter(c => c.status === 'ACTIVE').length,
@@ -368,12 +463,17 @@ export const CommunicationHub: React.FC = () => {
             {/* Campaigns Tab */}
             {activeTab === 'campaigns' && (
                 <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                        <p className="text-zinc-400">Gerencie campanhas e cupons</p>
-                        <Button onClick={() => setIsCampaignModalOpen(true)}>
-                            <Plus size={18} /> Nova Campanha
-                        </Button>
-                    </div>
+<div className="flex justify-between items-center">
+        <p className="text-zinc-400">Gerencie campanhas e cupons</p>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => { setEditingCoupon({ discount_percent: 10, usage_limit: 100, active: true }); setIsCouponModalOpen(true); }}>
+            <Plus size={18} /> Novo Cupom
+          </Button>
+          <Button onClick={() => { setEditingCampaign({ status: 'ACTIVE' }); setIsCampaignModalOpen(true); }}>
+            <Plus size={18} /> Nova Campanha
+          </Button>
+        </div>
+      </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {campaigns.map(campaign => (
@@ -390,12 +490,24 @@ export const CommunicationHub: React.FC = () => {
                                         <img src={campaign.image_url} alt="" className="w-16 h-16 rounded-lg object-cover" />
                                     )}
                                 </div>
-                                <p className="text-zinc-400 text-sm mb-4">{campaign.description}</p>
-                                <div className="flex gap-2">
-                                    <Button size="sm" onClick={() => handleSendCampaign(campaign)}>
-                                        <Send size={14} /> Disparar
-                                    </Button>
-                                </div>
+<p className="text-zinc-400 text-sm mb-4">{campaign.description}</p>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => handleSendCampaign(campaign)}>
+                  <Send size={14} /> Disparar
+                </Button>
+                <button
+                  onClick={() => { setEditingCampaign(campaign); setIsCampaignModalOpen(true); }}
+                  className="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:bg-zinc-700"
+                >
+                  <Edit2 size={14} />
+                </button>
+                <button
+                  onClick={() => handleDeleteCampaign(campaign.id)}
+                  className="p-2 bg-red-900/30 text-red-400 rounded-lg hover:bg-red-900/50"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
                             </div>
                         ))}
                         {campaigns.length === 0 && (
@@ -420,13 +532,27 @@ export const CommunicationHub: React.FC = () => {
                                             {coupon.active ? 'Ativo' : 'Inativo'}
                                         </span>
                                     </div>
-                                    <p className="text-white font-bold text-2xl">{coupon.discount_percent}% OFF</p>
-                                    <p className="text-xs text-zinc-500 mt-1">
-                                        Usado {coupon.times_used}/{coupon.usage_limit} vezes
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
+<p className="text-white font-bold text-2xl">{coupon.discount_percent}% OFF</p>
+              <p className="text-xs text-zinc-500 mt-1">
+                Usado {coupon.times_used}/{coupon.usage_limit} vezes
+              </p>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => { setEditingCoupon(coupon); setIsCouponModalOpen(true); }}
+                  className="p-1.5 bg-zinc-800 text-zinc-400 rounded hover:bg-zinc-700"
+                >
+                  <Edit2 size={12} />
+                </button>
+                <button
+                  onClick={() => handleDeleteCoupon(coupon.id)}
+                  className="p-1.5 bg-red-900/30 text-red-400 rounded hover:bg-red-900/50"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
                     </div>
                 </div>
             )}
@@ -611,16 +737,186 @@ export const CommunicationHub: React.FC = () => {
                                     className={`${inputStyle} h-40 resize-none`}
                                     placeholder="Use {nome}, {valor}, etc. para variáveis"
                                 />
-                            </div>
-                            <Button onClick={handleSaveTemplate} className="w-full">
-                                <Save size={18} /> Salvar Template
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
+</div>
+      <Button onClick={handleSaveTemplate} className="w-full">
+        <Save size={18} /> Salvar Template
+      </Button>
+    </div>
+  </div>
+</div>
+)}
+
+{/* Campaign Modal */}
+{isCampaignModalOpen && (
+<div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className="sticky top-0 bg-zinc-900 p-6 border-b border-zinc-800 flex justify-between items-center">
+      <h3 className="text-xl font-bold text-white">{editingCampaign.id ? 'Editar Campanha' : 'Nova Campanha'}</h3>
+      <button onClick={() => setIsCampaignModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
+    </div>
+    <div className="p-6 space-y-4">
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">Nome</label>
+        <input
+          type="text"
+          value={editingCampaign.name || ''}
+          onChange={e => setEditingCampaign(prev => ({ ...prev, name: e.target.value }))}
+          className={inputStyle}
+        />
+      </div>
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">Descrição</label>
+        <textarea
+          value={editingCampaign.description || ''}
+          onChange={e => setEditingCampaign(prev => ({ ...prev, description: e.target.value }))}
+          className={`${inputStyle} h-32 resize-none`}
+        />
+      </div>
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">URL da Imagem (opcional)</label>
+        <input
+          type="text"
+          value={editingCampaign.image_url || ''}
+          onChange={e => setEditingCampaign(prev => ({ ...prev, image_url: e.target.value }))}
+          className={inputStyle}
+          placeholder="https://..."
+        />
+      </div>
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">Link (opcional)</label>
+        <input
+          type="text"
+          value={editingCampaign.link || ''}
+          onChange={e => setEditingCampaign(prev => ({ ...prev, link: e.target.value }))}
+          className={inputStyle}
+          placeholder="https://..."
+        />
+      </div>
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">Status</label>
+        <select
+          value={editingCampaign.status || 'ACTIVE'}
+          onChange={e => setEditingCampaign(prev => ({ ...prev, status: e.target.value as any }))}
+          className={inputStyle}
+        >
+          <option value="ACTIVE">Ativa</option>
+          <option value="INACTIVE">Inativa</option>
+        </select>
+      </div>
+      <Button onClick={handleSaveCampaign} className="w-full">
+        <Save size={18} /> Salvar Campanha
+      </Button>
+    </div>
+  </div>
+</div>
+)}
+
+{/* Coupon Modal */}
+{isCouponModalOpen && (
+<div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className="sticky top-0 bg-zinc-900 p-6 border-b border-zinc-800 flex justify-between items-center">
+      <h3 className="text-xl font-bold text-white">{editingCoupon.id ? 'Editar Cupom' : 'Novo Cupom'}</h3>
+      <button onClick={() => setIsCouponModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
+    </div>
+    <div className="p-6 space-y-4">
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">Código</label>
+        <input
+          type="text"
+          value={editingCoupon.code || ''}
+          onChange={e => setEditingCoupon(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+          className={inputStyle}
+          placeholder="TUBARAO10"
+        />
+      </div>
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">Desconto (%)</label>
+        <input
+          type="number"
+          min="1"
+          max="100"
+          value={editingCoupon.discount_percent || ''}
+          onChange={e => setEditingCoupon(prev => ({ ...prev, discount_percent: parseInt(e.target.value) }))}
+          className={inputStyle}
+        />
+      </div>
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">Limite de Uso</label>
+        <input
+          type="number"
+          min="1"
+          value={editingCoupon.usage_limit || ''}
+          onChange={e => setEditingCoupon(prev => ({ ...prev, usage_limit: parseInt(e.target.value) }))}
+          className={inputStyle}
+        />
+      </div>
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">Válido até</label>
+        <input
+          type="date"
+          value={editingCoupon.valid_until || ''}
+          onChange={e => setEditingCoupon(prev => ({ ...prev, valid_until: e.target.value }))}
+          className={inputStyle}
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="coupon-active"
+          checked={editingCoupon.active || false}
+          onChange={e => setEditingCoupon(prev => ({ ...prev, active: e.target.checked }))}
+          className="w-4 h-4"
+        />
+        <label htmlFor="coupon-active" className="text-sm text-zinc-400">Ativo</label>
+      </div>
+      <Button onClick={handleSaveCoupon} className="w-full">
+        <Save size={18} /> Salvar Cupom
+      </Button>
+    </div>
+  </div>
+</div>
+)}
+
+{/* Status Scheduling Modal */}
+{isStatusModalOpen && (
+<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+    <div className="flex justify-between items-center mb-6">
+      <h3 className="text-lg font-bold text-[#D4AF37]">Agendar Status WhatsApp</h3>
+      <button onClick={() => setIsStatusModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
+    </div>
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">URL da Imagem *</label>
+        <input value={newStatus.imageUrl} onChange={e => setNewStatus(p => ({ ...p, imageUrl: e.target.value }))}
+          placeholder="https://..." className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white text-sm" />
+      </div>
+      {newStatus.imageUrl && (
+        <div className="aspect-video bg-black rounded-lg overflow-hidden border border-zinc-800">
+          <img src={newStatus.imageUrl} alt="Preview" className="w-full h-full object-cover" />
         </div>
-    );
+      )}
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">Legenda</label>
+        <textarea value={newStatus.caption} onChange={e => setNewStatus(p => ({ ...p, caption: e.target.value }))}
+          placeholder="Texto do status..." rows={3} className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white text-sm" />
+      </div>
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">Data/Hora do Agendamento</label>
+        <input type="datetime-local" value={newStatus.scheduledAt} onChange={e => setNewStatus(p => ({ ...p, scheduledAt: e.target.value }))}
+          className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white text-sm" />
+        <p className="text-xs text-zinc-600 mt-1">Deixe vazio para postar imediatamente</p>
+      </div>
+      <Button onClick={handleScheduleStatus} className="w-full">
+        <Camera size={18} /> Agendar Status
+      </Button>
+    </div>
+  </div>
+</div>
+)}
+</div>
+);
 };
 
 export default CommunicationHub;

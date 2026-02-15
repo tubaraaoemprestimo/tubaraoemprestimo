@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronRight, Wallet, Plus, Calendar, FileText, TrendingUp, X, Percent, Eye, EyeOff, Gift, Tag, Sparkles, AlertTriangle, Upload, CheckCircle, Calculator, Ticket, Megaphone, Briefcase, Download } from 'lucide-react';
+import { Bell, ChevronRight, Wallet, Plus, Calendar, FileText, TrendingUp, X, Percent, Eye, EyeOff, Gift, Tag, Sparkles, AlertTriangle, Upload, CheckCircle, Calculator, Ticket, Megaphone, Briefcase, Download, History, Clock } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Skeleton } from '../../components/Skeleton';
 import { apiService } from '../../services/apiService';
 import { useToast } from '../../components/Toast';
 import { LoanTimeline } from '../../components/LoanTimeline';
 import { LoanRequest, Campaign, LoanStatus } from '../../types';
+import { api } from '../../services/apiClient';
 import { MarketingPopup } from '../../components/MarketingPopup';
 import { Logo } from '../../components/Logo';
 import { referralService } from '../../services/referralService';
@@ -46,6 +47,8 @@ export const ClientDashboard: React.FC = () => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [contractPdfUrl, setContractPdfUrl] = useState<string | null>(null);
+const [loanHistory, setLoanHistory] = useState<LoanRequest[]>([]);
+const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
   // ... renegotiation ...
   const [renegotiateInstallments, setRenegotiateInstallments] = useState(12);
@@ -159,9 +162,15 @@ export const ClientDashboard: React.FC = () => {
       }
     } catch { }
 
-    if (user) {
+if (user) {
       const code = await referralService.getOrCreateCode(user.id, user.name);
       setReferralCode(code.code);
+      
+      // Buscar histórico de solicitações
+      const { data: historyData } = await api.get(`/loan-requests/history/${user.id}`);
+      if (historyData) {
+        setLoanHistory(historyData as LoanRequest[]);
+      }
     }
 
     setLoading(false);
@@ -401,6 +410,7 @@ export const ClientDashboard: React.FC = () => {
           <ActionButton icon={TrendingUp} label="Extrato" onClick={() => navigate('/client/statement')} />
           <ActionButton icon={Percent} label="Renegociar" onClick={() => setIsRenegotiateOpen(true)} disabled={userData.balance === 0} />
           <ActionButton icon={Gift} label="Indicações" onClick={() => navigate('/client/referrals')} />
+<ActionButton icon={History} label="Histórico" onClick={() => setIsHistoryModalOpen(true)} />
         </div>
 
         {/* Cards de Acesso: Ofertas, Cupons, Campanhas */}
@@ -667,6 +677,58 @@ export const ClientDashboard: React.FC = () => {
                 <p>Nenhum cupom disponível no momento.</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+{/* Modal de Histórico de Solicitações */}
+      {isHistoryModalOpen && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden shadow-2xl animate-in zoom-in duration-200">
+            <div className="flex justify-between items-center p-4 border-b border-zinc-800">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <History size={20} className="text-[#D4AF37]" />
+                Histórico de Solicitações
+              </h3>
+              <button onClick={() => setIsHistoryModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {loanHistory.length > 0 ? (
+                <div className="space-y-3">
+                  {loanHistory.map((loan) => (
+                    <div key={loan.id} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="font-bold text-white">R$ {loan.amount?.toLocaleString('pt-BR')}</p>
+                          <p className="text-xs text-zinc-500">{loan.installments}x parcelas</p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          loan.status === 'APPROVED' ? 'bg-green-900/50 text-green-400' :
+                          loan.status === 'REJECTED' ? 'bg-red-900/50 text-red-400' :
+                          loan.status === 'PENDING' ? 'bg-yellow-900/50 text-yellow-400' :
+                          'bg-blue-900/50 text-blue-400'
+                        }`}>
+                          {loan.status === 'APPROVED' ? 'Aprovado' :
+                           loan.status === 'REJECTED' ? 'Rejeitado' :
+                           loan.status === 'PENDING' ? 'Pendente' :
+                           loan.status === 'WAITING_DOCS' ? 'Aguardando Docs' :
+                           loan.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-zinc-500">
+                        <Clock size={12} />
+                        {new Date(loan.date || loan.createdAt).toLocaleDateString('pt-BR')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-zinc-500">
+                  <History size={48} className="mx-auto mb-4 opacity-50" />
+                  <p>Nenhuma solicitação encontrada</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
