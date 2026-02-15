@@ -185,7 +185,8 @@ export const AIHub: React.FC = () => {
         setTestResponse('');
 
         try {
-            const response = await aiChatbotService.generateResponse(testMessage, []);
+            // Usa config local (com chave real) em vez de re-buscar do backend (mascarada)
+            const response = await aiChatbotService.generateResponse(testMessage, [], config as any);
             setTestResponse(response || 'Sem resposta');
         } catch (error) {
             setTestResponse('Erro ao testar: ' + (error as Error).message);

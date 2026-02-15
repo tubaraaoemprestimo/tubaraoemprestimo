@@ -132,29 +132,23 @@ return {
     saveConfig: async (config: Partial<AIChatbotConfig>): Promise<boolean> => {
         try {
 const { error } = await api.put('/chatbot/config', {
-      id: config.id || 'b0000000-0000-0000-0000-000000000001',
-      enabled: config.enabled,
-      provider: config.provider,
-      api_key: config.apiKey || config.geminiApiKey,
-      gemini_api_key: config.geminiApiKey,
-      perplexity_api_key: config.perplexityApiKey,
-      openai_api_key: config.openaiApiKey,
-      openrouter_api_key: config.openrouterApiKey,
-      nvidia_api_key: config.nvidiaApiKey,
-      zai_api_key: config.zaiApiKey,
-      anthropic_api_key: config.anthropicApiKey,
-      groq_api_key: config.groqApiKey,
-      grok_api_key: config.grokApiKey,
-      system_prompt: config.systemPrompt,
-                welcome_message: config.welcomeMessage,
-                fallback_message: config.fallbackMessage,
-                transfer_keywords: config.transferKeywords,
-                auto_reply_enabled: config.autoReplyEnabled,
-                working_hours_only: config.workingHoursOnly,
-                working_hours_start: config.workingHoursStart,
-                working_hours_end: config.workingHoursEnd,
-                max_messages_per_chat: config.maxMessagesPerChat,
-                updated_at: new Date().toISOString()
+                enabled: config.enabled,
+                provider: config.provider,
+                apiKey: config.apiKey || config.geminiApiKey,
+                geminiApiKey: config.geminiApiKey,
+                perplexityApiKey: config.perplexityApiKey,
+                openaiApiKey: config.openaiApiKey,
+                openrouterApiKey: config.openrouterApiKey,
+                nvidiaApiKey: config.nvidiaApiKey,
+                zaiApiKey: config.zaiApiKey,
+                anthropicApiKey: config.anthropicApiKey,
+                groqApiKey: config.groqApiKey,
+                grokApiKey: config.grokApiKey,
+                systemPrompt: config.systemPrompt,
+                transferKeywords: config.transferKeywords ? config.transferKeywords.split(',').map(s => s.trim()) : undefined,
+                autoReplyEnabled: config.autoReplyEnabled,
+                workingHoursStart: config.workingHoursStart,
+                workingHoursEnd: config.workingHoursEnd,
             });
 
             if (error) {
@@ -759,49 +753,55 @@ case 'zai':
         return response;
     },
     // Gerar resposta (Wrapper para uso geral/teste)
-    generateResponse: async (message: string, history: ChatMessage[] = []): Promise<string> => {
-        const config = await aiChatbotService.getConfig();
+    generateResponse: async (message: string, history: ChatMessage[] = [], localConfig?: AIChatbotConfig | null): Promise<string> => {
+        const config = localConfig || await aiChatbotService.getConfig();
+
+        // Helper: retorna chave válida (ignora mascarada)
+        const validKey = (key: string | null | undefined): string | null => {
+            if (!key || key.startsWith('****') || key.trim() === '') return null;
+            return key;
+        };
 
         let apiKey: string | null = null;
         switch (config.provider) {
             case 'gemini':
-                apiKey = config.geminiApiKey || config.apiKey;
+                apiKey = validKey(config.geminiApiKey) || validKey(config.apiKey);
                 if (apiKey) return aiChatbotService.generateResponseGemini(history, config.systemPrompt, apiKey);
                 break;
             case 'perplexity':
-                apiKey = config.perplexityApiKey || config.apiKey;
+                apiKey = validKey(config.perplexityApiKey) || validKey(config.apiKey);
                 if (apiKey) return aiChatbotService.generateResponsePerplexity(history, config.systemPrompt, apiKey);
                 break;
             case 'openai':
-                apiKey = config.openaiApiKey || config.apiKey;
+                apiKey = validKey(config.openaiApiKey) || validKey(config.apiKey);
                 if (apiKey) return aiChatbotService.generateResponseOpenAI(history, config.systemPrompt, apiKey);
                 break;
             case 'openrouter':
-                apiKey = config.openrouterApiKey || config.apiKey;
+                apiKey = validKey(config.openrouterApiKey) || validKey(config.apiKey);
                 if (apiKey) return aiChatbotService.generateResponseOpenRouter(history, config.systemPrompt, apiKey);
                 break;
             case 'nvidia':
-                apiKey = config.nvidiaApiKey || config.apiKey;
+                apiKey = validKey(config.nvidiaApiKey) || validKey(config.apiKey);
                 if (apiKey) return aiChatbotService.generateResponseNvidia(history, config.systemPrompt, apiKey);
                 break;
-case 'zai':
-      apiKey = config.zaiApiKey || config.apiKey;
-      if (apiKey) return aiChatbotService.generateResponseZai(history, config.systemPrompt, apiKey);
-      break;
-    case 'anthropic':
-      apiKey = config.anthropicApiKey || config.apiKey;
-      if (apiKey) return aiChatbotService.generateResponseAnthropic(history, config.systemPrompt, apiKey);
-      break;
-    case 'groq':
-      apiKey = config.groqApiKey || config.apiKey;
-      if (apiKey) return aiChatbotService.generateResponseGroq(history, config.systemPrompt, apiKey);
-      break;
-    case 'grok':
-      apiKey = config.grokApiKey || config.apiKey;
-      if (apiKey) return aiChatbotService.generateResponseGrok(history, config.systemPrompt, apiKey);
-      break;
-    }
+            case 'zai':
+                apiKey = validKey(config.zaiApiKey) || validKey(config.apiKey);
+                if (apiKey) return aiChatbotService.generateResponseZai(history, config.systemPrompt, apiKey);
+                break;
+            case 'anthropic':
+                apiKey = validKey(config.anthropicApiKey) || validKey(config.apiKey);
+                if (apiKey) return aiChatbotService.generateResponseAnthropic(history, config.systemPrompt, apiKey);
+                break;
+            case 'groq':
+                apiKey = validKey(config.groqApiKey) || validKey(config.apiKey);
+                if (apiKey) return aiChatbotService.generateResponseGroq(history, config.systemPrompt, apiKey);
+                break;
+            case 'grok':
+                apiKey = validKey(config.grokApiKey) || validKey(config.apiKey);
+                if (apiKey) return aiChatbotService.generateResponseGrok(history, config.systemPrompt, apiKey);
+                break;
+        }
 
-    return "Erro: API Key não configurada.";
+        return "Erro: API Key não configurada.";
     }
 };
