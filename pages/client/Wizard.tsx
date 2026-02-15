@@ -2706,8 +2706,10 @@ export const Wizard: React.FC = () => {
                       className={`p-2 rounded-lg border text-sm ${formData.pixKeyType === o.v ? 'border-[#D4AF37] text-[#D4AF37]' : 'border-zinc-700 text-zinc-400'}`}>{o.l}</button>
                   ))}
                 </div>
-                <Input label="Chave PIX (OBRIGATÓRIO)" name="pixKey" value={formData.pixKey} onChange={handleChange} placeholder="Sua chave" />
+                <Input label="Chave PIX (OBRIGATÓRIO)" name="pixKey" value={formData.pixKey} onChange={handleChange}
+                  placeholder={formData.pixKeyType === 'cpf' ? '000.000.000-00' : formData.pixKeyType === 'phone' ? '(00) 00000-0000' : formData.pixKeyType === 'email' ? 'seu@email.com' : 'Chave aleatória'} />
                 <Input label="Nome do Titular da Conta (OBRIGATÓRIO)" name="accountHolderName" value={formData.accountHolderName} onChange={handleChange} placeholder="Seu nome completo" />
+                <Input label="CPF do Titular da Conta (OBRIGATÓRIO)" name="accountHolderCpf" value={formData.accountHolderCpf} onChange={handleChange} placeholder="000.000.000-00" />
               </div>
             )}
 
