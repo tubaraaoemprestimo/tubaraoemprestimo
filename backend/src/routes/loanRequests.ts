@@ -90,6 +90,18 @@ loanRequestsRouter.get('/latest', async (req: Request, res: Response) => {
     }
 });
 
+// Helper: converter array para string (banco aceita só String)
+function normalizeDocField(value: any): string | null {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) {
+        if (value.length === 0) return null;
+        if (value.length === 1) return value[0];
+        return JSON.stringify(value);
+    }
+    return String(value);
+}
+
 // POST /api/loan-requests — Nova solicitação
 loanRequestsRouter.post('/', async (req: Request, res: Response) => {
     try {
@@ -160,7 +172,7 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
             data: {
                 customerId: customer.id,
                 userId: req.user!.id,
-                clientName: data.clientName || req.user!.name,
+                clientName: data.clientName || data.name || req.user!.name,
                 cpf: data.cpf,
                 email: req.user!.email,
                 phone: data.phone,
@@ -168,30 +180,32 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 installments: data.installments || 1,
                 profileType: data.profileType,
                 referralCode: data.referralCode,
-                fatherPhone: data.fatherPhone,
-                motherPhone: data.motherPhone,
-                spousePhone: data.spousePhone,
+                fatherPhone: data.fatherPhone || data.contactTrust1 || null,
+                motherPhone: data.motherPhone || data.contactTrust2 || null,
+                spousePhone: data.spousePhone || null,
                 address: data.address,
                 neighborhood: data.neighborhood,
                 city: data.city,
                 state: data.state,
-                zipCode: data.zipCode,
+                zipCode: data.zipCode || data.cep || null,
                 birthDate: data.birthDate,
                 preferredDueDay: data.preferredDueDay,
                 instagram: data.instagram,
-                monthlyIncome: data.monthlyIncome,
-                // Documentos
-                selfieUrl: data.selfieUrl,
-                idCardUrl: data.idCardUrl,
-                idCardBackUrl: data.idCardBackUrl,
-                proofOfAddressUrl: data.proofOfAddressUrl,
-                proofIncomeUrl: data.proofIncomeUrl,
-                vehicleUrl: data.vehicleUrl,
-                videoSelfieUrl: data.videoSelfieUrl,
-                videoHouseUrl: data.videoHouseUrl,
-                videoVehicleUrl: data.videoVehicleUrl,
-                signatureUrl: data.signatureUrl,
-                workCardUrl: data.workCardUrl,
+                monthlyIncome: data.monthlyIncome || (data.income ? parseFloat(String(data.income).replace(/[^\d.,]/g, '').replace(',', '.')) || null : null),
+                // Documentos (aceita nomes do wizard OU do backend, e normaliza arrays)
+                selfieUrl: normalizeDocField(data.selfieUrl || data.selfie),
+                idCardUrl: normalizeDocField(data.idCardUrl || data.idCardFront),
+                idCardBackUrl: normalizeDocField(data.idCardBackUrl || data.idCardBack),
+                proofOfAddressUrl: normalizeDocField(data.proofOfAddressUrl || data.proofAddress),
+                proofIncomeUrl: normalizeDocField(data.proofIncomeUrl || data.proofIncome),
+                vehicleUrl: normalizeDocField(data.vehicleUrl || data.vehicleFront),
+                videoSelfieUrl: normalizeDocField(data.videoSelfieUrl || data.videoSelfie),
+                videoHouseUrl: normalizeDocField(data.videoHouseUrl || data.videoHouse),
+                videoVehicleUrl: normalizeDocField(data.videoVehicleUrl),
+                signatureUrl: normalizeDocField(data.signatureUrl || data.signature),
+                workCardUrl: normalizeDocField(data.workCardUrl || data.workCard),
+                // Dados extras (endereço detalhado, fotos casa, garantia, etc.)
+                supplementalDescription: data.supplementalDescription || null,
                 // Banco
                 bankName: data.bankName,
                 bankAgency: data.bankAgency,

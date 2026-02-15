@@ -288,8 +288,31 @@ export const apiService = {
     async submitRequest(requestData: any) {
         const uploadedData = { ...requestData };
 
-        // Mapear nomes do wizard para nomes do backend
-        const fieldMap: Record<string, string> = {
+        // ======= MAPEAMENTO COMPLETO: wizard → backend =======
+
+        // 1. Campos de dados pessoais
+        if (uploadedData.name && !uploadedData.clientName) {
+            uploadedData.clientName = uploadedData.name;
+        }
+        if (uploadedData.contactTrust1 && !uploadedData.fatherPhone) {
+            uploadedData.fatherPhone = uploadedData.contactTrust1;
+        }
+        if (uploadedData.contactTrust2 && !uploadedData.motherPhone) {
+            uploadedData.motherPhone = uploadedData.contactTrust2;
+        }
+        if (uploadedData.cep && !uploadedData.zipCode) {
+            uploadedData.zipCode = uploadedData.cep;
+        }
+        if (uploadedData.income && !uploadedData.monthlyIncome) {
+            const incomeStr = String(uploadedData.income).replace(/[^\d.,]/g, '').replace(',', '.');
+            uploadedData.monthlyIncome = parseFloat(incomeStr) || 0;
+        }
+        if (uploadedData.accountHolderName && !uploadedData.accountHolder) {
+            uploadedData.accountHolder = uploadedData.accountHolderName;
+        }
+
+        // 2. Campos de documentos (arquivo)
+        const docFieldMap: Record<string, string> = {
             selfie: 'selfieUrl',
             idCardFront: 'idCardUrl',
             idCardBack: 'idCardBackUrl',
@@ -302,14 +325,50 @@ export const apiService = {
             workCard: 'workCardUrl',
         };
 
-        for (const [wizardName, backendName] of Object.entries(fieldMap)) {
+        for (const [wizardName, backendName] of Object.entries(docFieldMap)) {
             if (uploadedData[wizardName] !== undefined && uploadedData[backendName] === undefined) {
                 uploadedData[backendName] = uploadedData[wizardName];
                 delete uploadedData[wizardName];
             }
         }
 
-        // Upload de documentos base64 antes de enviar (caso ainda existam)
+        // 3. Montar supplementalDescription com dados extras (location, fotos, garantia)
+        const extraData: Record<string, any> = {};
+        if (uploadedData.housePhotos && Array.isArray(uploadedData.housePhotos) && uploadedData.housePhotos.length > 0) {
+            extraData.housePhotos = uploadedData.housePhotos;
+        }
+        if (uploadedData.latitude || uploadedData.longitude) {
+            extraData.location = {
+                latitude: uploadedData.latitude,
+                longitude: uploadedData.longitude,
+                accuracy: uploadedData.accuracy,
+            };
+        }
+        if (uploadedData.guarantee) {
+            extraData.guarantee = uploadedData.guarantee;
+        }
+        if (uploadedData.address || uploadedData.cep) {
+            extraData.address = uploadedData.address;
+            extraData.number = uploadedData.number;
+            extraData.cep = uploadedData.cep || uploadedData.zipCode;
+            extraData.neighborhood = uploadedData.neighborhood;
+            extraData.city = uploadedData.city;
+            extraData.state = uploadedData.state;
+        }
+        if (uploadedData.billInName && Array.isArray(uploadedData.billInName) && uploadedData.billInName.length > 0) {
+            extraData.billInName = uploadedData.billInName;
+        }
+        if (uploadedData.contactTrust1Name) {
+            extraData.contactTrust1Name = uploadedData.contactTrust1Name;
+        }
+        if (uploadedData.contactTrust2Name) {
+            extraData.contactTrust2Name = uploadedData.contactTrust2Name;
+        }
+        if (Object.keys(extraData).length > 0 && !uploadedData.supplementalDescription) {
+            uploadedData.supplementalDescription = JSON.stringify(extraData);
+        }
+
+        // 4. Upload de documentos base64 (caso ainda existam)
         const docFields = [
             'selfieUrl', 'idCardUrl', 'idCardBackUrl', 'proofOfAddressUrl',
             'proofIncomeUrl', 'vehicleUrl', 'videoSelfieUrl', 'videoHouseUrl',
