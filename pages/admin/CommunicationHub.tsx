@@ -35,6 +35,8 @@ interface Coupon {
     usage_limit: number;
     times_used: number;
     active: boolean;
+    description?: string;
+    partner_name?: string;
 }
 
 const inputStyle = "w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none transition-colors";
@@ -73,7 +75,7 @@ export const CommunicationHub: React.FC = () => {
   // Editing states
   const [editingCampaign, setEditingCampaign] = useState<Partial<Campaign>>({});
   const [editingCoupon, setEditingCoupon] = useState<Partial<Coupon>>({ discount_percent: 10, usage_limit: 100, active: true });
-  const [newStatus, setNewStatus] = useState({ imageUrl: '', caption: '', scheduledAt: '' });
+  const [newStatus, setNewStatus] = useState({ imageUrl: '', caption: '', scheduledAt: '', recurrenceType: 'once' as 'once' | 'daily' | 'weekly' | 'monthly', recurrenceCount: 1 });
 
     // Search
     const [searchTerm, setSearchTerm] = useState('');
@@ -179,15 +181,42 @@ export const CommunicationHub: React.FC = () => {
             return;
         }
         try {
-            const { error } = await api.post('/whatsapp/schedule-status', {
-                imageUrl: newStatus.imageUrl,
-                caption: newStatus.caption || null,
-                scheduledAt: newStatus.scheduledAt || new Date().toISOString(),
-            });
-            if (error) throw new Error();
-            addToast('Status agendado!', 'success');
+            const baseDate = newStatus.scheduledAt ? new Date(newStatus.scheduledAt) : new Date();
+
+            // Single schedule (no recurrence)
+            if (newStatus.recurrenceType === 'once' || newStatus.recurrenceCount <= 1) {
+                const { error } = await api.post('/whatsapp/schedule-status', {
+                    imageUrl: newStatus.imageUrl,
+                    caption: newStatus.caption || null,
+                    scheduledAt: newStatus.scheduledAt || new Date().toISOString(),
+                });
+                if (error) throw new Error();
+                addToast('Status agendado!', 'success');
+            } else {
+                // Build bulk records with recurrence intervals
+                const records = [];
+                for (let i = 0; i < newStatus.recurrenceCount; i++) {
+                    const scheduledDate = new Date(baseDate);
+                    if (newStatus.recurrenceType === 'daily') {
+                        scheduledDate.setDate(scheduledDate.getDate() + i);
+                    } else if (newStatus.recurrenceType === 'weekly') {
+                        scheduledDate.setDate(scheduledDate.getDate() + (i * 7));
+                    } else if (newStatus.recurrenceType === 'monthly') {
+                        scheduledDate.setMonth(scheduledDate.getMonth() + i);
+                    }
+                    records.push({
+                        imageUrl: newStatus.imageUrl,
+                        caption: newStatus.caption || null,
+                        scheduledAt: scheduledDate.toISOString(),
+                    });
+                }
+                const { error } = await api.post('/whatsapp/schedule-bulk', { records });
+                if (error) throw new Error();
+                addToast(`${records.length} status agendados com recorrência!`, 'success');
+            }
+
             setIsStatusModalOpen(false);
-            setNewStatus({ imageUrl: '', caption: '', scheduledAt: '' });
+            setNewStatus({ imageUrl: '', caption: '', scheduledAt: '', recurrenceType: 'once', recurrenceCount: 1 });
             loadAllData();
         } catch {
             addToast('Erro ao agendar status', 'error');
@@ -533,6 +562,14 @@ export const CommunicationHub: React.FC = () => {
                                         </span>
                                     </div>
 <p className="text-white font-bold text-2xl">{coupon.discount_percent}% OFF</p>
+              {coupon.partner_name && (
+                <p className="text-sm text-zinc-300 mt-1 flex items-center gap-1">
+                  <UserPlus size={12} className="text-[#D4AF37]" /> {coupon.partner_name}
+                </p>
+              )}
+              {coupon.description && (
+                <p className="text-xs text-zinc-400 mt-1 line-clamp-2">{coupon.description}</p>
+              )}
               <p className="text-xs text-zinc-500 mt-1">
                 Usado {coupon.times_used}/{coupon.usage_limit} vezes
               </p>
@@ -860,6 +897,25 @@ export const CommunicationHub: React.FC = () => {
           className={inputStyle}
         />
       </div>
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">Parceiro</label>
+        <input
+          type="text"
+          value={editingCoupon.partner_name || ''}
+          onChange={e => setEditingCoupon(prev => ({ ...prev, partner_name: e.target.value }))}
+          className={inputStyle}
+          placeholder="Nome do parceiro (opcional)"
+        />
+      </div>
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">Descrição</label>
+        <textarea
+          value={editingCoupon.description || ''}
+          onChange={e => setEditingCoupon(prev => ({ ...prev, description: e.target.value }))}
+          className={`${inputStyle} h-24 resize-none`}
+          placeholder="Texto de marketing ou informações do parceiro (opcional)"
+        />
+      </div>
       <div className="flex items-center gap-2">
         <input
           type="checkbox"
@@ -902,14 +958,56 @@ export const CommunicationHub: React.FC = () => {
         <textarea value={newStatus.caption} onChange={e => setNewStatus(p => ({ ...p, caption: e.target.value }))}
           placeholder="Texto do status..." rows={3} className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white text-sm" />
       </div>
+      {/* AI Caption Generator - visible when image URL is provided */}
+      {newStatus.imageUrl && (
+        <AIGenerateCaption
+          imageBase64={newStatus.imageUrl}
+          onCaptionGenerated={(caption) => setNewStatus(p => ({ ...p, caption }))}
+        />
+      )}
       <div>
         <label className="block text-sm text-zinc-400 mb-1">Data/Hora do Agendamento</label>
         <input type="datetime-local" value={newStatus.scheduledAt} onChange={e => setNewStatus(p => ({ ...p, scheduledAt: e.target.value }))}
           className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white text-sm" />
         <p className="text-xs text-zinc-600 mt-1">Deixe vazio para postar imediatamente</p>
       </div>
+      {/* Recurrence scheduling */}
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">
+          <Repeat size={14} className="inline mr-1" />
+          Recorrência
+        </label>
+        <select
+          value={newStatus.recurrenceType}
+          onChange={e => setNewStatus(p => ({ ...p, recurrenceType: e.target.value as 'once' | 'daily' | 'weekly' | 'monthly' }))}
+          className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white text-sm focus:border-[#D4AF37] outline-none transition-colors"
+        >
+          <option value="once">Apenas uma vez</option>
+          <option value="daily">Diariamente</option>
+          <option value="weekly">Semanalmente</option>
+          <option value="monthly">Mensalmente</option>
+        </select>
+      </div>
+      {newStatus.recurrenceType !== 'once' && (
+        <div>
+          <label className="block text-sm text-zinc-400 mb-1">Repetir quantas vezes?</label>
+          <input
+            type="number"
+            min="2"
+            max="90"
+            value={newStatus.recurrenceCount}
+            onChange={e => setNewStatus(p => ({ ...p, recurrenceCount: Math.max(2, parseInt(e.target.value) || 2) }))}
+            className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white text-sm focus:border-[#D4AF37] outline-none transition-colors"
+          />
+          <p className="text-xs text-zinc-600 mt-1">
+            {newStatus.recurrenceType === 'daily' && `Será postado por ${newStatus.recurrenceCount} dias consecutivos`}
+            {newStatus.recurrenceType === 'weekly' && `Será postado por ${newStatus.recurrenceCount} semanas`}
+            {newStatus.recurrenceType === 'monthly' && `Será postado por ${newStatus.recurrenceCount} meses`}
+          </p>
+        </div>
+      )}
       <Button onClick={handleScheduleStatus} className="w-full">
-        <Camera size={18} /> Agendar Status
+        <Camera size={18} /> {newStatus.recurrenceType !== 'once' && newStatus.recurrenceCount > 1 ? `Agendar ${newStatus.recurrenceCount} Status` : 'Agendar Status'}
       </Button>
     </div>
   </div>
