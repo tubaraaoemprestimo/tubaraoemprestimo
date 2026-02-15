@@ -456,6 +456,16 @@ export const Requests: React.FC = () => {
                                 </div>
                             )}
 
+                            {/* Instagram do Cliente */}
+                            {selectedRequest.instagram && (
+                                <div className="flex items-center gap-3 p-3 bg-zinc-900 border border-pink-500/30 rounded-xl">
+                                    <div className="flex-1">
+                                        <p className="text-xs text-zinc-500">Instagram</p>
+                                        <a href={`https://instagram.com/${selectedRequest.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="text-pink-400 font-bold text-sm hover:underline">{selectedRequest.instagram}</a>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Contrato PDF Download */}
                             {selectedRequest.contractPdfUrl && (
                                 <div className="flex items-center gap-3 p-3 bg-zinc-900 border border-emerald-500/30 rounded-xl">

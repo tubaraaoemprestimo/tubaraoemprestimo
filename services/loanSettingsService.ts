@@ -67,7 +67,7 @@ export const loanSettingsService = {
                 minLoanAmount: 300,
                 maxLoanNoGuarantee: 3000,
                 maxLoanAmount: 10000,
-                defaultInstallments: 4,
+                defaultInstallments: 1,
 
                 // Pacotes
                 loanPackages: [500, 1000, 1500, 2000, 2500, 3000],
@@ -100,7 +100,7 @@ export const loanSettingsService = {
             minLoanAmount: 300,
             maxLoanNoGuarantee: 3000,
             maxLoanAmount: 10000,
-            defaultInstallments: 4,
+            defaultInstallments: 1,
             loanPackages: [500, 1000, 1500, 2000, 2500, 3000],
             releaseTimeHours: 72,
         };

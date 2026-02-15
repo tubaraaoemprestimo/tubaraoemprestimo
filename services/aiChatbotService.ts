@@ -549,7 +549,7 @@ Empréstimos Ativos: ${customer.active_loans_count || 0}`;
                 }
                 break;
             case 'perplexity':
-                apiKey = config.perplexityApiResponseKey || config.apiKey;
+                apiKey = config.perplexityApiKey || config.apiKey;
                 if (apiKey) {
                     response = await aiChatbotService.generateResponsePerplexity(history, config.systemPrompt, apiKey, customerContext);
                 }
@@ -605,7 +605,7 @@ Empréstimos Ativos: ${customer.active_loans_count || 0}`;
                 if (apiKey) return aiChatbotService.generateResponseGemini(history, config.systemPrompt, apiKey);
                 break;
             case 'perplexity':
-                apiKey = config.perplexityApiResponseKey || config.apiKey;
+                apiKey = config.perplexityApiKey || config.apiKey;
                 if (apiKey) return aiChatbotService.generateResponsePerplexity(history, config.systemPrompt, apiKey);
                 break;
             case 'openai':

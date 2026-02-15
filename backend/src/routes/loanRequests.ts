@@ -233,7 +233,6 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 <p>Recebemos sua solicitação de empréstimo e ela está em análise.</p>
                 <div style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 15px; margin: 15px 0;">
                     <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Valor:</strong> ${amtFmt}</p>
-                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Parcelas:</strong> ${request.installments}x</p>
                     <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Tipo:</strong> ${request.profileType || 'Empréstimo'}</p>
                 </div>
                 <p>Acompanhe o status pelo aplicativo. Você receberá uma notificação assim que tivermos novidades.</p>
@@ -247,7 +246,7 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
         // WhatsApp para o cliente
         if (data.phone) {
             sendWhatsAppNotification(data.phone,
-                `📋 *Solicitação Recebida!*\n\nOlá, ${(data.clientName || req.user!.name).split(' ')[0]}!\n\nSua solicitação de ${amtFmt} em ${request.installments}x foi recebida e está em análise.\n\nAcompanhe pelo app:\nhttps://www.tubaraoemprestimo.com.br\n\n_Tubarão Empréstimos 🦈_`
+                `📋 *Solicitação Recebida!*\n\nOlá, ${(data.clientName || req.user!.name).split(' ')[0]}!\n\nSua solicitação de ${amtFmt} foi recebida e está em análise.\n\nAcompanhe pelo app:\nhttps://www.tubaraoemprestimo.com.br\n\n_Tubarão Empréstimos 🦈_`
             );
         }
 
@@ -257,14 +256,14 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
             for (const admin of admins) {
                 if (admin.phone) {
                     await sendWhatsAppNotification(admin.phone,
-                        `🦈 *Nova Solicitação!*\n\nCliente: ${data.clientName || req.user!.name}\nValor: ${amtFmt}\nParcelas: ${request.installments}x\nTipo: ${request.profileType || 'Empréstimo'}\n\nAcesse o painel para avaliar.`
+                        `🦈 *Nova Solicitação!*\n\nCliente: ${data.clientName || req.user!.name}\nValor: ${amtFmt}\nTipo: ${request.profileType || 'Empréstimo'}\n\nAcesse o painel para avaliar.`
                     );
                 }
             }
             await prisma.notification.create({
                 data: {
                     title: '📋 Nova Solicitação de Empréstimo',
-                    message: `${data.clientName || req.user!.name} solicitou ${amtFmt} em ${request.installments}x (${request.profileType || 'Empréstimo'})`,
+                    message: `${data.clientName || req.user!.name} solicitou ${amtFmt} (${request.profileType || 'Empréstimo'})`,
                     type: 'INFO'
                 }
             }).catch(() => {});
@@ -434,10 +433,9 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
                 <p>Seu pedido de empréstimo foi <strong style="color: #4CAF50;">APROVADO</strong>!</p>
                 <div style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 15px; margin: 15px 0;">
                     <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Valor:</strong> ${amountFormatted}</p>
-                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Parcelas:</strong> ${request.installments}x</p>
                     <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Tipo:</strong> ${request.profileType || 'Empréstimo'}</p>
                 </div>
-                <p>Acesse o aplicativo para ver os detalhes e acompanhar suas parcelas.</p>
+                <p>Acesse o aplicativo para ver os detalhes do seu empréstimo.</p>
                 <div style="text-align: center; margin: 20px 0;">
                     <a href="https://www.tubaraoemprestimo.com.br" style="background: #D4AF37; color: #000; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Acessar App</a>
                 </div>
@@ -450,8 +448,7 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
             const waMsg = `✅ *EMPRÉSTIMO APROVADO!*\n\n` +
                 `Olá, ${request.clientName}!\n\n` +
                 `Seu pedido de empréstimo foi *APROVADO*! 🎉\n\n` +
-                `💰 *Valor:* ${amountFormatted}\n` +
-                `📊 *Parcelas:* ${request.installments}x\n\n` +
+                `💰 *Valor:* ${amountFormatted}\n\n` +
                 `Acesse o app para mais detalhes:\nhttps://www.tubaraoemprestimo.com.br\n\n` +
                 `_Tubarão Empréstimos 🦈_`;
             sendWhatsAppNotification(request.phone, waMsg);
@@ -464,7 +461,7 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
                     customerId: request.customerId,
                     customerEmail: request.email,
                     title: '✅ Empréstimo Aprovado',
-                    message: `Seu empréstimo de ${amountFormatted} em ${request.installments}x foi aprovado!`,
+                    message: `Seu empréstimo de ${amountFormatted} foi aprovado!`,
                     type: 'SUCCESS'
                 }
             }).catch(() => { });

@@ -437,7 +437,7 @@ export function generateGenericContractHTML(
         <div class="data-item"><span class="label">Telefone</span><br><span class="value">${formData.phone}</span></div>
         <div class="data-item"><span class="label">Email</span><br><span class="value">${formData.email}</span></div>
         <div class="data-item"><span class="label">Valor Solicitado</span><br><span class="value">R$ ${formData.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-        <div class="data-item"><span class="label">Parcelas</span><br><span class="value">${formData.installments}x de R$ ${formData.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+        ${formData.installments > 1 ? `<div class="data-item"><span class="label">Parcelas</span><br><span class="value">${formData.installments}x de R$ ${formData.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>` : ''}
         <div class="data-item"><span class="label">Taxa de Juros</span><br><span class="value">${formData.interestRate}% ao mês</span></div>
         <div class="data-item"><span class="label">Valor Total</span><br><span class="value">R$ ${formData.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
       </div>

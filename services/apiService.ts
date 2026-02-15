@@ -364,6 +364,12 @@ export const apiService = {
         if (uploadedData.contactTrust2Name) {
             extraData.contactTrust2Name = uploadedData.contactTrust2Name;
         }
+        if (uploadedData.instagram) {
+            extraData.instagram = uploadedData.instagram;
+        }
+        if (uploadedData.occupation) {
+            extraData.occupation = uploadedData.occupation;
+        }
         if (Object.keys(extraData).length > 0 && !uploadedData.supplementalDescription) {
             uploadedData.supplementalDescription = JSON.stringify(extraData);
         }
