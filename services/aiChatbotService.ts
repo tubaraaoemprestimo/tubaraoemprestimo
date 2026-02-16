@@ -145,7 +145,11 @@ const { error } = await api.put('/chatbot/config', {
                 groqApiKey: config.groqApiKey,
                 grokApiKey: config.grokApiKey,
                 systemPrompt: config.systemPrompt,
-                transferKeywords: config.transferKeywords ? config.transferKeywords.split(',').map(s => s.trim()) : undefined,
+                transferKeywords: config.transferKeywords
+                    ? (typeof config.transferKeywords === 'string'
+                        ? config.transferKeywords.split(',').map(s => s.trim())
+                        : config.transferKeywords)
+                    : undefined,
                 autoReplyEnabled: config.autoReplyEnabled,
                 workingHoursStart: config.workingHoursStart,
                 workingHoursEnd: config.workingHoursEnd,

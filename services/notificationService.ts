@@ -237,12 +237,19 @@ export const notificationService = {
 
     notifyNewRequest: async (clientName: string, amount: number, profileType?: string) => {
         const isLimpaNome = profileType === 'LIMPA_NOME';
+        const isMoto = profileType === 'MOTO';
+        const title = isLimpaNome ? '📝 Nova Solicitação - Limpa Nome'
+            : isMoto ? '🏍️ Nova Solicitação - Financiamento Moto'
+            : '📝 Nova Solicitação';
+        const message = isLimpaNome
+            ? `${clientName} solicitou o serviço Limpa Nome.`
+            : isMoto
+            ? `${clientName} solicitou financiamento de motocicleta Honda Pop 110i 2026.`
+            : `${clientName} solicitou um empréstimo de R$ ${amount.toLocaleString()}.`;
         return notificationService.create({
             type: 'info',
-            title: isLimpaNome ? '📝 Nova Solicitação - Limpa Nome' : '📝 Nova Solicitação',
-            message: isLimpaNome
-                ? `${clientName} solicitou o serviço Limpa Nome.`
-                : `${clientName} solicitou um empréstimo de R$ ${amount.toLocaleString()}.`,
+            title,
+            message,
             customerEmail: null, // Para admin
             forRole: 'ADMIN'
         });

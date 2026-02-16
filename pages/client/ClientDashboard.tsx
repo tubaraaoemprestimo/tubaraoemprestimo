@@ -166,8 +166,8 @@ if (user) {
       const code = await referralService.getOrCreateCode(user.id, user.name);
       setReferralCode(code.code);
       
-      // Buscar histórico de solicitações
-      const { data: historyData } = await api.get(`/loan-requests/history/${user.id}`);
+      // Buscar histórico de solicitações (GET /loan-requests filtra por JWT auth)
+      const { data: historyData } = await api.get('/loan-requests');
       if (historyData) {
         setLoanHistory(historyData as LoanRequest[]);
       }

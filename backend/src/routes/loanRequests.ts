@@ -223,30 +223,58 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
         });
 
         // ====== NOTIFICAÇÕES DE NOVA SOLICITAÇÃO ======
+        const isMoto = request.profileType === 'MOTO';
+        const isLimpaNome = request.profileType === 'LIMPA_NOME';
+        const profileLabels: Record<string, string> = {
+            CLT: 'Empréstimo Pessoal (CLT)',
+            AUTONOMO: 'Capital de Giro (Comércio)',
+            MOTO: 'Financiamento de Motocicleta',
+            GARANTIA: 'Empréstimo com Garantia',
+            LIMPA_NOME: 'Limpa Nome',
+        };
+        const typeLabel = profileLabels[request.profileType || ''] || 'Empréstimo';
         const amtFmt = (request.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // Detalhes de valor para exibição
+        const valorDisplay = isMoto
+            ? `<p style="margin: 5px 0;"><strong style="color: #D4AF37;">Produto:</strong> Honda Pop 110i 2026</p>
+               <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Entrada:</strong> R$ 2.000,00</p>
+               <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Parcelas:</strong> 36x R$ 611,00 + Seguro R$ 150,00/mês</p>`
+            : isLimpaNome
+            ? `<p style="margin: 5px 0;"><strong style="color: #D4AF37;">Serviço:</strong> Limpa Nome</p>`
+            : `<p style="margin: 5px 0;"><strong style="color: #D4AF37;">Valor:</strong> ${amtFmt}</p>`;
+
+        const descricaoResumida = isMoto
+            ? 'financiamento de motocicleta Honda Pop 110i'
+            : isLimpaNome
+            ? 'serviço Limpa Nome'
+            : `${amtFmt}`;
 
         // Email para o cliente confirmando recebimento
         if (req.user!.email) {
             const clientHtml = brandedEmailHtml(`
                 <h2 style="color: #D4AF37;">📋 Solicitação Recebida!</h2>
                 <p>Olá, <strong>${data.clientName || req.user!.name}</strong>!</p>
-                <p>Recebemos sua solicitação de empréstimo e ela está em análise.</p>
+                <p>Recebemos sua solicitação de ${isMoto ? 'financiamento' : isLimpaNome ? 'serviço' : 'empréstimo'} e ela está em análise.</p>
                 <div style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 15px; margin: 15px 0;">
-                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Valor:</strong> ${amtFmt}</p>
-                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Tipo:</strong> ${request.profileType || 'Empréstimo'}</p>
+                    ${valorDisplay}
+                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Tipo:</strong> ${typeLabel}</p>
                 </div>
                 <p>Acompanhe o status pelo aplicativo. Você receberá uma notificação assim que tivermos novidades.</p>
                 <div style="text-align: center; margin: 20px 0;">
                     <a href="https://www.tubaraoemprestimo.com.br" style="background: #D4AF37; color: #000; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Acessar App</a>
                 </div>
             `);
-            emailService.send(req.user!.email, '📋 Solicitação Recebida — Tubarão Empréstimos', clientHtml).catch(() => {});
+            const emailSubject = isMoto
+                ? '🏍️ Solicitação de Financiamento Recebida — Tubarão Empréstimos'
+                : '📋 Solicitação Recebida — Tubarão Empréstimos';
+            emailService.send(req.user!.email, emailSubject, clientHtml).catch(() => {});
         }
 
         // WhatsApp para o cliente
         if (data.phone) {
             sendWhatsAppNotification(data.phone,
-                `📋 *Solicitação Recebida!*\n\nOlá, ${(data.clientName || req.user!.name).split(' ')[0]}!\n\nSua solicitação de ${amtFmt} foi recebida e está em análise.\n\nAcompanhe pelo app:\nhttps://www.tubaraoemprestimo.com.br\n\n_Tubarão Empréstimos 🦈_`
+                `📋 *Solicitação Recebida!*\n\nOlá, ${(data.clientName || req.user!.name).split(' ')[0]}!\n\nSua solicitação de ${descricaoResumida} foi recebida e está em análise.\n\nAcompanhe pelo app:\nhttps://www.tubaraoemprestimo.com.br\n\n_Tubarão Empréstimos 🦈_`
             );
         }
 
@@ -256,14 +284,14 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
             for (const admin of admins) {
                 if (admin.phone) {
                     await sendWhatsAppNotification(admin.phone,
-                        `🦈 *Nova Solicitação!*\n\nCliente: ${data.clientName || req.user!.name}\nValor: ${amtFmt}\nTipo: ${request.profileType || 'Empréstimo'}\n\nAcesse o painel para avaliar.`
+                        `🦈 *Nova Solicitação!*\n\nCliente: ${data.clientName || req.user!.name}\n${isMoto ? 'Produto: Honda Pop 110i 2026' : `Valor: ${amtFmt}`}\nTipo: ${typeLabel}\n\nAcesse o painel para avaliar.`
                     );
                 }
             }
             await prisma.notification.create({
                 data: {
-                    title: '📋 Nova Solicitação de Empréstimo',
-                    message: `${data.clientName || req.user!.name} solicitou ${amtFmt} (${request.profileType || 'Empréstimo'})`,
+                    title: isMoto ? '🏍️ Nova Solicitação - Financiamento Moto' : '📋 Nova Solicitação de Empréstimo',
+                    message: `${data.clientName || req.user!.name} solicitou ${descricaoResumida} (${typeLabel})`,
                     type: 'INFO'
                 }
             }).catch(() => {});

@@ -1104,11 +1104,12 @@ export const Wizard: React.FC = () => {
         proofAddress: proofAddressUrls,
         vehicleFront: vehicleFrontUrls,
 
-        amount: getAmount(),
-        installments: settings.defaultInstallments,
-        totalAmount: calculateTotal(),
-        installmentValue: calculateInstallment(),
-        interestRate: settings.interestRateMonthly,
+        // MOTO tem valores fixos de financiamento (Honda Pop 110i 2026)
+        amount: profileType === 'MOTO' ? 21996 : getAmount(),
+        installments: profileType === 'MOTO' ? 36 : settings.defaultInstallments,
+        totalAmount: profileType === 'MOTO' ? 29396 : calculateTotal(),
+        installmentValue: profileType === 'MOTO' ? 611 : calculateInstallment(),
+        interestRate: profileType === 'MOTO' ? 0 : settings.interestRateMonthly,
         lateFeeDaily: settings.lateFeeDaily,
         lateFeeMonthly: settings.lateFeeMonthly,
         lateFeeFixed: settings.lateFeeFixed,
@@ -1140,11 +1141,11 @@ export const Wizard: React.FC = () => {
               cpf: formData.cpf,
               phone: formData.phone,
               email: formData.email,
-              amount: getAmount(),
-              installments: settings.defaultInstallments,
-              installmentValue: calculateInstallment(),
-              interestRate: settings.interestRateMonthly,
-              totalAmount: calculateTotal(),
+              amount: profileType === 'MOTO' ? 21996 : getAmount(),
+              installments: profileType === 'MOTO' ? 36 : settings.defaultInstallments,
+              installmentValue: profileType === 'MOTO' ? 611 : calculateInstallment(),
+              interestRate: profileType === 'MOTO' ? 0 : settings.interestRateMonthly,
+              totalAmount: profileType === 'MOTO' ? 29396 : calculateTotal(),
             },
             signatureUrl,
             brandData ? {
@@ -1177,15 +1178,15 @@ export const Wizard: React.FC = () => {
       emailService.notifyNewRequest({
         clientName: formData.name,
         clientEmail: formData.email,
-        amount: getAmount(),
-        installments: settings.defaultInstallments,
+        amount: profileType === 'MOTO' ? 21996 : getAmount(),
+        installments: profileType === 'MOTO' ? 36 : settings.defaultInstallments,
         profileType,
       }).catch((err) => { console.error('Erro ao enviar email de notificação:', err); });
 
       // 📱 Enviar WhatsApp e Notificação automática (silencioso)
       autoNotificationService.onLoanRequested(
         formData.email,
-        getAmount(),
+        profileType === 'MOTO' ? 21996 : getAmount(),
         formData.name,
         profileType
       ).catch(() => { });

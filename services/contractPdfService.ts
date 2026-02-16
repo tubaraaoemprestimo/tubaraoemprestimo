@@ -436,10 +436,19 @@ export function generateGenericContractHTML(
         <div class="data-item"><span class="label">CPF</span><br><span class="value">${formData.cpf}</span></div>
         <div class="data-item"><span class="label">Telefone</span><br><span class="value">${formData.phone}</span></div>
         <div class="data-item"><span class="label">Email</span><br><span class="value">${formData.email}</span></div>
+        ${formData.profileType === 'MOTO' ? `
+        <div class="data-item"><span class="label">Produto</span><br><span class="value">Honda Pop 110i 2026</span></div>
+        <div class="data-item"><span class="label">Entrada</span><br><span class="value">R$ 2.000,00</span></div>
+        <div class="data-item"><span class="label">Parcelas</span><br><span class="value">36x de R$ 611,00</span></div>
+        <div class="data-item"><span class="label">Seguro Mensal</span><br><span class="value">R$ 150,00/mês</span></div>
+        <div class="data-item"><span class="label">Mensal Total</span><br><span class="value">R$ 761,00</span></div>
+        <div class="data-item"><span class="label">Valor Total</span><br><span class="value">R$ ${formData.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+        ` : `
         <div class="data-item"><span class="label">Valor Solicitado</span><br><span class="value">R$ ${formData.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
         ${formData.installments > 1 ? `<div class="data-item"><span class="label">Parcelas</span><br><span class="value">${formData.installments}x de R$ ${formData.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>` : ''}
         <div class="data-item"><span class="label">Taxa de Juros</span><br><span class="value">${formData.interestRate}% ao mês</span></div>
         <div class="data-item"><span class="label">Valor Total</span><br><span class="value">R$ ${formData.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+        `}
       </div>
 
       <h3 class="section-title">CONDIÇÕES</h3>

@@ -60,8 +60,19 @@ const emailTemplates = {
   // ==========================================
   // ADMIN: Nova Solicitação
   // ==========================================
-  adminNewRequest: (data: LoanEmailData) => ({
-    subject: `🔔 Nova Solicitação - ${data.clientName} - R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+  adminNewRequest: (data: LoanEmailData) => {
+    const isMoto = data.profileType === 'MOTO';
+    const profileLabels: Record<string, string> = {
+      CLT: 'Empréstimo Pessoal (CLT)',
+      AUTONOMO: 'Capital de Giro (Comércio)',
+      MOTO: 'Financiamento de Motocicleta',
+      GARANTIA: 'Empréstimo com Garantia',
+    };
+    const typeLabel = profileLabels[data.profileType || ''] || 'Empréstimo';
+    return {
+    subject: isMoto
+      ? `🔔 Nova Solicitação - ${data.clientName} - Financiamento Moto`
+      : `🔔 Nova Solicitação - ${data.clientName} - R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -82,9 +93,21 @@ const emailTemplates = {
               <div class="value">${data.clientEmail}</div>
             </div>
             <div class="info-box">
+              <div class="label">Tipo</div>
+              <div class="value">${typeLabel}</div>
+            </div>
+            ${isMoto ? `
+            <div class="info-box">
+              <div class="label">Produto</div>
+              <div class="value highlight">Honda Pop 110i 2026</div>
+              <p style="color: #888; font-size: 13px; margin-top: 5px;">Entrada: R$ 2.000,00 | 36x R$ 611,00 + Seguro R$ 150,00/mês</p>
+            </div>
+            ` : `
+            <div class="info-box">
               <div class="label">Valor Solicitado</div>
               <div class="value highlight">R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
+            `}
 
             <div style="text-align: center;">
               <a href="https://tubaraoemprestimo.com.br/#/admin/requests" class="button">Ver Solicitação</a>
@@ -97,13 +120,24 @@ const emailTemplates = {
       </body>
       </html>
     `,
-  }),
+  };},
 
   // ==========================================
   // CLIENTE: Solicitação Recebida
   // ==========================================
-  clientRequestReceived: (data: LoanEmailData) => ({
-    subject: `✅ Recebemos sua Solicitação - Tubarão Empréstimos`,
+  clientRequestReceived: (data: LoanEmailData) => {
+    const isMoto = data.profileType === 'MOTO';
+    const profileLabels: Record<string, string> = {
+      CLT: 'empréstimo pessoal',
+      AUTONOMO: 'capital de giro',
+      MOTO: 'financiamento de motocicleta',
+      GARANTIA: 'empréstimo com garantia',
+    };
+    const typeLabel = profileLabels[data.profileType || ''] || 'empréstimo';
+    return {
+    subject: isMoto
+      ? `✅ Recebemos sua Solicitação de Financiamento - Tubarão Empréstimos`
+      : `✅ Recebemos sua Solicitação - Tubarão Empréstimos`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -115,12 +149,20 @@ const emailTemplates = {
           </div>
           <div class="content">
             <h2>Olá, ${data.clientName}! 👋</h2>
-            <p>Recebemos sua solicitação de empréstimo e ela está em análise.</p>
+            <p>Recebemos sua solicitação de ${typeLabel} e ela está em análise.</p>
 
+            ${isMoto ? `
+            <div class="info-box">
+              <div class="label">Financiamento</div>
+              <div class="value highlight">Honda Pop 110i 2026</div>
+              <p style="color: #888; font-size: 13px; margin-top: 5px;">Entrada: R$ 2.000,00 | 36x R$ 611,00 + Seguro R$ 150,00/mês</p>
+            </div>
+            ` : `
             <div class="info-box">
               <div class="label">Valor Solicitado</div>
               <div class="value highlight">R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
+            `}
 
 
 
@@ -140,7 +182,7 @@ const emailTemplates = {
               </div>
               <div class="step">
                 <div class="step-number">3</div>
-                <span>Se aprovado, o valor será depositado via PIX</span>
+                <span>${data.profileType === 'MOTO' ? 'Se aprovado, entraremos em contato para entrega da moto' : 'Se aprovado, o valor será depositado via PIX'}</span>
               </div>
             </div>
           </div>
@@ -152,7 +194,7 @@ const emailTemplates = {
       </body>
       </html>
     `,
-  }),
+  };},
 
   // ==========================================
   // CLIENTE: Empréstimo APROVADO
