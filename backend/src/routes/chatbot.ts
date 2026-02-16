@@ -525,6 +525,44 @@ chatbotRouter.put('/config', authenticate, requireAdmin, async (req: Request, re
             transferKeywords
         } = req.body;
 
+        // Obter configuração existente para preservar chaves não atualizadas
+        const existingConfig = await prisma.aiChatbotConfig.findFirst();
+        let updatedConfig: any = existingConfig ? { ...existingConfig } : {};
+
+        // Atualizar campos não-chave
+        if (enabled !== undefined) updatedConfig.enabled = enabled;
+        if (provider !== undefined) updatedConfig.provider = provider;
+        if (systemPrompt !== undefined) updatedConfig.systemPrompt = systemPrompt;
+        if (autoReplyEnabled !== undefined) updatedConfig.autoReplyEnabled = autoReplyEnabled;
+        if (workingHoursStart !== undefined) updatedConfig.workingHoursStart = workingHoursStart;
+        if (workingHoursEnd !== undefined) updatedConfig.workingHoursEnd = workingHoursEnd;
+        if (transferKeywords !== undefined) updatedConfig.transferKeywords = transferKeywords;
+
+        // API Keys: atualizar apenas se forem fornecidas e não mascaradas
+        const keyFields = {
+            apiKey,
+            geminiApiKey,
+            perplexityApiKey,
+            openaiApiKey,
+            openrouterApiKey,
+            nvidiaApiKey,
+            zaiApiKey,
+            anthropicApiKey,
+            groqApiKey,
+            grokApiKey
+        };
+
+        for (const [field, value] of Object.entries(keyFields)) {
+            if (value !== undefined && typeof value === 'string') {
+                // Se o valor não está mascarado, atualiza com o novo valor
+                if (!value.startsWith('****')) {
+                    updatedConfig[field] = value;
+                }
+                // Se o valor está mascarado (****), preservamos o valor existente
+            }
+        }
+
+        // Preparar dados para atualização/criação
         const data: any = {};
         if (enabled !== undefined) data.enabled = enabled;
         if (provider !== undefined) data.provider = provider;
@@ -534,17 +572,18 @@ chatbotRouter.put('/config', authenticate, requireAdmin, async (req: Request, re
         if (workingHoursEnd !== undefined) data.workingHoursEnd = workingHoursEnd;
         if (transferKeywords !== undefined) data.transferKeywords = transferKeywords;
 
-        // Per-provider API keys (só atualiza se não for masked)
-        const keyFields = { apiKey, geminiApiKey, perplexityApiKey, openaiApiKey, openrouterApiKey, nvidiaApiKey, zaiApiKey, anthropicApiKey, groqApiKey, grokApiKey };
+        // Atualizar apenas as chaves que não estão mascaradas
         for (const [field, value] of Object.entries(keyFields)) {
             if (value !== undefined && typeof value === 'string' && !value.startsWith('****')) {
                 data[field] = value;
+            } else if (updatedConfig[field]) {
+                // Se o valor está mascarado, manter o valor existente
+                data[field] = updatedConfig[field];
             }
         }
 
-        const existing = await prisma.aiChatbotConfig.findFirst();
-        if (existing) {
-            await prisma.aiChatbotConfig.update({ where: { id: existing.id }, data });
+        if (existingConfig) {
+            await prisma.aiChatbotConfig.update({ where: { id: existingConfig.id }, data });
         } else {
             await prisma.aiChatbotConfig.create({ data });
         }
@@ -677,6 +716,24 @@ chatbotRouter.post('/message', authenticate, async (req: Request, res: Response)
 
         // 6. Monta system prompt com contexto do cliente
         let systemPrompt = config.systemPrompt || 'Você é um assistente virtual da Tubarão Empréstimos, uma empresa de crédito. Seja educado, profissional e objetivo.';
+
+        // Adiciona instruções para reconhecer renda informal/PJ
+        const incomeRecognitionAppendix = `
+
+INSTRUÇÕES IMPORTANTES SOBRE MODALIDADES DE RENDA:
+- Se o cliente mencionar que trabalha como autônomo, freelancer, profissional liberal, faz bico, é motorista de app (Uber, 99, etc), entregador (iFood, Rappi), vendedor ambulante, costureira, pedreiro, eletricista, ou qualquer trabalho sem carteira assinada: trate como renda INFORMAL/AUTÔNOMO. Oriente que ele pode solicitar empréstimo normalmente, selecionando "Autônomo" como perfil.
+- Se o cliente mencionar que é PJ, MEI, microempreendedor, tem CNPJ, é empresário ou dono de negócio: trate como renda PJ. Oriente que ele selecione "Autônomo" como perfil e informe a renda mensal do negócio.
+- Se o cliente mencionar que é CLT, carteira assinada, funcionário público, militar: trate como CLT. Oriente que selecione "CLT" como perfil.
+- Se o cliente mencionar que é aposentado, pensionista ou recebe benefício do INSS: trate como renda fixa. Oriente que selecione "CLT" como perfil e informe o valor do benefício.
+- NUNCA recuse ou desanime o cliente por causa do tipo de renda. Todos são bem-vindos!
+
+INFORMAÇÕES SOBRE O SISTEMA DE INDICAÇÃO:
+- "Indique e Ganhe": Clientes podem indicar amigos usando seu código de indicação. Quando o indicado toma um empréstimo e paga 3 parcelas, o indicador ganha pontos que podem ser trocados por descontos.
+- "Parceiro Tubarão": Para quem quer ganhar comissões por trazer clientes regularmente. Parceiros recebem comissões fixas por cada empréstimo aprovado, liberadas conforme o pagamento das parcelas (40% na 1ª, 30% na 2ª, 30% na 3ª).
+- Valores de comissão: Empréstimo até 3k = R$120, 5k+ = R$150, 10k+ = R$180, Moto = R$250, Limpa Nome = R$50.
+- Bônus mensal: 5+ contratos com <10% inadimplência = R$500 (Silver), 10+ contratos com <5% inadimplência = R$1000 (Gold).`;
+
+        systemPrompt += incomeRecognitionAppendix;
 
         if (customerContext) {
             systemPrompt += `\n\nContexto do cliente:\n${JSON.stringify(customerContext)}`;

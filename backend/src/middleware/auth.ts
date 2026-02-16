@@ -7,6 +7,7 @@ export interface AuthUser {
     email: string;
     name: string;
     role: string;
+    isAdmin?: boolean;
 }
 
 // Extend Express Request
@@ -47,7 +48,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
             return;
         }
 
-        req.user = user;
+        req.user = { ...user, isAdmin: user.role === 'ADMIN' };
         next();
     } catch (error: any) {
         if (error.name === 'TokenExpiredError') {

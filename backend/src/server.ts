@@ -30,6 +30,9 @@ import { adminRouter } from './routes/admin';
 import { paymentReceiptsRouter } from './routes/paymentReceipts';
 import { openFinanceRouter } from './routes/openFinance';
 import { pixRouter } from './routes/pix';
+import { collectionsRouter } from './routes/collections';
+import { partnersRouter } from './routes/partners';
+import { loanRequestUpdatesRouter } from './routes/loanRequestUpdates';
 import { initCronJobs } from './cron/installmentReminders';
 
 const app = express();
@@ -74,6 +77,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/customers', customersRouter);
 app.use('/api/loan-requests', loanRequestsRouter);
+app.use('/api/loan-request-updates', loanRequestUpdatesRouter);
 app.use('/api/loans', loansRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/upload', uploadRouter);
@@ -93,6 +97,8 @@ app.use('/api/admin', adminRouter);
 app.use('/api/payment-receipts', paymentReceiptsRouter);
 app.use('/api/open-finance', openFinanceRouter);
 app.use('/api/pix', pixRouter);
+app.use('/api/collections', collectionsRouter);
+app.use('/api/partners', partnersRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {

@@ -9,13 +9,22 @@ communicationRouter.use(requireAdmin);
 // ============ MESSAGE TEMPLATES ============
 
 // GET /api/communication/templates - Listar templates
-communicationRouter.get('/templates', async (_req: Request, res: Response) => {
+communicationRouter.get('/templates', async (req: Request, res: Response) => {
     try {
+        const { trigger_event, is_active, category } = req.query;
+
+        const where: any = {};
+        if (trigger_event) where.triggerEvent = trigger_event;
+        if (is_active) where.isActive = is_active === 'true';
+        if (category) where.category = category;
+
         const templates = await prisma.messageTemplate.findMany({
+            where,
             orderBy: { createdAt: 'desc' }
         });
         res.json(templates);
-    } catch {
+    } catch (error) {
+        console.error('[Communication] Erro ao buscar templates:', error);
         res.status(500).json({ error: 'Erro ao buscar templates' });
     }
 });
@@ -23,18 +32,22 @@ communicationRouter.get('/templates', async (_req: Request, res: Response) => {
 // POST /api/communication/templates - Criar template
 communicationRouter.post('/templates', async (req: Request, res: Response) => {
     try {
-        const { name, category, content, variables, isActive } = req.body;
+        const { name, category, triggerEvent, channel, subject, content, variables, isActive } = req.body;
         const template = await prisma.messageTemplate.create({
             data: {
                 name,
                 category,
+                triggerEvent,
+                channel,
+                subject,
                 content,
                 variables: variables || [],
                 isActive: isActive !== false
             }
         });
         res.status(201).json(template);
-    } catch {
+    } catch (error) {
+        console.error('[Communication] Erro ao criar template:', error);
         res.status(500).json({ error: 'Erro ao criar template' });
     }
 });
@@ -43,13 +56,14 @@ communicationRouter.post('/templates', async (req: Request, res: Response) => {
 communicationRouter.put('/templates/:id', async (req: Request, res: Response) => {
     try {
         const id = String(req.params.id);
-        const { name, category, content, variables, isActive } = req.body;
+        const { name, category, triggerEvent, channel, subject, content, variables, isActive } = req.body;
         const template = await prisma.messageTemplate.update({
             where: { id },
-            data: { name, category, content, variables, isActive }
+            data: { name, category, triggerEvent, channel, subject, content, variables, isActive }
         });
         res.json(template);
-    } catch {
+    } catch (error) {
+        console.error('[Communication] Erro ao atualizar template:', error);
         res.status(500).json({ error: 'Erro ao atualizar template' });
     }
 });
@@ -60,7 +74,8 @@ communicationRouter.delete('/templates/:id', async (req: Request, res: Response)
         const id = String(req.params.id);
         await prisma.messageTemplate.delete({ where: { id } });
         res.json({ success: true });
-    } catch {
+    } catch (error) {
+        console.error('[Communication] Erro ao deletar template:', error);
         res.status(500).json({ error: 'Erro ao deletar template' });
     }
 });

@@ -86,6 +86,99 @@ loansRouter.put('/:loanId/installments/:installmentId/proof', async (req: Reques
                     }
                 }
             }
+
+            // ====== GATILHO DE LIBERAÇÃO DE COMISSÃO (40/30/30) ======
+            try {
+                // Verificar se este loan veio de uma indicação de parceiro
+                const loanRequest = await prisma.loanRequest.findUnique({
+                    where: { id: loan.requestId }
+                });
+
+                if (loanRequest?.isPartnerReferral && loanRequest?.partnerId) {
+                    // Buscar comissão pendente para este contrato
+                    const commission = await prisma.partnerCommission.findFirst({
+                        where: {
+                            contractId: loan.id,
+                            status: { in: ['PENDING', 'PARTIAL'] }
+                        }
+                    });
+
+                    if (commission) {
+                        // Contar parcelas pagas do empréstimo
+                        const paidInstallments = await prisma.installment.count({
+                            where: {
+                                loanId: loan.id,
+                                status: 'PAID'
+                            }
+                        });
+
+                        const totalComm = commission.totalCommission;
+                        let updateData: any = {};
+
+                        if (paidInstallments === 1 && commission.installmentsReleased < 1) {
+                            // 1ª parcela paga: libera 40%
+                            const release = totalComm * 0.40;
+                            updateData = {
+                                installmentsReleased: 1,
+                                releasedPercent: 40,
+                                commissionAmount: release,
+                                release1Amount: release,
+                                release1At: new Date(),
+                                status: 'PARTIAL'
+                            };
+                            console.log(`[Loans] Partner commission: Released 40% (R$ ${release.toFixed(2)}) for partner ${loanRequest.partnerId}`);
+                        } else if (paidInstallments === 2 && commission.installmentsReleased < 2) {
+                            // 2ª parcela paga: libera +30% (total 70%)
+                            const release = totalComm * 0.30;
+                            updateData = {
+                                installmentsReleased: 2,
+                                releasedPercent: 70,
+                                commissionAmount: (commission.release1Amount || 0) + release,
+                                release2Amount: release,
+                                release2At: new Date(),
+                                status: 'PARTIAL'
+                            };
+                            console.log(`[Loans] Partner commission: Released +30% (R$ ${release.toFixed(2)}) for partner ${loanRequest.partnerId}`);
+                        } else if (paidInstallments >= 3 && commission.installmentsReleased < 3) {
+                            // 3ª parcela paga: libera +30% (total 100%)
+                            const release = totalComm * 0.30;
+                            updateData = {
+                                installmentsReleased: 3,
+                                releasedPercent: 100,
+                                commissionAmount: totalComm,
+                                release3Amount: release,
+                                release3At: new Date(),
+                                status: 'PAID',
+                                paidAt: new Date()
+                            };
+                            console.log(`[Loans] Partner commission: Released final 30% (R$ ${release.toFixed(2)}) - FULLY PAID for partner ${loanRequest.partnerId}`);
+                        }
+
+                        if (Object.keys(updateData).length > 0) {
+                            await prisma.partnerCommission.update({
+                                where: { id: commission.id },
+                                data: updateData
+                            });
+
+                            // Atualizar partnerScore (total liberado)
+                            const totalReleased = await prisma.partnerCommission.aggregate({
+                                where: {
+                                    partnerId: loanRequest.partnerId,
+                                    status: { in: ['PARTIAL', 'PAID'] }
+                                },
+                                _sum: { commissionAmount: true }
+                            });
+
+                            await prisma.user.update({
+                                where: { id: loanRequest.partnerId },
+                                data: { partnerScore: totalReleased._sum.commissionAmount || 0 }
+                            });
+                        }
+                    }
+                }
+            } catch (commErr) {
+                console.error('[Loans] Commission release error:', commErr);
+            }
         }
 
         res.json({ success: true });

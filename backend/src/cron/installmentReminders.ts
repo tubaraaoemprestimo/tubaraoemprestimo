@@ -92,7 +92,7 @@ export const scheduleInstallmentReminders = () => {
         }
 
         if (c.userId) {
-          sendPushToUser(c.userId, '⏰ Parcela vence em 3 dias', `Sua parcela de ${amtFmt} vence em ${brDate(inst.dueDate)}`).catch(() => {});
+          sendPushToUser(c.userId, '⏰ Parcela vence em 3 dias', `Sua parcela de ${amtFmt} vence em ${brDate(inst.dueDate)}`).catch(() => { });
         }
 
         await prisma.notification.create({
@@ -103,7 +103,7 @@ export const scheduleInstallmentReminders = () => {
             message: `Sua parcela de ${amtFmt} vence em ${brDate(inst.dueDate)}.`,
             type: 'WARNING'
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       // Lembrete no dia
@@ -138,7 +138,7 @@ export const scheduleInstallmentReminders = () => {
         }
 
         if (c.userId) {
-          sendPushToUser(c.userId, '⚠️ Parcela vence HOJE', `Sua parcela de ${amtFmt} vence hoje!`).catch(() => {});
+          sendPushToUser(c.userId, '⚠️ Parcela vence HOJE', `Sua parcela de ${amtFmt} vence hoje!`).catch(() => { });
         }
 
         await prisma.notification.create({
@@ -149,7 +149,7 @@ export const scheduleInstallmentReminders = () => {
             message: `Sua parcela de ${amtFmt} vence hoje. Evite juros!`,
             type: 'WARNING'
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       console.log(`[Cron] reminders ok: +3d=${dueIn3.length}, today=${dueToday.length}`);
@@ -225,7 +225,7 @@ export const scheduleLatePaymentDetection = () => {
 
         // Push ao cliente
         if (c.userId) {
-          sendPushToUser(c.userId, `🚨 Parcela ATRASADA (${daysOverdue}d)`, `Sua parcela de ${amtFmt} está ${daysOverdue} dia(s) atrasada.`).catch(() => {});
+          sendPushToUser(c.userId, `🚨 Parcela ATRASADA (${daysOverdue}d)`, `Sua parcela de ${amtFmt} está ${daysOverdue} dia(s) atrasada.`).catch(() => { });
         }
 
         // Notificação interna
@@ -237,7 +237,7 @@ export const scheduleLatePaymentDetection = () => {
             message: `Parcela de ${amtFmt} vencida em ${brDate(inst.dueDate)}.`,
             type: 'ALERT'
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       // Alerta para admin com resumo
@@ -251,10 +251,10 @@ export const scheduleLatePaymentDetection = () => {
           message: `Total em atraso: R$ ${totalAmount.toFixed(2)}. Verifique o painel de cobranças.`,
           type: 'ALERT'
         }
-      }).catch(() => {});
+      }).catch(() => { });
 
       // Push para admins
-      sendPushToRole('ADMIN', `🚨 ${totalOverdue} parcela(s) em atraso`, `Total: R$ ${totalAmount.toFixed(2)}`).catch(() => {});
+      sendPushToRole('ADMIN', `🚨 ${totalOverdue} parcela(s) em atraso`, `Total: R$ ${totalAmount.toFixed(2)}`).catch(() => { });
 
       // WhatsApp para admins
       try {
@@ -263,10 +263,10 @@ export const scheduleLatePaymentDetection = () => {
           if (admin.phone) {
             sendWhatsAppMessage(admin.phone,
               `🚨 *Resumo de Atrasos*\n\n${totalOverdue} parcela(s) em atraso\nTotal: R$ ${totalAmount.toFixed(2)}\n\nAcesse o painel para detalhes.`
-            ).catch(() => {});
+            ).catch(() => { });
           }
         }
-      } catch {}
+      } catch { }
 
       console.log(`[Cron] late detection: ${totalOverdue} overdue, total R$ ${totalAmount.toFixed(2)}`);
     } catch (e) {
@@ -315,10 +315,201 @@ export const scheduleWhatsAppStatus = () => {
   job.start();
 };
 
+// ============ CRON: BÔNUS MENSAL DE PARCEIROS ============
+const schedulePartnerBonusEvaluation = () => {
+  // Roda no dia 1 de cada mês às 10h
+  const job = new CronJob('0 10 1 * *', async () => {
+    try {
+      console.log('[Cron] Starting monthly partner bonus evaluation...');
+
+      // Mês anterior
+      const now = new Date();
+      const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const monthStr = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`;
+      const monthStart = prevMonth;
+      const monthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+      // Buscar todos os parceiros ativos
+      const partners = await prisma.user.findMany({
+        where: { isPartner: true }
+      });
+
+      for (const partner of partners) {
+        // Contar contratos do parceiro no mês anterior
+        const contracts = await prisma.partnerCommission.findMany({
+          where: {
+            partnerId: partner.id,
+            createdAt: { gte: monthStart, lte: monthEnd }
+          },
+          include: {
+            loanRequest: {
+              include: {
+                loan: {
+                  include: {
+                    installments: true
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        const contractsCount = contracts.length;
+        if (contractsCount === 0) continue;
+
+        // Calcular taxa de inadimplência
+        let totalInstallments = 0;
+        let lateInstallments = 0;
+
+        for (const contract of contracts) {
+          const loan = contract.loanRequest?.loan;
+          if (loan?.installments) {
+            for (const inst of loan.installments) {
+              if (new Date(inst.dueDate) <= monthEnd) {
+                totalInstallments++;
+                if (inst.status !== 'PAID') {
+                  lateInstallments++;
+                }
+              }
+            }
+          }
+        }
+
+        const defaultRate = totalInstallments > 0 ? (lateInstallments / totalInstallments) * 100 : 0;
+
+        // Verificar se qualifica para bônus
+        let bonusAmount = 0;
+        let bonusTier = '';
+
+        if (contractsCount >= 10 && defaultRate < 5) {
+          bonusAmount = 1000;
+          bonusTier = 'GOLD';
+        } else if (contractsCount >= 5 && defaultRate < 10) {
+          bonusAmount = 500;
+          bonusTier = 'SILVER';
+        }
+
+        if (bonusAmount > 0) {
+          // Criar registro de bônus (upsert para evitar duplicatas)
+          await prisma.partnerBonus.upsert({
+            where: {
+              partnerId_month: {
+                partnerId: partner.id,
+                month: monthStr
+              }
+            },
+            create: {
+              partnerId: partner.id,
+              month: monthStr,
+              contractsCount,
+              defaultRate,
+              bonusAmount,
+              bonusTier,
+              status: 'PENDING'
+            },
+            update: {
+              contractsCount,
+              defaultRate,
+              bonusAmount,
+              bonusTier
+            }
+          });
+
+          console.log(`[Cron] Partner ${partner.name}: ${bonusTier} bonus (R$ ${bonusAmount}) - ${contractsCount} contracts, ${defaultRate.toFixed(1)}% default`);
+
+          // Notificar parceiro
+          if (partner.email) {
+            const bonusHtml = brandedHtml(`
+              <h2 style="color:#D4AF37;">🏆 Bônus de Performance!</h2>
+              <p>Parabéns, <strong>${partner.name}</strong>!</p>
+              <p>Você atingiu a meta ${bonusTier === 'GOLD' ? 'GOLD 🥇' : 'SILVER 🥈'} no mês de ${monthStr}!</p>
+              <div style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Contratos:</strong> ${contractsCount}</p>
+                <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Inadimplência:</strong> ${defaultRate.toFixed(1)}%</p>
+                <p style="margin: 5px 0;"><strong style="color: #4CAF50; font-size: 18px;">Bônus: R$ ${bonusAmount.toFixed(2)}</strong></p>
+              </div>
+              <p>O pagamento será realizado em breve. Continue assim! 🦈</p>
+            `);
+            emailService.send(partner.email, `🏆 Bônus ${bonusTier} — R$ ${bonusAmount} — Tubarão Parceiros`, bonusHtml).catch(() => { });
+          }
+        }
+      }
+
+      console.log('[Cron] Monthly partner bonus evaluation complete.');
+    } catch (e) {
+      console.error('[Cron] Partner bonus evaluation error:', e);
+    }
+  });
+
+  job.start();
+};
+
+// ============ CRON: CANCELAMENTO DE COMISSÃO POR INADIMPLÊNCIA ============
+const scheduleCommissionCancellation = () => {
+  // Roda diariamente às 23h
+  const job = new CronJob('0 23 * * *', async () => {
+    try {
+      console.log('[Cron] Checking for commission cancellations...');
+
+      // Buscar comissões PENDING ou PARTIAL
+      const pendingCommissions = await prisma.partnerCommission.findMany({
+        where: {
+          status: { in: ['PENDING', 'PARTIAL'] }
+        },
+        include: {
+          loanRequest: {
+            include: {
+              loan: {
+                include: {
+                  installments: {
+                    orderBy: { dueDate: 'asc' }
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      for (const commission of pendingCommissions) {
+        const loan = commission.loanRequest?.loan;
+        if (!loan) continue;
+
+        // Verificar se há parcelas atrasadas 30+ dias sem pagamento
+        const criticallyLateInstallments = loan.installments.filter(
+          (inst: any) => inst.status !== 'PAID' && new Date(inst.dueDate) < thirtyDaysAgo
+        );
+
+        if (criticallyLateInstallments.length > 0) {
+          await prisma.partnerCommission.update({
+            where: { id: commission.id },
+            data: {
+              status: 'CANCELLED',
+              cancelReason: `Inadimplência: ${criticallyLateInstallments.length} parcela(s) atrasada(s) 30+ dias`
+            }
+          });
+
+          console.log(`[Cron] Commission ${commission.id} cancelled due to late payments`);
+        }
+      }
+    } catch (e) {
+      console.error('[Cron] Commission cancellation error:', e);
+    }
+  });
+
+  job.start();
+};
+
 // ============ INIT ============
 export const initCronJobs = () => {
   scheduleInstallmentReminders();
   scheduleLatePaymentDetection();
   scheduleWhatsAppStatus();
-  console.log('[Cron] initialized (reminders + late detection + whatsapp status)');
+  schedulePartnerBonusEvaluation();
+  scheduleCommissionCancellation();
+  console.log('[Cron] initialized (reminders + late detection + whatsapp status + partner bonus + commission cancellation)');
 };
+

@@ -205,8 +205,8 @@ export const Wizard: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '', cpf: '', email: '', phone: '', birthDate: '', referralCode: '',
     whatsappPersonal: '',
-    contactTrust1: '', contactTrust1Name: '',
-    contactTrust2: '', contactTrust2Name: '',
+    contactTrust1: '', contactTrust1Name: '', contactTrust1Relationship: '',
+    contactTrust2: '', contactTrust2Name: '', contactTrust2Relationship: '',
     instagram: '',
     occupation: '', companyName: '', companyAddress: '', workTime: '',
     // Indicação
@@ -245,6 +245,8 @@ export const Wizard: React.FC = () => {
     limpaNomeContractSigned: false,
     // Moto - Cor selecionada
     motoColor: '',
+    // Declaração de veracidade
+    declarationAccepted: false,
   });
 
   // Carregar configurações REAIS do banco e registrar visita (antifraude)
@@ -884,8 +886,16 @@ export const Wizard: React.FC = () => {
           file = new File([blobFile], `${folder}_${timestamp}_${index}.${extension}`, { type: mime });
         }
       } else {
-        // Tratar data: URLs (base64 - imagens/selfie/assinatura)
-        extension = dataUrl.includes('image/png') ? 'png' : dataUrl.includes('image/jpeg') ? 'jpg' : 'jpg';
+        // Tratar data: URLs (base64 - imagens/selfie/assinatura/PDF)
+        if (dataUrl.includes('application/pdf')) {
+          extension = 'pdf';
+        } else if (dataUrl.includes('image/png')) {
+          extension = 'png';
+        } else if (dataUrl.includes('image/jpeg') || dataUrl.includes('image/jpg')) {
+          extension = 'jpg';
+        } else {
+          extension = 'jpg';
+        }
         const fileName = `${folder}_${timestamp}_${index}.${extension}`;
         file = dataURLtoFile(dataUrl, fileName);
       }
@@ -1221,6 +1231,41 @@ export const Wizard: React.FC = () => {
           <input type="file" id={`${isGuarantee ? 'g-' : ''}${name}`} multiple accept="image/*" onChange={(e) => handleFileChange(e, name, isGuarantee)} className="hidden" />
           <label htmlFor={`${isGuarantee ? 'g-' : ''}${name}`} className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border border-dashed border-zinc-700 bg-zinc-900/50 hover:border-[#D4AF37] cursor-pointer">
             <Plus size={24} className="text-zinc-500" />
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Upload area que aceita PDF + Imagens (para CTPS Digital)
+  const renderPdfUploadArea = (name: string, label: string, files: string[], isGuarantee = false) => (
+    <div className="space-y-3">
+      <label className="text-sm text-zinc-400 font-medium block">{label}</label>
+      <div className="grid grid-cols-3 gap-2">
+        {files.map((file, idx) => {
+          const isPdf = file.includes('application/pdf') || file.endsWith('.pdf');
+          return (
+            <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-zinc-700 bg-black group">
+              {isPdf ? (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900">
+                  <FileText size={32} className="text-red-500 mb-1" />
+                  <span className="text-xs text-zinc-400">PDF</span>
+                  <span className="text-[10px] text-green-500 mt-1">✓ Enviado</span>
+                </div>
+              ) : (
+                <img src={file} alt="" className="w-full h-full object-cover" />
+              )}
+              <button onClick={() => removeFile(name, idx, isGuarantee)} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <X size={12} />
+              </button>
+            </div>
+          );
+        })}
+        <div className="relative group">
+          <input type="file" id={`${isGuarantee ? 'g-' : ''}${name}`} multiple accept="application/pdf,image/*" onChange={(e) => handleFileChange(e, name, isGuarantee)} className="hidden" />
+          <label htmlFor={`${isGuarantee ? 'g-' : ''}${name}`} className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border border-dashed border-zinc-700 bg-zinc-900/50 hover:border-[#D4AF37] cursor-pointer">
+            <Plus size={24} className="text-zinc-500" />
+            <span className="text-[10px] text-zinc-600 mt-1">PDF ou Foto</span>
           </label>
         </div>
       </div>
@@ -2286,13 +2331,49 @@ export const Wizard: React.FC = () => {
                       <div className="pt-4 border-t border-zinc-800 space-y-4">
                         <h3 className="text-sm font-bold text-[#D4AF37]">Referências (Pessoas Próximas)</h3>
                         <p className="text-xs text-zinc-500">Informe 2 contatos de pessoas próximas para referência.</p>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-3">
                           <Input label="Nome da Referência 1" name="contactTrust1Name" value={formData.contactTrust1Name} onChange={handleChange} placeholder="Nome completo" />
                           <Input label="WhatsApp Referência 1" name="contactTrust1" value={formData.contactTrust1} onChange={handleChange} placeholder="(99) 99999-9999" />
+                          <div>
+                            <label className="text-sm text-zinc-400 font-medium block mb-1">Parentesco</label>
+                            <select name="contactTrust1Relationship" value={formData.contactTrust1Relationship} onChange={handleChange as any}
+                              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-[#D4AF37] outline-none">
+                              <option value="">Selecione</option>
+                              <option value="pai">Pai</option>
+                              <option value="mae">Mãe</option>
+                              <option value="irmao">Irmão(ã)</option>
+                              <option value="conjuge">Cônjuge</option>
+                              <option value="filho">Filho(a)</option>
+                              <option value="tio">Tio(a)</option>
+                              <option value="primo">Primo(a)</option>
+                              <option value="amigo">Amigo(a)</option>
+                              <option value="colega">Colega de trabalho</option>
+                              <option value="vizinho">Vizinho(a)</option>
+                              <option value="outro">Outro</option>
+                            </select>
+                          </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-3">
                           <Input label="Nome da Referência 2" name="contactTrust2Name" value={formData.contactTrust2Name} onChange={handleChange} placeholder="Nome completo" />
                           <Input label="WhatsApp Referência 2" name="contactTrust2" value={formData.contactTrust2} onChange={handleChange} placeholder="(99) 99999-9999" />
+                          <div>
+                            <label className="text-sm text-zinc-400 font-medium block mb-1">Parentesco</label>
+                            <select name="contactTrust2Relationship" value={formData.contactTrust2Relationship} onChange={handleChange as any}
+                              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-[#D4AF37] outline-none">
+                              <option value="">Selecione</option>
+                              <option value="pai">Pai</option>
+                              <option value="mae">Mãe</option>
+                              <option value="irmao">Irmão(ã)</option>
+                              <option value="conjuge">Cônjuge</option>
+                              <option value="filho">Filho(a)</option>
+                              <option value="tio">Tio(a)</option>
+                              <option value="primo">Primo(a)</option>
+                              <option value="amigo">Amigo(a)</option>
+                              <option value="colega">Colega de trabalho</option>
+                              <option value="vizinho">Vizinho(a)</option>
+                              <option value="outro">Outro</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -2553,7 +2634,7 @@ export const Wizard: React.FC = () => {
                         <li>Envie o arquivo aqui</li>
                       </ol>
                     </div>
-                    {renderUploadArea('workCard', 'Carteira de Trabalho - PDF (OBRIGATÓRIO)', formData.workCard)}
+                    {renderPdfUploadArea('workCard', 'Carteira de Trabalho - PDF (OBRIGATÓRIO)', formData.workCard)}
                     <p className="text-xs text-red-400">❌ Não aceitamos foto da carteira física. Apenas PDF do app oficial.</p>
                   </div>
                 )}
@@ -2781,6 +2862,18 @@ export const Wizard: React.FC = () => {
                       <div className="flex justify-between"><span className="text-zinc-400">Juros Mensais:</span><span className="font-bold text-[#D4AF37]">{settings.interestRateMonthly}% ao mês</span></div>
                     </div>
 
+                    {/* DECLARAÇÃO DE VERACIDADE - OBRIGATÓRIA */}
+                    <label className="flex items-start gap-3 p-4 bg-yellow-900/20 border-2 border-yellow-600/50 rounded-xl cursor-pointer hover:border-[#D4AF37] transition-all">
+                      <input type="checkbox" checked={formData.declarationAccepted} onChange={(e) => setFormData({ ...formData, declarationAccepted: e.target.checked })}
+                        className="w-6 h-6 mt-0.5 accent-yellow-500 shrink-0" />
+                      <div>
+                        <span className="text-white font-bold text-sm">📜 DECLARAÇÃO DE VERACIDADE</span>
+                        <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                          Declaro que <strong className="text-white">TODAS</strong> as informações fornecidas neste formulário são <strong className="text-white">verdadeiras e corretas</strong>, incluindo dados pessoais, profissionais, referências e documentos. Estou ciente de que a <strong className="text-red-400">falsidade ideológica</strong> configura crime previsto no Art. 299 do Código Penal, sujeito a pena de reclusão de 1 a 5 anos, e que informações falsas resultarão no <strong className="text-red-400">cancelamento imediato</strong> da solicitação e possíveis medidas judiciais.
+                        </p>
+                      </div>
+                    </label>
+
                     {/* TERMO FINAL */}
                     <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-2">
                       <h3 className="font-bold text-red-400 text-xs uppercase">TERMO DE COMPROMISSO (OBRIGATÓRIO)</h3>
@@ -2810,7 +2903,8 @@ export const Wizard: React.FC = () => {
               {currentStep === 1 ? 'Começar Simulação' : 'Continuar'}
             </Button>
           ) : (
-            <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading} disabled={!formData.signature}>
+            <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading}
+              disabled={profileType === 'LIMPA_NOME' ? !formData.signature : (!formData.signature || !formData.declarationAccepted)}>
               {profileType === 'INVESTIDOR' ? 'QUERO SER INVESTIDOR' :
                 profileType === 'LIMPA_NOME' ? 'SOLICITAR SERVIÇO' :
                   profileType === 'MOTO' ? 'SOLICITAR FINANCIAMENTO' : 'SOLICITAR MEU EMPRÉSTIMO'}

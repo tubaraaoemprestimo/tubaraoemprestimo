@@ -18,7 +18,8 @@ customersRouter.get('/', async (_req: Request, res: Response) => {
               pre_approved_amount, pre_approved_at,
               instagram, source, profile_pic, birth_date,
               monthly_interest_rate, late_fixed_fee, late_interest_daily, late_interest_monthly,
-              installment_offer, referral_code, referral_points, joined_at
+              installment_offer, referral_code, referral_points, joined_at,
+              partner_id, is_partner_customer, partner_commission_rate, contract_terms_accepted
             FROM customers
             ORDER BY joined_at DESC
         `);
@@ -59,6 +60,10 @@ customersRouter.get('/', async (_req: Request, res: Response) => {
             deviceInfo: c.device_info,
             lastIp: c.last_ip,
             joinedAt: c.joined_at,
+            partnerId: c.partner_id,
+            isPartnerCustomer: c.is_partner_customer,
+            partnerCommissionRate: c.partner_commission_rate,
+            contractTermsAccepted: c.contract_terms_accepted,
             preApprovedOffer: c.pre_approved_amount ? {
                 amount: c.pre_approved_amount,
                 createdAt: c.pre_approved_at || new Date().toISOString()
@@ -202,13 +207,63 @@ customersRouter.get('/:id', async (req: Request, res: Response) => {
 customersRouter.put('/:id', requireAdmin, async (req: Request, res: Response) => {
     try {
         const data = req.body;
+        const customerId = req.params.id as string;
+
+        // Verificar se o cliente existe
+        const existing = await prisma.customer.findUnique({ where: { id: customerId } });
+        if (!existing) {
+            res.status(404).json({ error: 'Cliente não encontrado' });
+            return;
+        }
+
+        // Whitelist de campos atualizáveis para evitar erros do Prisma
+        const allowedFields = [
+            'name', 'cpf', 'email', 'phone', 'status',
+            'internalScore', 'totalDebt', 'activeLoansCount',
+            'address', 'neighborhood', 'city', 'state', 'zipCode',
+            'latitude', 'longitude', 'monthlyIncome',
+            'preApprovedAmount', 'preApprovedAt',
+            'instagram', 'source', 'profilePic', 'birthDate',
+            'monthlyInterestRate', 'lateFixedFee', 'lateInterestDaily', 'lateInterestMonthly',
+            'installmentOffer', 'referralCode', 'referralPoints',
+            'partnerId', 'isPartnerCustomer', 'partnerCommissionRate',
+            'contractTermsAccepted'
+        ];
+
+        const updateData: any = {};
+
+        for (const field of allowedFields) {
+            if (data[field] !== undefined) {
+                updateData[field] = data[field];
+            }
+        }
+
+        // Tratar campos numéricos
+        if (updateData.internalScore !== undefined) updateData.internalScore = parseInt(updateData.internalScore) || 0;
+        if (updateData.totalDebt !== undefined) updateData.totalDebt = parseFloat(updateData.totalDebt) || 0;
+        if (updateData.activeLoansCount !== undefined) updateData.activeLoansCount = parseInt(updateData.activeLoansCount) || 0;
+        if (updateData.monthlyIncome !== undefined) updateData.monthlyIncome = parseFloat(updateData.monthlyIncome) || null;
+        if (updateData.referralPoints !== undefined) updateData.referralPoints = parseInt(updateData.referralPoints) || 0;
+        if (updateData.monthlyInterestRate !== undefined) updateData.monthlyInterestRate = parseFloat(updateData.monthlyInterestRate) || null;
+        if (updateData.lateFixedFee !== undefined) updateData.lateFixedFee = parseFloat(updateData.lateFixedFee) || null;
+        if (updateData.lateInterestDaily !== undefined) updateData.lateInterestDaily = parseFloat(updateData.lateInterestDaily) || null;
+        if (updateData.lateInterestMonthly !== undefined) updateData.lateInterestMonthly = parseFloat(updateData.lateInterestMonthly) || null;
+
+        if (Object.keys(updateData).length === 0) {
+            res.status(400).json({ error: 'Nenhum campo válido para atualizar' });
+            return;
+        }
+
         await prisma.customer.update({
-            where: { id: req.params.id as string },
-            data
+            where: { id: customerId },
+            data: updateData
         });
+
+        console.log(`[Customers] Updated customer ${customerId}, fields: ${Object.keys(updateData).join(', ')}`);
         res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'Erro ao atualizar cliente' });
+    } catch (error: any) {
+        console.error('[Customers] Update error:', error?.message || error);
+        res.status(500).json({ error: 'Erro ao atualizar cliente', details: error?.message });
     }
 });
 

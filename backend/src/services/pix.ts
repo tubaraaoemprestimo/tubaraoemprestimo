@@ -28,11 +28,20 @@ export function generatePixCode(payload: PixPayload): string {
         description = ''
     } = payload;
 
-    const formattedAmount = amount.toFixed(2).replace('.', '');
-    const paddedAmount = formattedAmount.padStart(10, '0');
+    // Garantir nome com tamanho máximo de 25 caracteres
+    const sanitizedName = name.substring(0, 25).padEnd(2, ' ');
 
-    // Identificador Pix (chave)
-    let pixKey = '';
+    // Formatar valor com 2 casas decimais
+    const formattedAmount = amount.toFixed(2);
+
+    // Montar os campos EMV QR
+    let result = "000201"; // Payload Format Indicator
+
+    // Merchant Account Information (chave PIX)
+    const keyType = type.toUpperCase();
+    let pixKey = key;
+
+    // Sanitizar a chave PIX de acordo com o tipo
     switch (type) {
         case 'cpf':
             pixKey = key.replace(/\D/g, '');
@@ -47,14 +56,73 @@ export function generatePixCode(payload: PixPayload): string {
             pixKey = key.toLowerCase().trim();
             break;
         case 'random':
+            // Para chave aleatória, verificar se é um UUID ou similar
             pixKey = key;
             break;
     }
 
-    const encodedKey = Buffer.from(pixKey).toString('base64');
-    const payloadString = `00020126330014BR.GOV.BCB.PIX01${encodedKey}5204000053039865406${paddedAmount}5802BR5913TUBARAOEMPRESTITIMOS6008SAOPAULO62070503***`;
+    // Adicionar campo da chave
+    const merchantAccount = `0014BR.GOV.BCB.PIX01${pixKey.length.toString().padStart(2, '0')}${pixKey}`;
+    result += `26${merchantAccount.length.toString().padStart(2, '0')}${merchantAccount}`;
 
-    return payloadString;
+    // Merchant Category Code
+    result += "52040000";
+
+    // Transaction Currency
+    result += "5303986";
+
+    // Transaction Amount (opcional, mas adicionando se fornecido)
+    if (amount > 0) {
+        result += `54${formattedAmount.length.toString().padStart(2, '0')}${formattedAmount}`;
+    }
+
+    // Country Code
+    result += "5802BR";
+
+    // Merchant Name
+    const merchantName = sanitizedName.substring(0, 25);
+    result += `59${merchantName.length.toString().padStart(2, '0')}${merchantName}`;
+
+    // Merchant City
+    const sanitixedCity = city.substring(0, 15);
+    result += `60${sanitixedCity.length.toString().padStart(2, '0')}${sanitixedCity}`;
+
+    // Transaction ID (TXID) - obrigatório e com tamanho fixo entre 25-35
+    let finalTxid = txid.substring(0, 25).padEnd(25, 'A');
+    // Garantir que o TXID tenha tamanho adequado (25-35)
+    if (finalTxid.length < 25) {
+        finalTxid = finalTxid.padEnd(25, '0');
+    } else if (finalTxid.length > 35) {
+        finalTxid = finalTxid.substring(0, 35);
+    }
+
+    const additionalData = `05${finalTxid.length.toString().padStart(2, '0')}${finalTxid}`;
+    result += `62${additionalData.length.toString().padStart(2, '0')}${additionalData}`;
+
+    // CRC16 - vamos adicionar o CRC16 no final
+    const crc = calculateCRC16(result + "6304");
+    result += "6304" + crc;
+
+    return result;
+}
+
+// Função para calcular CRC16 CCITT
+function calculateCRC16(data: string): string {
+    // Implementação do CRC16 conforme padrão BSPC
+    let crc = 0xFFFF;
+    for (let i = 0; i < data.length; i++) {
+        crc ^= data.charCodeAt(i) << 8;
+        for (let j = 0; j < 8; j++) {
+            if (crc & 0x8000) {
+                crc = (crc << 1) ^ 0x1021;
+            } else {
+                crc <<= 1;
+            }
+            crc &= 0xFFFF;
+        }
+    }
+    // Converter resultado para hexadecimal com 4 dígitos
+    return crc.toString(16).toUpperCase().padStart(4, '0');
 }
 
 /**

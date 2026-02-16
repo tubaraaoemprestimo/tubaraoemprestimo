@@ -160,7 +160,7 @@ model Customer {
   deviceInfo          String?        @map("device_info")
   lastIp              String?        @map("last_ip")
   monthlyIncome       Float?         @map("monthly_income")
-  preApprovedAmount   Float?         @map("pre_approved_amount")
+  preApprovedAmount   Float?         @map("pre-approved_amount")
   preApprovedAt       DateTime?      @map("pre_approved_at")
   instagram           String?
   source              String?        @default("MANUAL")
@@ -174,10 +174,15 @@ model Customer {
   referralCode        String?        @unique @map("referral_code")
   referralPoints      Int            @default(0) @map("referral_points")
   joinedAt            DateTime       @default(now()) @map("joined_at")
-  
+  partnerId           String?        @map("partner_id") // ID do parceiro que trouxe o cliente
+  isPartnerCustomer   Boolean        @default(false) @map("is_partner_customer") // Indica se o cliente veio de um parceiro
+  partnerCommissionRate Float?       @map("partner_commission_rate") // Taxa de comissão do parceiro
+  contractTermsAccepted Boolean      @default(false) @map("contract_terms_accepted") // Termo de veracidade aceito
+
   coupons             Coupon[]
-  user                User?          @relation(fields: [userId], references: [id])
-  loanRequests        LoanRequest[]
+  user                User?          @relation(fields: [userId], references: [id], name: "CustomerUser") // Relacionamento com usuário (agente)
+  partner             User?          @relation(fields: [partnerId], references: [id], name: "CustomerPartner") // Relacionamento com parceiro
+  loanRequests        LoanRequest[]  @relation("LoanRequestCustomer")
   loans               Loan[]
   notifications       Notification[]
   referralsGiven      Referral[]     @relation("ReferrerCustomer")
@@ -242,6 +247,9 @@ model LoanRequest {
   fatherPhone             String?   @map("father_phone")
   motherPhone             String?   @map("mother_phone")
   spousePhone             String?   @map("spouse_phone")
+  fatherPhoneRelationship String?   @map("father_phone_relationship")
+  motherPhoneRelationship String?   @map("mother_phone_relationship")
+  spousePhoneRelationship String?   @map("spouse_phone_relationship")
   address                 String?
   neighborhood            String?
   city                    String?
@@ -262,6 +270,12 @@ model LoanRequest {
   videoVehicleUrl         String?   @map("video_vehicle_url")
   signatureUrl            String?   @map("signature_url")
   workCardUrl             String?   @map("work_card_url")
+  companyAddress          Json?     @map("company_address")
+  companyProfession       String?   @map("company_profession")
+  companyWorkSince        String?   @map("company_work_since")
+  companyIncome           Float?    @map("company_income")
+  companyPaymentDay       Int?      @map("company_payment_day")
+  companyName             String?   @map("company_name")
   supplementalDescription String?   @map("supplemental_description")
   supplementalDocUrl      String?   @map("supplemental_doc_url")
   supplementalRequestedAt DateTime? @map("supplemental_requested_at")
@@ -270,6 +284,8 @@ model LoanRequest {
   longitude               Float?
   accuracy                Float?
   contractAccepted        Boolean   @default(false) @map("contract_accepted")
+  contractTermsAccepted   Boolean   @default(false) @map("contract_terms_accepted")
+  declarationAccepted     Boolean   @default(false) @map("declaration_accepted")
   bankName                String?   @map("bank_name")
   bankAgency              String?   @map("bank_agency")
   bankAccount             String?   @map("bank_account")
@@ -280,10 +296,15 @@ model LoanRequest {
   updatedAt               DateTime  @updatedAt @map("updated_at")
   contractPdfUrl          String?   @map("contract_pdf_url")
   referralCode            String?   @map("referral_code")
-  
-  customer                Customer? @relation(fields: [customerId], references: [id])
-  user                    User?     @relation(fields: [userId], references: [id])
+  partnerId               String?   @map("partner_id")
+  isPartnerReferral       Boolean   @default(false) @map("is_partner_referral")
+  partnerCommissionRate   Float?    @map("partner_commission_rate")
+
+  customer                Customer? @relation(fields: [customerId], references: [id], name: "LoanRequestCustomer")
+  user                    User?     @relation(fields: [userId], references: [id], name: "LoanRequestUser")
+  partner                 User?     @relation(fields: [partnerId], references: [id], name: "LoanRequestPartner")
   loan                    Loan?
+  partnerCommissions      PartnerCommission[] @relation("PartnerCommissionLoanRequest")
 
   @@map("loan_requests")
 }
@@ -306,15 +327,21 @@ model Loan {
 }
 
 model MessageTemplate {
-  id        String   @id @default(uuid())
-  name      String
-  category  String
-  content   String
-  variables String[]
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
+  id          String   @id @default(uuid())
+  name        String
+  category    String
+  triggerEvent String?  @map("trigger_event")
+  channel     String?  // email, whatsapp, notification
+  subject     String?  // subject for emails
+  content     String
+  variables   String[]
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   @@map("message_templates")
+  @@index([triggerEvent])
+  @@index([isActive])
+  @@index([category])
 }
 
 model NotificationLog {
@@ -506,9 +533,17 @@ model User {
   city                String?
   neighborhood        String?
   avatarUrl           String?              @map("avatar_url")
+  referralCode        String?              @unique @map("referral_code")
   createdAt           DateTime             @default(now()) @map("created_at")
-  customers           Customer[]
-  loanRequests        LoanRequest[]
+  isPartner           Boolean              @default(false) @map("is_partner")
+  partnerScore        Float?               @map("partner_score")
+  customers           Customer[]           @relation("CustomerUser")
+  loanRequests        LoanRequest[]        @relation("LoanRequestUser")
+  partnerCustomers    Customer[]           @relation("CustomerPartner")
+  partnerLoanRequests LoanRequest[]        @relation("LoanRequestPartner")
+  partnerCommissions  PartnerCommission[]  @relation("PartnerCommissionPartner")
+  partnerBonuses      PartnerBonus[]       @relation("PartnerBonusPartner")
+  partnerInvites      PartnerInvite[]      @relation("PartnerInvitePartner")
   pushSubscriptions   PushSubscription[]
   riskEvents          RiskEvent[]
   securityBlocks      SecurityBlock[]
@@ -617,4 +652,93 @@ model OpenFinanceConsent {
   revokedAt  DateTime? @map("revoked_at")
 
   @@map("open_finance_consents")
+}
+
+model PartnerProgram {
+  id                String    @id @default(uuid())
+  name              String    // Nome do programa de parceiros
+  description       String    // Descrição do programa
+  commissionRate    Float     @map("commission_rate") // Taxa de comissão (em porcentagem)
+  minimumCommission Float     @map("minimum_commission") // Valor mínimo de comissão
+  maximumCommission Float     @map("maximum_commission") // Valor máximo de comissão
+  isActive          Boolean   @default(true) @map("is_active") // Programa ativo ou não
+  startDate         DateTime  @map("start_date") // Data de início do programa
+  endDate           DateTime? @map("end_date") // Data de término do programa
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@map("partner_programs")
+}
+
+model PartnerCommission {
+  id                    String    @id @default(uuid())
+  partnerId             String    @map("partner_id")
+  loanRequestId         String    @map("loan_request_id")
+  contractId            String?   @map("contract_id") // ID do empréstimo/contrato
+  totalCommission       Float     @map("total_commission") // Valor total da comissão
+  commissionAmount      Float     @map("commission_amount") // Valor já liberado da comissão
+  commissionRate        Float     @map("commission_rate")
+  installmentsReleased  Int       @default(0) @map("installments_released") // Parcelas pagas (0, 1, 2, 3)
+  releasedPercent       Float     @default(0) @map("released_percent") // % já liberado (0, 40, 70, 100)
+  release1Amount        Float?    @map("release_1_amount") // 40% liberado na 1ª parcela
+  release1At            DateTime? @map("release_1_at")
+  release2Amount        Float?    @map("release_2_amount") // 30% liberado na 2ª parcela
+  release2At            DateTime? @map("release_2_at")
+  release3Amount        Float?    @map("release_3_amount") // 30% liberado na 3ª parcela
+  release3At            DateTime? @map("release_3_at")
+  status                String    @default("PENDING") // PENDING, PARTIAL, PAID, CANCELLED
+  cancelReason          String?   @map("cancel_reason")
+  paidAt                DateTime? @map("paid_at")
+  paymentMethod         String?   @map("payment_method")
+  paymentReference      String?   @map("payment_reference")
+  notes                 String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  partner               User        @relation(fields: [partnerId], references: [id], name: "PartnerCommissionPartner")
+  loanRequest           LoanRequest @relation(fields: [loanRequestId], references: [id], name: "PartnerCommissionLoanRequest")
+
+  @@map("partner_commissions")
+  @@index([partnerId])
+  @@index([loanRequestId])
+  @@index([contractId])
+  @@index([status])
+}
+
+model PartnerBonus {
+  id              String    @id @default(uuid())
+  partnerId       String    @map("partner_id")
+  month           String    // YYYY-MM
+  contractsCount  Int       @default(0) @map("contracts_count")
+  defaultRate     Float     @default(0) @map("default_rate") // Taxa de inadimplência %
+  bonusAmount     Float     @map("bonus_amount")
+  bonusTier       String    @map("bonus_tier") // SILVER (R$500) ou GOLD (R$1000)
+  status          String    @default("PENDING") // PENDING, PAID, CANCELLED
+  paidAt          DateTime? @map("paid_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  partner         User      @relation(fields: [partnerId], references: [id], name: "PartnerBonusPartner")
+
+  @@map("partner_bonuses")
+  @@unique([partnerId, month])
+  @@index([partnerId])
+  @@index([month])
+}
+
+model PartnerInvite {
+  id                  String    @id @default(uuid())
+  partnerId           String    @map("partner_id")
+  invitedEmail        String    @map("invited_email")
+  inviteCode          String    @unique @map("invite_code")
+  status              String    @default("PENDING")
+  acceptedAt          DateTime? @map("accepted_at")
+  expiredAt           DateTime  @map("expired_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  partner             User    @relation(fields: [partnerId], references: [id], name: "PartnerInvitePartner")
+
+  @@map("partner_invites")
+  @@index([partnerId])
+  @@index([invitedEmail])
+  @@index([inviteCode])
 }

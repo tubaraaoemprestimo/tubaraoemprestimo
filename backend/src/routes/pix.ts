@@ -9,7 +9,7 @@ pixRouter.use(authenticate);
 // POST /api/pix/generate/:installmentId - Gerar QR Code PIX para parcela
 pixRouter.post('/generate/:installmentId', async (req: Request, res: Response) => {
     try {
-        const installmentId = String(req.params.id);
+        const installmentId = String(req.params.installmentId);
         const { customerName, customerCity } = req.body;
 
         // Buscar a parcela

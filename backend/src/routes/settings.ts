@@ -133,7 +133,19 @@ settingsRouter.put('/theme', authenticate, requireAdmin, async (req: Request, re
 settingsRouter.get('/whatsapp', authenticate, requireAdmin, async (_req: Request, res: Response) => {
     try {
         const config = await prisma.whatsappConfig.findFirst();
-        res.json(config || { apiUrl: '', apiKey: '', instanceName: '', isConnected: false });
+        if (!config) {
+            res.json({ apiUrl: '', apiKey: '', instanceName: '', isConnected: false });
+            return;
+        }
+
+        // Mascara a chave da API para não expor no frontend (mostra apenas últimos 4 chars)
+        const maskKey = (key: string) => key ? `****${key.slice(-4)}` : '';
+        const maskedConfig = {
+            ...config,
+            apiKey: maskKey(config.apiKey),
+        };
+
+        res.json(maskedConfig);
     } catch (error) {
         res.status(500).json({ error: 'Erro' });
     }
@@ -142,10 +154,25 @@ settingsRouter.get('/whatsapp', authenticate, requireAdmin, async (_req: Request
 // PUT /api/settings/whatsapp
 settingsRouter.put('/whatsapp', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
-        const data = req.body;
-        const existing = await prisma.whatsappConfig.findFirst();
-        if (existing) {
-            await prisma.whatsappConfig.update({ where: { id: existing.id }, data });
+        const { apiUrl, apiKey, instanceName } = req.body;
+
+        // Obter configuração existente para preservar chave não atualizada
+        const existingConfig = await prisma.whatsappConfig.findFirst();
+        let updatedApiKey = apiKey;
+
+        // Se a chave da API está mascarada, preservamos a existente
+        if (apiKey && typeof apiKey === 'string' && apiKey.startsWith('****')) {
+            updatedApiKey = existingConfig?.apiKey || '';
+        }
+
+        const data = {
+            apiUrl,
+            apiKey: updatedApiKey,
+            instanceName
+        };
+
+        if (existingConfig) {
+            await prisma.whatsappConfig.update({ where: { id: existingConfig.id }, data });
         } else {
             await prisma.whatsappConfig.create({ data });
         }

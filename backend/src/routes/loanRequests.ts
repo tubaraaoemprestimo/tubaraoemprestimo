@@ -112,6 +112,37 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
             where: { OR: [{ cpf: data.cpf }, { email: req.user!.email }] }
         });
 
+        // Verificar se o cliente veio de um parceiro
+        let partnerId = null;
+        let isPartnerReferral = false;
+        let partnerCommissionRate = null;
+
+        if (data.referralCode) {
+            // Verificar se o código de indicação pertence a um parceiro
+            const partner = await prisma.user.findFirst({
+                where: {
+                    isPartner: true,
+                    OR: [
+                        { email: data.referralCode },
+                        { referralCode: data.referralCode }
+                    ]
+                }
+            });
+
+            if (partner) {
+                partnerId = partner.id;
+                isPartnerReferral = true;
+                // Pegar a taxa de comissão padrão do parceiro
+                const partnerProgram = await prisma.partnerProgram.findFirst({
+                    where: {
+                        id: partner.id
+                    },
+                    orderBy: { createdAt: 'desc' }
+                });
+                partnerCommissionRate = partnerProgram?.commissionRate || 5.0;
+            }
+        }
+
         if (!customer) {
             customer = await prisma.customer.create({
                 data: {
@@ -129,6 +160,10 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                     birthDate: data.birthDate,
                     instagram: data.instagram,
                     status: 'ACTIVE',
+                    // Novos campos para sistema de parceiros
+                    partnerId,
+                    isPartnerCustomer: isPartnerReferral,
+                    partnerCommissionRate,
                     // Geocalização
                     latitude: data.latitude,
                     longitude: data.longitude,
@@ -149,6 +184,13 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 zipCode: data.zipCode,
                 monthlyIncome: data.monthlyIncome
             };
+
+            // Atualizar campos de parceiros se for uma referência de parceiro
+            if (isPartnerReferral) {
+                customerUpdateData.partnerId = partnerId;
+                customerUpdateData.isPartnerCustomer = true;
+                customerUpdateData.partnerCommissionRate = partnerCommissionRate;
+            }
 
             // Atualizar geolocalização apenas se novos dados foram capturados
             if (data.latitude !== undefined && data.latitude !== null) {
@@ -183,6 +225,20 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 fatherPhone: data.fatherPhone || data.contactTrust1 || null,
                 motherPhone: data.motherPhone || data.contactTrust2 || null,
                 spousePhone: data.spousePhone || null,
+                // Novos campos - Relacionamentos familiares
+                fatherPhoneRelationship: data.fatherPhoneRelationship || null,
+                motherPhoneRelationship: data.motherPhoneRelationship || null,
+                spousePhoneRelationship: data.spousePhoneRelationship || null,
+                // Novos campos - Dados profissionais
+                companyAddress: data.companyAddress || null,
+                companyProfession: data.companyProfession || null,
+                companyWorkSince: data.companyWorkSince || null,
+                companyIncome: data.companyIncome || null,
+                companyPaymentDay: data.companyPaymentDay || null,
+                companyName: data.companyName || null,
+                // Novos campos - Termo de veracidade
+                contractTermsAccepted: data.contractTermsAccepted || false,
+                declarationAccepted: data.declarationAccepted || false,
                 address: data.address,
                 neighborhood: data.neighborhood,
                 city: data.city,
@@ -218,6 +274,10 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 longitude: data.longitude,
                 accuracy: data.accuracy,
                 contractAccepted: data.contractAccepted || false,
+                // Campos para sistema de parceiros
+                partnerId,
+                isPartnerReferral,
+                partnerCommissionRate,
                 status: 'PENDING'
             }
         });
@@ -241,14 +301,14 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Entrada:</strong> R$ 2.000,00</p>
                <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Parcelas:</strong> 36x R$ 611,00 + Seguro R$ 150,00/mês</p>`
             : isLimpaNome
-            ? `<p style="margin: 5px 0;"><strong style="color: #D4AF37;">Serviço:</strong> Limpa Nome</p>`
-            : `<p style="margin: 5px 0;"><strong style="color: #D4AF37;">Valor:</strong> ${amtFmt}</p>`;
+                ? `<p style="margin: 5px 0;"><strong style="color: #D4AF37;">Serviço:</strong> Limpa Nome</p>`
+                : `<p style="margin: 5px 0;"><strong style="color: #D4AF37;">Valor:</strong> ${amtFmt}</p>`;
 
         const descricaoResumida = isMoto
             ? 'financiamento de motocicleta Honda Pop 110i'
             : isLimpaNome
-            ? 'serviço Limpa Nome'
-            : `${amtFmt}`;
+                ? 'serviço Limpa Nome'
+                : `${amtFmt}`;
 
         // Email para o cliente confirmando recebimento
         if (req.user!.email) {
@@ -268,7 +328,7 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
             const emailSubject = isMoto
                 ? '🏍️ Solicitação de Financiamento Recebida — Tubarão Empréstimos'
                 : '📋 Solicitação Recebida — Tubarão Empréstimos';
-            emailService.send(req.user!.email, emailSubject, clientHtml).catch(() => {});
+            emailService.send(req.user!.email, emailSubject, clientHtml).catch(() => { });
         }
 
         // WhatsApp para o cliente
@@ -294,7 +354,7 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                     message: `${data.clientName || req.user!.name} solicitou ${descricaoResumida} (${typeLabel})`,
                     type: 'INFO'
                 }
-            }).catch(() => {});
+            }).catch(() => { });
         } catch (notifErr) {
             console.error('[LoanRequests] Notification error:', notifErr);
         }
@@ -309,7 +369,7 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                     message: `Sua solicitação de ${amtFmt} está em análise.`,
                     type: 'INFO'
                 }
-            }).catch(() => {});
+            }).catch(() => { });
         }
 
         res.status(201).json({ success: true, id: request.id });
@@ -378,6 +438,105 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
                     date: new Date()
                 }
             });
+
+            // ====== COMISSÃO DE PARCEIROS (NOVO SISTEMA) ======
+            try {
+                if (request.partnerId && request.isPartnerReferral) {
+                    // Calcular comissão FIXA baseada no tipo e valor do empréstimo
+                    let commissionAmount = 0;
+                    const profileType = request.profileType || 'CLT';
+                    const amount = request.amount || 0;
+
+                    switch (profileType) {
+                        case 'MOTO':
+                            commissionAmount = 250; // R$ 250 fixo para moto
+                            break;
+                        case 'LIMPA_NOME':
+                            commissionAmount = 50; // R$ 50 fixo para limpa nome
+                            break;
+                        case 'INVESTIDOR':
+                            commissionAmount = amount * 0.01; // 1% do valor
+                            break;
+                        default: // CLT, AUTONOMO, GARANTIA, etc.
+                            if (amount >= 10000) {
+                                commissionAmount = 180;
+                            } else if (amount >= 5000) {
+                                commissionAmount = 150;
+                            } else {
+                                commissionAmount = 120; // Até 3k
+                            }
+                            break;
+                    }
+
+                    // Criar a comissão com status PENDING (liberação por parcela 40/30/30)
+                    const commission = await prisma.partnerCommission.create({
+                        data: {
+                            partnerId: request.partnerId,
+                            loanRequestId: request.id,
+                            contractId: loan.id,
+                            totalCommission: commissionAmount,
+                            commissionAmount: 0, // Nada liberado ainda
+                            commissionRate: 0,
+                            installmentsReleased: 0,
+                            releasedPercent: 0,
+                            status: 'PENDING',
+                            notes: `Comissão ${profileType} - Valor: R$ ${commissionAmount.toFixed(2)} (aguardando pagamento de parcelas)`
+                        }
+                    });
+
+                    console.log(`[LoanRequests] Partner commission created: R$ ${commissionAmount} for partner ${request.partnerId}`);
+
+                    // Enviar notificação ao parceiro
+                    const partner = await prisma.user.findUnique({
+                        where: { id: request.partnerId }
+                    });
+
+                    if (partner) {
+                        // Enviar notificação por email
+                        if (partner.email) {
+                            const commissionHtml = brandedEmailHtml(`
+                                <h2 style="color:#4CAF50;">💰 Nova Comissão Gerada!</h2>
+                                <p>Olá, <strong>${partner.name}</strong>!</p>
+                                <p>O empréstimo referenciado por você foi aprovado e gerou uma comissão!</p>
+                                <div style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Cliente:</strong> ${request.clientName}</p>
+                                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Tipo:</strong> ${profileType}</p>
+                                    <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Valor da Comissão Total:</strong> R$ ${commissionAmount.toFixed(2)}</p>
+                                    <p style="margin: 5px 0; color: #aaa;">A liberação acontece em 3 etapas: 40% (1ª parcela), 30% (2ª parcela), 30% (3ª parcela).</p>
+                                </div>
+                                <p>Acesse o painel de parceiros para mais detalhes sobre suas comissões.</p>
+                            `);
+                            emailService.send(partner.email, '💰 Nova Comissão Gerada — Tubarão Parceiros', commissionHtml).catch(() => { });
+                        }
+
+                        // Enviar notificação por WhatsApp
+                        if (partner.phone) {
+                            const commissionMsg = `💰 *Nova Comissão Gerada!*\n\n` +
+                                `Olá, ${partner.name.split(' ')[0]}!\n\n` +
+                                `O empréstimo de *${request.clientName}* foi aprovado.\n\n` +
+                                `📊 *Tipo:* ${profileType}\n` +
+                                `📊 *Comissão Total:* R$ ${commissionAmount.toFixed(2)}\n` +
+                                `📊 *Liberação:* 40% na 1ª parcela, 30% na 2ª, 30% na 3ª\n\n` +
+                                `Acesse o painel de parceiros para mais detalhes.\n\n` +
+                                `_Tubarão Parceiros 🦈_`;
+                            sendWhatsAppNotification(partner.phone, commissionMsg);
+                        }
+
+                        // Notificação no sistema
+                        await prisma.notification.create({
+                            data: {
+                                customerEmail: partner.email,
+                                title: '💰 Nova Comissão Gerada!',
+                                message: `Empréstimo de ${request.clientName} aprovado. Comissão de R$ ${commissionAmount.toFixed(2)} gerada (liberação por parcela).`,
+                                type: 'SUCCESS'
+                            }
+                        }).catch(() => { });
+                    }
+                }
+            } catch (commissionErr) {
+                console.error('[LoanRequests] Partner commission error:', commissionErr);
+            }
+
         }
 
         // ====== GAMIFICAÇÃO DE INDICAÇÃO ======
@@ -417,7 +576,7 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
                                 <p>O empréstimo de <strong>${request.clientName}</strong> foi aprovado!</p>
                                 <p>Você ganhou <strong style="color:#D4AF37;">${points} pontos</strong>${bonus > 0 ? ` e um bônus de <strong style="color:#4CAF50;">R$ ${bonus}</strong>` : ''}!</p>
                             `)
-                        ).catch(() => {});
+                        ).catch(() => { });
                     }
                 }
             }
@@ -453,32 +612,58 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
         // ====== NOTIFICAÇÕES AUTOMÁTICAS ======
         const amountFormatted = request.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+        // Buscar chave PIX para incluir nas notificações
+        const pixSetting = await prisma.systemSetting.findUnique({
+            where: { key: 'pix_key' }
+        });
+
         // Email de aprovação
         if (request.email) {
-            const html = brandedEmailHtml(`
+            let emailContent = `
                 <h2 style="color: #4CAF50;">✅ Empréstimo Aprovado!</h2>
                 <p>Olá, <strong>${request.clientName}</strong>!</p>
                 <p>Seu pedido de empréstimo foi <strong style="color: #4CAF50;">APROVADO</strong>!</p>
                 <div style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 15px; margin: 15px 0;">
                     <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Valor:</strong> ${amountFormatted}</p>
                     <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Tipo:</strong> ${request.profileType || 'Empréstimo'}</p>
-                </div>
+                </div>`;
+
+            // Incluir chave PIX se estiver configurada
+            if (pixSetting?.value) {
+                emailContent += `
+                <div style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                    <p style="margin: 5px 0; color: #ccc;"><strong style="color: #D4AF37;">Chave PIX para pagamentos:</strong> ${pixSetting.value}</p>
+                    <p style="margin: 5px 0; color: #aaa; font-size: 12px;">Use esta chave para realizar pagamentos de suas parcelas</p>
+                </div>`;
+            }
+
+            emailContent += `
                 <p>Acesse o aplicativo para ver os detalhes do seu empréstimo.</p>
                 <div style="text-align: center; margin: 20px 0;">
                     <a href="https://www.tubaraoemprestimo.com.br" style="background: #D4AF37; color: #000; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Acessar App</a>
                 </div>
-            `);
+            `;
+
+            const html = brandedEmailHtml(emailContent);
             emailService.send(request.email, '✅ Empréstimo Aprovado — Tubarão Empréstimos', html).catch(() => { });
         }
 
         // WhatsApp de aprovação
         if (request.phone) {
-            const waMsg = `✅ *EMPRÉSTIMO APROVADO!*\n\n` +
+            let waMsg = `✅ *EMPRÉSTIMO APROVADO!*\n\n` +
                 `Olá, ${request.clientName}!\n\n` +
                 `Seu pedido de empréstimo foi *APROVADO*! 🎉\n\n` +
-                `💰 *Valor:* ${amountFormatted}\n\n` +
-                `Acesse o app para mais detalhes:\nhttps://www.tubaraoemprestimo.com.br\n\n` +
+                `💰 *Valor:* ${amountFormatted}\n\n`;
+
+            // Incluir chave PIX se estiver configurada
+            if (pixSetting?.value) {
+                waMsg += `📱 *Chave PIX:* ${pixSetting.value}\n` +
+                    `Use esta chave para pagar suas parcelas.\n\n`;
+            }
+
+            waMsg += `Acesse o app para mais detalhes:\nhttps://www.tubaraoemprestimo.com.br\n\n` +
                 `_Tubarão Empréstimos 🦈_`;
+
             sendWhatsAppNotification(request.phone, waMsg);
         }
 
@@ -497,7 +682,7 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
 
         // Push notification para o cliente
         if (request.userId) {
-            sendPushToUser(request.userId, '✅ Empréstimo Aprovado!', `Seu empréstimo de ${amountFormatted} foi aprovado!`).catch(() => {});
+            sendPushToUser(request.userId, '✅ Empréstimo Aprovado!', `Seu empréstimo de ${amountFormatted} foi aprovado!`).catch(() => { });
         }
 
         res.json({ success: true });
@@ -555,7 +740,7 @@ loanRequestsRouter.put('/:id/reject', requireAdmin, async (req: Request, res: Re
 
         // Push notification para o cliente
         if (loanRequest.userId) {
-            sendPushToUser(loanRequest.userId, 'Solicitação Atualizada', 'Sua solicitação foi atualizada. Acesse o app.').catch(() => {});
+            sendPushToUser(loanRequest.userId, 'Solicitação Atualizada', 'Sua solicitação foi atualizada. Acesse o app.').catch(() => { });
         }
 
         res.json({ success: true });
@@ -624,11 +809,11 @@ loanRequestsRouter.put('/:id/supplemental', requireAdmin, async (req: Request, r
                     message: `Precisamos de documentos adicionais: ${description || 'Acesse o app.'}`,
                     type: 'WARNING'
                 }
-            }).catch(() => {});
+            }).catch(() => { });
         }
 
         if (loanRequest.userId) {
-            sendPushToUser(loanRequest.userId, '📄 Documentos Solicitados', 'Precisamos de documentos adicionais. Acesse o app.').catch(() => {});
+            sendPushToUser(loanRequest.userId, '📄 Documentos Solicitados', 'Precisamos de documentos adicionais. Acesse o app.').catch(() => { });
         }
 
         res.json({ success: true });
