@@ -344,6 +344,22 @@ export const Wizard: React.FC = () => {
     } catch (e) { }
   };
 
+  const fetchCompanyAddress = async (cleanCep: string) => {
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await res.json();
+      if (!data.erro) {
+        setFormData(prev => ({
+          ...prev,
+          companyStreet: data.logradouro || '',
+          companyNeighborhood: data.bairro || '',
+          companyCity: data.localidade || '',
+          companyState: data.uf || '',
+        }));
+      }
+    } catch (e) { }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     let newValue = value;
@@ -359,11 +375,14 @@ export const Wizard: React.FC = () => {
       if (name === 'cpf') setErrors(prev => ({ ...prev, cpf: validateCPF(newValue) }));
     }
 
-    if (name === 'cep') {
+    if (name === 'cep' || name === 'companyCep') {
       let v = value.replace(/\D/g, '').slice(0, 8);
       if (v.length > 5) v = v.replace(/^(\d{5})(\d)/, '$1-$2');
       newValue = v;
-      if (v.replace(/\D/g, '').length === 8) fetchAddress(v.replace(/\D/g, ''));
+      if (v.replace(/\D/g, '').length === 8) {
+        if (name === 'cep') fetchAddress(v.replace(/\D/g, ''));
+        if (name === 'companyCep') fetchCompanyAddress(v.replace(/\D/g, ''));
+      }
     }
 
     if (['phone', 'whatsappPersonal', 'contactTrust1', 'contactTrust2'].includes(name)) {
