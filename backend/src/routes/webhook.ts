@@ -63,10 +63,11 @@ async function callGeminiAPI(
 }
 
 /**
- * Chama a API do Perplexity
+ * Chama qualquer API compatível com OpenAI (Groq, OpenAI, OpenRouter, Nvidia, Perplexity, Grok)
  */
-async function callPerplexityAPI(
-    apiKey: string, systemPrompt: string,
+async function callOpenAICompatibleAPI(
+    apiKey: string, baseUrl: string, model: string,
+    systemPrompt: string,
     history: { role: string; content: string }[], userMessage: string
 ): Promise<string> {
     const messages: any[] = [];
@@ -76,16 +77,46 @@ async function callPerplexityAPI(
     }
     messages.push({ role: 'user', content: userMessage });
 
-    const response = await axios.post('https://api.perplexity.ai/chat/completions', {
-        model: 'llama-3.1-sonar-small-128k-online', messages, temperature: 0.7, max_tokens: 1024
+    const response = await axios.post(`${baseUrl}/chat/completions`, {
+        model, messages, temperature: 0.7, max_tokens: 1024
     }, {
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         timeout: 30000
     });
 
     const content = response.data?.choices?.[0]?.message?.content;
-    if (!content) throw new Error('Resposta vazia do Perplexity');
+    if (!content) throw new Error(`Resposta vazia do provider (${model})`);
     return content;
+}
+
+// Configuração dos providers OpenAI-compatíveis
+const PROVIDER_CONFIG: Record<string, { url: string; model: string }> = {
+    groq: { url: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile' },
+    openai: { url: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+    openrouter: { url: 'https://openrouter.ai/api/v1', model: 'meta-llama/llama-3.1-70b-instruct' },
+    nvidia: { url: 'https://integrate.api.nvidia.com/v1', model: 'meta/llama-3.1-70b-instruct' },
+    perplexity: { url: 'https://api.perplexity.ai', model: 'llama-3.1-sonar-small-128k-online' },
+    grok: { url: 'https://api.x.ai/v1', model: 'grok-2-latest' },
+    anthropic: { url: 'https://api.anthropic.com/v1', model: 'claude-3-haiku-20240307' },
+};
+
+/**
+ * Resolve a API key correta para o provider selecionado
+ */
+function getProviderApiKey(config: any): string {
+    const provider = config.provider || 'gemini';
+    const keyMap: Record<string, string> = {
+        gemini: config.geminiApiKey || config.apiKey,
+        groq: config.groqApiKey,
+        openai: config.openaiApiKey,
+        openrouter: config.openrouterApiKey,
+        nvidia: config.nvidiaApiKey,
+        perplexity: config.perplexityApiKey,
+        grok: config.grokApiKey,
+        anthropic: config.anthropicApiKey,
+        zai: config.zaiApiKey,
+    };
+    return keyMap[provider] || config.apiKey || '';
 }
 
 /**
@@ -191,9 +222,9 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
                 message: `${content.substring(0, 200)}`,
                 type: 'INFO'
             }
-        }).catch(() => {});
+        }).catch(() => { });
         // Push para admins
-        sendPushToRole('ADMIN', `📩 WhatsApp: ${senderName}`, content.substring(0, 100)).catch(() => {});
+        sendPushToRole('ADMIN', `📩 WhatsApp: ${senderName}`, content.substring(0, 100)).catch(() => { });
         // WhatsApp para admins (encaminhar mensagem do cliente)
         try {
             const admins = await prisma.user.findMany({ where: { role: 'ADMIN' } });
@@ -201,10 +232,10 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
                 if (admin.phone && admin.phone !== phone) {
                     sendWhatsAppMessage(admin.phone,
                         `📩 *Mensagem de Cliente*\n\nDe: ${senderName} (${phone})\n\n"${content.substring(0, 300)}"\n\n_Encaminhado automaticamente_`
-                    ).catch(() => {});
+                    ).catch(() => { });
                 }
             }
-        } catch {}
+        } catch { }
 
         // 3. Busca config do chatbot IA
         const chatConfig = await prisma.aiChatbotConfig.findFirst();
@@ -243,14 +274,14 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
 
             // Alertar TODOS admins via Push + WhatsApp + Notificação
             const clientName = customer?.name || phone;
-            sendPushToRole('ADMIN', '🤖 Cliente quer falar com humano', `${clientName} solicitou transferência. Msg: "${content.substring(0, 80)}"`).catch(() => {});
+            sendPushToRole('ADMIN', '🤖 Cliente quer falar com humano', `${clientName} solicitou transferência. Msg: "${content.substring(0, 80)}"`).catch(() => { });
             await prisma.notification.create({
                 data: {
                     title: '🤖 Transferência Chatbot',
                     message: `${clientName} (${phone}) solicitou atendimento humano. Mensagem: "${content.substring(0, 200)}"`,
                     type: 'ALERT'
                 }
-            }).catch(() => {});
+            }).catch(() => { });
             // WhatsApp para admins
             try {
                 const admins = await prisma.user.findMany({ where: { role: 'ADMIN' } });
@@ -258,10 +289,10 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
                     if (admin.phone) {
                         sendWhatsAppMessage(admin.phone,
                             `🤖 *Transferência Chatbot*\n\nCliente: ${clientName}\nTel: ${phone}\nMsg: "${content.substring(0, 150)}"\n\nResponda diretamente ou acesse o painel.`
-                        ).catch(() => {});
+                        ).catch(() => { });
                     }
                 }
-            } catch {}
+            } catch { }
             return;
         }
 
@@ -279,18 +310,32 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
             systemPrompt += `\n\nContexto do cliente:\nNome: ${customer.name}\nCPF: ${customer.cpf}\nEmail: ${customer.email}\nStatus: ${customer.status}`;
         }
 
-        // 9. Chama a IA
+        // 9. Chama a IA (com provider correto e key correta)
         let aiResponse: string;
+        const resolvedApiKey = getProviderApiKey(chatConfig);
+        const provider = chatConfig.provider || 'gemini';
+        console.log(`[Webhook] Chamando IA: provider=${provider}, keyLen=${resolvedApiKey?.length || 0}`);
+
+        if (!resolvedApiKey) {
+            console.error(`[Webhook] API key vazia para provider ${provider}`);
+            await prisma.aiChatHistory.create({ data: { phone, role: 'user', content } });
+            return;
+        }
+
         try {
-            if (chatConfig.provider === 'perplexity') {
-                aiResponse = await callPerplexityAPI(chatConfig.apiKey, systemPrompt, conversationHistory, content);
+            if (provider === 'gemini') {
+                aiResponse = await callGeminiAPI(resolvedApiKey, systemPrompt, conversationHistory, content);
+            } else if (PROVIDER_CONFIG[provider]) {
+                const cfg = PROVIDER_CONFIG[provider];
+                aiResponse = await callOpenAICompatibleAPI(resolvedApiKey, cfg.url, cfg.model, systemPrompt, conversationHistory, content);
             } else {
-                aiResponse = await callGeminiAPI(chatConfig.apiKey, systemPrompt, conversationHistory, content);
+                // Fallback: tenta como Gemini
+                aiResponse = await callGeminiAPI(resolvedApiKey, systemPrompt, conversationHistory, content);
             }
         } catch (aiError: any) {
-            console.error('[Webhook] Erro na IA:', aiError.message);
+            console.error(`[Webhook] Erro na IA (${provider}):`, aiError?.response?.data || aiError.message);
             await prisma.aiChatHistory.create({ data: { phone, role: 'user', content } });
-            await prisma.aiChatHistory.create({ data: { phone, role: 'system', content: 'ERROR', metadata: { error: aiError.message } } });
+            await prisma.aiChatHistory.create({ data: { phone, role: 'system', content: 'ERROR', metadata: { error: aiError.message, provider } } });
             return;
         }
 
