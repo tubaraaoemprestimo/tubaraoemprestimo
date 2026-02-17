@@ -2,28 +2,28 @@
 import { api } from './apiClient';
 
 interface AIChatbotConfig {
-  id: string;
-  enabled: boolean;
-  provider: 'gemini' | 'perplexity' | 'openai' | 'openrouter' | 'nvidia' | 'zai' | 'anthropic' | 'groq' | 'grok';
-  apiKey: string | null;
-  geminiApiKey: string | null;
-  perplexityApiKey: string | null;
-  openaiApiKey: string | null;
-  openrouterApiKey: string | null;
-  nvidiaApiKey: string | null;
-  zaiApiKey: string | null;
-  anthropicApiKey: string | null;
-  groqApiKey: string | null;
-  grokApiKey: string | null;
-  systemPrompt: string;
-  welcomeMessage: string;
-  fallbackMessage: string;
-  transferKeywords: string;
-  autoReplyEnabled: boolean;
-  workingHoursOnly: boolean;
-  workingHoursStart: string;
-  workingHoursEnd: string;
-  maxMessagesPerChat: number;
+    id: string;
+    enabled: boolean;
+    provider: 'gemini' | 'perplexity' | 'openai' | 'openrouter' | 'nvidia' | 'zai' | 'anthropic' | 'groq' | 'grok';
+    apiKey: string | null;
+    geminiApiKey: string | null;
+    perplexityApiKey: string | null;
+    openaiApiKey: string | null;
+    openrouterApiKey: string | null;
+    nvidiaApiKey: string | null;
+    zaiApiKey: string | null;
+    anthropicApiKey: string | null;
+    groqApiKey: string | null;
+    grokApiKey: string | null;
+    systemPrompt: string;
+    welcomeMessage: string;
+    fallbackMessage: string;
+    transferKeywords: string;
+    autoReplyEnabled: boolean;
+    workingHoursOnly: boolean;
+    workingHoursStart: string;
+    workingHoursEnd: string;
+    maxMessagesPerChat: number;
 }
 
 interface ChatMessage {
@@ -32,19 +32,19 @@ interface ChatMessage {
 }
 
 const DEFAULT_CONFIG: AIChatbotConfig = {
-  id: '',
-  enabled: false,
-  provider: 'gemini',
-  apiKey: null,
-  geminiApiKey: null,
-  perplexityApiKey: null,
-  openaiApiKey: null,
-  openrouterApiKey: null,
-  nvidiaApiKey: null,
-  zaiApiKey: null,
-  anthropicApiKey: null,
-  groqApiKey: null,
-  grokApiKey: null,
+    id: '',
+    enabled: false,
+    provider: 'gemini',
+    apiKey: null,
+    geminiApiKey: null,
+    perplexityApiKey: null,
+    openaiApiKey: null,
+    openrouterApiKey: null,
+    nvidiaApiKey: null,
+    zaiApiKey: null,
+    anthropicApiKey: null,
+    groqApiKey: null,
+    grokApiKey: null,
     systemPrompt: `Você é o Assistente Virtual inteligente do Tubarão Empréstimos. Sua missão é ajudar clientes com informações sobre empréstimos, pagamentos e dúvidas gerais.
 
 ⚠️ IMPORTANTE:
@@ -98,21 +98,21 @@ export const aiChatbotService = {
             }
 
             const d = data as any;
-return {
-      id: d.id,
-      enabled: d.enabled,
-      provider: d.provider,
-      apiKey: d.api_key || d.apiKey,
-      geminiApiKey: d.gemini_api_key || d.geminiApiKey,
-      perplexityApiKey: d.perplexity_api_key || d.perplexityApiKey,
-      openaiApiKey: d.openai_api_key || d.openaiApiKey,
-      openrouterApiKey: d.openrouter_api_key || d.openrouterApiKey,
-      nvidiaApiKey: d.nvidia_api_key || d.nvidiaApiKey,
-      zaiApiKey: d.zai_api_key || d.zaiApiKey,
-      anthropicApiKey: d.anthropic_api_key || d.anthropicApiKey,
-      groqApiKey: d.groq_api_key || d.groqApiKey,
-      grokApiKey: d.grok_api_key || d.grokApiKey,
-      systemPrompt: d.system_prompt || d.systemPrompt || DEFAULT_CONFIG.systemPrompt,
+            return {
+                id: d.id,
+                enabled: d.enabled,
+                provider: d.provider,
+                apiKey: d.api_key || d.apiKey,
+                geminiApiKey: d.gemini_api_key || d.geminiApiKey,
+                perplexityApiKey: d.perplexity_api_key || d.perplexityApiKey,
+                openaiApiKey: d.openai_api_key || d.openaiApiKey,
+                openrouterApiKey: d.openrouter_api_key || d.openrouterApiKey,
+                nvidiaApiKey: d.nvidia_api_key || d.nvidiaApiKey,
+                zaiApiKey: d.zai_api_key || d.zaiApiKey,
+                anthropicApiKey: d.anthropic_api_key || d.anthropicApiKey,
+                groqApiKey: d.groq_api_key || d.groqApiKey,
+                grokApiKey: d.grok_api_key || d.grokApiKey,
+                systemPrompt: d.system_prompt || d.systemPrompt || DEFAULT_CONFIG.systemPrompt,
                 welcomeMessage: d.welcome_message || d.welcomeMessage || DEFAULT_CONFIG.welcomeMessage,
                 fallbackMessage: d.fallback_message || d.fallbackMessage || DEFAULT_CONFIG.fallbackMessage,
                 transferKeywords: d.transfer_keywords || d.transferKeywords || DEFAULT_CONFIG.transferKeywords,
@@ -131,7 +131,7 @@ return {
     // Salvar configurações
     saveConfig: async (config: Partial<AIChatbotConfig>): Promise<boolean> => {
         try {
-const { error } = await api.put('/chatbot/config', {
+            const { error } = await api.put('/chatbot/config', {
                 enabled: config.enabled,
                 provider: config.provider,
                 apiKey: config.apiKey || config.geminiApiKey,
@@ -145,14 +145,18 @@ const { error } = await api.put('/chatbot/config', {
                 groqApiKey: config.groqApiKey,
                 grokApiKey: config.grokApiKey,
                 systemPrompt: config.systemPrompt,
+                welcomeMessage: config.welcomeMessage,
+                fallbackMessage: config.fallbackMessage,
                 transferKeywords: config.transferKeywords
                     ? (typeof config.transferKeywords === 'string'
                         ? config.transferKeywords.split(',').map(s => s.trim())
                         : config.transferKeywords)
                     : undefined,
                 autoReplyEnabled: config.autoReplyEnabled,
+                workingHoursOnly: config.workingHoursOnly,
                 workingHoursStart: config.workingHoursStart,
                 workingHoursEnd: config.workingHoursEnd,
+                maxMessagesPerChat: config.maxMessagesPerChat,
             });
 
             if (error) {
@@ -441,144 +445,144 @@ const { error } = await api.put('/chatbot/config', {
             console.error('[AI Chatbot] Z.AI exception:', err);
             return '';
         }
-},
+    },
 
-  // Gerar resposta com Anthropic (Claude)
-  generateResponseAnthropic: async (
-    messages: ChatMessage[],
-    systemPrompt: string,
-    apiKey: string,
-    customerContext?: string
-  ): Promise<string> => {
-    try {
-      const formattedMessages = messages.slice(-10).map(m => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: m.content
-      }));
+    // Gerar resposta com Anthropic (Claude)
+    generateResponseAnthropic: async (
+        messages: ChatMessage[],
+        systemPrompt: string,
+        apiKey: string,
+        customerContext?: string
+    ): Promise<string> => {
+        try {
+            const formattedMessages = messages.slice(-10).map(m => ({
+                role: m.role === 'assistant' ? 'assistant' : 'user',
+                content: m.content
+            }));
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': apiKey,
-          'Content-Type': 'application/json',
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
-          max_tokens: 500,
-          temperature: 0.7,
-          system: customerContext ? `${systemPrompt}\n\nContexto do cliente:\n${customerContext}` : systemPrompt,
-          messages: formattedMessages
-        })
-      });
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'x-api-key': apiKey,
+                    'Content-Type': 'application/json',
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify({
+                    model: 'claude-3-5-sonnet-20241022',
+                    max_tokens: 500,
+                    temperature: 0.7,
+                    system: customerContext ? `${systemPrompt}\n\nContexto do cliente:\n${customerContext}` : systemPrompt,
+                    messages: formattedMessages
+                })
+            });
 
-      if (!response.ok) {
-        console.error('[AI Chatbot] Anthropic API error:', await response.text());
-        return '';
-      }
+            if (!response.ok) {
+                console.error('[AI Chatbot] Anthropic API error:', await response.text());
+                return '';
+            }
 
-      const data = await response.json();
-      return data.content?.[0]?.text || '';
-    } catch (err) {
-      console.error('[AI Chatbot] Anthropic exception:', err);
-      return '';
-    }
-  },
+            const data = await response.json();
+            return data.content?.[0]?.text || '';
+        } catch (err) {
+            console.error('[AI Chatbot] Anthropic exception:', err);
+            return '';
+        }
+    },
 
-  // Gerar resposta com Groq
-  generateResponseGroq: async (
-    messages: ChatMessage[],
-    systemPrompt: string,
-    apiKey: string,
-    customerContext?: string
-  ): Promise<string> => {
-    try {
-      const formattedMessages: any[] = [];
+    // Gerar resposta com Groq
+    generateResponseGroq: async (
+        messages: ChatMessage[],
+        systemPrompt: string,
+        apiKey: string,
+        customerContext?: string
+    ): Promise<string> => {
+        try {
+            const formattedMessages: any[] = [];
 
-      if (systemPrompt) {
-        formattedMessages.push({ role: 'system', content: customerContext ? `${systemPrompt}\n\nContexto do cliente:\n${customerContext}` : systemPrompt });
-      }
+            if (systemPrompt) {
+                formattedMessages.push({ role: 'system', content: customerContext ? `${systemPrompt}\n\nContexto do cliente:\n${customerContext}` : systemPrompt });
+            }
 
-      formattedMessages.push(...messages.slice(-10).map(m => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: m.content
-      })));
+            formattedMessages.push(...messages.slice(-10).map(m => ({
+                role: m.role === 'assistant' ? 'assistant' : 'user',
+                content: m.content
+            })));
 
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: formattedMessages,
-          temperature: 0.7,
-          max_tokens: 500
-        })
-      });
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'llama-3.3-70b-versatile',
+                    messages: formattedMessages,
+                    temperature: 0.7,
+                    max_tokens: 500
+                })
+            });
 
-      if (!response.ok) {
-        console.error('[AI Chatbot] Groq API error:', await response.text());
-        return '';
-      }
+            if (!response.ok) {
+                console.error('[AI Chatbot] Groq API error:', await response.text());
+                return '';
+            }
 
-      const data = await response.json();
-      return data.choices?.[0]?.message?.content || '';
-    } catch (err) {
-      console.error('[AI Chatbot] Groq exception:', err);
-      return '';
-    }
-  },
+            const data = await response.json();
+            return data.choices?.[0]?.message?.content || '';
+        } catch (err) {
+            console.error('[AI Chatbot] Groq exception:', err);
+            return '';
+        }
+    },
 
-  // Gerar resposta com Grok (xAI)
-  generateResponseGrok: async (
-    messages: ChatMessage[],
-    systemPrompt: string,
-    apiKey: string,
-    customerContext?: string
-  ): Promise<string> => {
-    try {
-      const formattedMessages: any[] = [];
+    // Gerar resposta com Grok (xAI)
+    generateResponseGrok: async (
+        messages: ChatMessage[],
+        systemPrompt: string,
+        apiKey: string,
+        customerContext?: string
+    ): Promise<string> => {
+        try {
+            const formattedMessages: any[] = [];
 
-      if (systemPrompt) {
-        formattedMessages.push({ role: 'system', content: customerContext ? `${systemPrompt}\n\nContexto do cliente:\n${customerContext}` : systemPrompt });
-      }
+            if (systemPrompt) {
+                formattedMessages.push({ role: 'system', content: customerContext ? `${systemPrompt}\n\nContexto do cliente:\n${customerContext}` : systemPrompt });
+            }
 
-      formattedMessages.push(...messages.slice(-10).map(m => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: m.content
-      })));
+            formattedMessages.push(...messages.slice(-10).map(m => ({
+                role: m.role === 'assistant' ? 'assistant' : 'user',
+                content: m.content
+            })));
 
-      const response = await fetch('https://api.x.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'grok-beta',
-          messages: formattedMessages,
-          temperature: 0.7,
-          max_tokens: 500
-        })
-      });
+            const response = await fetch('https://api.x.ai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'grok-beta',
+                    messages: formattedMessages,
+                    temperature: 0.7,
+                    max_tokens: 500
+                })
+            });
 
-      if (!response.ok) {
-        console.error('[AI Chatbot] Grok API error:', await response.text());
-        return '';
-      }
+            if (!response.ok) {
+                console.error('[AI Chatbot] Grok API error:', await response.text());
+                return '';
+            }
 
-      const data = await response.json();
-      return data.choices?.[0]?.message?.content || '';
-    } catch (err) {
-      console.error('[AI Chatbot] Grok exception:', err);
-      return '';
-    }
-  },
+            const data = await response.json();
+            return data.choices?.[0]?.message?.content || '';
+        } catch (err) {
+            console.error('[AI Chatbot] Grok exception:', err);
+            return '';
+        }
+    },
 
-  // Gerar resposta com Perplexity
-  generateResponsePerplexity: async (
+    // Gerar resposta com Perplexity
+    generateResponsePerplexity: async (
         messages: ChatMessage[],
         systemPrompt: string,
         apiKey: string,
@@ -716,33 +720,33 @@ Empréstimos Ativos: ${customer.active_loans_count || 0}`;
                     response = await aiChatbotService.generateResponseNvidia(history, config.systemPrompt, apiKey, customerContext);
                 }
                 break;
-case 'zai':
-      apiKey = config.zaiApiKey || config.apiKey;
-      if (apiKey) {
-        response = await aiChatbotService.generateResponseZai(history, config.systemPrompt, apiKey, customerContext);
-      }
-      break;
-    case 'anthropic':
-      apiKey = config.anthropicApiKey || config.apiKey;
-      if (apiKey) {
-        response = await aiChatbotService.generateResponseAnthropic(history, config.systemPrompt, apiKey, customerContext);
-      }
-      break;
-    case 'groq':
-      apiKey = config.groqApiKey || config.apiKey;
-      if (apiKey) {
-        response = await aiChatbotService.generateResponseGroq(history, config.systemPrompt, apiKey, customerContext);
-      }
-      break;
-    case 'grok':
-      apiKey = config.grokApiKey || config.apiKey;
-      if (apiKey) {
-        response = await aiChatbotService.generateResponseGrok(history, config.systemPrompt, apiKey, customerContext);
-      }
-      break;
-    }
+            case 'zai':
+                apiKey = config.zaiApiKey || config.apiKey;
+                if (apiKey) {
+                    response = await aiChatbotService.generateResponseZai(history, config.systemPrompt, apiKey, customerContext);
+                }
+                break;
+            case 'anthropic':
+                apiKey = config.anthropicApiKey || config.apiKey;
+                if (apiKey) {
+                    response = await aiChatbotService.generateResponseAnthropic(history, config.systemPrompt, apiKey, customerContext);
+                }
+                break;
+            case 'groq':
+                apiKey = config.groqApiKey || config.apiKey;
+                if (apiKey) {
+                    response = await aiChatbotService.generateResponseGroq(history, config.systemPrompt, apiKey, customerContext);
+                }
+                break;
+            case 'grok':
+                apiKey = config.grokApiKey || config.apiKey;
+                if (apiKey) {
+                    response = await aiChatbotService.generateResponseGrok(history, config.systemPrompt, apiKey, customerContext);
+                }
+                break;
+        }
 
-    if (!apiKey) {
+        if (!apiKey) {
             console.error('[AI Chatbot] No API key configured for provider:', config.provider);
             return config.fallbackMessage;
         }

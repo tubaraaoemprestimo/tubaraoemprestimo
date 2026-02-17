@@ -151,7 +151,15 @@ maintenanceRouter.get('/run-migration', async (_req: Request, res: Response) => 
             `CREATE UNIQUE INDEX IF NOT EXISTS "partner_bonuses_partner_id_month_key" ON "partner_bonuses"("partner_id", "month");`,
 
             // ==========================================
-            // 11. Verificação final
+            // 11. AI_CHATBOT_CONFIG - Campos extras
+            // ==========================================
+            `ALTER TABLE "ai_chatbot_config" ADD COLUMN IF NOT EXISTS "welcome_message" TEXT DEFAULT '';`,
+            `ALTER TABLE "ai_chatbot_config" ADD COLUMN IF NOT EXISTS "fallback_message" TEXT DEFAULT '';`,
+            `ALTER TABLE "ai_chatbot_config" ADD COLUMN IF NOT EXISTS "working_hours_only" BOOLEAN DEFAULT false;`,
+            `ALTER TABLE "ai_chatbot_config" ADD COLUMN IF NOT EXISTS "max_messages_per_chat" INTEGER DEFAULT 50;`,
+
+            // ==========================================
+            // 12. Verificação final
             // ==========================================
             `SELECT 'MIGRATION COMPLETE' AS result;`
         ];

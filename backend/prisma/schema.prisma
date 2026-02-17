@@ -33,9 +33,13 @@ model AiChatbotConfig {
   groqApiKey         String   @default("") @map("groq_api_key")
   grokApiKey         String   @default("") @map("grok_api_key")
   systemPrompt      String   @default("") @map("system_prompt")
+  welcomeMessage    String   @default("") @map("welcome_message")
+  fallbackMessage   String   @default("") @map("fallback_message")
   autoReplyEnabled  Boolean  @default(true) @map("auto_reply_enabled")
+  workingHoursOnly  Boolean  @default(false) @map("working_hours_only")
   workingHoursStart String   @default("08:00") @map("working_hours_start")
   workingHoursEnd   String   @default("18:00") @map("working_hours_end")
+  maxMessagesPerChat Int     @default(50) @map("max_messages_per_chat")
   transferKeywords  String[] @default(["atendente", "humano", "pessoa"]) @map("transfer_keywords")
   updatedAt         DateTime @updatedAt @map("updated_at")
 

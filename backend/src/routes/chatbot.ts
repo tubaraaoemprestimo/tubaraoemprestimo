@@ -480,23 +480,8 @@ chatbotRouter.get('/config', authenticate, async (_req: Request, res: Response) 
             return;
         }
 
-        // Mascara todas as API keys para não expor no frontend (mostra apenas últimos 4 chars)
-        const maskKey = (key: string) => key ? `****${key.slice(-4)}` : '';
-        const maskedConfig = {
-            ...config,
-            apiKey: maskKey(config.apiKey),
-            geminiApiKey: maskKey(config.geminiApiKey),
-            perplexityApiKey: maskKey(config.perplexityApiKey),
-            openaiApiKey: maskKey(config.openaiApiKey),
-            openrouterApiKey: maskKey(config.openrouterApiKey),
-            nvidiaApiKey: maskKey(config.nvidiaApiKey),
-            zaiApiKey: maskKey(config.zaiApiKey),
-            anthropicApiKey: maskKey(config.anthropicApiKey),
-            groqApiKey: maskKey(config.groqApiKey),
-            grokApiKey: maskKey(config.grokApiKey),
-        };
-
-        res.json(maskedConfig);
+        // Retorna config real -- a rota já exige authenticate + requireAdmin
+        res.json(config);
     } catch {
         res.status(500).json({ error: 'Erro ao buscar configuração do chatbot' });
     }
@@ -519,9 +504,13 @@ chatbotRouter.put('/config', authenticate, requireAdmin, async (req: Request, re
             groqApiKey,
             grokApiKey,
             systemPrompt,
+            welcomeMessage,
+            fallbackMessage,
             autoReplyEnabled,
+            workingHoursOnly,
             workingHoursStart,
             workingHoursEnd,
+            maxMessagesPerChat,
             transferKeywords
         } = req.body;
 
@@ -533,9 +522,13 @@ chatbotRouter.put('/config', authenticate, requireAdmin, async (req: Request, re
         if (enabled !== undefined) updatedConfig.enabled = enabled;
         if (provider !== undefined) updatedConfig.provider = provider;
         if (systemPrompt !== undefined) updatedConfig.systemPrompt = systemPrompt;
+        if (welcomeMessage !== undefined) updatedConfig.welcomeMessage = welcomeMessage;
+        if (fallbackMessage !== undefined) updatedConfig.fallbackMessage = fallbackMessage;
         if (autoReplyEnabled !== undefined) updatedConfig.autoReplyEnabled = autoReplyEnabled;
+        if (workingHoursOnly !== undefined) updatedConfig.workingHoursOnly = workingHoursOnly;
         if (workingHoursStart !== undefined) updatedConfig.workingHoursStart = workingHoursStart;
         if (workingHoursEnd !== undefined) updatedConfig.workingHoursEnd = workingHoursEnd;
+        if (maxMessagesPerChat !== undefined) updatedConfig.maxMessagesPerChat = maxMessagesPerChat;
         if (transferKeywords !== undefined) updatedConfig.transferKeywords = transferKeywords;
 
         // API Keys: atualizar apenas se forem fornecidas e não mascaradas
@@ -567,9 +560,13 @@ chatbotRouter.put('/config', authenticate, requireAdmin, async (req: Request, re
         if (enabled !== undefined) data.enabled = enabled;
         if (provider !== undefined) data.provider = provider;
         if (systemPrompt !== undefined) data.systemPrompt = systemPrompt;
+        if (welcomeMessage !== undefined) data.welcomeMessage = welcomeMessage;
+        if (fallbackMessage !== undefined) data.fallbackMessage = fallbackMessage;
         if (autoReplyEnabled !== undefined) data.autoReplyEnabled = autoReplyEnabled;
+        if (workingHoursOnly !== undefined) data.workingHoursOnly = workingHoursOnly;
         if (workingHoursStart !== undefined) data.workingHoursStart = workingHoursStart;
         if (workingHoursEnd !== undefined) data.workingHoursEnd = workingHoursEnd;
+        if (maxMessagesPerChat !== undefined) data.maxMessagesPerChat = maxMessagesPerChat;
         if (transferKeywords !== undefined) data.transferKeywords = transferKeywords;
 
         // Atualizar apenas as chaves que não estão mascaradas
