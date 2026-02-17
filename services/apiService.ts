@@ -361,14 +361,35 @@ export const apiService = {
         if (uploadedData.contactTrust1Name) {
             extraData.contactTrust1Name = uploadedData.contactTrust1Name;
         }
+        if (uploadedData.contactTrust1Relationship) {
+            extraData.contactTrust1Relationship = uploadedData.contactTrust1Relationship;
+        }
         if (uploadedData.contactTrust2Name) {
             extraData.contactTrust2Name = uploadedData.contactTrust2Name;
+        }
+        if (uploadedData.contactTrust2Relationship) {
+            extraData.contactTrust2Relationship = uploadedData.contactTrust2Relationship;
         }
         if (uploadedData.instagram) {
             extraData.instagram = uploadedData.instagram;
         }
         if (uploadedData.occupation) {
             extraData.occupation = uploadedData.occupation;
+        }
+        // Endereço da empresa
+        if (uploadedData.companyCep || uploadedData.companyStreet) {
+            extraData.companyAddress = {
+                cep: uploadedData.companyCep,
+                street: uploadedData.companyStreet,
+                number: uploadedData.companyNumber,
+                neighborhood: uploadedData.companyNeighborhood,
+                city: uploadedData.companyCity,
+                state: uploadedData.companyState,
+            };
+        }
+        // WhatsApp pessoal (segundo número)
+        if (uploadedData.whatsappPersonal) {
+            extraData.whatsappPersonal = uploadedData.whatsappPersonal;
         }
         if (Object.keys(extraData).length > 0 && !uploadedData.supplementalDescription) {
             uploadedData.supplementalDescription = JSON.stringify(extraData);

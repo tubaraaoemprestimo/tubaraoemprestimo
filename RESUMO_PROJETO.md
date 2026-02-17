@@ -600,3 +600,30 @@ Migração completa do frontend para deixar de depender do SDK do Supabase e pas
    - **Resultado**: Build `tsc --noEmit` com 0 erros. Cron `[Cron] initialized` sem TypeError. Todos endpoints testados respondendo corretamente.
    - **Commits**: `7ed725f` (schema uuid), `7f61174` (cron + openFinance + aliases)
 
+---
+
+## 🎥 Melhorias em Uploads de Vídeo & Notificações (16/02/2026)
+
+### 1. Notificações de Email por Tipo de Serviço
+- **Separação Lógica:** Emails agora identificam corretamente `LIMPA_NOME` e `INVESTIDOR`.
+- **Templates Dinâmicos:**
+  - **Limpa Nome:** Assunto "Serviço Limpa Nome", corpo com detalhes do serviço (não mostra valor R$).
+  - **Investidor:** Assunto "Investidor", corpo com valor do investimento.
+  - **Moto/Empréstimo:** Mantido comportamento padrão com valores e parcelas.
+- **Wizard:** Corrigido envio de dados no submit (`amount: 0` para Limpa Nome).
+
+### 2. Painel Admin Aprimorado
+- **Detalhes da Solicitação:**
+  - **Referências Pessoais:** Agora exibe Nome, Telefone e Parentesco (Pai, Mãe, Amigo, etc.).
+  - **Dados Profissionais:** Nova seção com Profissão, WhatsApp Pessoal e Endereço Completo da Empresa.
+  - **Visualização de Vídeos:** Players de vídeo (`videoSelfie`, `videoHouse`) funcionais diretamente no modal.
+
+### 3. Upload de Vídeos Longos (Upload 100MB)
+- **Backend:** Aumento do limite do Multer de 10MB para **100MB** (suporte a vídeos HD de 30s+).
+- **Frontend:** Aumento do timeout do axios para 5 minutos e `maxContentLength` para 100MB.
+- **Conversão:** Garantia de conversão correta de `blob:` URLs para `File` antes do upload.
+
+### 4. Correções de Build (Produção)
+- **Vite Config:** Adicionado `html2pdf.js` em `optimizeDeps` e `commonjsOptions` para corrigir erro de build em produção.
+- **Status:** Build concluído com sucesso (`Exit code: 0`).
+

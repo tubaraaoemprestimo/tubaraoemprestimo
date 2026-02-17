@@ -209,6 +209,8 @@ export const Wizard: React.FC = () => {
     contactTrust2: '', contactTrust2Name: '', contactTrust2Relationship: '',
     instagram: '',
     occupation: '', companyName: '', companyAddress: '', workTime: '',
+    // Endereço da empresa
+    companyCep: '', companyStreet: '', companyNumber: '', companyNeighborhood: '', companyCity: '', companyState: '',
     // Indicação
     referredByCode: '',
     // Autônomo
@@ -1114,12 +1116,12 @@ export const Wizard: React.FC = () => {
         proofAddress: proofAddressUrls,
         vehicleFront: vehicleFrontUrls,
 
-        // MOTO tem valores fixos de financiamento (Honda Pop 110i 2026)
-        amount: profileType === 'MOTO' ? 21996 : getAmount(),
-        installments: profileType === 'MOTO' ? 36 : settings.defaultInstallments,
-        totalAmount: profileType === 'MOTO' ? 29396 : calculateTotal(),
-        installmentValue: profileType === 'MOTO' ? 611 : calculateInstallment(),
-        interestRate: profileType === 'MOTO' ? 0 : settings.interestRateMonthly,
+        // Valores por tipo de serviço
+        amount: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 21996 : getAmount(),
+        installments: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 36 : settings.defaultInstallments,
+        totalAmount: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 29396 : calculateTotal(),
+        installmentValue: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 611 : calculateInstallment(),
+        interestRate: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 0 : settings.interestRateMonthly,
         lateFeeDaily: settings.lateFeeDaily,
         lateFeeMonthly: settings.lateFeeMonthly,
         lateFeeFixed: settings.lateFeeFixed,
@@ -1188,8 +1190,14 @@ export const Wizard: React.FC = () => {
       emailService.notifyNewRequest({
         clientName: formData.name,
         clientEmail: formData.email,
-        amount: profileType === 'MOTO' ? 21996 : getAmount(),
-        installments: profileType === 'MOTO' ? 36 : settings.defaultInstallments,
+        amount: profileType === 'LIMPA_NOME' ? 0
+          : profileType === 'MOTO' ? 21996
+            : profileType === 'INVESTIDOR' ? (investorData.customInvestmentAmount ? Number(investorData.customInvestmentAmount) : investorData.investmentAmount)
+              : getAmount(),
+        installments: profileType === 'LIMPA_NOME' ? 0
+          : profileType === 'MOTO' ? 36
+            : profileType === 'INVESTIDOR' ? 0
+              : settings.defaultInstallments,
         profileType,
       }).catch((err) => { console.error('Erro ao enviar email de notificação:', err); });
 
@@ -2309,13 +2317,39 @@ export const Wizard: React.FC = () => {
                       <div className="pt-4 border-t border-zinc-800 space-y-4">
                         <h3 className="text-sm font-bold text-[#D4AF37]">Dados Profissionais</h3>
                         <Input label="Profissão" name="occupation" value={formData.occupation} onChange={handleChange} />
-                        {profileType === 'CLT' && (
+                        {(profileType === 'CLT' || profileType === 'MOTO') && (
                           <Input label="Nome da Empresa" name="companyName" value={formData.companyName} onChange={handleChange} placeholder="Empresa onde trabalha" />
                         )}
                         <div className="grid grid-cols-2 gap-4">
                           <Input label="Renda Mensal" name="income" value={formData.income} onChange={handleChange} />
                           <Input label="Dia Pagamento" name="workTime" value={formData.workTime} onChange={handleChange} placeholder="Dia 05" />
                         </div>
+
+                        {/* Endereço da Empresa */}
+                        {(profileType === 'CLT' || profileType === 'MOTO') && (
+                          <div className="pt-3 space-y-3">
+                            <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wide">Endereço da Empresa</h4>
+                            <div className="grid grid-cols-2 gap-3">
+                              <Input label="CEP da Empresa" name="companyCep" value={formData.companyCep} onChange={handleChange} placeholder="00000-000" />
+                              <Input label="Número" name="companyNumber" value={formData.companyNumber} onChange={handleChange} placeholder="123" />
+                            </div>
+                            <Input label="Logradouro" name="companyStreet" value={formData.companyStreet} onChange={handleChange} placeholder="Rua, Av, etc." />
+                            <div className="grid grid-cols-3 gap-3">
+                              <Input label="Bairro" name="companyNeighborhood" value={formData.companyNeighborhood} onChange={handleChange} placeholder="Bairro" />
+                              <Input label="Cidade" name="companyCity" value={formData.companyCity} onChange={handleChange} placeholder="Cidade" />
+                              <div>
+                                <label className="text-sm text-zinc-400 font-medium block mb-1">UF</label>
+                                <select name="companyState" value={formData.companyState} onChange={handleChange as any}
+                                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-[#D4AF37] outline-none">
+                                  <option value="">UF</option>
+                                  {['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'].map(uf => (
+                                    <option key={uf} value={uf}>{uf}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 

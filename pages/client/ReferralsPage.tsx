@@ -138,13 +138,12 @@ export const ReferralsPage: React.FC = () => {
                       <p className="font-bold">{ref.referred_name}</p>
                       <p className="text-xs text-zinc-500">{new Date(ref.created_at).toLocaleDateString('pt-BR')}</p>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      ref.status === 'APPROVED' ? 'bg-green-900/50 text-green-400' :
-                      ref.status === 'PENDING' ? 'bg-yellow-900/50 text-yellow-400' :
-                      'bg-red-900/50 text-red-400'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${ref.status === 'APPROVED' ? 'bg-green-900/50 text-green-400' :
+                        ref.status === 'PENDING' ? 'bg-yellow-900/50 text-yellow-400' :
+                          'bg-red-900/50 text-red-400'
+                      }`}>
                       {ref.status === 'APPROVED' ? 'Aprovado' :
-                       ref.status === 'PENDING' ? 'Pendente' : 'Rejeitado'}
+                        ref.status === 'PENDING' ? 'Pendente' : 'Rejeitado'}
                     </span>
                   </div>
                   {ref.status === 'APPROVED' && (
@@ -167,7 +166,7 @@ export const ReferralsPage: React.FC = () => {
           )}
         </div>
 
-        {/* Regras */}
+        {/* Regras Detalhadas */}
         <div className="bg-gradient-to-br from-zinc-900 to-black border border-zinc-800 rounded-2xl p-6">
           <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
             <Gift className="text-[#D4AF37]" />
@@ -177,33 +176,65 @@ export const ReferralsPage: React.FC = () => {
             <div className="flex gap-3">
               <div className="w-8 h-8 rounded-full bg-emerald-900/50 flex items-center justify-center shrink-0 text-emerald-400 font-bold">1</div>
               <div>
-                <p className="font-bold text-white">Compartilhe seu codigo</p>
-                <p className="text-zinc-400">Envie para amigos, familia ou redes sociais.</p>
+                <p className="font-bold text-white">Compartilhe seu código</p>
+                <p className="text-zinc-400">Envie para amigos, família ou redes sociais.</p>
               </div>
             </div>
             <div className="flex gap-3">
               <div className="w-8 h-8 rounded-full bg-emerald-900/50 flex items-center justify-center shrink-0 text-emerald-400 font-bold">2</div>
               <div>
-                <p className="font-bold text-white">Eles se cadastram com seu codigo</p>
-                <p className="text-zinc-400">Na hora do cadastro, basta informar seu codigo.</p>
+                <p className="font-bold text-white">Eles se cadastram com seu código</p>
+                <p className="text-zinc-400">Na hora do cadastro, basta informar seu código.</p>
               </div>
             </div>
             <div className="flex gap-3">
               <div className="w-8 h-8 rounded-full bg-emerald-900/50 flex items-center justify-center shrink-0 text-emerald-400 font-bold">3</div>
               <div>
                 <p className="font-bold text-white">Receba recompensas</p>
-                <p className="text-zinc-400">Pontos e bonus quando o emprestimo for aprovado.</p>
+                <p className="text-zinc-400">Pontos e bônus quando o empréstimo for aprovado.</p>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 p-4 bg-emerald-900/20 border border-emerald-700/30 rounded-xl">
-            <p className="text-sm text-emerald-200">
-              <strong>Regras atuais:</strong><br />
-              {rules.map((r, i) => (
-                <span key={i}>- {r.description}: <strong>{r.points} pontos</strong>{r.bonus > 0 ? ` + R$ ${r.bonus}` : ''}<br /></span>
-              ))}
-            </p>
+          {/* Card de Regras Detalhadas */}
+          <div className="mt-6 space-y-3">
+            <div className="p-4 bg-emerald-900/20 border border-emerald-700/30 rounded-xl space-y-2">
+              <p className="text-sm font-bold text-emerald-300">🎯 Pontuação:</p>
+              <ul className="text-sm text-zinc-300 space-y-1.5 list-none">
+                <li className="flex items-center gap-2">
+                  <CheckCircle size={14} className="text-emerald-500 shrink-0" />
+                  Indicação aprovada: <strong className="text-emerald-400">100 pontos</strong>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Star size={14} className="text-[#D4AF37] shrink-0" />
+                  Contrato acima de R$ 5.000: <strong className="text-[#D4AF37]">+ R$ 50</strong> (em pontos)
+                </li>
+                <li className="flex items-center gap-2">
+                  <Trophy size={14} className="text-yellow-400 shrink-0" />
+                  Contrato acima de R$ 10.000: <strong className="text-yellow-400">+ R$ 100</strong> (em pontos)
+                </li>
+              </ul>
+            </div>
+
+            <div className="p-4 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl space-y-2">
+              <p className="text-sm font-bold text-[#D4AF37]">💰 Conversão:</p>
+              <ul className="text-sm text-zinc-300 space-y-1.5 list-none">
+                <li className="flex items-center gap-2">
+                  <Coins size={14} className="text-[#D4AF37] shrink-0" />
+                  100 pontos = <strong className="text-white">R$ 20,00</strong>
+                </li>
+                <li className="flex items-center gap-2">
+                  <TrendingUp size={14} className="text-[#D4AF37] shrink-0" />
+                  Saque mínimo: <strong className="text-white">500 pontos (R$ 100)</strong>
+                </li>
+              </ul>
+            </div>
+
+            <div className="p-3 bg-red-900/20 border border-red-700/30 rounded-xl">
+              <p className="text-xs text-red-300">
+                <strong>⚠️ Atenção:</strong> A recompensa só é validada após o pagamento da <strong>1ª parcela</strong> do indicado. Indicações reprovadas ou inadimplentes não geram pontos.
+              </p>
+            </div>
           </div>
         </div>
 

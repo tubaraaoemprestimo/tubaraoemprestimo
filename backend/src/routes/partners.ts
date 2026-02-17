@@ -16,7 +16,6 @@ partnersRouter.get('/', async (req: Request, res: Response) => {
     const partners = await prisma.user.findMany({
       where: {
         isPartner: true,
-        role: 'CLIENT' // Parceiros são clientes com status especial
       },
       include: {
         _count: {
@@ -34,12 +33,60 @@ partnersRouter.get('/', async (req: Request, res: Response) => {
       }
     });
 
+    // Get commission aggregates per partner
+    const commissionAggregates = await prisma.partnerCommission.groupBy({
+      by: ['partnerId'],
+      _sum: {
+        commissionAmount: true,
+      },
+      _count: true,
+    });
+
+    const paidAggregates = await prisma.partnerCommission.groupBy({
+      by: ['partnerId'],
+      where: { status: 'PAID' },
+      _sum: { commissionAmount: true },
+    });
+
+    const pendingAggregates = await prisma.partnerCommission.groupBy({
+      by: ['partnerId'],
+      where: { status: { in: ['PENDING', 'PARTIAL'] } },
+      _sum: { commissionAmount: true },
+    });
+
+    const commissionMap = new Map((commissionAggregates as any[]).map((a: any) => [a.partnerId, a]));
+    const paidMap = new Map((paidAggregates as any[]).map((a: any) => [a.partnerId, a._sum.commissionAmount || 0]));
+    const pendingMap = new Map((pendingAggregates as any[]).map((a: any) => [a.partnerId, a._sum.commissionAmount || 0]));
+
+    const enrichedPartners = partners.map(partner => ({
+      ...partner,
+      _count: {
+        ...partner._count,
+        referrals: partner._count.loanRequests,
+        commissions: (commissionMap.get(partner.id) as any)?._count || 0,
+      },
+      totalEarned: (commissionMap.get(partner.id) as any)?._sum?.commissionAmount || 0,
+      totalPending: pendingMap.get(partner.id) || 0,
+      totalPaid: paidMap.get(partner.id) || 0,
+    }));
+
+    // Calculate overall stats
+    const totalPaid = Array.from(paidMap.values()).reduce((s: number, v: any) => s + (v as number), 0);
+    const totalPending = Array.from(pendingMap.values()).reduce((s: number, v: any) => s + (v as number), 0);
+    const totalCommissions = (commissionAggregates as any[]).reduce((s: number, a: any) => s + (a._sum.commissionAmount || 0), 0);
+    const avgScore = partners.length > 0
+      ? partners.reduce((s, p) => s + (p.partnerScore || 0), 0) / partners.length
+      : 0;
+
     res.json({
-      success: true,
-      data: partners.map(partner => ({
-        ...partner,
-        loanRequestsCount: partner._count.loanRequests
-      }))
+      partners: enrichedPartners,
+      stats: {
+        totalPartners: partners.length,
+        totalCommissions,
+        totalPaid,
+        totalPending,
+        averageScore: avgScore,
+      }
     });
   } catch (error: any) {
     console.error('Erro ao buscar parceiros:', error);
@@ -47,6 +94,202 @@ partnersRouter.get('/', async (req: Request, res: Response) => {
       success: false,
       error: error.message || 'Erro ao buscar parceiros'
     });
+  }
+});
+
+// GET /api/partners/my-dashboard - Dashboard do parceiro (cliente logado)
+partnersRouter.get('/my-dashboard', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Não autenticado' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || !user.isPartner) {
+      return res.status(404).json({ error: 'Você não é um parceiro' });
+    }
+
+    // Get commissions
+    const commissions = await prisma.partnerCommission.findMany({
+      where: { partnerId: userId },
+      include: {
+        loanRequest: {
+          select: {
+            clientName: true,
+            amount: true,
+            profileType: true,
+            status: true,
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    // Get bonuses
+    const bonuses = await prisma.partnerBonus.findMany({
+      where: { partnerId: userId },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    // Aggregates
+    const totalAgg = await prisma.partnerCommission.aggregate({
+      where: { partnerId: userId },
+      _sum: { commissionAmount: true },
+      _count: true,
+    });
+
+    const paidAgg = await prisma.partnerCommission.aggregate({
+      where: { partnerId: userId, status: 'PAID' },
+      _sum: { commissionAmount: true },
+    });
+
+    const pendingAgg = await prisma.partnerCommission.aggregate({
+      where: { partnerId: userId, status: { in: ['PENDING', 'PARTIAL'] } },
+      _sum: { commissionAmount: true },
+    });
+
+    const cancelledAgg = await prisma.partnerCommission.aggregate({
+      where: { partnerId: userId, status: 'CANCELLED' },
+      _count: true,
+    });
+
+    // Referred clients count
+    const referredCount = await prisma.loanRequest.count({
+      where: { referralCode: user.referralCode || '', isPartnerReferral: true },
+    });
+
+    const approvedCount = await prisma.loanRequest.count({
+      where: { referralCode: user.referralCode || '', isPartnerReferral: true, status: 'APPROVED' },
+    });
+
+    // Default rate
+    const totalCommissions = totalAgg._count || 0;
+    const cancelledCount = cancelledAgg._count || 0;
+    const defaultRate = totalCommissions > 0 ? (cancelledCount / totalCommissions) * 100 : 0;
+
+    res.json({
+      referralCode: user.referralCode || '',
+      partnerScore: user.partnerScore || 0,
+      totalCommissions: totalAgg._count || 0,
+      paidCommissions: paidAgg._sum.commissionAmount ? 1 : 0,
+      pendingCommissions: pendingAgg._sum.commissionAmount ? 1 : 0,
+      cancelledCommissions: cancelledCount,
+      totalEarned: totalAgg._sum.commissionAmount || 0,
+      totalPending: pendingAgg._sum.commissionAmount || 0,
+      totalPaid: paidAgg._sum.commissionAmount || 0,
+      clientsReferred: referredCount,
+      clientsApproved: approvedCount,
+      defaultRate,
+      monthlyStats: [],
+      recentCommissions: commissions.map(c => ({
+        id: c.id,
+        clientName: c.loanRequest?.clientName || 'Cliente',
+        profileType: c.loanRequest?.profileType || 'N/A',
+        amount: c.loanRequest?.amount || 0,
+        totalCommission: c.commissionAmount || 0,
+        installmentsReleased: c.installmentsReleased || 0,
+        releasedPercent: c.releasedPercent || 0,
+        status: c.status,
+        createdAt: c.createdAt.toISOString(),
+      })),
+      bonuses: bonuses.map(b => ({
+        id: b.id,
+        month: b.month,
+        contractsCount: b.contractsCount,
+        bonusAmount: b.bonusAmount,
+        bonusTier: b.bonusTier || 'STANDARD',
+        status: b.status,
+      })),
+    });
+  } catch (error: any) {
+    console.error('Erro ao buscar dashboard do parceiro:', error);
+    res.status(500).json({ error: error.message || 'Erro interno' });
+  }
+});
+
+// POST /api/partners/commissions/:commissionId/pay - Marcar comissão como paga
+partnersRouter.post('/commissions/:commissionId/pay', async (req: Request, res: Response) => {
+  try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    const { commissionId } = req.params;
+    const { paymentMethod, paymentReference } = req.body;
+
+    const commission = await prisma.partnerCommission.findUnique({
+      where: { id: commissionId },
+    });
+
+    if (!commission) {
+      return res.status(404).json({ error: 'Comissão não encontrada' });
+    }
+
+    const updated = await prisma.partnerCommission.update({
+      where: { id: commissionId },
+      data: {
+        status: 'PAID',
+        paidAt: new Date(),
+        paymentMethod: paymentMethod || 'PIX',
+        notes: paymentReference ? `Ref: ${paymentReference}` : commission.notes,
+        installmentsReleased: 3,
+        releasedPercent: 100,
+        release1Amount: commission.commissionAmount * 0.4,
+        release1At: commission.release1At || new Date(),
+        release2Amount: commission.commissionAmount * 0.3,
+        release2At: commission.release2At || new Date(),
+        release3Amount: commission.commissionAmount * 0.3,
+        release3At: new Date(),
+      },
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (error: any) {
+    console.error('Erro ao pagar comissão:', error);
+    res.status(500).json({ error: error.message || 'Erro interno' });
+  }
+});
+
+// POST /api/partners/:userId/toggle - Ativar/desativar parceiro
+partnersRouter.post('/:userId/toggle', async (req: Request, res: Response) => {
+  try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    const { userId } = req.params;
+    const { isPartner } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    // Generate referral code if activating and doesn't have one
+    let referralCode = user.referralCode;
+    if (isPartner && !referralCode) {
+      referralCode = await generateUniqueCode('referral', 'referralCode');
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        isPartner: !!isPartner,
+        referralCode,
+        partnerScore: isPartner ? (user.partnerScore || 50) : user.partnerScore,
+      },
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (error: any) {
+    console.error('Erro ao alternar status do parceiro:', error);
+    res.status(500).json({ error: error.message || 'Erro interno' });
   }
 });
 
@@ -280,8 +523,7 @@ partnersRouter.get('/:id/commissions', async (req: Request, res: Response) => {
     });
 
     res.json({
-      success: true,
-      data: commissions,
+      commissions,
       totals: {
         totalCommissions: totals._sum.commissionAmount || 0
       }

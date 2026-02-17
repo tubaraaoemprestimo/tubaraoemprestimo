@@ -19,10 +19,17 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, '.'),
       }
     },
+    optimizeDeps: {
+      include: ['html2pdf.js'],
+    },
     build: {
       outDir: 'dist',
       sourcemap: false,
       minify: 'esbuild',
+      commonjsOptions: {
+        include: [/html2pdf/, /node_modules/],
+        transformMixedEsModules: true,
+      },
       rollupOptions: {
         output: {
           manualChunks: {

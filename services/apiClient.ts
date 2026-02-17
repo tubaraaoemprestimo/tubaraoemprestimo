@@ -113,7 +113,10 @@ class ApiClient {
             const formData = new FormData();
             formData.append('file', file, filename || 'upload');
             const response = await this.client.post('/upload', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+                headers: { 'Content-Type': 'multipart/form-data' },
+                timeout: 300000, // 5 minutos para vídeos grandes
+                maxContentLength: 104857600, // 100MB
+                maxBodyLength: 104857600, // 100MB
             });
             return { data: response.data, error: null };
         } catch (error: any) {

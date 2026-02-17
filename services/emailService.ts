@@ -62,18 +62,27 @@ const emailTemplates = {
   // ==========================================
   adminNewRequest: (data: LoanEmailData) => {
     const isMoto = data.profileType === 'MOTO';
+    const isLimpaNome = data.profileType === 'LIMPA_NOME';
+    const isInvestidor = data.profileType === 'INVESTIDOR';
     const profileLabels: Record<string, string> = {
       CLT: 'Empréstimo Pessoal (CLT)',
       AUTONOMO: 'Capital de Giro (Comércio)',
       MOTO: 'Financiamento de Motocicleta',
       GARANTIA: 'Empréstimo com Garantia',
+      LIMPA_NOME: 'Serviço Limpa Nome',
+      INVESTIDOR: 'Cadastro de Investidor',
     };
     const typeLabel = profileLabels[data.profileType || ''] || 'Empréstimo';
+    const subjectLabel = isLimpaNome
+      ? `🔔 Nova Solicitação - ${data.clientName} - Serviço Limpa Nome`
+      : isInvestidor
+        ? `🔔 Nova Solicitação - ${data.clientName} - Investidor`
+        : isMoto
+          ? `🔔 Nova Solicitação - ${data.clientName} - Financiamento Moto`
+          : `🔔 Nova Solicitação - ${data.clientName} - R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
     return {
-    subject: isMoto
-      ? `🔔 Nova Solicitação - ${data.clientName} - Financiamento Moto`
-      : `🔔 Nova Solicitação - ${data.clientName} - R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-    html: `
+      subject: subjectLabel,
+      html: `
       <!DOCTYPE html>
       <html>
       <head><style>${baseStyles}</style></head>
@@ -96,7 +105,19 @@ const emailTemplates = {
               <div class="label">Tipo</div>
               <div class="value">${typeLabel}</div>
             </div>
-            ${isMoto ? `
+            ${isLimpaNome ? `
+            <div class="info-box" style="border-left-color: #7C3AED;">
+              <div class="label">Serviço</div>
+              <div class="value" style="color: #7C3AED;">Contestação Administrativa de Negativação</div>
+              <p style="color: #888; font-size: 13px; margin-top: 5px;">Limpa Nome - Contrato assinado digitalmente</p>
+            </div>
+            ` : isInvestidor ? `
+            <div class="info-box" style="border-left-color: #06B6D4;">
+              <div class="label">Investimento</div>
+              <div class="value" style="color: #06B6D4;">R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+              <p style="color: #888; font-size: 13px; margin-top: 5px;">Novo investidor cadastrado</p>
+            </div>
+            ` : isMoto ? `
             <div class="info-box">
               <div class="label">Produto</div>
               <div class="value highlight">Honda Pop 110i 2026</div>
@@ -120,25 +141,30 @@ const emailTemplates = {
       </body>
       </html>
     `,
-  };},
+    };
+  },
 
   // ==========================================
   // CLIENTE: Solicitação Recebida
   // ==========================================
   clientRequestReceived: (data: LoanEmailData) => {
     const isMoto = data.profileType === 'MOTO';
+    const isLimpaNome = data.profileType === 'LIMPA_NOME';
+    const isInvestidor = data.profileType === 'INVESTIDOR';
     const profileLabels: Record<string, string> = {
       CLT: 'empréstimo pessoal',
       AUTONOMO: 'capital de giro',
       MOTO: 'financiamento de motocicleta',
       GARANTIA: 'empréstimo com garantia',
+      LIMPA_NOME: 'serviço Limpa Nome',
+      INVESTIDOR: 'cadastro como investidor',
     };
     const typeLabel = profileLabels[data.profileType || ''] || 'empréstimo';
     return {
-    subject: isMoto
-      ? `✅ Recebemos sua Solicitação de Financiamento - Tubarão Empréstimos`
-      : `✅ Recebemos sua Solicitação - Tubarão Empréstimos`,
-    html: `
+      subject: isMoto
+        ? `✅ Recebemos sua Solicitação de Financiamento - Tubarão Empréstimos`
+        : `✅ Recebemos sua Solicitação - Tubarão Empréstimos`,
+      html: `
       <!DOCTYPE html>
       <html>
       <head><style>${baseStyles}</style></head>
@@ -151,7 +177,18 @@ const emailTemplates = {
             <h2>Olá, ${data.clientName}! 👋</h2>
             <p>Recebemos sua solicitação de ${typeLabel} e ela está em análise.</p>
 
-            ${isMoto ? `
+            ${isLimpaNome ? `
+            <div class="info-box" style="border-left-color: #7C3AED;">
+              <div class="label">Serviço Solicitado</div>
+              <div class="value" style="color: #7C3AED;">Limpa Nome</div>
+              <p style="color: #888; font-size: 13px; margin-top: 5px;">Contestação administrativa de negativação</p>
+            </div>
+            ` : isInvestidor ? `
+            <div class="info-box" style="border-left-color: #06B6D4;">
+              <div class="label">Investimento</div>
+              <div class="value" style="color: #06B6D4;">R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+            </div>
+            ` : isMoto ? `
             <div class="info-box">
               <div class="label">Financiamento</div>
               <div class="value highlight">Honda Pop 110i 2026</div>
@@ -194,7 +231,8 @@ const emailTemplates = {
       </body>
       </html>
     `,
-  };},
+    };
+  },
 
   // ==========================================
   // CLIENTE: Empréstimo APROVADO
