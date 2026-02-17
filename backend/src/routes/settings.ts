@@ -138,14 +138,9 @@ settingsRouter.get('/whatsapp', authenticate, requireAdmin, async (_req: Request
             return;
         }
 
-        // Mascara a chave da API para não expor no frontend (mostra apenas últimos 4 chars)
-        const maskKey = (key: string) => key ? `****${key.slice(-4)}` : '';
-        const maskedConfig = {
-            ...config,
-            apiKey: maskKey(config.apiKey),
-        };
-
-        res.json(maskedConfig);
+        // Retorna a chave real — o frontend precisa dela para autenticar
+        // diretamente com a Evolution API. A rota já exige admin autenticado.
+        res.json(config);
     } catch (error) {
         res.status(500).json({ error: 'Erro' });
     }
