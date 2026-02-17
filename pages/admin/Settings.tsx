@@ -331,13 +331,13 @@ export const Settings: React.FC = () => {
                   step="0.01"
                   value={settings.lateFixedFee || 0}
                   onChange={(e) => setSettings({ ...settings, lateFixedFee: Number(e.target.value) })}
-                  className={`${inputStyle} flex-1 min-w-0 text-lg font-bold`}
+                  className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white text-lg font-bold focus:border-[#D4AF37] outline-none transition-colors"
                   placeholder="0.00"
                 />
                 <select
                   value={settings.lateFixedFeeType || 'FIXED'}
                   onChange={(e) => setSettings({ ...settings, lateFixedFeeType: e.target.value as any })}
-                  className={`${inputStyle} w-20 shrink-0 text-center font-bold`}
+                  className="w-16 bg-black border border-zinc-700 rounded-lg p-3 text-white text-center font-bold focus:border-[#D4AF37] outline-none"
                 >
                   <option value="FIXED">R$</option>
                   <option value="PERCENT">%</option>
@@ -359,13 +359,13 @@ export const Settings: React.FC = () => {
                   step="0.01"
                   value={settings.lateInterestDaily || 0}
                   onChange={(e) => setSettings({ ...settings, lateInterestDaily: Number(e.target.value) })}
-                  className={`${inputStyle} flex-1 min-w-0 text-lg font-bold`}
+                  className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white text-lg font-bold focus:border-[#D4AF37] outline-none transition-colors"
                   placeholder="0.033"
                 />
                 <select
                   value={settings.lateInterestDailyType || 'PERCENT'}
                   onChange={(e) => setSettings({ ...settings, lateInterestDailyType: e.target.value as any })}
-                  className={`${inputStyle} w-20 shrink-0 text-center font-bold`}
+                  className="w-16 bg-black border border-zinc-700 rounded-lg p-3 text-white text-center font-bold focus:border-[#D4AF37] outline-none"
                 >
                   <option value="PERCENT">%</option>
                   <option value="FIXED">R$</option>
@@ -383,13 +383,13 @@ export const Settings: React.FC = () => {
                   step="0.1"
                   value={settings.lateInterestMonthly || 0}
                   onChange={(e) => setSettings({ ...settings, lateInterestMonthly: Number(e.target.value) })}
-                  className={`${inputStyle} flex-1 min-w-0 text-lg font-bold`}
+                  className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white text-lg font-bold focus:border-[#D4AF37] outline-none transition-colors"
                   placeholder="1.0"
                 />
                 <select
                   value={settings.lateInterestMonthlyType || 'PERCENT'}
                   onChange={(e) => setSettings({ ...settings, lateInterestMonthlyType: e.target.value as any })}
-                  className={`${inputStyle} w-20 shrink-0 text-center font-bold`}
+                  className="w-16 bg-black border border-zinc-700 rounded-lg p-3 text-white text-center font-bold focus:border-[#D4AF37] outline-none"
                 >
                   <option value="PERCENT">%</option>
                   <option value="FIXED">R$</option>
@@ -407,13 +407,13 @@ export const Settings: React.FC = () => {
                   step="0.5"
                   value={settings.lateInterestYearly || 0}
                   onChange={(e) => setSettings({ ...settings, lateInterestYearly: Number(e.target.value) })}
-                  className={`${inputStyle} flex-1 min-w-0 text-lg font-bold`}
+                  className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white text-lg font-bold focus:border-[#D4AF37] outline-none transition-colors"
                   placeholder="12.0"
                 />
                 <select
                   value={settings.lateInterestYearlyType || 'PERCENT'}
                   onChange={(e) => setSettings({ ...settings, lateInterestYearlyType: e.target.value as any })}
-                  className={`${inputStyle} w-20 shrink-0 text-center font-bold`}
+                  className="w-16 bg-black border border-zinc-700 rounded-lg p-3 text-white text-center font-bold focus:border-[#D4AF37] outline-none"
                 >
                   <option value="PERCENT">%</option>
                   <option value="FIXED">R$</option>
