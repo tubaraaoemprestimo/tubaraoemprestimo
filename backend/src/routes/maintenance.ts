@@ -159,7 +159,20 @@ maintenanceRouter.get('/run-migration', async (_req: Request, res: Response) => 
             `ALTER TABLE "ai_chatbot_config" ADD COLUMN IF NOT EXISTS "max_messages_per_chat" INTEGER DEFAULT 50;`,
 
             // ==========================================
-            // 12. Verificação final
+            // 12. WHATSAPP_CONFIG - Tabela de configuração
+            // ==========================================
+            `CREATE TABLE IF NOT EXISTS "whatsapp_config" (
+                "id" TEXT NOT NULL DEFAULT gen_random_uuid()::TEXT,
+                "api_url" TEXT NOT NULL DEFAULT '',
+                "api_key" TEXT NOT NULL DEFAULT '',
+                "instance_name" TEXT NOT NULL DEFAULT '',
+                "is_connected" BOOLEAN NOT NULL DEFAULT false,
+                "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT "whatsapp_config_pkey" PRIMARY KEY ("id")
+            );`,
+
+            // ==========================================
+            // 13. Verificação final
             // ==========================================
             `SELECT 'MIGRATION COMPLETE' AS result;`
         ];

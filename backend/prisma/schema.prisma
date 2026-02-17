@@ -746,3 +746,14 @@ model PartnerInvite {
   @@index([invitedEmail])
   @@index([inviteCode])
 }
+
+model WhatsappConfig {
+  id           String   @id @default(uuid())
+  apiUrl       String   @default("") @map("api_url")
+  apiKey       String   @default("") @map("api_key")
+  instanceName String   @default("") @map("instance_name")
+  isConnected  Boolean  @default(false) @map("is_connected")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("whatsapp_config")
+}
