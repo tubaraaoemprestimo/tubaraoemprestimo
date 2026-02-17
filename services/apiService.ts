@@ -522,6 +522,19 @@ export const apiService = {
         return data;
     },
 
+    async generatePayment(loanId: string, type: 'interest_only' | 'full') {
+        const { data, error } = await api.post(`/loans/${loanId}/generate-payment`, { type });
+        if (error) throw new Error(error.error || 'Erro ao gerar cobrança');
+        return data as {
+            success: boolean; payment: {
+                type: string; amount: number; description: string;
+                originalAmount: number; remainingAmount: number; interestAmount: number;
+                interestRate: number; pixKey: string; pixKeyType: string; pixReceiver: string;
+                contractId: string;
+            }
+        };
+    },
+
     // ============= CUSTOMERS / CRM =============
 
     async getCustomers() {
