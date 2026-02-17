@@ -8,75 +8,13 @@ customersRouter.use(authenticate);
 // GET /api/customers — Listar clientes
 customersRouter.get('/', async (_req: Request, res: Response) => {
     try {
-        const rows = await prisma.$queryRawUnsafe(`
-            SELECT
-              id, user_id, name, cpf, email, phone, status,
-              internal_score, total_debt, active_loans_count,
-              address, neighborhood, city, state, zip_code,
-              latitude, longitude, location_updated_at, device_info, last_ip,
-              monthly_income,
-              pre_approved_amount, pre_approved_at,
-              instagram, source, profile_pic, birth_date,
-              monthly_interest_rate, late_fixed_fee, late_interest_daily, late_interest_monthly,
-              installment_offer, referral_code, referral_points, joined_at,
-              partner_id, is_partner_customer, partner_commission_rate, contract_terms_accepted
-            FROM customers
-            ORDER BY joined_at DESC
-        `);
+        const customers = await prisma.customer.findMany({
+            orderBy: { joinedAt: 'desc' },
+        });
 
-        const mapped = (rows || []).map((c: any) => ({
-            id: c.id,
-            userId: c.user_id,
-            name: c.name,
-            cpf: c.cpf,
-            email: c.email,
-            phone: c.phone,
-            status: c.status,
-            internalScore: c.internal_score,
-            totalDebt: c.total_debt,
-            activeLoansCount: c.active_loans_count,
-            address: c.address,
-            neighborhood: c.neighborhood,
-            city: c.city,
-            state: c.state,
-            zipCode: c.zip_code,
-            latitude: c.latitude,
-            longitude: c.longitude,
-            monthlyIncome: c.monthly_income,
-            preApprovedAmount: c.pre_approved_amount,
-            preApprovedAt: c.pre_approved_at,
-            instagram: c.instagram,
-            source: c.source,
-            profilePic: c.profile_pic,
-            birthDate: c.birth_date,
-            monthlyInterestRate: c.monthly_interest_rate,
-            lateFixedFee: c.late_fixed_fee,
-            lateInterestDaily: c.late_interest_daily,
-            lateInterestMonthly: c.late_interest_monthly,
-            installmentOffer: c.installment_offer,
-            referralCode: c.referral_code,
-            referralPoints: c.referral_points,
-            locationUpdatedAt: c.location_updated_at,
-            deviceInfo: c.device_info,
-            lastIp: c.last_ip,
-            joinedAt: c.joined_at,
-            partnerId: c.partner_id,
-            isPartnerCustomer: c.is_partner_customer,
-            partnerCommissionRate: c.partner_commission_rate,
-            contractTermsAccepted: c.contract_terms_accepted,
-            preApprovedOffer: c.pre_approved_amount ? {
-                amount: c.pre_approved_amount,
-                createdAt: c.pre_approved_at || new Date().toISOString()
-            } : undefined,
-            customRates: (c.monthly_interest_rate || c.late_fixed_fee || c.late_interest_daily || c.late_interest_monthly) ? {
-                monthlyInterestRate: c.monthly_interest_rate,
-                lateFixedFee: c.late_fixed_fee,
-                lateInterestDaily: c.late_interest_daily,
-                lateInterestMonthly: c.late_interest_monthly
-            } : undefined,
-        }));
-
-        res.json(mapped);
+        // Prisma automatically returns camelCase fields, matching the frontend expectations.
+        // No need for manual mapping.
+        res.json(customers);
     } catch (error) {
         console.error('[Customers] list error:', error);
         res.status(500).json({ error: 'Erro ao buscar clientes' });

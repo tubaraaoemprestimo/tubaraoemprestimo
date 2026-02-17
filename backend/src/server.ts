@@ -32,6 +32,7 @@ import { openFinanceRouter } from './routes/openFinance';
 import { pixRouter } from './routes/pix';
 import { collectionsRouter } from './routes/collections';
 import { partnersRouter } from './routes/partners';
+import { maintenanceRouter } from './routes/maintenance';
 import { loanRequestUpdatesRouter } from './routes/loanRequestUpdates';
 import { initCronJobs } from './cron/installmentReminders';
 
@@ -99,6 +100,7 @@ app.use('/api/open-finance', openFinanceRouter);
 app.use('/api/pix', pixRouter);
 app.use('/api/collections', collectionsRouter);
 app.use('/api/partners', partnersRouter);
+app.use('/api/maintenance', maintenanceRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {

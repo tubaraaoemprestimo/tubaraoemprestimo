@@ -627,3 +627,10 @@ Migração completa do frontend para deixar de depender do SDK do Supabase e pas
 - **Vite Config:** Adicionado `html2pdf.js` em `optimizeDeps` e `commonjsOptions` para corrigir erro de build em produção.
 - **Status:** Build concluído com sucesso (`Exit code: 0`).
 
+### 5. Correção Crítica de Banco de Dados (Schema Fix)
+- **Diagnóstico:** Erro 500 generalizado (`/customers`, `/loan-requests`) causado por Schema Drift (código espera tabelas de parceiros, banco não tem).
+- **Solução:**
+  - Substituído `queryRawUnsafe` em `customers.ts` por `prisma.customer.findMany()` (Type-Safe).
+  - Criado endpoint de emergência `/api/maintenance/run-migration` para aplicar SQL pendente.
+- **Ação Necessária:** Após deploy, acessar `https://app-api.tubaraoemprestimo.com.br/api/maintenance/run-migration` para sincronizar o banco.
+
