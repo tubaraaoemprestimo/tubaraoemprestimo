@@ -160,7 +160,7 @@ model Customer {
   deviceInfo          String?        @map("device_info")
   lastIp              String?        @map("last_ip")
   monthlyIncome       Float?         @map("monthly_income")
-  preApprovedAmount   Float?         @map("pre-approved_amount")
+  preApprovedAmount   Float?         @map("pre_approved_amount")
   preApprovedAt       DateTime?      @map("pre_approved_at")
   instagram           String?
   source              String?        @default("MANUAL")
