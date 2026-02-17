@@ -16,7 +16,7 @@ export const Settings: React.FC = () => {
   const { addToast } = useToast();
   const { settings: brandSettings, updateSettings: updateBrand, resetSettings: resetBrand } = useBrand();
 
-  const [activeTab, setActiveTab] = useState<'FINANCIAL' | 'AUTOMATION' | 'INTEGRATION' | 'BRANDING' | 'GOALS' | 'TEMA'>('FINANCIAL');
+  const [activeTab, setActiveTab] = useState<'FINANCIAL' | 'AUTOMATION' | 'INTEGRATION' | 'BRANDING' | 'GOALS' | 'TEMA' | 'PAYMENTS'>('FINANCIAL');
 
   // Financial State
   const [settings, setSettings] = useState<SystemSettings>({ monthlyInterestRate: 0, lateFeeRate: 0 });
@@ -850,7 +850,25 @@ export const Settings: React.FC = () => {
   );
 
   const renderGoalsTab = () => {
-    if (!goals) return <div className="text-zinc-500">Carregando...</div>;
+    if (!goals) return <div className="text-zinc-500 p-8 text-center">Carregando metas...</div>;
+
+    // Ensure projections array exists with defaults
+    const safeGoals = {
+      ...goals,
+      projections: goals.projections || [
+        { month: 'Jan', target: 0 }, { month: 'Fev', target: 0 },
+        { month: 'Mar', target: 0 }, { month: 'Abr', target: 0 },
+        { month: 'Mai', target: 0 }, { month: 'Jun', target: 0 },
+        { month: 'Jul', target: 0 }, { month: 'Ago', target: 0 },
+        { month: 'Set', target: 0 }, { month: 'Out', target: 0 },
+        { month: 'Nov', target: 0 }, { month: 'Dez', target: 0 },
+      ],
+      monthlyLoanGoal: goals.monthlyLoanGoal || 0,
+      monthlyClientGoal: goals.monthlyClientGoal || 0,
+      monthlyApprovalRateGoal: goals.monthlyApprovalRateGoal || 0,
+      expectedGrowthRate: goals.expectedGrowthRate || 0,
+      goalPeriod: goals.goalPeriod || new Date().toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' }),
+    };
 
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
@@ -878,8 +896,8 @@ export const Settings: React.FC = () => {
                 <span className="text-zinc-500">R$</span>
                 <input
                   type="number"
-                  value={goals.monthlyLoanGoal}
-                  onChange={(e) => setGoals({ ...goals, monthlyLoanGoal: Number(e.target.value) })}
+                  value={safeGoals.monthlyLoanGoal}
+                  onChange={(e) => setGoals({ ...safeGoals, monthlyLoanGoal: Number(e.target.value) })}
                   className={inputStyle}
                   step="10000"
                 />
@@ -896,8 +914,8 @@ export const Settings: React.FC = () => {
               </div>
               <input
                 type="number"
-                value={goals.monthlyClientGoal}
-                onChange={(e) => setGoals({ ...goals, monthlyClientGoal: Number(e.target.value) })}
+                value={safeGoals.monthlyClientGoal}
+                onChange={(e) => setGoals({ ...safeGoals, monthlyClientGoal: Number(e.target.value) })}
                 className={inputStyle}
               />
               <p className="text-xs text-zinc-600 mt-2">Quantidade de novos clientes</p>
@@ -913,8 +931,8 @@ export const Settings: React.FC = () => {
               <div className="flex items-center gap-2">
                 <input
                   type="number"
-                  value={goals.monthlyApprovalRateGoal}
-                  onChange={(e) => setGoals({ ...goals, monthlyApprovalRateGoal: Number(e.target.value) })}
+                  value={safeGoals.monthlyApprovalRateGoal}
+                  onChange={(e) => setGoals({ ...safeGoals, monthlyApprovalRateGoal: Number(e.target.value) })}
                   className={inputStyle}
                   min="0"
                   max="100"
@@ -936,8 +954,8 @@ export const Settings: React.FC = () => {
               <div className="flex items-center gap-2">
                 <input
                   type="number"
-                  value={goals.expectedGrowthRate}
-                  onChange={(e) => setGoals({ ...goals, expectedGrowthRate: Number(e.target.value) })}
+                  value={safeGoals.expectedGrowthRate}
+                  onChange={(e) => setGoals({ ...safeGoals, expectedGrowthRate: Number(e.target.value) })}
                   className={inputStyle}
                   step="0.5"
                 />
@@ -954,8 +972,8 @@ export const Settings: React.FC = () => {
               </div>
               <input
                 type="text"
-                value={goals.goalPeriod}
-                onChange={(e) => setGoals({ ...goals, goalPeriod: e.target.value })}
+                value={safeGoals.goalPeriod}
+                onChange={(e) => setGoals({ ...safeGoals, goalPeriod: e.target.value })}
                 className={inputStyle}
                 placeholder="12/2024"
               />
@@ -977,7 +995,7 @@ export const Settings: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {goals.projections.map((proj, index) => (
+            {safeGoals.projections.map((proj, index) => (
               <div key={proj.month} className="bg-black border border-zinc-800 rounded-xl p-4">
                 <label className="block text-xs text-zinc-500 mb-2 font-bold uppercase">{proj.month}</label>
                 <div className="flex items-center gap-1">
@@ -998,7 +1016,7 @@ export const Settings: React.FC = () => {
             <div className="flex justify-between items-center">
               <span className="text-zinc-400 text-sm">Total Projeção Anual:</span>
               <span className="text-[#D4AF37] font-bold text-lg">
-                R$ {goals.projections.reduce((acc, p) => acc + p.target, 0).toLocaleString()}
+                R$ {safeGoals.projections.reduce((acc, p) => acc + p.target, 0).toLocaleString()}
               </span>
             </div>
           </div>
@@ -1134,7 +1152,9 @@ export const Settings: React.FC = () => {
               tab === 'GOALS' ? 'Metas' :
                 tab === 'AUTOMATION' ? 'Automação' :
                   tab === 'INTEGRATION' ? 'Integrações' :
-                    tab === 'BRANDING' ? 'Identidade Visual' : '?? Cores'}
+                    tab === 'BRANDING' ? 'Identidade Visual' :
+                      tab === 'TEMA' ? 'Cores' :
+                        tab === 'PAYMENTS' ? 'Pagamentos' : tab}
           </button>
         ))}
       </div>
@@ -1144,7 +1164,7 @@ export const Settings: React.FC = () => {
       {activeTab === 'AUTOMATION' && renderAutomationTab()}
       {activeTab === 'INTEGRATION' && renderIntegrationTab()}
       {activeTab === 'BRANDING' && renderBrandingTab()}
-        {activeTab === 'TEMA' && renderThemeTab()}
+      {activeTab === 'TEMA' && renderThemeTab()}
       {activeTab === 'PAYMENTS' && <PIXSettings settings={settings} onUpdate={loadData} />}
 
       {/* Modals */}
