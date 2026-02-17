@@ -12,43 +12,7 @@ function esc(value: string): string {
     return value.replace(/'/g, "''");
 }
 
-// GET /api/notifications
-notificationsRouter.get('/', async (req: Request, res: Response) => {
-    try {
-        const forRole = String(req.query.forRole || '').toUpperCase();
-        const email = String(req.query.email || req.user?.email || '');
-        const limit = Math.min(Number(req.query.limit || 50), 200);
-        const unreadOnly = String(req.query.unread || '').toLowerCase() === 'true';
-
-        const clauses: string[] = [];
-        if (unreadOnly) clauses.push('is_read = false');
-
-        if (forRole === 'ADMIN' || (isAdminUser(req) && !email)) {
-            clauses.push('customer_email IS NULL');
-        } else if (email) {
-            clauses.push(`customer_email = '${esc(email)}'`);
-        }
-
-        const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-        const sql = `SELECT id, title, message, type, is_read, created_at, customer_email FROM notifications ${where} ORDER BY created_at DESC LIMIT ${Number.isFinite(limit) ? limit : 50}`;
-        const rows = await prisma.$queryRawUnsafe(sql);
-
-        const payload = (rows || []).map((n: any) => ({
-            id: n.id,
-            title: n.title,
-            message: n.message,
-            type: n.type,
-            is_read: n.is_read,
-            created_at: n.created_at,
-            customer_email: n.customer_email,
-            for_role: n.customer_email ? 'CLIENT' : 'ADMIN'
-        }));
-
-        res.json(payload);
-    } catch {
-        res.json([]);
-    }
-});
+// ============ STATIC ROUTES FIRST (before /:id) ============
 
 // GET /api/notifications/count
 notificationsRouter.get('/count', async (req: Request, res: Response) => {
@@ -68,10 +32,97 @@ notificationsRouter.get('/count', async (req: Request, res: Response) => {
 
         const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
         const sql = `SELECT COUNT(*)::int AS count FROM notifications ${where}`;
-        const rows = await prisma.$queryRawUnsafe(sql);
+        const rows: any[] = await prisma.$queryRawUnsafe(sql);
         res.json({ count: rows?.[0]?.count || 0 });
     } catch {
         res.json({ count: 0 });
+    }
+});
+
+// PUT /api/notifications/read-all  — MUST come before /:id/read
+notificationsRouter.put('/read-all', async (req: Request, res: Response) => {
+    try {
+        // Accept from body OR query params
+        const forRole = String(req.body?.forRole || req.query.forRole || '').toUpperCase();
+        const email = String(req.body?.email || req.query.email || '');
+
+        let where = '';
+        if (forRole === 'ADMIN' || (isAdminUser(req) && !email)) {
+            where = 'WHERE customer_email IS NULL';
+        } else if (email) {
+            where = `WHERE customer_email = '${esc(email)}'`;
+        }
+
+        const result: any = await prisma.$executeRawUnsafe(`UPDATE notifications SET is_read = true ${where}`);
+        console.log(`[Notifications] Read-all: ${where || 'ALL'}, affected: ${result}`);
+        res.json({ success: true });
+    } catch (e: any) {
+        console.error('[Notifications] read-all error:', e.message);
+        res.json({ success: false });
+    }
+});
+
+// DELETE /api/notifications/clear-all  — MUST come before /:id
+notificationsRouter.delete('/clear-all', async (req: Request, res: Response) => {
+    try {
+        // Accept from query params OR body
+        const forRole = String(req.query.forRole || req.body?.forRole || '').toUpperCase();
+        const email = String(req.query.email || req.body?.email || '');
+
+        let where = '';
+        if (forRole === 'ADMIN' || (isAdminUser(req) && !email)) {
+            where = 'WHERE customer_email IS NULL';
+        } else if (email) {
+            where = `WHERE customer_email = '${esc(email)}'`;
+        }
+
+        const result: any = await prisma.$executeRawUnsafe(`DELETE FROM notifications ${where}`);
+        console.log(`[Notifications] Clear-all: ${where || 'ALL'}, affected: ${result}`);
+        res.json({ success: true });
+    } catch (e: any) {
+        console.error('[Notifications] clear-all error:', e.message);
+        res.json({ success: false });
+    }
+});
+
+// ============ PARAMETERIZED ROUTES (after static) ============
+
+// GET /api/notifications
+notificationsRouter.get('/', async (req: Request, res: Response) => {
+    try {
+        const forRole = String(req.query.forRole || '').toUpperCase();
+        const email = String(req.query.email || req.user?.email || '');
+        const limit = Math.min(Number(req.query.limit || 50), 200);
+        const unreadOnly = String(req.query.unread || '').toLowerCase() === 'true';
+
+        const clauses: string[] = [];
+        if (unreadOnly) clauses.push('is_read = false');
+
+        if (forRole === 'ADMIN' || (isAdminUser(req) && !email)) {
+            clauses.push('customer_email IS NULL');
+        } else if (email) {
+            clauses.push(`customer_email = '${esc(email)}'`);
+        }
+
+        const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+        const sql = `SELECT id, title, message, type, is_read, created_at, customer_email FROM notifications ${where} ORDER BY created_at DESC LIMIT ${Number.isFinite(limit) ? limit : 50}`;
+        const rows: any[] = await prisma.$queryRawUnsafe(sql);
+
+        const payload = (rows || []).map((n: any) => ({
+            id: n.id,
+            title: n.title,
+            message: n.message,
+            type: n.type,
+            is_read: n.is_read,
+            read: n.is_read,
+            created_at: n.created_at,
+            customer_email: n.customer_email,
+            for_role: n.customer_email ? 'CLIENT' : 'ADMIN'
+        }));
+
+        res.json(payload);
+    } catch {
+        res.json([]);
     }
 });
 
@@ -86,51 +137,11 @@ notificationsRouter.put('/:id/read', async (req: Request, res: Response) => {
     }
 });
 
-// PUT /api/notifications/read-all
-notificationsRouter.put('/read-all', async (req: Request, res: Response) => {
-    try {
-        const forRole = String(req.body?.forRole || '').toUpperCase();
-        const email = String(req.body?.email || req.user?.email || '');
-
-        let where = '';
-        if (forRole === 'ADMIN' || (isAdminUser(req) && !email)) {
-            where = 'WHERE customer_email IS NULL';
-        } else if (email) {
-            where = `WHERE customer_email = '${esc(email)}'`;
-        }
-
-        await prisma.$executeRawUnsafe(`UPDATE notifications SET is_read = true ${where}`);
-        res.json({ success: true });
-    } catch {
-        res.json({ success: false });
-    }
-});
-
 // DELETE /api/notifications/:id
 notificationsRouter.delete('/:id', async (req: Request, res: Response) => {
     try {
         const id = esc(String(req.params.id || ''));
         await prisma.$executeRawUnsafe(`DELETE FROM notifications WHERE id = '${id}'`);
-        res.json({ success: true });
-    } catch {
-        res.json({ success: false });
-    }
-});
-
-// DELETE /api/notifications/clear-all
-notificationsRouter.delete('/clear-all', async (req: Request, res: Response) => {
-    try {
-        const forRole = String(req.query.forRole || '').toUpperCase();
-        const email = String(req.query.email || req.user?.email || '');
-
-        let where = '';
-        if (forRole === 'ADMIN' || (isAdminUser(req) && !email)) {
-            where = 'WHERE customer_email IS NULL';
-        } else if (email) {
-            where = `WHERE customer_email = '${esc(email)}'`;
-        }
-
-        await prisma.$executeRawUnsafe(`DELETE FROM notifications ${where}`);
         res.json({ success: true });
     } catch {
         res.json({ success: false });
@@ -215,4 +226,3 @@ notificationsRouter.delete('/coupons/:id', requireAdmin, async (req: Request, re
         res.status(500).json({ error: 'Erro ao deletar cupom' });
     }
 });
-

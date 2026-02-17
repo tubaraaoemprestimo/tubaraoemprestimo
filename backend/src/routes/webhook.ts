@@ -304,10 +304,93 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
         });
         const conversationHistory = recentHistory.reverse().map(h => ({ role: h.role, content: h.content }));
 
-        // 8. Monta system prompt com contexto
+        // 8. Monta system prompt com contexto ENRIQUECIDO
         let systemPrompt = chatConfig.systemPrompt || 'Você é um assistente virtual da Tubarão Empréstimos, uma empresa de crédito. Seja educado, profissional e objetivo.';
-        if (customer) {
-            systemPrompt += `\n\nContexto do cliente:\nNome: ${customer.name}\nCPF: ${customer.cpf}\nEmail: ${customer.email}\nStatus: ${customer.status}`;
+
+        // 8.1 Detectar CPF na mensagem (formato: XXX.XXX.XXX-XX ou XXXXXXXXXXX)
+        const cpfMatch = content.match(/(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/);
+        let lookupCustomer = customer;
+
+        if (cpfMatch && !customer) {
+            const cpfClean = cpfMatch[1].replace(/\D/g, '');
+            const cpfFormatted = cpfClean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+            lookupCustomer = await prisma.customer.findFirst({
+                where: { OR: [{ cpf: cpfClean }, { cpf: cpfFormatted }] }
+            });
+            if (!lookupCustomer) {
+                // CPF não encontrado no sistema — a IA deve informar
+                systemPrompt += `\n\n⚠️ CONSULTA DE CPF: O cliente informou o CPF ${cpfFormatted} mas NÃO foi encontrado no sistema. Informe educadamente que o CPF não está cadastrado e oriente a pessoa a se cadastrar pelo site ou app.`;
+            }
+        }
+
+        // 8.2 Injetar dados completos do cliente identificado
+        if (lookupCustomer) {
+            systemPrompt += `\n\n===== DADOS DO CLIENTE (CONFIDENCIAL — use para responder, mas nunca mostre dados sensíveis completos) =====`;
+            systemPrompt += `\nNome: ${lookupCustomer.name}`;
+            systemPrompt += `\nCPF: ${lookupCustomer.cpf}`;
+            systemPrompt += `\nEmail: ${lookupCustomer.email}`;
+            systemPrompt += `\nTelefone: ${lookupCustomer.phone || 'não informado'}`;
+            systemPrompt += `\nStatus: ${lookupCustomer.status}`;
+
+            // Buscar empréstimos ativos
+            try {
+                const loans = await prisma.loan.findMany({
+                    where: { customerId: lookupCustomer.id },
+                    include: {
+                        installments: { orderBy: { dueDate: 'asc' } }
+                    }
+                });
+
+                if (loans.length === 0) {
+                    systemPrompt += `\nEmpréstimos: Nenhum empréstimo ativo encontrado.`;
+                } else {
+                    systemPrompt += `\n\n--- EMPRÉSTIMOS (${loans.length}) ---`;
+                    for (const loan of loans) {
+                        systemPrompt += `\n\nContrato #${loan.id.slice(-6)}:`;
+                        systemPrompt += `\n  Valor emprestado: R$ ${loan.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                        systemPrompt += `\n  Saldo devedor: R$ ${loan.remainingAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                        systemPrompt += `\n  Total de parcelas: ${loan.installmentsCount}`;
+                        systemPrompt += `\n  Status: ${loan.status || 'ATIVO'}`;
+
+                        // Parcelas detalhadas
+                        const paid = loan.installments.filter((i: any) => i.status === 'PAID').length;
+                        const late = loan.installments.filter((i: any) => i.status === 'LATE');
+                        const open = loan.installments.filter((i: any) => i.status === 'OPEN');
+
+                        systemPrompt += `\n  Parcelas pagas: ${paid}/${loan.installmentsCount}`;
+
+                        if (late.length > 0) {
+                            systemPrompt += `\n  ⚠️ PARCELAS ATRASADAS (${late.length}):`;
+                            for (const inst of late) {
+                                const daysLate = Math.floor((Date.now() - new Date(inst.dueDate).getTime()) / 86400000);
+                                systemPrompt += `\n    - Parcela R$ ${inst.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} venceu em ${new Date(inst.dueDate).toLocaleDateString('pt-BR')} (${daysLate} dias de atraso)`;
+                            }
+                        }
+
+                        if (open.length > 0) {
+                            const nextInst = open[0];
+                            systemPrompt += `\n  Próxima parcela: R$ ${(nextInst as any).amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} vence em ${new Date((nextInst as any).dueDate).toLocaleDateString('pt-BR')}`;
+                        }
+                    }
+                }
+
+                // Buscar solicitações pendentes
+                const pendingRequests = await prisma.loanRequest.findMany({
+                    where: { customerId: lookupCustomer.id, status: { in: ['PENDING', 'IN_REVIEW'] } }
+                });
+                if (pendingRequests.length > 0) {
+                    systemPrompt += `\n\n--- SOLICITAÇÕES PENDENTES (${pendingRequests.length}) ---`;
+                    for (const req of pendingRequests) {
+                        systemPrompt += `\n  Solicitação: R$ ${req.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em ${req.installments}x — Status: ${req.status}`;
+                    }
+                }
+
+            } catch (dbErr: any) {
+                console.error('[Webhook] Erro ao buscar dados financeiros do cliente:', dbErr.message);
+            }
+
+            systemPrompt += `\n===== FIM DOS DADOS DO CLIENTE =====`;
+            systemPrompt += `\n\nIMPORTANTE: Use esses dados para responder perguntas do cliente sobre seus empréstimos, parcelas, saldo devedor, datas de vencimento, etc. Nunca exponha o CPF completo ou dados sensíveis na resposta. Se o cliente perguntar "quanto devo?", informe o saldo devedor. Se perguntar sobre parcelas, detalhe as próximas e atrasadas.`;
         }
 
         // 9. Chama a IA (com provider correto e key correta)
