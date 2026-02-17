@@ -100,15 +100,15 @@ emailRouter.post('/send', async (req: Request, res: Response) => {
         // Aplica template branded se solicitado (default: true)
         const finalHtml = useTemplate !== false ? wrapInBrandedTemplate(html) : html;
 
-        // Tenta SMTP primeiro (primary)
-        let result = await sendViaSMTP(to, subject, finalHtml, text);
-        let provider = 'SMTP';
+        // Tenta Resend primeiro (primary)
+        let result = await sendViaResend(to, subject, finalHtml);
+        let provider = 'RESEND';
 
-        // Se SMTP falhar, tenta Resend como fallback
-        if (!result.success && process.env.RESEND_API_KEY) {
-            console.log('[Email] SMTP falhou, tentando Resend como fallback...');
-            result = await sendViaResend(to, subject, finalHtml);
-            provider = 'RESEND';
+        // Se Resend falhar, tenta SMTP como fallback
+        if (!result.success && process.env.SMTP_USER && process.env.SMTP_PASS) {
+            console.log('[Email] Resend falhou, tentando SMTP como fallback...');
+            result = await sendViaSMTP(to, subject, finalHtml, text);
+            provider = 'SMTP';
         }
 
         // Loga no NotificationLog
@@ -167,14 +167,14 @@ emailRouter.post('/test', requireAdmin, async (req: Request, res: Response) => {
 
         const finalHtml = wrapInBrandedTemplate(testHtml);
 
-        // Tenta SMTP primeiro
-        let result = await sendViaSMTP(recipient, '🧪 Teste de Email — Tubarão Empréstimos', finalHtml);
-        let provider = 'SMTP';
+        // Tenta Resend primeiro (primary)
+        let result = await sendViaResend(recipient, '🧪 Teste de Email — Tubarão Empréstimos', finalHtml);
+        let provider = 'RESEND';
 
-        // Fallback para Resend
-        if (!result.success && process.env.RESEND_API_KEY) {
-            result = await sendViaResend(recipient, '🧪 Teste de Email — Tubarão Empréstimos', finalHtml);
-            provider = 'RESEND';
+        // Fallback para SMTP
+        if (!result.success && process.env.SMTP_USER && process.env.SMTP_PASS) {
+            result = await sendViaSMTP(recipient, '🧪 Teste de Email — Tubarão Empréstimos', finalHtml);
+            provider = 'SMTP';
         }
 
         // Loga
