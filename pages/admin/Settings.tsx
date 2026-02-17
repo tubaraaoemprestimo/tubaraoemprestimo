@@ -325,23 +325,23 @@ export const Settings: React.FC = () => {
             {/* Multa Fixa */}
             <div>
               <label className="block text-sm font-bold text-zinc-300 mb-2">Multa por Atraso</label>
-              <div className="flex gap-3">
-                <select
-                  value={settings.lateFixedFeeType || 'FIXED'}
-                  onChange={(e) => setSettings({ ...settings, lateFixedFeeType: e.target.value as any })}
-                  className={`${inputStyle} w-28 text-center font-bold`}
-                >
-                  <option value="FIXED">R$</option>
-                  <option value="PERCENT">%</option>
-                </select>
+              <div className="flex gap-2 items-center">
                 <input
                   type="number"
                   step="0.01"
                   value={settings.lateFixedFee || 0}
                   onChange={(e) => setSettings({ ...settings, lateFixedFee: Number(e.target.value) })}
-                  className={`${inputStyle} flex-1 text-lg font-bold`}
+                  className={`${inputStyle} flex-1 min-w-0 text-lg font-bold`}
                   placeholder="0.00"
                 />
+                <select
+                  value={settings.lateFixedFeeType || 'FIXED'}
+                  onChange={(e) => setSettings({ ...settings, lateFixedFeeType: e.target.value as any })}
+                  className={`${inputStyle} w-20 shrink-0 text-center font-bold`}
+                >
+                  <option value="FIXED">R$</option>
+                  <option value="PERCENT">%</option>
+                </select>
               </div>
               <p className="text-xs text-zinc-600 mt-2">
                 {settings.lateFixedFeeType === 'PERCENT'
@@ -353,23 +353,23 @@ export const Settings: React.FC = () => {
             {/* Juros/Dia */}
             <div>
               <label className="block text-sm font-bold text-zinc-300 mb-2">Juros por Dia de Atraso</label>
-              <div className="flex gap-3">
-                <select
-                  value={settings.lateInterestDailyType || 'PERCENT'}
-                  onChange={(e) => setSettings({ ...settings, lateInterestDailyType: e.target.value as any })}
-                  className={`${inputStyle} w-28 text-center font-bold`}
-                >
-                  <option value="PERCENT">%</option>
-                  <option value="FIXED">R$</option>
-                </select>
+              <div className="flex gap-2 items-center">
                 <input
                   type="number"
                   step="0.01"
                   value={settings.lateInterestDaily || 0}
                   onChange={(e) => setSettings({ ...settings, lateInterestDaily: Number(e.target.value) })}
-                  className={`${inputStyle} flex-1 text-lg font-bold`}
+                  className={`${inputStyle} flex-1 min-w-0 text-lg font-bold`}
                   placeholder="0.033"
                 />
+                <select
+                  value={settings.lateInterestDailyType || 'PERCENT'}
+                  onChange={(e) => setSettings({ ...settings, lateInterestDailyType: e.target.value as any })}
+                  className={`${inputStyle} w-20 shrink-0 text-center font-bold`}
+                >
+                  <option value="PERCENT">%</option>
+                  <option value="FIXED">R$</option>
+                </select>
               </div>
               <p className="text-xs text-zinc-600 mt-2">Aplicado a cada dia de atraso</p>
             </div>
@@ -377,23 +377,23 @@ export const Settings: React.FC = () => {
             {/* Juros/Mês */}
             <div>
               <label className="block text-sm font-bold text-zinc-300 mb-2">Juros por Mês de Atraso</label>
-              <div className="flex gap-3">
-                <select
-                  value={settings.lateInterestMonthlyType || 'PERCENT'}
-                  onChange={(e) => setSettings({ ...settings, lateInterestMonthlyType: e.target.value as any })}
-                  className={`${inputStyle} w-28 text-center font-bold`}
-                >
-                  <option value="PERCENT">%</option>
-                  <option value="FIXED">R$</option>
-                </select>
+              <div className="flex gap-2 items-center">
                 <input
                   type="number"
                   step="0.1"
                   value={settings.lateInterestMonthly || 0}
                   onChange={(e) => setSettings({ ...settings, lateInterestMonthly: Number(e.target.value) })}
-                  className={`${inputStyle} flex-1 text-lg font-bold`}
+                  className={`${inputStyle} flex-1 min-w-0 text-lg font-bold`}
                   placeholder="1.0"
                 />
+                <select
+                  value={settings.lateInterestMonthlyType || 'PERCENT'}
+                  onChange={(e) => setSettings({ ...settings, lateInterestMonthlyType: e.target.value as any })}
+                  className={`${inputStyle} w-20 shrink-0 text-center font-bold`}
+                >
+                  <option value="PERCENT">%</option>
+                  <option value="FIXED">R$</option>
+                </select>
               </div>
               <p className="text-xs text-zinc-600 mt-2">Juros moratórios mensais</p>
             </div>
@@ -401,23 +401,23 @@ export const Settings: React.FC = () => {
             {/* Juros/Ano */}
             <div>
               <label className="block text-sm font-bold text-zinc-300 mb-2">Juros por Ano de Atraso</label>
-              <div className="flex gap-3">
-                <select
-                  value={settings.lateInterestYearlyType || 'PERCENT'}
-                  onChange={(e) => setSettings({ ...settings, lateInterestYearlyType: e.target.value as any })}
-                  className={`${inputStyle} w-28 text-center font-bold`}
-                >
-                  <option value="PERCENT">%</option>
-                  <option value="FIXED">R$</option>
-                </select>
+              <div className="flex gap-2 items-center">
                 <input
                   type="number"
                   step="0.5"
                   value={settings.lateInterestYearly || 0}
                   onChange={(e) => setSettings({ ...settings, lateInterestYearly: Number(e.target.value) })}
-                  className={`${inputStyle} flex-1 text-lg font-bold`}
+                  className={`${inputStyle} flex-1 min-w-0 text-lg font-bold`}
                   placeholder="12.0"
                 />
+                <select
+                  value={settings.lateInterestYearlyType || 'PERCENT'}
+                  onChange={(e) => setSettings({ ...settings, lateInterestYearlyType: e.target.value as any })}
+                  className={`${inputStyle} w-20 shrink-0 text-center font-bold`}
+                >
+                  <option value="PERCENT">%</option>
+                  <option value="FIXED">R$</option>
+                </select>
               </div>
               <p className="text-xs text-zinc-600 mt-2">Taxa anual de referência</p>
             </div>
