@@ -4,6 +4,8 @@ import { apiService } from '../../services/apiService';
 import { useToast } from '../../components/Toast';
 import { Button } from '../../components/Button';
 
+const inputStyle = "w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none transition-colors";
+
 interface PIXSettingsProps {
   settings: any;
   onUpdate: () => void;
@@ -103,7 +105,7 @@ export const PIXSettings: React.FC<PIXSettingsProps> = ({ settings, onUpdate }) 
                 className={`p-3 rounded-lg border text-sm transition-all ${pixKeyType === type
                   ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]'
                   : 'border-zinc-700 bg-black hover:border-zinc-500'
-                }`}
+                  }`}
               >
                 {getPixKeyTypeLabel(type)}
               </button>
@@ -118,10 +120,10 @@ export const PIXSettings: React.FC<PIXSettingsProps> = ({ settings, onUpdate }) 
             value={pixKey}
             onChange={(e) => setPixKey(e.target.value)}
             placeholder={pixKeyType === 'CPF' ? '000.000.000-00' :
-                       pixKeyType === 'CNPJ' ? '00.000.000/0000-00' :
-                       pixKeyType === 'EMAIL' ? 'email@exemplo.com' :
-                       pixKeyType === 'TELEFONE' ? '(11) 99999-9999' :
-                       '00000000-0000-0000-0000-000000000000'}
+              pixKeyType === 'CNPJ' ? '00.000.000/0000-00' :
+                pixKeyType === 'EMAIL' ? 'email@exemplo.com' :
+                  pixKeyType === 'TELEFONE' ? '(11) 99999-9999' :
+                    '00000000-0000-0000-0000-000000000000'}
             className={inputStyle}
           />
         </div>
