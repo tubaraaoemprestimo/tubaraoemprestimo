@@ -296,172 +296,191 @@ if (user) {
         </div>
       </header>
 
-      <main className="p-4 max-w-lg mx-auto space-y-4 animate-in slide-in-from-bottom-4 duration-500">
-        {/* Saudação - Mais compacta */}
-        <div className="pl-1">
-          <h1 className="text-zinc-500 text-xs font-medium tracking-wide">Olá,</h1>
-          {loading ? <Skeleton className="h-6 w-40 mt-0.5" /> : <h2 className="text-lg font-bold text-white tracking-tight">{userData.name.split(' ')[0]}</h2>}
+      <main className="max-w-lg mx-auto animate-in slide-in-from-bottom-4 duration-500">
+
+        {/* Saudação */}
+        <div className="px-5 pt-5 pb-3">
+          {loading ? <Skeleton className="h-7 w-44" /> : (
+            <h2 className="text-2xl font-bold text-white">Bem-vindo, {userData.name.split(' ')[0]}</h2>
+          )}
         </div>
 
-        {/* Pre-Approved Offer Banner */}
+        {/* Alerts dinâmicos */}
         {preApprovedAmount && (
-          <div className="bg-gradient-to-r from-[#D4AF37] to-[#FDB931] rounded-xl p-3.5 shadow-lg shadow-[#D4AF37]/20 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-3 opacity-20">
-              <Sparkles size={48} className="text-black" />
-            </div>
-            <div className="relative z-10 text-black">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <Sparkles size={12} />
-                <span className="text-[10px] font-bold uppercase tracking-wider">Oferta Especial</span>
-              </div>
-              <h3 className="text-sm font-bold leading-tight mb-1.5">Crédito Pré-Aprovado</h3>
-              <div className="text-2xl font-extrabold mb-2.5">R$ {preApprovedAmount.toLocaleString()}</div>
-              <Button
-                onClick={() => navigate(`/wizard?amount=${preApprovedAmount}`)}
-                className="w-full bg-black text-[#D4AF37] hover:bg-zinc-800 border-none text-sm py-2"
-              >
-                Contratar Agora
-              </Button>
+          <div className="mx-4 mb-3 bg-gradient-to-r from-[#D4AF37] to-[#FDB931] rounded-xl p-3.5 relative overflow-hidden">
+            <div className="absolute right-3 top-2 opacity-20"><Sparkles size={40} className="text-black" /></div>
+            <div className="text-black">
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5">Oferta Especial</p>
+              <p className="text-base font-bold mb-1">Crédito Pré-Aprovado — R$ {preApprovedAmount.toLocaleString()}</p>
+              <button onClick={() => navigate(`/wizard?amount=${preApprovedAmount}`)} className="text-xs font-bold bg-black text-[#D4AF37] px-3 py-1.5 rounded-lg">
+                Contratar Agora →
+              </button>
             </div>
           </div>
         )}
 
-        {/* Waiting Docs Action Card */}
         {pendingRequest && pendingRequest.status === LoanStatus.WAITING_DOCS && (
-          <div className="bg-blue-900/20 border border-blue-500/50 rounded-xl p-3.5 flex flex-col gap-2.5">
-            <div className="flex items-center gap-2.5 text-blue-400 font-bold text-sm">
-              <AlertTriangle size={16} /> Pendência na Análise
+          <div className="mx-4 mb-3 bg-blue-900/20 border border-blue-500/40 rounded-xl p-3.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-blue-400">
+              <AlertTriangle size={16} />
+              <span className="text-sm font-bold">Documento pendente</span>
             </div>
-            <p className="text-xs text-zinc-300">
-              Precisamos de um documento complementar: <br />
-              <span className="text-white font-bold italic text-[11px]">"{pendingRequest.supplementalInfo?.description}"</span>
-            </p>
-            <Button onClick={() => setIsUploadModalOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none text-xs py-2">
-              <Upload size={14} className="mr-1.5" /> Enviar Documento
-            </Button>
+            <button onClick={() => setIsUploadModalOpen(true)} className="text-xs font-bold bg-blue-600 text-white px-3 py-1.5 rounded-lg shrink-0">
+              Enviar
+            </button>
           </div>
         )}
 
-        {/* Loan Progress Timeline */}
-        {pendingRequest && (
-          <LoanTimeline
-            status={pendingRequest.status}
-            date={pendingRequest.date}
-            amount={pendingRequest.amount}
-            installments={pendingRequest.installments}
-          />
-        )}
+        {pendingRequest && <div className="px-4 mb-3"><LoanTimeline status={pendingRequest.status} date={pendingRequest.date} amount={pendingRequest.amount} installments={pendingRequest.installments} /></div>}
 
-        {/* Contract PDF Download Card */}
         {contractPdfUrl && (
-          <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-green-900/20 rounded-xl p-3 border border-green-500/30 flex items-center gap-3">
-            <div className="bg-green-500/20 p-2.5 rounded-lg">
-              <FileText size={20} className="text-green-400" />
-            </div>
-            <div className="flex-1">
-              <p className="font-bold text-white text-xs">Contrato Assinado</p>
-              <p className="text-[10px] text-zinc-400">Seu contrato foi gerado em PDF</p>
-            </div>
-            <a href={contractPdfUrl} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-[11px] transition-all shrink-0">
-              <Download size={14} /> Baixar
+          <div className="mx-4 mb-3 bg-zinc-900 border border-green-500/30 rounded-xl p-3 flex items-center gap-3">
+            <div className="bg-green-500/20 p-2 rounded-lg"><FileText size={18} className="text-green-400" /></div>
+            <p className="flex-1 text-xs font-bold text-white">Contrato disponível em PDF</p>
+            <a href={contractPdfUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold bg-green-600 text-white px-3 py-1.5 rounded-lg shrink-0 flex items-center gap-1">
+              <Download size={12} /> Baixar
             </a>
           </div>
         )}
 
-        {/* CARD SALDO DEVEDOR - Mais compacto e profissional */}
-        <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-[#D4AF37]/10 rounded-2xl p-5 border border-zinc-800 relative overflow-hidden shadow-xl">
-          <div className="relative z-10">
-            <div className="flex items-center gap-1.5 text-zinc-400 mb-2">
+        {/* ── CARD SALDO DEVEDOR ── */}
+        <div className="mx-4 mb-4 bg-[#1a1a1a] rounded-2xl overflow-hidden border border-zinc-800 shadow-xl">
+          {/* Topo do card */}
+          <div className="p-5 pb-4">
+            <div className="flex items-center gap-2 text-zinc-400 mb-2">
               <Wallet size={14} />
               <span className="text-[10px] font-bold uppercase tracking-widest">Saldo Devedor</span>
             </div>
-
-            {loading ? <Skeleton className="h-10 w-36 mb-4" /> : (
-              <div className="text-3xl font-bold text-[#D4AF37] mb-4 transition-all">
-                {formatCurrency(userData.balance)}
+            {loading ? <Skeleton className="h-10 w-36" /> : (
+              <div className="text-[2.2rem] font-bold text-white leading-none">
+                {isPrivacyEnabled ? 'R$ ••••••' : (
+                  <>
+                    <span className="text-xl font-semibold text-zinc-300">R$ </span>
+                    {userData.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </>
+                )}
               </div>
             )}
+          </div>
 
-            <div className="flex items-center justify-between p-3.5 bg-black/40 rounded-xl border border-zinc-800/50 mb-4">
-              <div>
-                <div className="text-[9px] text-zinc-500 uppercase mb-0.5">Próxima Parcela</div>
-                <div className="text-white font-bold text-sm flex items-center gap-1.5">
-                  <Calendar size={12} className="text-[#FF0000]" />
-                  {loading ? <Skeleton className="h-4 w-16" /> : userData.nextDue}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[9px] text-zinc-500 uppercase mb-0.5">Valor</div>
-                <div className="text-white font-bold text-base">
-                  {loading ? <Skeleton className="h-4 w-20 ml-auto" /> : formatCurrency(userData.nextInstallmentValue)}
-                </div>
+          {/* Próxima parcela */}
+          <div className="mx-4 mb-4 bg-black/50 rounded-xl p-3.5 flex items-center justify-between">
+            <div>
+              <p className="text-[9px] text-zinc-500 uppercase tracking-widest mb-1">Próxima Parcela</p>
+              <div className="flex items-center gap-1.5">
+                <Calendar size={13} className="text-[#FF0000]" />
+                <span className="text-white font-bold text-sm">
+                  {loading ? '...' : (() => {
+                    const parts = userData.nextDue.split('/');
+                    return parts.length >= 2 ? (
+                      <><span className="text-white font-extrabold">{parts[0]}/{parts[1]}</span>{parts[2] ? `/${parts[2]}` : ''}</>
+                    ) : userData.nextDue;
+                  })()}
+                </span>
               </div>
             </div>
-
-            <Button onClick={() => navigate('/client/contracts')} className="w-full bg-[#FF0000] hover:bg-red-600 shadow-lg text-sm py-3 font-bold" disabled={loading || userData.balance === 0}>
-              Pagar Parcela <ChevronRight size={16} />
-            </Button>
-          </div>
-        </div>
-
-        {/* BOTÕES PRINCIPAIS - Mais compactos e profissionais */}
-        <div className="space-y-3">
-          {/* Bloco Principal - Botões Grandes */}
-          <div className="grid grid-cols-3 gap-2.5">
-            <MainActionButton icon={Plus} label="Solicitar Crédito" onClick={() => navigate('/client/wizard')} />
-            <MainActionButton icon={FileText} label="Meus Contratos" onClick={() => navigate('/client/contracts')} />
-            <MainActionButton icon={TrendingUp} label="Extrato" onClick={() => navigate('/client/statement')} />
+            <div className="text-right">
+              <p className="text-[9px] text-zinc-500 uppercase tracking-widest mb-1">Valor</p>
+              <span className="text-white font-bold text-sm">
+                {loading ? '...' : formatCurrency(userData.nextInstallmentValue)}
+              </span>
+            </div>
           </div>
 
-          {/* Bloco Secundário - Botões Menores */}
-          <div className="grid grid-cols-3 gap-2.5">
-            <SecondaryActionButton icon={Percent} label="Renegociar" onClick={() => setIsRenegotiateOpen(true)} disabled={userData.balance === 0} />
-            <SecondaryActionButton icon={Gift} label="Indicações" onClick={() => navigate('/client/referrals')} />
-            <SecondaryActionButton icon={History} label="Histórico" onClick={() => setIsHistoryModalOpen(true)} />
-          </div>
-        </div>
-
-        {/* Cards de Acesso: Ofertas, Cupons, Campanhas - Mais compactos */}
-        <div className="grid grid-cols-3 gap-2.5">
-          {/* Ofertas/Propostas */}
+          {/* Botão Pagar Parcela */}
           <button
-            onClick={() => setIsOffersModalOpen(true)}
-            className="relative flex flex-col items-center gap-1.5 p-3 rounded-xl bg-gradient-to-br from-emerald-900/30 to-emerald-900/10 border border-emerald-600/50 hover:border-emerald-400 transition-all"
+            onClick={() => navigate('/client/contracts')}
+            disabled={loading || userData.balance === 0}
+            className="w-full bg-[#FF0000] hover:bg-red-700 active:bg-red-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm tracking-widest uppercase py-4 flex items-center justify-center gap-2 transition-all"
           >
-            <Calculator size={20} className="text-emerald-400" />
-            <span className="text-[10px] font-bold text-white">Ofertas</span>
+            PAGAR PARCELA <ChevronRight size={18} />
+          </button>
+        </div>
+
+        {/* ── MEUS SERVIÇOS ── */}
+        <div className="px-4 mb-1">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Meus Serviços</p>
+        </div>
+
+        <div className="mx-4 rounded-2xl overflow-hidden border border-zinc-800 bg-[#1a1a1a] mb-4">
+          {/* Solicitar Crédito */}
+          <button onClick={() => navigate('/client/wizard')} className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-zinc-800/50 active:bg-zinc-800 transition-all border-b border-zinc-800">
+            <div className="w-9 h-9 rounded-lg bg-[#FF0000] flex items-center justify-center shrink-0">
+              <Plus size={18} strokeWidth={2.5} className="text-white" />
+            </div>
+            <span className="flex-1 text-left text-sm font-semibold text-white">Solicitar Crédito</span>
+            <ChevronRight size={16} className="text-zinc-500" />
+          </button>
+
+          {/* Meus Contratos */}
+          <button onClick={() => navigate('/client/contracts')} className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-zinc-800/50 active:bg-zinc-800 transition-all border-b border-zinc-800">
+            <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0">
+              <FileText size={18} className="text-zinc-300" />
+            </div>
+            <span className="flex-1 text-left text-sm font-semibold text-white">Meus Contratos</span>
+            <ChevronRight size={16} className="text-zinc-500" />
+          </button>
+
+          {/* Extrato */}
+          <button onClick={() => navigate('/client/statement')} className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-zinc-800/50 active:bg-zinc-800 transition-all">
+            <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0">
+              <TrendingUp size={18} className="text-zinc-300" />
+            </div>
+            <span className="flex-1 text-left text-sm font-semibold text-white">Extrato</span>
+            <ChevronRight size={16} className="text-zinc-500" />
+          </button>
+        </div>
+
+        {/* ── OPORTUNIDADES ── */}
+        <div className="px-4 mb-1">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Oportunidades</p>
+        </div>
+
+        {/* Linha 1: Ofertas, Cupons, Campanhas */}
+        <div className="mx-4 grid grid-cols-3 gap-2 mb-2">
+          <button onClick={() => setIsOffersModalOpen(true)} className="relative flex items-center gap-2.5 px-3 py-3 rounded-xl bg-[#1a2a1e] border border-emerald-900/60 hover:border-emerald-600 active:scale-95 transition-all">
+            <Calculator size={18} className="text-emerald-400 shrink-0" />
+            <span className="text-xs font-bold text-white">Ofertas</span>
             {(preApprovedAmount || installmentOffer) && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 text-black text-[9px] font-bold rounded-full flex items-center justify-center">
                 {(preApprovedAmount ? 1 : 0) + (installmentOffer ? 1 : 0)}
               </span>
             )}
           </button>
-
-          {/* Cupons */}
-          <button
-            onClick={() => setIsCouponsModalOpen(true)}
-            className="relative flex flex-col items-center gap-1.5 p-3 rounded-xl bg-gradient-to-br from-purple-900/30 to-purple-900/10 border border-purple-600/50 hover:border-purple-400 transition-all"
-          >
-            <Ticket size={20} className="text-purple-400" />
-            <span className="text-[10px] font-bold text-white">Cupons</span>
+          <button onClick={() => setIsCouponsModalOpen(true)} className="relative flex items-center gap-2.5 px-3 py-3 rounded-xl bg-[#1e1a2a] border border-purple-900/60 hover:border-purple-600 active:scale-95 transition-all">
+            <Ticket size={18} className="text-purple-400 shrink-0" />
+            <span className="text-xs font-bold text-white">Cupons</span>
             {coupons.length > 0 && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{coupons.length}</span>
             )}
           </button>
-
-          {/* Campanhas */}
-          <button
-            onClick={() => setIsCampaignsModalOpen(true)}
-            className="relative flex flex-col items-center gap-1.5 p-3 rounded-xl bg-gradient-to-br from-amber-900/30 to-amber-900/10 border border-amber-600/50 hover:border-amber-400 transition-all"
-          >
-            <Megaphone size={20} className="text-amber-400" />
-            <span className="text-[10px] font-bold text-white">Campanhas</span>
+          <button onClick={() => setIsCampaignsModalOpen(true)} className="relative flex items-center gap-2.5 px-3 py-3 rounded-xl bg-[#2a221a] border border-amber-900/60 hover:border-amber-600 active:scale-95 transition-all">
+            <Megaphone size={18} className="text-amber-400 shrink-0" />
+            <span className="text-xs font-bold text-white">Campanhas</span>
             {activeCampaigns.length > 0 && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-black text-[9px] font-bold rounded-full flex items-center justify-center">{activeCampaigns.length}</span>
             )}
           </button>
         </div>
+
+        {/* Linha 2: Renegociar, Indicações, Histórico */}
+        <div className="mx-4 bg-[#1a1a1a] border border-zinc-800 rounded-2xl overflow-hidden mb-6">
+          <div className="grid grid-cols-3">
+            <button onClick={() => setIsRenegotiateOpen(true)} disabled={userData.balance === 0} className="flex flex-col items-center gap-2 py-4 hover:bg-zinc-800/50 disabled:opacity-40 transition-all border-r border-zinc-800 active:scale-95">
+              <Percent size={20} className="text-zinc-300" />
+              <span className="text-[10px] font-semibold text-zinc-300">Renegociar</span>
+            </button>
+            <button onClick={() => navigate('/client/referrals')} className="flex flex-col items-center gap-2 py-4 hover:bg-zinc-800/50 transition-all border-r border-zinc-800 active:scale-95">
+              <Gift size={20} className="text-zinc-300" />
+              <span className="text-[10px] font-semibold text-zinc-300">Indicações</span>
+            </button>
+            <button onClick={() => setIsHistoryModalOpen(true)} className="flex flex-col items-center gap-2 py-4 hover:bg-zinc-800/50 transition-all active:scale-95">
+              <History size={20} className="text-zinc-300" />
+              <span className="text-[10px] font-semibold text-zinc-300">Histórico</span>
+            </button>
+          </div>
+        </div>
+
       </main>
 
       {/* Upload Supplemental Doc Modal */}
