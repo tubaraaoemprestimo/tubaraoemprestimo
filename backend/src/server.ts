@@ -27,6 +27,7 @@ import { whatsappStatusRouter } from './routes/whatsappStatus';
 import { referralsRouter } from './routes/referrals';
 import { communicationRouter } from './routes/communication';
 import { adminRouter } from './routes/admin';
+import { qualificationLeadsRouter } from './routes/qualificationLeads';
 import { paymentReceiptsRouter } from './routes/paymentReceipts';
 import { openFinanceRouter } from './routes/openFinance';
 import { pixRouter } from './routes/pix';
@@ -101,6 +102,7 @@ app.use('/api/pix', pixRouter);
 app.use('/api/collections', collectionsRouter);
 app.use('/api/partners', partnersRouter);
 app.use('/api/maintenance', maintenanceRouter);
+app.use('/api/qualification-leads', qualificationLeadsRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {

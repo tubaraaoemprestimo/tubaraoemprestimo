@@ -25,6 +25,7 @@ import { Investors } from './pages/admin/Investors';
 import { ImportContacts } from './pages/admin/ImportContacts';
 import { DataSearch } from './pages/admin/DataSearch';
 import { Partners } from './pages/admin/Partners';
+import { QualificationLeadsAdmin } from './pages/admin/QualificationLeadsAdmin';
 
 // Pages - Admin Extended (Hubs Unificados)
 import { FinanceHub } from './pages/admin/FinanceHub';
@@ -45,6 +46,7 @@ import { LandingPage } from './pages/public/LandingPage';
 import Register from './pages/auth/Register';
 import ResetPassword from './pages/auth/ResetPassword';
 import { SalesPage } from './pages/public/SalesPage';
+import { QualificationPage } from './pages/public/QualificationPage';
 
 // Components
 import { Chatbot } from './components/Chatbot';
@@ -483,6 +485,7 @@ function App() {
             {/* Public Routes */}
             <Route path="/" element={<Login />} />
             <Route path="/site" element={<SalesPage />} />
+            <Route path="/qualificacao" element={<QualificationPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
@@ -512,6 +515,7 @@ function App() {
             <Route path="/admin/import-contacts" element={<AdminLayout><ImportContacts /></AdminLayout>} />
             <Route path="/admin/data-search" element={<AdminLayout><DataSearch /></AdminLayout>} />
             <Route path="/admin/partners" element={<AdminLayout><Partners /></AdminLayout>} />
+            <Route path="/admin/qualification-leads" element={<AdminLayout><QualificationLeadsAdmin /></AdminLayout>} />
             <Route path="/admin/settings" element={<AdminLayout><Settings /></AdminLayout>} />
 
             {/* Admin Protected - Hubs Unificados */}

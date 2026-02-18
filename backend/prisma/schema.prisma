@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:tubarao123@localhost:5432/tubarao_db"
+  url      = env("DATABASE_URL")
 }
 
 model AiChatHistory {
@@ -584,6 +584,30 @@ model WhatsappConfig {
   @@map("whatsapp_config")
 }
 
+model QualificationLead {
+  id                String   @id @default(uuid())
+  name              String
+  email             String
+  phone             String
+  hasExperience     Boolean  @map("has_experience")
+  experienceLevel   String?  @map("experience_level")
+  hasCapital        Boolean  @map("has_capital")
+  capitalAmount     String?  @map("capital_amount")
+  wantsToLearn      Boolean  @map("wants_to_learn")
+  learningInterest  String?  @map("learning_interest")
+  hasTime           Boolean  @map("has_time")
+  timeAvailability  String?  @map("time_availability")
+  wantsPartnership  Boolean  @map("wants_partnership")
+  partnershipType   String?  @map("partnership_type")
+  tags              String[] @default([])
+  status            String   @default("NEW")
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("qualification_leads")
+}
+
 model Referral {
   id                 String    @id @default(uuid())
   referrerCustomerId String    @map("referrer_customer_id")
@@ -745,4 +769,28 @@ model PartnerInvite {
   @@index([partnerId])
   @@index([invitedEmail])
   @@index([inviteCode])
+}
+
+
+model QualificationLead {
+  id                   String   @id @default(uuid())
+  mainInterest         String   @map("main_interest")
+  creditExperience     String   @map("credit_experience")
+  availableCapital     String   @map("available_capital")
+  intention            String
+  investmentCapacity   String   @map("investment_capacity")
+  interestedSolutions  String[] @map("interested_solutions")
+  weeklyTime           String   @map("weekly_time")
+  fullName             String   @map("full_name")
+  whatsapp             String
+  email                String
+  city                 String
+  state                String
+  tags                 Json
+  status               String   @default("PENDING")
+  notes                String?
+  submittedAt          DateTime @map("submitted_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("qualification_leads")
 }
