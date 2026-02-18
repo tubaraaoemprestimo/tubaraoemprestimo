@@ -537,9 +537,10 @@ export const Wizard: React.FC = () => {
     // Validação Específica INVESTIDOR
     if (profileType === 'INVESTIDOR' && currentStep === 3) {
       if (!investorData.fullName.trim()) { addToast("Informe seu nome completo.", 'warning'); return; }
-      if (!investorData.cpfCnpj.trim()) { addToast("Informe seu CPF ou CNPJ.", 'warning'); return; }
+      if (!investorData.birthDate) { addToast("Informe sua data de nascimento.", 'warning'); return; }
       if (!investorData.phone.trim()) { addToast("Informe seu telefone.", 'warning'); return; }
       if (!investorData.email.trim()) { addToast("Informe seu email.", 'warning'); return; }
+      if (!investorData.preferredContactTime) { addToast("Selecione o melhor horário para contato.", 'warning'); return; }
     }
 
     if (currentStep === dataStep && profileType !== 'INVESTIDOR') {
