@@ -88,7 +88,7 @@ const profileOptions = [
 
 // Steps dinâmicos baseados no perfil
 const getStepsForProfile = (profile: ProfileType) => {
-  // INVESTIDOR tem fluxo próprio: Info > Dados > Investimento > Banco > Termos > Confirmar
+  // INVESTIDOR tem fluxo próprio: Info > Dados > Investimento > Banco > Visualizar Termos > Aceitar e Assinar > Confirmar
   if (profile === 'INVESTIDOR') {
     return [
       { id: 1, title: 'Serviço', icon: Users },
@@ -96,8 +96,9 @@ const getStepsForProfile = (profile: ProfileType) => {
       { id: 3, title: 'Dados', icon: User },
       { id: 4, title: 'Investimento', icon: DollarSign },
       { id: 5, title: 'Banco', icon: Landmark },
-      { id: 6, title: 'Termos', icon: FileSignature },
-      { id: 7, title: 'Confirmar', icon: CheckCircle2 },
+      { id: 6, title: 'Termos', icon: FileText },
+      { id: 7, title: 'Assinar', icon: FileSignature },
+      { id: 8, title: 'Confirmar', icon: CheckCircle2 },
     ];
   }
   // LIMPA_NOME é um SERVIÇO simples - não precisa de documentos
@@ -176,8 +177,7 @@ export const Wizard: React.FC = () => {
   // Investidor - campos específicos
   const [investorData, setInvestorData] = useState({
     fullName: '', cpfCnpj: '', rgCnh: '', birthDate: '',
-    email: '', phone: '',
-    address: '', city: '', state: '', zipCode: '',
+    email: '', phone: '', preferredContactTime: '',
     bankName: '', pixKey: '', pixKeyType: 'cpf', accountHolderName: '',
     investmentAmount: 10000,
     customInvestmentAmount: '',
@@ -464,9 +464,9 @@ export const Wizard: React.FC = () => {
         if (!investorData.email.trim() || !investorData.email.includes('@')) {
           addToast("Informe um email válido.", 'warning'); return;
         }
-        if (!investorData.address.trim()) { addToast("Informe seu endereço.", 'warning'); return; }
-        if (!investorData.city.trim()) { addToast("Informe sua cidade.", 'warning'); return; }
-        if (!investorData.state.trim()) { addToast("Informe seu estado.", 'warning'); return; }
+        if (!investorData.preferredContactTime) {
+          addToast("Selecione o melhor horário para contato.", 'warning'); return;
+        }
       }
       // Step 4: Investimento (valor, modalidade)
       if (currentStep === 4) {
@@ -494,10 +494,13 @@ export const Wizard: React.FC = () => {
         if (!investorData.pixKey.trim()) { addToast("Informe sua chave PIX.", 'warning'); return; }
         if (!investorData.accountHolderName.trim()) { addToast("Informe o nome do titular.", 'warning'); return; }
       }
-      // Step 6: Termos + Assinatura
+      // Step 6: Aceite dos Termos
       if (currentStep === 6) {
-        if (!termsAccepted) { addToast("Aceite os termos para continuar.", 'warning'); return; }
-        if (!formData.signature) { addToast("Assine para confirmar.", 'warning'); return; }
+        if (!termsAccepted) { addToast("Você precisa aceitar os termos para continuar.", 'warning'); return; }
+      }
+      // Step 7: Assinatura
+      if (currentStep === 7) {
+        if (!formData.signature) { addToast("Assine o contrato para confirmar.", 'warning'); return; }
       }
     }
 
@@ -987,10 +990,7 @@ export const Wizard: React.FC = () => {
         birthDate: investorData.birthDate,
         email: investorData.email,
         phone: investorData.phone,
-        address: investorData.address,
-        city: investorData.city,
-        state: investorData.state,
-        zipCode: investorData.zipCode,
+        preferredContactTime: investorData.preferredContactTime,
         bankName: investorData.bankName,
         pixKey: investorData.pixKey,
         pixKeyType: investorData.pixKeyType,
@@ -1545,22 +1545,21 @@ export const Wizard: React.FC = () => {
               <Input label="Email" name="investorEmail" type="email" value={investorData.email}
                 onChange={(e: any) => setInvestorData({ ...investorData, email: e.target.value })} placeholder="seu@email.com" required />
 
-              <Input label="Endereço Completo" name="investorAddress" value={investorData.address}
-                onChange={(e: any) => setInvestorData({ ...investorData, address: e.target.value })} placeholder="Rua, número, bairro" />
-
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="Cidade" name="investorCity" value={investorData.city}
-                  onChange={(e: any) => setInvestorData({ ...investorData, city: e.target.value })} placeholder="São Paulo" />
-                <Input label="UF" name="investorState" value={investorData.state}
-                  onChange={(e: any) => setInvestorData({ ...investorData, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="SP" />
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Melhor horário para contato</label>
+                <select
+                  value={investorData.preferredContactTime || ''}
+                  onChange={(e: any) => setInvestorData({ ...investorData, preferredContactTime: e.target.value })}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:outline-none"
+                  required
+                >
+                  <option value="">Selecione o melhor horário</option>
+                  <option value="manha">Manhã (08h - 12h)</option>
+                  <option value="tarde">Tarde (12h - 18h)</option>
+                  <option value="noite">Noite (18h - 22h)</option>
+                  <option value="qualquer">Qualquer horário</option>
+                </select>
               </div>
-
-              <Input label="CEP" name="investorZipCode" value={investorData.zipCode}
-                onChange={(e: any) => {
-                  let v = e.target.value.replace(/\D/g, '').slice(0, 8);
-                  if (v.length > 5) v = v.replace(/^(\d{5})(\d)/, '$1-$2');
-                  setInvestorData({ ...investorData, zipCode: v });
-                }} placeholder="00000-000" />
             </div>
           )}
 
@@ -1693,13 +1692,13 @@ export const Wizard: React.FC = () => {
             </div>
           )}
 
-          {/* INVESTIDOR STEP 6: Termos + Assinatura */}
+          {/* INVESTIDOR STEP 6: Visualizar e Aceitar Termos */}
           {currentStep === 6 && profileType === 'INVESTIDOR' && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center">
-                <FileSignature size={48} className="mx-auto text-cyan-400 mb-3" />
-                <h2 className="text-xl font-bold">CONTRATO DE ALOCAÇÃO DE CAPITAL - ACEITE ELETRÔNICO</h2>
-                <p className="text-zinc-400 text-sm mt-1">Leia atentamente antes de continuar.</p>
+                <FileText size={48} className="mx-auto text-cyan-400 mb-3" />
+                <h2 className="text-xl font-bold">CONTRATO DE ALOCAÇÃO DE CAPITAL</h2>
+                <p className="text-zinc-400 text-sm mt-1">Leia atentamente antes de prosseguir.</p>
               </div>
 
               <div className="bg-cyan-900/20 border border-cyan-600/30 rounded-xl p-4">
@@ -1754,6 +1753,23 @@ export const Wizard: React.FC = () => {
                 </span>
               </label>
 
+              <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3">
+                <p className="text-xs text-yellow-400">
+                  <strong>IMPORTANTE:</strong> Após aceitar os termos, você será direcionado para a próxima etapa onde deverá assinar digitalmente o contrato.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* INVESTIDOR STEP 7: Assinatura Digital */}
+          {currentStep === 7 && profileType === 'INVESTIDOR' && (
+            <div className="space-y-6 animate-in slide-in-from-right">
+              <div className="text-center">
+                <FileSignature size={48} className="mx-auto text-cyan-400 mb-3" />
+                <h2 className="text-xl font-bold">Assinatura Digital do Contrato</h2>
+                <p className="text-zinc-400 text-sm mt-1">Assine no campo abaixo para confirmar sua adesão.</p>
+              </div>
+
               {/* Assinatura */}
               <div className="space-y-2">
                 <h3 className="font-bold text-cyan-400">Confirmar e Assinar</h3>
@@ -1767,8 +1783,8 @@ export const Wizard: React.FC = () => {
             </div>
           )}
 
-          {/* INVESTIDOR STEP 7: Confirmação Final */}
-          {currentStep === 7 && profileType === 'INVESTIDOR' && (
+          {/* INVESTIDOR STEP 8: Confirmação Final */}
+          {currentStep === 8 && profileType === 'INVESTIDOR' && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center">
                 <CheckCircle2 size={48} className="mx-auto text-green-500 mb-3" />

@@ -244,6 +244,7 @@ model LoanRequest {
   cpf                     String
   email                   String
   phone                   String
+  preferredContactTime    String?   @map("preferred_contact_time")
   amount                  Float     @default(0)
   installments            Int       @default(1)
   status                  String    @default("PENDING")
