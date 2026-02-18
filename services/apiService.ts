@@ -806,6 +806,38 @@ export const apiService = {
         const { data, error } = await api.put(`/payment-receipts/${id}/reject`, { notes });
         if (error) throw new Error((error as any).error || 'Erro ao rejeitar');
         return data;
+    },
+
+    // ============= SCHEDULED STATUS =============
+
+    async getScheduledStatus() {
+        const { data, error } = await api.get('/scheduled-status');
+        if (error) return [];
+        return data || [];
+    },
+
+    async createScheduledStatus(statusData: any) {
+        const { data, error } = await api.post('/scheduled-status', statusData);
+        if (error) throw new Error((error as any).error || 'Erro ao criar agendamento');
+        return data;
+    },
+
+    async deleteScheduledStatus(id: string) {
+        const { data, error } = await api.delete(`/scheduled-status/${id}`);
+        if (error) throw new Error((error as any).error || 'Erro ao deletar agendamento');
+        return data;
+    },
+
+    async updateScheduledStatusStatus(id: string, status: string, postsCount?: number) {
+        const { data, error } = await api.put(`/scheduled-status/${id}/status`, { status, postsCount });
+        if (error) throw new Error((error as any).error || 'Erro ao atualizar status');
+        return data;
+    },
+
+    async generateCaptionFromImage(imageUrl: string) {
+        const { data, error } = await api.post('/scheduled-status/generate-caption', { imageUrl });
+        if (error) throw new Error((error as any).error || 'Erro ao gerar legenda');
+        return data?.caption || '';
     }
 };
 

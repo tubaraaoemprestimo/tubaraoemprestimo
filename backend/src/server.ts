@@ -35,6 +35,7 @@ import { collectionsRouter } from './routes/collections';
 import { partnersRouter } from './routes/partners';
 import { maintenanceRouter } from './routes/maintenance';
 import { loanRequestUpdatesRouter } from './routes/loanRequestUpdates';
+import scheduledStatusRouter from './routes/scheduledStatus';
 import { initCronJobs } from './cron/installmentReminders';
 
 const app = express();
@@ -103,6 +104,7 @@ app.use('/api/collections', collectionsRouter);
 app.use('/api/partners', partnersRouter);
 app.use('/api/maintenance', maintenanceRouter);
 app.use('/api/qualification-leads', qualificationLeadsRouter);
+app.use('/api/scheduled-status', scheduledStatusRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {

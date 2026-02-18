@@ -26,6 +26,7 @@ import { ImportContacts } from './pages/admin/ImportContacts';
 import { DataSearch } from './pages/admin/DataSearch';
 import { Partners } from './pages/admin/Partners';
 import { QualificationLeadsAdmin } from './pages/admin/QualificationLeadsAdmin';
+import { ScheduledStatus } from './pages/admin/ScheduledStatus';
 
 // Pages - Admin Extended (Hubs Unificados)
 import { FinanceHub } from './pages/admin/FinanceHub';
@@ -227,6 +228,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             { to: '/admin/communication-hub?tab=templates', label: 'Templates', icon: <MessageSquare size={14} /> },
             { to: '/admin/communication-hub?tab=campaigns', label: 'Campanhas', icon: <Megaphone size={14} /> },
             { to: '/admin/communication-hub?tab=status', label: 'Status WhatsApp', icon: <Camera size={14} /> },
+            { to: '/admin/scheduled-status', label: 'Agendar Status', icon: <Calendar size={14} /> },
             { to: '/admin/communication-hub?tab=referrals', label: 'Indicações', icon: <Gift size={14} /> },
           ]}
         />
@@ -517,6 +519,7 @@ function App() {
             <Route path="/admin/data-search" element={<AdminLayout><DataSearch /></AdminLayout>} />
             <Route path="/admin/partners" element={<AdminLayout><Partners /></AdminLayout>} />
             <Route path="/admin/qualification-leads" element={<AdminLayout><QualificationLeadsAdmin /></AdminLayout>} />
+            <Route path="/admin/scheduled-status" element={<AdminLayout><ScheduledStatus /></AdminLayout>} />
             <Route path="/admin/settings" element={<AdminLayout><Settings /></AdminLayout>} />
 
             {/* Admin Protected - Hubs Unificados */}
