@@ -243,7 +243,7 @@ if (user) {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white pb-24 font-sans">
+    <div className="min-h-screen bg-black text-white pb-32 font-sans">
       <MarketingPopup />
 
       <header className="sticky top-0 z-20 bg-black/80 backdrop-blur-md border-b border-zinc-900 px-6 py-4 flex items-center justify-between">
@@ -296,7 +296,8 @@ if (user) {
         </div>
       </header>
 
-      <main className="p-6 max-w-lg mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+      <main className="p-6 max-w-lg mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+        {/* Saudação */}
         <div className="pl-1">
           <h1 className="text-zinc-500 text-sm font-medium tracking-wide">Bem-vindo de volta,</h1>
           {loading ? <Skeleton className="h-8 w-48 mt-1" /> : <h2 className="text-2xl font-bold text-white tracking-tight">{userData.name}</h2>}
@@ -368,49 +369,57 @@ if (user) {
           </div>
         )}
 
-        {/* Main Debt Card */}
-        <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-[#D4AF37]/10 rounded-3xl p-6 border border-zinc-800 relative overflow-hidden shadow-2xl">
+        {/* CARD SALDO DEVEDOR - MAIOR E MAIS DESTACADO */}
+        <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-[#D4AF37]/10 rounded-3xl p-8 border border-zinc-800 relative overflow-hidden shadow-2xl">
           <div className="relative z-10">
-            <div className="flex items-center gap-2 text-zinc-400 mb-2">
-              <Wallet size={16} />
-              <span className="text-xs font-bold uppercase tracking-widest">Saldo Devedor</span>
+            <div className="flex items-center gap-2 text-zinc-400 mb-3">
+              <Wallet size={18} />
+              <span className="text-sm font-bold uppercase tracking-widest">Saldo Devedor</span>
             </div>
 
-            {loading ? <Skeleton className="h-10 w-40 mb-8" /> : (
-              <div className="text-4xl font-bold text-[#D4AF37] mb-8 transition-all">
+            {loading ? <Skeleton className="h-14 w-48 mb-6" /> : (
+              <div className="text-5xl font-bold text-[#D4AF37] mb-6 transition-all">
                 {formatCurrency(userData.balance)}
               </div>
             )}
 
-            <div className="flex items-center justify-between p-4 bg-black/40 rounded-xl border border-zinc-800/50 mb-6">
+            <div className="flex items-center justify-between p-5 bg-black/40 rounded-2xl border border-zinc-800/50 mb-6">
               <div>
-                <div className="text-[10px] text-zinc-500 uppercase">Próxima Parcela</div>
-                <div className="text-white font-semibold flex items-center gap-2">
-                  <Calendar size={14} className="text-shark" />
-                  {loading ? <Skeleton className="h-4 w-16" /> : userData.nextDue}
+                <div className="text-xs text-zinc-500 uppercase mb-1">Próxima Parcela</div>
+                <div className="text-white font-bold text-lg flex items-center gap-2">
+                  <Calendar size={16} className="text-[#FF0000]" />
+                  {loading ? <Skeleton className="h-5 w-20" /> : userData.nextDue}
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] text-zinc-500 uppercase">Valor</div>
-                <div className="text-white font-bold">
-                  {loading ? <Skeleton className="h-4 w-20 ml-auto" /> : formatCurrency(userData.nextInstallmentValue)}
+                <div className="text-xs text-zinc-500 uppercase mb-1">Valor</div>
+                <div className="text-white font-bold text-xl">
+                  {loading ? <Skeleton className="h-5 w-24 ml-auto" /> : formatCurrency(userData.nextInstallmentValue)}
                 </div>
               </div>
             </div>
 
-            <Button onClick={() => navigate('/client/contracts')} className="w-full bg-shark hover:bg-red-600 shadow-lg" disabled={loading || userData.balance === 0}>
-              Pagar Parcela <ChevronRight size={18} />
+            <Button onClick={() => navigate('/client/contracts')} className="w-full bg-[#FF0000] hover:bg-red-600 shadow-lg text-lg py-4 font-bold" disabled={loading || userData.balance === 0}>
+              Pagar Parcela <ChevronRight size={20} />
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-3">
-          <ActionButton icon={Briefcase} label="Solicitar" onClick={() => navigate('/client/wizard')} />
-          <ActionButton icon={FileText} label="Contratos" onClick={() => navigate('/client/contracts')} />
-          <ActionButton icon={TrendingUp} label="Extrato" onClick={() => navigate('/client/statement')} />
-          <ActionButton icon={Percent} label="Renegociar" onClick={() => setIsRenegotiateOpen(true)} disabled={userData.balance === 0} />
-          <ActionButton icon={Gift} label="Indicações" onClick={() => navigate('/client/referrals')} />
-<ActionButton icon={History} label="Histórico" onClick={() => setIsHistoryModalOpen(true)} />
+        {/* BOTÕES PRINCIPAIS - HIERARQUIA CLARA */}
+        <div className="space-y-4">
+          {/* Bloco Principal - Botões Grandes */}
+          <div className="grid grid-cols-3 gap-3">
+            <MainActionButton icon={Plus} label="Solicitar Crédito" onClick={() => navigate('/client/wizard')} />
+            <MainActionButton icon={FileText} label="Meus Contratos" onClick={() => navigate('/client/contracts')} />
+            <MainActionButton icon={TrendingUp} label="Extrato" onClick={() => navigate('/client/statement')} />
+          </div>
+
+          {/* Bloco Secundário - Botões Menores */}
+          <div className="grid grid-cols-3 gap-3">
+            <SecondaryActionButton icon={Percent} label="Renegociar" onClick={() => setIsRenegotiateOpen(true)} disabled={userData.balance === 0} />
+            <SecondaryActionButton icon={Gift} label="Indicações" onClick={() => navigate('/client/referrals')} />
+            <SecondaryActionButton icon={History} label="Histórico" onClick={() => setIsHistoryModalOpen(true)} />
+          </div>
         </div>
 
         {/* Cards de Acesso: Ofertas, Cupons, Campanhas */}
@@ -451,13 +460,6 @@ if (user) {
             {activeCampaigns.length > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-black text-xs font-bold rounded-full flex items-center justify-center">{activeCampaigns.length}</span>
             )}
-          </button>
-        </div>
-
-        {/* FAB - Solicitar Serviço */}
-        <div className="fixed bottom-20 right-6 md:right-[calc(50%-14rem)] z-30">
-          <button onClick={() => navigate('/client/wizard')} className="bg-shark text-white px-6 py-4 rounded-full shadow-lg hover:bg-red-600 hover:scale-105 transition-all flex items-center gap-3 font-bold border border-white/10">
-            <Plus size={24} /> <span>Novo Serviço</span>
           </button>
         </div>
       </main>
@@ -788,5 +790,33 @@ const ActionButton = ({ icon: Icon, label, onClick, disabled }: any) => (
       <Icon size={20} />
     </div>
     <span className="text-[10px] font-bold text-white">{label}</span>
+  </button>
+);
+
+// Botões Principais - Maiores e mais destacados
+const MainActionButton = ({ icon: Icon, label, onClick, disabled }: any) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className="flex flex-col items-center justify-center gap-3 p-5 rounded-2xl bg-gradient-to-br from-zinc-900 to-zinc-800 border-2 border-zinc-700 hover:border-[#FF0000] hover:shadow-lg hover:shadow-[#FF0000]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+  >
+    <div className="w-14 h-14 rounded-2xl bg-[#FF0000] flex items-center justify-center text-white shadow-lg">
+      <Icon size={28} strokeWidth={2.5} />
+    </div>
+    <span className="text-xs font-bold text-white text-center leading-tight">{label}</span>
+  </button>
+);
+
+// Botões Secundários - Menores mas ainda proporcionais
+const SecondaryActionButton = ({ icon: Icon, label, onClick, disabled }: any) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+  >
+    <div className="w-11 h-11 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-400">
+      <Icon size={22} strokeWidth={2} />
+    </div>
+    <span className="text-[11px] font-semibold text-zinc-300 text-center leading-tight">{label}</span>
   </button>
 );
