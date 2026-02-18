@@ -1581,43 +1581,69 @@ export const Wizard: React.FC = () => {
                 <p className="text-zinc-400 text-sm mt-1">Mínimo: R$ 10.000,00 | Prazo: 12 meses</p>
               </div>
 
-              {/* Valores pré-definidos */}
-              <div className="grid grid-cols-2 gap-3">
-                {[10000, 20000, 30000, 50000, 100000, 200000].map((val) => (
-                  <button key={val} onClick={() => {
-                    const tier = val >= 50000 ? 'PREMIUM' : 'STANDARD';
-                    const rate = tier === 'PREMIUM'
-                      ? (investorData.payoutMode === 'MONTHLY' ? 5.0 : 6.0)
-                      : (investorData.payoutMode === 'MONTHLY' ? 2.5 : 3.5);
-                    setInvestorData({ ...investorData, investmentAmount: val, customInvestmentAmount: '', investmentTier: tier, monthlyRate: rate });
-                  }}
-                    className={`p-4 rounded-xl border-2 transition-all ${investorData.investmentAmount === val && !investorData.customInvestmentAmount
-                      ? 'border-cyan-500 bg-cyan-500/10 scale-105'
-                      : 'border-zinc-800 bg-black hover:border-zinc-600'
-                      }`}>
-                    <span className="text-lg font-bold">R$ {val.toLocaleString('pt-BR')}</span>
-                    <p className="text-xs text-zinc-500 mt-1">{val >= 50000 ? 'Premium' : 'Standard'}</p>
-                  </button>
-                ))}
-              </div>
+              {/* Slider de Valor do Investimento */}
+              <div className="space-y-4">
+                <div className="bg-gradient-to-br from-cyan-500/10 to-zinc-900 border border-cyan-600/30 rounded-2xl p-6">
+                  <div className="text-center mb-6">
+                    <p className="text-sm text-zinc-400 mb-2">Valor do investimento</p>
+                    <p className="text-4xl font-bold text-cyan-400">
+                      R$ {investorData.investmentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-zinc-500 mt-2">
+                      Faixa: <span className={investorData.investmentTier === 'PREMIUM' ? 'text-[#D4AF37] font-bold' : 'text-cyan-400 font-bold'}>
+                        {investorData.investmentTier === 'PREMIUM' ? 'Premium (≥ R$ 50.000)' : 'Standard (R$ 10.000 - R$ 49.999)'}
+                      </span>
+                    </p>
+                  </div>
 
-              {/* Valor personalizado */}
-              <div className="space-y-2">
-                <label className="text-sm text-zinc-400">Ou digite o valor:</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">R$</span>
-                  <input type="number" value={investorData.customInvestmentAmount}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const numVal = parseFloat(val) || 0;
-                      const tier = numVal >= 50000 ? 'PREMIUM' : 'STANDARD';
-                      const rate = tier === 'PREMIUM'
-                        ? (investorData.payoutMode === 'MONTHLY' ? 5.0 : 6.0)
-                        : (investorData.payoutMode === 'MONTHLY' ? 2.5 : 3.5);
-                      setInvestorData({ ...investorData, customInvestmentAmount: val, investmentAmount: numVal, investmentTier: tier, monthlyRate: rate });
-                    }}
-                    placeholder="10000" min="10000"
-                    className="w-full bg-black border border-zinc-700 rounded-xl pl-12 pr-4 py-4 text-white text-xl font-bold focus:border-cyan-500 outline-none" />
+                  {/* Slider */}
+                  <div className="space-y-3">
+                    <input
+                      type="range"
+                      min={10000}
+                      max={500000}
+                      step={1000}
+                      value={investorData.investmentAmount}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        const tier = val >= 50000 ? 'PREMIUM' : 'STANDARD';
+                        const rate = tier === 'PREMIUM'
+                          ? (investorData.payoutMode === 'MONTHLY' ? 5.0 : 6.0)
+                          : (investorData.payoutMode === 'MONTHLY' ? 2.5 : 3.5);
+                        setInvestorData({ ...investorData, investmentAmount: val, customInvestmentAmount: '', investmentTier: tier, monthlyRate: rate });
+                      }}
+                      className="w-full h-3 bg-zinc-800 rounded-lg appearance-none cursor-pointer slider-thumb"
+                      style={{
+                        background: `linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(investorData.investmentAmount - 10000) / (500000 - 10000) * 100}%, #27272a ${(investorData.investmentAmount - 10000) / (500000 - 10000) * 100}%, #27272a 100%)`
+                      }}
+                    />
+                    <div className="flex justify-between text-xs text-zinc-500">
+                      <span>R$ 10.000</span>
+                      <span>R$ 500.000</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Valores Rápidos */}
+                <div>
+                  <p className="text-sm text-zinc-400 mb-3 text-center">Ou escolha um valor rápido:</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[10000, 20000, 30000, 50000, 100000, 200000].map((val) => (
+                      <button key={val} onClick={() => {
+                        const tier = val >= 50000 ? 'PREMIUM' : 'STANDARD';
+                        const rate = tier === 'PREMIUM'
+                          ? (investorData.payoutMode === 'MONTHLY' ? 5.0 : 6.0)
+                          : (investorData.payoutMode === 'MONTHLY' ? 2.5 : 3.5);
+                        setInvestorData({ ...investorData, investmentAmount: val, customInvestmentAmount: '', investmentTier: tier, monthlyRate: rate });
+                      }}
+                        className={`p-3 rounded-xl border-2 transition-all ${investorData.investmentAmount === val && !investorData.customInvestmentAmount
+                          ? 'border-cyan-500 bg-cyan-500/10 scale-105'
+                          : 'border-zinc-800 bg-black hover:border-zinc-600'
+                          }`}>
+                        <span className="text-sm font-bold">R$ {val.toLocaleString('pt-BR')}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -1659,14 +1685,33 @@ export const Wizard: React.FC = () => {
                 const monthlyReturn = amount * rate;
                 const annualReturn = monthlyReturn * 12;
                 return (
-                  <div className="bg-gradient-to-br from-cyan-900/20 to-zinc-900 border border-cyan-600/30 rounded-xl p-5">
-                    <h3 className="font-bold text-cyan-400 mb-3 text-center">Simulação de Rendimento</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-zinc-400">Valor investido:</span><span className="font-bold">R$ {amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-400">Taxa:</span><span className="font-bold text-cyan-400">{investorData.monthlyRate}% ao mês</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-400">Rendimento mensal:</span><span className="font-bold text-green-400">R$ {monthlyReturn.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                      <div className="flex justify-between border-t border-zinc-700 pt-2"><span className="text-zinc-400">Rendimento em 12 meses:</span><span className="font-bold text-[#D4AF37]">R$ {annualReturn.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-400">Total ao final:</span><span className="font-bold text-white text-lg">R$ {(amount + annualReturn).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
+                    <h3 className="font-bold text-cyan-400 text-center mb-4">Simulação de Rendimento</h3>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-black/50 rounded-xl p-4 text-center">
+                        <p className="text-xs text-zinc-400 mb-1">Rendimento Mensal</p>
+                        <p className="text-2xl font-bold text-green-400">
+                          R$ {monthlyReturn.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1">{investorData.monthlyRate}% a.m.</p>
+                      </div>
+
+                      <div className="bg-black/50 rounded-xl p-4 text-center">
+                        <p className="text-xs text-zinc-400 mb-1">Rendimento em 12 meses</p>
+                        <p className="text-2xl font-bold text-[#D4AF37]">
+                          R$ {annualReturn.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1">Total de juros</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-600/30 rounded-xl p-4 text-center">
+                      <p className="text-xs text-zinc-400 mb-1">Valor Total ao Final</p>
+                      <p className="text-3xl font-bold text-cyan-300">
+                        R$ {(amount + annualReturn).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">Capital + Rendimentos</p>
                     </div>
                   </div>
                 );
@@ -1826,35 +1871,101 @@ export const Wizard: React.FC = () => {
                 <p className="text-zinc-400 text-sm mt-2">Simule agora e receba em instantes.</p>
               </div>
 
-              {/* Pacotes (Ocultar se for Moto/Garantia, ou mostrar valores maiores) */}
-              {profileType !== 'GARANTIA_VEICULO' && (
-                <div className="grid grid-cols-3 gap-3">
-                  {settings.loanPackages.map((pkg, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => { setSelectedAmount(pkg); setCustomAmount(''); }}
-                      className={`p-4 rounded-xl border-2 transition-all ${selectedAmount === pkg && !customAmount ? 'border-[#D4AF37] bg-[#D4AF37]/10 scale-105' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600'
-                        }`}
-                    >
-                      <span className="text-lg font-bold">R$ {pkg.toLocaleString('pt-BR')}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Slider de Valor */}
+              <div className="space-y-4">
+                <div className="bg-gradient-to-br from-[#D4AF37]/10 to-zinc-900 border border-[#D4AF37]/30 rounded-2xl p-6">
+                  <div className="text-center mb-6">
+                    <p className="text-sm text-zinc-400 mb-2">Valor solicitado</p>
+                    <p className="text-4xl font-bold text-[#D4AF37]">
+                      R$ {(customAmount ? parseFloat(customAmount) : selectedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
 
-              {/* Valor personalizado */}
-              <div className="space-y-2">
-                <label className="text-sm text-zinc-400">Digite o valor desejado:</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">R$</span>
-                  <input
-                    type="number"
-                    value={customAmount}
-                    onChange={(e) => setCustomAmount(e.target.value)}
-                    placeholder={profileType === 'GARANTIA_VEICULO' ? "Ex: 15000" : "0,00"}
-                    className="w-full bg-black border border-zinc-700 rounded-xl pl-12 pr-4 py-4 text-white text-xl font-bold focus:border-[#D4AF37] outline-none"
-                  />
+                  {/* Slider */}
+                  <div className="space-y-3">
+                    <input
+                      type="range"
+                      min={settings.minLoanAmount}
+                      max={settings.maxLoanAmount}
+                      step={100}
+                      value={customAmount ? parseFloat(customAmount) : selectedAmount}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setCustomAmount(val.toString());
+                        setSelectedAmount(0);
+                      }}
+                      className="w-full h-3 bg-zinc-800 rounded-lg appearance-none cursor-pointer slider-thumb"
+                      style={{
+                        background: `linear-gradient(to right, #D4AF37 0%, #D4AF37 ${((customAmount ? parseFloat(customAmount) : selectedAmount) - settings.minLoanAmount) / (settings.maxLoanAmount - settings.minLoanAmount) * 100}%, #27272a ${((customAmount ? parseFloat(customAmount) : selectedAmount) - settings.minLoanAmount) / (settings.maxLoanAmount - settings.minLoanAmount) * 100}%, #27272a 100%)`
+                      }}
+                    />
+                    <div className="flex justify-between text-xs text-zinc-500">
+                      <span>R$ {settings.minLoanAmount.toLocaleString('pt-BR')}</span>
+                      <span>R$ {settings.maxLoanAmount.toLocaleString('pt-BR')}</span>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Cálculos em Tempo Real */}
+                {(() => {
+                  const amount = customAmount ? parseFloat(customAmount) : selectedAmount;
+                  const installmentsCount = 12; // Padrão 12 meses
+                  const monthlyRate = settings.interestRate / 100;
+                  const totalWithInterest = amount * Math.pow(1 + monthlyRate, installmentsCount);
+                  const monthlyPayment = totalWithInterest / installmentsCount;
+                  const totalInterest = totalWithInterest - amount;
+
+                  return (
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
+                      <h3 className="font-bold text-cyan-400 text-center mb-4">Simulação do Empréstimo</h3>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-black/50 rounded-xl p-4 text-center">
+                          <p className="text-xs text-zinc-400 mb-1">Parcela Mensal</p>
+                          <p className="text-2xl font-bold text-green-400">
+                            R$ {monthlyPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-zinc-500 mt-1">{installmentsCount}x</p>
+                        </div>
+
+                        <div className="bg-black/50 rounded-xl p-4 text-center">
+                          <p className="text-xs text-zinc-400 mb-1">Total de Juros</p>
+                          <p className="text-2xl font-bold text-orange-400">
+                            R$ {totalInterest.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-zinc-500 mt-1">{settings.interestRate}% a.m.</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-600/30 rounded-xl p-4 text-center">
+                        <p className="text-xs text-zinc-400 mb-1">Valor Total a Pagar</p>
+                        <p className="text-3xl font-bold text-cyan-300">
+                          R$ {totalWithInterest.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1">Quitação em {installmentsCount} meses</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Pacotes Rápidos */}
+                {profileType !== 'GARANTIA_VEICULO' && (
+                  <div>
+                    <p className="text-sm text-zinc-400 mb-3 text-center">Ou escolha um valor rápido:</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {settings.loanPackages.map((pkg, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => { setSelectedAmount(pkg); setCustomAmount(''); }}
+                          className={`p-3 rounded-xl border-2 transition-all ${selectedAmount === pkg && !customAmount ? 'border-[#D4AF37] bg-[#D4AF37]/10 scale-105' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600'
+                            }`}
+                        >
+                          <span className="text-sm font-bold">R$ {pkg.toLocaleString('pt-BR')}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Checkbox Moto */}
@@ -2994,3 +3105,49 @@ const Input = ({ label, error, className = "", required, ...props }: any) => (
     {error && <p className="text-xs text-red-500 mt-1 ml-1">{error}</p>}
   </div>
 );
+
+// CSS para o slider customizado
+const sliderStyles = `
+  input[type="range"].slider-thumb::-webkit-slider-thumb {
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #D4AF37;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+    transition: all 0.2s ease;
+  }
+
+  input[type="range"].slider-thumb::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.8);
+  }
+
+  input[type="range"].slider-thumb::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #D4AF37;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+    transition: all 0.2s ease;
+  }
+
+  input[type="range"].slider-thumb::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.8);
+  }
+`;
+
+// Injetar estilos
+if (typeof document !== 'undefined') {
+  const styleElement = document.getElementById('slider-styles');
+  if (!styleElement) {
+    const style = document.createElement('style');
+    style.id = 'slider-styles';
+    style.textContent = sliderStyles;
+    document.head.appendChild(style);
+  }
+}
