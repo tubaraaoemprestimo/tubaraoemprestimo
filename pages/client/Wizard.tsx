@@ -448,7 +448,10 @@ export const Wizard: React.FC = () => {
 
     // === INVESTIDOR: Validações específicas por step ===
     if (profileType === 'INVESTIDOR') {
-      // Step 2: "Saiba Mais" - apenas informativo, sem validação
+      // Step 2: "Saiba Mais" - validar aceite dos termos
+      if (currentStep === 2) {
+        if (!termsAccepted) { addToast("Você precisa aceitar os termos para continuar.", 'warning'); return; }
+      }
       // Step 3: Dados pessoais
       if (currentStep === 3) {
         if (!investorData.fullName.trim()) { addToast("Informe seu nome completo ou razão social.", 'warning'); return; }
@@ -494,10 +497,7 @@ export const Wizard: React.FC = () => {
         if (!investorData.pixKey.trim()) { addToast("Informe sua chave PIX.", 'warning'); return; }
         if (!investorData.accountHolderName.trim()) { addToast("Informe o nome do titular.", 'warning'); return; }
       }
-      // Step 6: Aceite dos Termos
-      if (currentStep === 6) {
-        if (!termsAccepted) { addToast("Você precisa aceitar os termos para continuar.", 'warning'); return; }
-      }
+      // Step 6: Visualizar Termos (sem validação, apenas leitura)
       // Step 7: Assinatura
       if (currentStep === 7) {
         if (!formData.signature) { addToast("Assine o contrato para confirmar.", 'warning'); return; }
@@ -1506,6 +1506,15 @@ export const Wizard: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Checkbox de aceite dos termos */}
+              <label className="flex items-start gap-3 p-4 bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer hover:border-cyan-500 transition-all">
+                <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="w-6 h-6 mt-0.5 accent-cyan-500 shrink-0" />
+                <span className="text-xs text-zinc-300 leading-relaxed">
+                  Li e aceito os termos e condições do programa de investimento Tubarão. Estou ciente das condições de remuneração, prazo de contrato e aviso prévio para resgate.
+                </span>
+              </label>
             </div>
           )}
 
@@ -1744,18 +1753,9 @@ export const Wizard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Checkbox de aceite */}
-              <label className="flex items-start gap-3 p-4 bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer hover:border-cyan-500 transition-all">
-                <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)}
-                  className="w-6 h-6 mt-0.5 accent-cyan-500 shrink-0" />
-                <span className="text-xs text-zinc-300 leading-relaxed">
-                  {(SERVICE_TERMS as any).INVESTIDOR?.finalCheckboxText || (SERVICE_TERMS as any).INVESTIDOR?.checkboxText}
-                </span>
-              </label>
-
               <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3">
                 <p className="text-xs text-yellow-400">
-                  <strong>IMPORTANTE:</strong> Após aceitar os termos, você será direcionado para a próxima etapa onde deverá assinar digitalmente o contrato.
+                  <strong>IMPORTANTE:</strong> Na próxima etapa, você deverá assinar digitalmente o contrato.
                 </p>
               </div>
             </div>
