@@ -1877,7 +1877,7 @@ export const Wizard: React.FC = () => {
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
                         setCustomAmount(val.toString());
-                        setSelectedAmount(0);
+                        setSelectedAmount(val);
                       }}
                       className="w-full h-3 bg-zinc-800 rounded-lg appearance-none cursor-pointer slider-thumb"
                       style={{
