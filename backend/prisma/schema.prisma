@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://postgres:tubarao123@localhost:5432/tubarao_db"
 }
 
 model AiChatHistory {
@@ -769,28 +769,4 @@ model PartnerInvite {
   @@index([partnerId])
   @@index([invitedEmail])
   @@index([inviteCode])
-}
-
-
-model QualificationLead {
-  id                   String   @id @default(uuid())
-  mainInterest         String   @map("main_interest")
-  creditExperience     String   @map("credit_experience")
-  availableCapital     String   @map("available_capital")
-  intention            String
-  investmentCapacity   String   @map("investment_capacity")
-  interestedSolutions  String[] @map("interested_solutions")
-  weeklyTime           String   @map("weekly_time")
-  fullName             String   @map("full_name")
-  whatsapp             String
-  email                String
-  city                 String
-  state                String
-  tags                 Json
-  status               String   @default("PENDING")
-  notes                String?
-  submittedAt          DateTime @map("submitted_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
-
-  @@map("qualification_leads")
 }

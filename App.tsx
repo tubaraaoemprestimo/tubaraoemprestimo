@@ -243,6 +243,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             { to: '/admin/analytics-hub?tab=audit', label: 'Auditoria', icon: <FileText size={14} /> },
             { to: '/admin/analytics-hub?tab=geo', label: 'Geolocalização', icon: <MapPin size={14} /> },
             { to: '/admin/analytics-hub?tab=openfinance', label: 'Open Finance', icon: <Landmark size={14} /> },
+            { to: '/admin/qualification-leads', label: 'Qualificação de Leads', icon: <Users size={14} /> },
           ]}
         />
 
