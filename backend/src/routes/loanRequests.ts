@@ -285,12 +285,14 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
         // ====== NOTIFICAÇÕES DE NOVA SOLICITAÇÃO ======
         const isMoto = request.profileType === 'MOTO';
         const isLimpaNome = request.profileType === 'LIMPA_NOME';
+        const isInvestidor = request.profileType === 'INVESTIDOR';
         const profileLabels: Record<string, string> = {
             CLT: 'Empréstimo Pessoal (CLT)',
             AUTONOMO: 'Capital de Giro (Comércio)',
             MOTO: 'Financiamento de Motocicleta',
             GARANTIA: 'Empréstimo com Garantia',
             LIMPA_NOME: 'Limpa Nome',
+            INVESTIDOR: 'Programa de Investimento',
         };
         const typeLabel = profileLabels[request.profileType || ''] || 'Empréstimo';
         const amtFmt = (request.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -302,32 +304,40 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Parcelas:</strong> 36x R$ 611,00 + Seguro R$ 150,00/mês</p>`
             : isLimpaNome
                 ? `<p style="margin: 5px 0;"><strong style="color: #D4AF37;">Serviço:</strong> Limpa Nome</p>`
-                : `<p style="margin: 5px 0;"><strong style="color: #D4AF37;">Valor:</strong> ${amtFmt}</p>`;
+                : isInvestidor
+                    ? `<p style="margin: 5px 0;"><strong style="color: #D4AF37;">Valor do Investimento:</strong> ${amtFmt}</p>
+                       <p style="margin: 5px 0;"><strong style="color: #06b6d4;">Rendimento:</strong> ${data.monthlyRate || 2.5}% ao mês</p>
+                       <p style="margin: 5px 0;"><strong style="color: #06b6d4;">Modalidade:</strong> ${data.payoutMode === 'MONTHLY' ? 'Mensal' : 'Anual Acumulado'}</p>`
+                    : `<p style="margin: 5px 0;"><strong style="color: #D4AF37;">Valor:</strong> ${amtFmt}</p>`;
 
         const descricaoResumida = isMoto
             ? 'financiamento de motocicleta Honda Pop 110i'
             : isLimpaNome
                 ? 'serviço Limpa Nome'
-                : `${amtFmt}`;
+                : isInvestidor
+                    ? `investimento de ${amtFmt}`
+                    : `${amtFmt}`;
 
         // Email para o cliente confirmando recebimento
         if (req.user!.email) {
             const clientHtml = brandedEmailHtml(`
                 <h2 style="color: #D4AF37;">📋 Solicitação Recebida!</h2>
                 <p>Olá, <strong>${data.clientName || req.user!.name}</strong>!</p>
-                <p>Recebemos sua solicitação de ${isMoto ? 'financiamento' : isLimpaNome ? 'serviço' : 'empréstimo'} e ela está em análise.</p>
+                <p>Recebemos sua solicitação de ${isMoto ? 'financiamento' : isLimpaNome ? 'serviço' : isInvestidor ? 'investimento' : 'empréstimo'} e ela está em análise.</p>
                 <div style="background: #111; border: 1px solid #333; border-radius: 8px; padding: 15px; margin: 15px 0;">
                     ${valorDisplay}
                     <p style="margin: 5px 0;"><strong style="color: #D4AF37;">Tipo:</strong> ${typeLabel}</p>
                 </div>
-                <p>Acompanhe o status pelo aplicativo. Você receberá uma notificação assim que tivermos novidades.</p>
+                <p>${isInvestidor ? 'Nossa equipe entrará em contato em até 48 horas para dar continuidade ao processo.' : 'Acompanhe o status pelo aplicativo. Você receberá uma notificação assim que tivermos novidades.'}</p>
                 <div style="text-align: center; margin: 20px 0;">
                     <a href="https://www.tubaraoemprestimo.com.br" style="background: #D4AF37; color: #000; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Acessar App</a>
                 </div>
             `);
             const emailSubject = isMoto
                 ? '🏍️ Solicitação de Financiamento Recebida — Tubarão Empréstimos'
-                : '📋 Solicitação Recebida — Tubarão Empréstimos';
+                : isInvestidor
+                    ? '💰 Solicitação de Investimento Recebida — Tubarão Empréstimos'
+                    : '📋 Solicitação Recebida — Tubarão Empréstimos';
             emailService.send(req.user!.email, emailSubject, clientHtml).catch(() => { });
         }
 
@@ -344,13 +354,13 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
             for (const admin of admins) {
                 if (admin.phone) {
                     await sendWhatsAppNotification(admin.phone,
-                        `🦈 *Nova Solicitação!*\n\nCliente: ${data.clientName || req.user!.name}\n${isMoto ? 'Produto: Honda Pop 110i 2026' : `Valor: ${amtFmt}`}\nTipo: ${typeLabel}\n\nAcesse o painel para avaliar.`
+                        `🦈 *Nova Solicitação!*\n\nCliente: ${data.clientName || req.user!.name}\n${isMoto ? 'Produto: Honda Pop 110i 2026' : isInvestidor ? `Investimento: ${amtFmt}` : `Valor: ${amtFmt}`}\nTipo: ${typeLabel}\n\nAcesse o painel para avaliar.`
                     );
                 }
             }
             await prisma.notification.create({
                 data: {
-                    title: isMoto ? '🏍️ Nova Solicitação - Financiamento Moto' : '📋 Nova Solicitação de Empréstimo',
+                    title: isMoto ? '🏍️ Nova Solicitação - Financiamento Moto' : isInvestidor ? '💰 Nova Solicitação - Investidor' : '📋 Nova Solicitação de Empréstimo',
                     message: `${data.clientName || req.user!.name} solicitou ${descricaoResumida} (${typeLabel})`,
                     type: 'INFO'
                 }
