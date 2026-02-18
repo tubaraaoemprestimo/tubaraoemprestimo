@@ -17,6 +17,7 @@ type InvestorRow = {
   city: string;
   state: string;
   zipCode: string;
+  preferredContactTime: string;
   investmentAmount: number;
   investmentTier: string;
   payoutMode: string;
@@ -96,6 +97,7 @@ const toInvestorRow = (raw: any): InvestorRow => ({
   city: raw.city ?? '-',
   state: raw.state ?? '-',
   zipCode: raw.zip_code ?? raw.zipCode ?? '-',
+  preferredContactTime: raw.preferred_contact_time ?? raw.preferredContactTime ?? '-',
   investmentAmount: Number(raw.investment_amount ?? raw.investmentAmount ?? 0),
   investmentTier: raw.investment_tier ?? raw.investmentTier ?? '-',
   payoutMode: raw.payout_mode ?? raw.payoutMode ?? '-',
@@ -384,18 +386,25 @@ export const Investors: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5 text-sm">
-              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 lg:col-span-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5 text-sm">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
                 <p className="text-zinc-400 text-xs mb-1">Dados pessoais</p>
                 <p className="font-semibold text-base">{selected.fullName}</p>
-                <p className="text-zinc-400">CPF/CNPJ: {selected.cpfCnpj}</p>
-                <p className="text-zinc-400">RG/CNH: {selected.rgCnh}</p>
                 <p className="text-zinc-400">Nascimento: {formatDate(selected.birthDate)}</p>
               </div>
               <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
                 <p className="text-zinc-400 text-xs mb-1">Contato</p>
                 <p className="text-zinc-200 flex items-center gap-2"><Mail size={14} /> {selected.email}</p>
                 <p className="text-zinc-200 flex items-center gap-2 mt-1"><Phone size={14} /> {selected.phone}</p>
+                <p className="text-zinc-400 text-xs mt-2">
+                  Melhor horário: {
+                    selected.preferredContactTime === 'manha' ? 'Manhã (08h - 12h)' :
+                    selected.preferredContactTime === 'tarde' ? 'Tarde (12h - 18h)' :
+                    selected.preferredContactTime === 'noite' ? 'Noite (18h - 22h)' :
+                    selected.preferredContactTime === 'qualquer' ? 'Qualquer horário' :
+                    'Não informado'
+                  }
+                </p>
                 <div className="mt-3 flex gap-2">
                   <a href={selectedWhatsApp ? `https://wa.me/55${selectedWhatsApp}` : '#'} target="_blank" rel="noreferrer" className={`text-xs px-2 py-1 rounded border ${selectedWhatsApp ? 'border-green-500/50 text-green-300 hover:bg-green-900/20' : 'border-zinc-700 text-zinc-500 pointer-events-none'}`}>
                     WhatsApp
@@ -407,13 +416,7 @@ export const Investors: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5 text-sm">
-              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
-                <p className="text-zinc-400 text-xs mb-1">Endereço</p>
-                <p>{selected.address}</p>
-                <p className="text-zinc-400">{selected.city} - {selected.state}</p>
-                <p className="text-zinc-400">CEP: {selected.zipCode}</p>
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5 text-sm">
               <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
                 <p className="text-zinc-400 text-xs mb-1">Dados do investimento</p>
                 <p className="font-bold text-[#D4AF37]">{formatCurrency(selected.investmentAmount)}</p>
