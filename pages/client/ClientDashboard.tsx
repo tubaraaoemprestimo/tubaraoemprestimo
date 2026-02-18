@@ -243,7 +243,7 @@ if (user) {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white pb-32 font-sans">
+    <div className="min-h-screen bg-black text-white pb-24 font-sans">
       <MarketingPopup />
 
       <header className="sticky top-0 z-20 bg-black/80 backdrop-blur-md border-b border-zinc-900 px-6 py-4 flex items-center justify-between">
@@ -296,29 +296,29 @@ if (user) {
         </div>
       </header>
 
-      <main className="p-6 max-w-lg mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-        {/* Saudação */}
+      <main className="p-4 max-w-lg mx-auto space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+        {/* Saudação - Mais compacta */}
         <div className="pl-1">
-          <h1 className="text-zinc-500 text-sm font-medium tracking-wide">Bem-vindo de volta,</h1>
-          {loading ? <Skeleton className="h-8 w-48 mt-1" /> : <h2 className="text-2xl font-bold text-white tracking-tight">{userData.name}</h2>}
+          <h1 className="text-zinc-500 text-xs font-medium tracking-wide">Olá,</h1>
+          {loading ? <Skeleton className="h-6 w-40 mt-0.5" /> : <h2 className="text-lg font-bold text-white tracking-tight">{userData.name.split(' ')[0]}</h2>}
         </div>
 
         {/* Pre-Approved Offer Banner */}
         {preApprovedAmount && (
-          <div className="bg-gradient-to-r from-[#D4AF37] to-[#FDB931] rounded-2xl p-4 shadow-lg shadow-[#D4AF37]/20 relative overflow-hidden animate-pulse">
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <Sparkles size={64} className="text-black" />
+          <div className="bg-gradient-to-r from-[#D4AF37] to-[#FDB931] rounded-xl p-3.5 shadow-lg shadow-[#D4AF37]/20 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-3 opacity-20">
+              <Sparkles size={48} className="text-black" />
             </div>
             <div className="relative z-10 text-black">
-              <div className="flex items-center gap-2 mb-1">
-                <Sparkles size={16} />
-                <span className="text-xs font-bold uppercase tracking-wider">Oferta Especial</span>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Sparkles size={12} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">Oferta Especial</span>
               </div>
-              <h3 className="text-lg font-bold leading-tight mb-2">Crédito Pré-Aprovado</h3>
-              <div className="text-3xl font-extrabold mb-3">R$ {preApprovedAmount.toLocaleString()}</div>
+              <h3 className="text-sm font-bold leading-tight mb-1.5">Crédito Pré-Aprovado</h3>
+              <div className="text-2xl font-extrabold mb-2.5">R$ {preApprovedAmount.toLocaleString()}</div>
               <Button
                 onClick={() => navigate(`/wizard?amount=${preApprovedAmount}`)}
-                className="w-full bg-black text-[#D4AF37] hover:bg-zinc-800 border-none"
+                className="w-full bg-black text-[#D4AF37] hover:bg-zinc-800 border-none text-sm py-2"
               >
                 Contratar Agora
               </Button>
@@ -328,16 +328,16 @@ if (user) {
 
         {/* Waiting Docs Action Card */}
         {pendingRequest && pendingRequest.status === LoanStatus.WAITING_DOCS && (
-          <div className="bg-blue-900/20 border border-blue-500/50 rounded-2xl p-4 flex flex-col gap-3">
-            <div className="flex items-center gap-3 text-blue-400 font-bold">
-              <AlertTriangle size={20} /> Pendência na Análise
+          <div className="bg-blue-900/20 border border-blue-500/50 rounded-xl p-3.5 flex flex-col gap-2.5">
+            <div className="flex items-center gap-2.5 text-blue-400 font-bold text-sm">
+              <AlertTriangle size={16} /> Pendência na Análise
             </div>
-            <p className="text-sm text-zinc-300">
+            <p className="text-xs text-zinc-300">
               Precisamos de um documento complementar: <br />
-              <span className="text-white font-bold italic">"{pendingRequest.supplementalInfo?.description}"</span>
+              <span className="text-white font-bold italic text-[11px]">"{pendingRequest.supplementalInfo?.description}"</span>
             </p>
-            <Button onClick={() => setIsUploadModalOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none">
-              <Upload size={16} className="mr-2" /> Enviar Documento
+            <Button onClick={() => setIsUploadModalOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none text-xs py-2">
+              <Upload size={14} className="mr-1.5" /> Enviar Documento
             </Button>
           </div>
         )}
@@ -354,85 +354,85 @@ if (user) {
 
         {/* Contract PDF Download Card */}
         {contractPdfUrl && (
-          <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-green-900/20 rounded-2xl p-4 border border-green-500/30 flex items-center gap-4">
-            <div className="bg-green-500/20 p-3 rounded-xl">
-              <FileText size={24} className="text-green-400" />
+          <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-green-900/20 rounded-xl p-3 border border-green-500/30 flex items-center gap-3">
+            <div className="bg-green-500/20 p-2.5 rounded-lg">
+              <FileText size={20} className="text-green-400" />
             </div>
             <div className="flex-1">
-              <p className="font-bold text-white text-sm">Contrato Assinado</p>
-              <p className="text-xs text-zinc-400">Seu contrato foi gerado em PDF</p>
+              <p className="font-bold text-white text-xs">Contrato Assinado</p>
+              <p className="text-[10px] text-zinc-400">Seu contrato foi gerado em PDF</p>
             </div>
             <a href={contractPdfUrl} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-sm transition-all shrink-0">
-              <Download size={16} /> Baixar PDF
+              className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-[11px] transition-all shrink-0">
+              <Download size={14} /> Baixar
             </a>
           </div>
         )}
 
-        {/* CARD SALDO DEVEDOR - MAIOR E MAIS DESTACADO */}
-        <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-[#D4AF37]/10 rounded-3xl p-8 border border-zinc-800 relative overflow-hidden shadow-2xl">
+        {/* CARD SALDO DEVEDOR - Mais compacto e profissional */}
+        <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-[#D4AF37]/10 rounded-2xl p-5 border border-zinc-800 relative overflow-hidden shadow-xl">
           <div className="relative z-10">
-            <div className="flex items-center gap-2 text-zinc-400 mb-3">
-              <Wallet size={18} />
-              <span className="text-sm font-bold uppercase tracking-widest">Saldo Devedor</span>
+            <div className="flex items-center gap-1.5 text-zinc-400 mb-2">
+              <Wallet size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-widest">Saldo Devedor</span>
             </div>
 
-            {loading ? <Skeleton className="h-14 w-48 mb-6" /> : (
-              <div className="text-5xl font-bold text-[#D4AF37] mb-6 transition-all">
+            {loading ? <Skeleton className="h-10 w-36 mb-4" /> : (
+              <div className="text-3xl font-bold text-[#D4AF37] mb-4 transition-all">
                 {formatCurrency(userData.balance)}
               </div>
             )}
 
-            <div className="flex items-center justify-between p-5 bg-black/40 rounded-2xl border border-zinc-800/50 mb-6">
+            <div className="flex items-center justify-between p-3.5 bg-black/40 rounded-xl border border-zinc-800/50 mb-4">
               <div>
-                <div className="text-xs text-zinc-500 uppercase mb-1">Próxima Parcela</div>
-                <div className="text-white font-bold text-lg flex items-center gap-2">
-                  <Calendar size={16} className="text-[#FF0000]" />
-                  {loading ? <Skeleton className="h-5 w-20" /> : userData.nextDue}
+                <div className="text-[9px] text-zinc-500 uppercase mb-0.5">Próxima Parcela</div>
+                <div className="text-white font-bold text-sm flex items-center gap-1.5">
+                  <Calendar size={12} className="text-[#FF0000]" />
+                  {loading ? <Skeleton className="h-4 w-16" /> : userData.nextDue}
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-zinc-500 uppercase mb-1">Valor</div>
-                <div className="text-white font-bold text-xl">
-                  {loading ? <Skeleton className="h-5 w-24 ml-auto" /> : formatCurrency(userData.nextInstallmentValue)}
+                <div className="text-[9px] text-zinc-500 uppercase mb-0.5">Valor</div>
+                <div className="text-white font-bold text-base">
+                  {loading ? <Skeleton className="h-4 w-20 ml-auto" /> : formatCurrency(userData.nextInstallmentValue)}
                 </div>
               </div>
             </div>
 
-            <Button onClick={() => navigate('/client/contracts')} className="w-full bg-[#FF0000] hover:bg-red-600 shadow-lg text-lg py-4 font-bold" disabled={loading || userData.balance === 0}>
-              Pagar Parcela <ChevronRight size={20} />
+            <Button onClick={() => navigate('/client/contracts')} className="w-full bg-[#FF0000] hover:bg-red-600 shadow-lg text-sm py-3 font-bold" disabled={loading || userData.balance === 0}>
+              Pagar Parcela <ChevronRight size={16} />
             </Button>
           </div>
         </div>
 
-        {/* BOTÕES PRINCIPAIS - HIERARQUIA CLARA */}
-        <div className="space-y-4">
+        {/* BOTÕES PRINCIPAIS - Mais compactos e profissionais */}
+        <div className="space-y-3">
           {/* Bloco Principal - Botões Grandes */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2.5">
             <MainActionButton icon={Plus} label="Solicitar Crédito" onClick={() => navigate('/client/wizard')} />
             <MainActionButton icon={FileText} label="Meus Contratos" onClick={() => navigate('/client/contracts')} />
             <MainActionButton icon={TrendingUp} label="Extrato" onClick={() => navigate('/client/statement')} />
           </div>
 
           {/* Bloco Secundário - Botões Menores */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2.5">
             <SecondaryActionButton icon={Percent} label="Renegociar" onClick={() => setIsRenegotiateOpen(true)} disabled={userData.balance === 0} />
             <SecondaryActionButton icon={Gift} label="Indicações" onClick={() => navigate('/client/referrals')} />
             <SecondaryActionButton icon={History} label="Histórico" onClick={() => setIsHistoryModalOpen(true)} />
           </div>
         </div>
 
-        {/* Cards de Acesso: Ofertas, Cupons, Campanhas */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* Cards de Acesso: Ofertas, Cupons, Campanhas - Mais compactos */}
+        <div className="grid grid-cols-3 gap-2.5">
           {/* Ofertas/Propostas */}
           <button
             onClick={() => setIsOffersModalOpen(true)}
-            className="relative flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-emerald-900/30 to-emerald-900/10 border border-emerald-600/50 hover:border-emerald-400 transition-all"
+            className="relative flex flex-col items-center gap-1.5 p-3 rounded-xl bg-gradient-to-br from-emerald-900/30 to-emerald-900/10 border border-emerald-600/50 hover:border-emerald-400 transition-all"
           >
-            <Calculator size={24} className="text-emerald-400" />
-            <span className="text-xs font-bold text-white">Ofertas</span>
+            <Calculator size={20} className="text-emerald-400" />
+            <span className="text-[10px] font-bold text-white">Ofertas</span>
             {(preApprovedAmount || installmentOffer) && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-black text-xs font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 text-black text-[9px] font-bold rounded-full flex items-center justify-center">
                 {(preApprovedAmount ? 1 : 0) + (installmentOffer ? 1 : 0)}
               </span>
             )}
@@ -441,24 +441,24 @@ if (user) {
           {/* Cupons */}
           <button
             onClick={() => setIsCouponsModalOpen(true)}
-            className="relative flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-purple-900/30 to-purple-900/10 border border-purple-600/50 hover:border-purple-400 transition-all"
+            className="relative flex flex-col items-center gap-1.5 p-3 rounded-xl bg-gradient-to-br from-purple-900/30 to-purple-900/10 border border-purple-600/50 hover:border-purple-400 transition-all"
           >
-            <Ticket size={24} className="text-purple-400" />
-            <span className="text-xs font-bold text-white">Cupons</span>
+            <Ticket size={20} className="text-purple-400" />
+            <span className="text-[10px] font-bold text-white">Cupons</span>
             {coupons.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 text-white text-xs font-bold rounded-full flex items-center justify-center">{coupons.length}</span>
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{coupons.length}</span>
             )}
           </button>
 
           {/* Campanhas */}
           <button
             onClick={() => setIsCampaignsModalOpen(true)}
-            className="relative flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-amber-900/30 to-amber-900/10 border border-amber-600/50 hover:border-amber-400 transition-all"
+            className="relative flex flex-col items-center gap-1.5 p-3 rounded-xl bg-gradient-to-br from-amber-900/30 to-amber-900/10 border border-amber-600/50 hover:border-amber-400 transition-all"
           >
-            <Megaphone size={24} className="text-amber-400" />
-            <span className="text-xs font-bold text-white">Campanhas</span>
+            <Megaphone size={20} className="text-amber-400" />
+            <span className="text-[10px] font-bold text-white">Campanhas</span>
             {activeCampaigns.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-black text-xs font-bold rounded-full flex items-center justify-center">{activeCampaigns.length}</span>
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-black text-[9px] font-bold rounded-full flex items-center justify-center">{activeCampaigns.length}</span>
             )}
           </button>
         </div>
@@ -793,30 +793,30 @@ const ActionButton = ({ icon: Icon, label, onClick, disabled }: any) => (
   </button>
 );
 
-// Botões Principais - Maiores e mais destacados
+// Botões Principais - Mais compactos e profissionais
 const MainActionButton = ({ icon: Icon, label, onClick, disabled }: any) => (
   <button
     onClick={onClick}
     disabled={disabled}
-    className="flex flex-col items-center justify-center gap-3 p-5 rounded-2xl bg-gradient-to-br from-zinc-900 to-zinc-800 border-2 border-zinc-700 hover:border-[#FF0000] hover:shadow-lg hover:shadow-[#FF0000]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+    className="flex flex-col items-center justify-center gap-2 p-3.5 rounded-xl bg-gradient-to-br from-zinc-900 to-zinc-800 border border-zinc-700 hover:border-[#FF0000] hover:shadow-md hover:shadow-[#FF0000]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
   >
-    <div className="w-14 h-14 rounded-2xl bg-[#FF0000] flex items-center justify-center text-white shadow-lg">
-      <Icon size={28} strokeWidth={2.5} />
+    <div className="w-11 h-11 rounded-xl bg-[#FF0000] flex items-center justify-center text-white shadow-md">
+      <Icon size={22} strokeWidth={2.5} />
     </div>
-    <span className="text-xs font-bold text-white text-center leading-tight">{label}</span>
+    <span className="text-[10px] font-bold text-white text-center leading-tight">{label}</span>
   </button>
 );
 
-// Botões Secundários - Menores mas ainda proporcionais
+// Botões Secundários - Mais compactos
 const SecondaryActionButton = ({ icon: Icon, label, onClick, disabled }: any) => (
   <button
     onClick={onClick}
     disabled={disabled}
-    className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-600 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
   >
-    <div className="w-11 h-11 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-400">
-      <Icon size={22} strokeWidth={2} />
+    <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400">
+      <Icon size={18} strokeWidth={2} />
     </div>
-    <span className="text-[11px] font-semibold text-zinc-300 text-center leading-tight">{label}</span>
+    <span className="text-[9px] font-semibold text-zinc-300 text-center leading-tight">{label}</span>
   </button>
 );
