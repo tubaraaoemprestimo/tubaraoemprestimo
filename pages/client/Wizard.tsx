@@ -455,11 +455,6 @@ export const Wizard: React.FC = () => {
       // Step 3: Dados pessoais
       if (currentStep === 3) {
         if (!investorData.fullName.trim()) { addToast("Informe seu nome completo ou razão social.", 'warning'); return; }
-        const cpfCnpjDigits = investorData.cpfCnpj.replace(/\D/g, '');
-        if (!cpfCnpjDigits || (cpfCnpjDigits.length !== 11 && cpfCnpjDigits.length !== 14)) {
-          addToast("Informe um CPF ou CNPJ válido.", 'warning'); return;
-        }
-        if (!investorData.rgCnh.trim()) { addToast("Informe seu RG ou CNH.", 'warning'); return; }
         if (!investorData.birthDate) { addToast("Informe sua data de nascimento.", 'warning'); return; }
         if (!investorData.phone || investorData.phone.replace(/\D/g, '').length < 10) {
           addToast("Informe seu telefone.", 'warning'); return;
@@ -985,8 +980,6 @@ export const Wizard: React.FC = () => {
 
       const success = await apiService.submitInvestorRequest({
         fullName: investorData.fullName,
-        cpfCnpj: investorData.cpfCnpj,
-        rgCnh: investorData.rgCnh,
         birthDate: investorData.birthDate,
         email: investorData.email,
         phone: investorData.phone,
@@ -1529,17 +1522,6 @@ export const Wizard: React.FC = () => {
 
               <Input label="Nome Completo / Razão Social" name="investorFullName" value={investorData.fullName}
                 onChange={(e: any) => setInvestorData({ ...investorData, fullName: e.target.value })} placeholder="Seu nome completo" required />
-
-              <Input label="CPF ou CNPJ" name="investorCpfCnpj" value={investorData.cpfCnpj}
-                onChange={(e: any) => {
-                  let v = e.target.value.replace(/\D/g, '');
-                  if (v.length <= 11) v = v.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-                  else v = v.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
-                  setInvestorData({ ...investorData, cpfCnpj: v });
-                }} placeholder="000.000.000-00" required />
-
-              <Input label="RG ou CNH" name="investorRgCnh" value={investorData.rgCnh}
-                onChange={(e: any) => setInvestorData({ ...investorData, rgCnh: e.target.value })} placeholder="Número do documento" />
 
               <Input label="Data de Nascimento" name="investorBirthDate" type="date" value={investorData.birthDate}
                 onChange={(e: any) => setInvestorData({ ...investorData, birthDate: e.target.value })} />
