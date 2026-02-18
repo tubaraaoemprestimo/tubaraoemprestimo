@@ -981,6 +981,7 @@ export const Wizard: React.FC = () => {
 
       const success = await apiService.submitInvestorRequest({
         fullName: investorData.fullName,
+        cpf: '', // Campo obrigatório no backend
         cpfCnpj: '', // Campo removido do formulário mas pode ser necessário no backend
         rgCnh: '', // Campo removido do formulário mas pode ser necessário no backend
         birthDate: investorData.birthDate,
