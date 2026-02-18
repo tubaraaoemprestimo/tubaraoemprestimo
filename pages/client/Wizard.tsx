@@ -702,8 +702,8 @@ export const Wizard: React.FC = () => {
     let docsStep = 5;
     if (profileType === 'MOTO') docsStep = 5;
     if (profileType === 'GARANTIA') docsStep = 6;
-    // LIMPA_NOME pula validação de documentos (não tem esse step)
-    if (profileType !== 'LIMPA_NOME' && currentStep === docsStep) {
+    // LIMPA_NOME e INVESTIDOR pulam validação de documentos (não tem esse step)
+    if (profileType !== 'LIMPA_NOME' && profileType !== 'INVESTIDOR' && currentStep === docsStep) {
       // Selfie obrigatória
       if (!formData.selfie) {
         addToast("Tire a selfie segurando o documento.", 'warning');
