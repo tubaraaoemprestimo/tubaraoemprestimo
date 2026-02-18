@@ -3069,7 +3069,11 @@ export const Wizard: React.FC = () => {
             </Button>
           ) : (
             <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading}
-              disabled={profileType === 'LIMPA_NOME' ? !formData.signature : (!formData.signature || !formData.declarationAccepted)}>
+              disabled={
+                profileType === 'INVESTIDOR' ? !formData.signature :
+                profileType === 'LIMPA_NOME' ? !formData.signature :
+                (!formData.signature || !formData.declarationAccepted)
+              }>
               {profileType === 'INVESTIDOR' ? 'QUERO SER INVESTIDOR' :
                 profileType === 'LIMPA_NOME' ? 'SOLICITAR SERVIÇO' :
                   profileType === 'MOTO' ? 'SOLICITAR FINANCIAMENTO' : 'SOLICITAR MEU EMPRÉSTIMO'}
