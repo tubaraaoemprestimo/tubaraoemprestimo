@@ -981,6 +981,7 @@ export const Wizard: React.FC = () => {
 
       const success = await apiService.submitInvestorRequest({
         fullName: investorData.fullName,
+        clientName: investorData.fullName,
         cpf: '', // Campo obrigatório no backend
         cpfCnpj: '', // Campo removido do formulário mas pode ser necessário no backend
         rgCnh: '', // Campo removido do formulário mas pode ser necessário no backend
@@ -992,6 +993,7 @@ export const Wizard: React.FC = () => {
         pixKey: investorData.pixKey,
         pixKeyType: investorData.pixKeyType,
         accountHolderName: investorData.accountHolderName,
+        amount: investorData.investmentAmount, // Backend espera 'amount', não 'investmentAmount'
         investmentAmount: investorData.investmentAmount,
         investmentTier: investorData.investmentTier,
         payoutMode: investorData.payoutMode,
@@ -1527,7 +1529,7 @@ export const Wizard: React.FC = () => {
               <Input label="Nome Completo / Razão Social" name="investorFullName" value={investorData.fullName}
                 onChange={(e: any) => setInvestorData({ ...investorData, fullName: e.target.value })} placeholder="Seu nome completo" required />
 
-              <Input label="Data de Nascimento" name="investorBirthDate" type="date" value={investorData.birthDate}
+              <DateInput label="Data de Nascimento" name="investorBirthDate" value={investorData.birthDate}
                 onChange={(e: any) => setInvestorData({ ...investorData, birthDate: e.target.value })} />
 
               <Input label="Telefone / WhatsApp" name="investorPhone" value={investorData.phone}
@@ -2419,7 +2421,7 @@ export const Wizard: React.FC = () => {
                     <Input label="Nome Completo" name="name" value={formData.name} onChange={handleChange} placeholder="Como no documento" />
                     <Input label="Telefone" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
                     <Input label="CPF ou CNPJ" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00 ou 00.000.000/0000-00" error={errors.cpf} />
-                    <Input label="Data de Nascimento" type="date" name="birthDate" value={formData.birthDate} onChange={handleChange} />
+                    <DateInput label="Data de Nascimento" name="birthDate" value={formData.birthDate} onChange={handleChange} />
                     <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="seu@email.com" />
                     <Input label="Cupom de Indicação (Opcional)" name="referralCode" value={formData.referralCode} onChange={handleChange} placeholder="Código ou CPF de quem indicou" />
                   </div>
@@ -2428,7 +2430,7 @@ export const Wizard: React.FC = () => {
                     <div className="space-y-4">
                       <Input label="Nome Completo" name="name" value={formData.name} onChange={handleChange} placeholder="Como no documento" />
                       <Input label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00" error={errors.cpf} />
-                      <Input label="Data de Nascimento" type="date" name="birthDate" value={formData.birthDate} onChange={handleChange} />
+                      <DateInput label="Data de Nascimento" name="birthDate" value={formData.birthDate} onChange={handleChange} />
                       <Input label="WhatsApp Principal" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
                       <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} />
                       <Input label="Cupom de Indicação (Opcional)" name="referralCode" value={formData.referralCode} onChange={handleChange} placeholder="Insira seu cupom aqui" />
@@ -3095,6 +3097,54 @@ const Input = ({ label, error, className = "", required, ...props }: any) => (
     {error && <p className="text-xs text-red-500 mt-1 ml-1">{error}</p>}
   </div>
 );
+
+const DateInput = ({ label, error, className = "", required, value, onChange, name }: any) => {
+  const toDisplay = (v: string) => {
+    if (!v) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      const [y, m, d] = v.split('-');
+      return `${d}/${m}/${y}`;
+    }
+    return v;
+  };
+
+  const [display, setDisplay] = React.useState(() => toDisplay(value));
+
+  React.useEffect(() => {
+    setDisplay(toDisplay(value || ''));
+  }, [value]);
+
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 8);
+    let masked = raw;
+    if (raw.length > 4) masked = raw.replace(/^(\d{2})(\d{2})(\d{1,4})/, '$1/$2/$3');
+    else if (raw.length > 2) masked = raw.replace(/^(\d{2})(\d{1,2})/, '$1/$2');
+    setDisplay(masked);
+    let isoValue = raw;
+    if (raw.length === 8) {
+      isoValue = `${raw.slice(4, 8)}-${raw.slice(2, 4)}-${raw.slice(0, 2)}`;
+    }
+    if (onChange) onChange({ target: { name, value: isoValue } });
+  };
+
+  return (
+    <div>
+      <label className="block text-xs text-zinc-400 mb-1.5 ml-1">
+        {label}{required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <input
+        type="text"
+        inputMode="numeric"
+        placeholder="DD/MM/AAAA"
+        value={display}
+        onChange={handleInput}
+        name={name}
+        className={`w-full bg-black border rounded-lg p-3 text-white text-sm focus:border-[#D4AF37] outline-none ${error ? 'border-red-900' : 'border-zinc-700'} ${className}`}
+      />
+      {error && <p className="text-xs text-red-500 mt-1 ml-1">{error}</p>}
+    </div>
+  );
+};
 
 // CSS para o slider customizado
 const sliderStyles = `
