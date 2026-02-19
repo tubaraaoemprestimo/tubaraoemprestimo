@@ -34,9 +34,10 @@ async function generateCaptionFromImage(imageUrl: string): Promise<string> {
 
     Retorne apenas a legenda, sem explicações adicionais.`;
 
+    const arrayBuffer = await fetch(imageUrl).then(r => r.arrayBuffer());
     const imagePart = {
       inlineData: {
-        data: Buffer.from(new Uint8Array(await fetch(imageUrl).then(r => r.arrayBuffer()))).toString('base64'),
+        data: Buffer.from(new Uint8Array(arrayBuffer)).toString('base64'),
         mimeType: 'image/jpeg',
       },
     };
@@ -214,9 +215,10 @@ router.post('/generate-caption', authenticate, async (req, res) => {
 router.delete('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
+    const idString = Array.isArray(id) ? id[0] : id;
 
     await prisma.scheduledStatus.delete({
-      where: { id },
+      where: { id: idString },
     });
 
     res.json({ success: true });
@@ -230,10 +232,11 @@ router.delete('/:id', authenticate, async (req, res) => {
 router.put('/:id/status', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
+    const idString = Array.isArray(id) ? id[0] : id;
     const { status, postsCount } = req.body;
 
     const item = await prisma.scheduledStatus.findUnique({
-      where: { id },
+      where: { id: idString },
     });
 
     if (!item) {
@@ -255,7 +258,7 @@ router.put('/:id/status', authenticate, async (req, res) => {
     }
 
     const updated = await prisma.scheduledStatus.update({
-      where: { id },
+      where: { id: idString },
       data: {
         status,
         postsCount: postsCount || item.postsCount,
