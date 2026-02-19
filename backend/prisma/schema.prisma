@@ -427,14 +427,30 @@ model RiskEvent {
 }
 
 model ScheduledStatus {
-  id           String    @id @default(uuid())
-  imageUrl     String    @map("image_url")
-  caption      String?
-  status       String    @default("PENDING")
-  errorMessage String?   @map("error_message")
-  scheduledAt  DateTime  @default(now()) @map("scheduled_at")
-  postedAt     DateTime? @map("posted_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
+  id                  String    @id @default(uuid())
+  title               String?
+  content             String?
+  mediaType           String?   @map("media_type")
+  mediaUrl            String?   @map("media_url")
+  imageUrl            String?   @map("image_url")
+  caption             String?
+  aiGeneratedCaption  Boolean   @default(false) @map("ai_generated_caption")
+  recurrence          String    @default("ONCE")
+  selectedDays        String[]  @map("selected_days")
+  postsPerDay         Int       @default(1) @map("posts_per_day")
+  totalDays           Int       @default(1) @map("total_days")
+  startDate           DateTime  @map("start_date")
+  endDate             DateTime? @map("end_date")
+  postTimes           String[]  @map("post_times")
+  status              String    @default("SCHEDULED")
+  nextPostAt          DateTime? @map("next_post_at")
+  lastPostedAt        DateTime? @map("last_posted_at")
+  postsCount          Int       @default(0) @map("posts_count")
+  errorMessage        String?   @map("error_message")
+  scheduledAt         DateTime  @default(now()) @map("scheduled_at")
+  postedAt            DateTime? @map("posted_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  createdBy           String?   @map("created_by")
 
   @@map("scheduled_status")
 }

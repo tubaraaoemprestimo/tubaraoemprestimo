@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticateToken } from '../middleware/auth';
+import { authenticate } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -36,7 +36,7 @@ async function generateCaptionFromImage(imageUrl: string): Promise<string> {
 
     const imagePart = {
       inlineData: {
-        data: Buffer.from(await fetch(imageUrl).then(r => r.arrayBuffer())).toString('base64'),
+        data: Buffer.from(new Uint8Array(await fetch(imageUrl).then(r => r.arrayBuffer()))).toString('base64'),
         mimeType: 'image/jpeg',
       },
     };
@@ -119,7 +119,7 @@ function calculateNextPostDate(
 }
 
 // GET - Listar todos os status agendados
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
   try {
     const items = await prisma.scheduledStatus.findMany({
       orderBy: { createdAt: 'desc' },
@@ -133,7 +133,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // POST - Criar novo agendamento
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
   try {
     const {
       title,
@@ -194,7 +194,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // POST - Gerar legenda com IA
-router.post('/generate-caption', authenticateToken, async (req, res) => {
+router.post('/generate-caption', authenticate, async (req, res) => {
   try {
     const { imageUrl } = req.body;
 
@@ -211,7 +211,7 @@ router.post('/generate-caption', authenticateToken, async (req, res) => {
 });
 
 // DELETE - Excluir agendamento
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -227,7 +227,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 });
 
 // PUT - Atualizar status (para marcar como postado, falhou, etc)
-router.put('/:id/status', authenticateToken, async (req, res) => {
+router.put('/:id/status', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, postsCount } = req.body;
