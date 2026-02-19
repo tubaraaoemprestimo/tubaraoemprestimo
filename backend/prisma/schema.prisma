@@ -304,6 +304,14 @@ model LoanRequest {
   partnerId               String?   @map("partner_id")
   isPartnerReferral       Boolean   @default(false) @map("is_partner_referral")
   partnerCommissionRate   Float?    @map("partner_commission_rate")
+  // Campos específicos para INVESTIDOR
+  investmentTier          String?   @map("investment_tier")
+  payoutMode              String?   @map("payout_mode")
+  monthlyRate             Float?    @map("monthly_rate")
+  contractMonths          Int?      @map("contract_months")
+  autoRenew               Boolean   @default(true) @map("auto_renew")
+  withdrawalNoticeMonths  Int?      @map("withdrawal_notice_months")
+  accountHolderName       String?   @map("account_holder_name")
 
   customer                Customer? @relation(fields: [customerId], references: [id], name: "LoanRequestCustomer")
   user                    User?     @relation(fields: [userId], references: [id], name: "LoanRequestUser")

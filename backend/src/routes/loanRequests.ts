@@ -278,6 +278,14 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 partnerId,
                 isPartnerReferral,
                 partnerCommissionRate,
+                // Campos específicos para INVESTIDOR
+                investmentTier: data.investmentTier || null,
+                payoutMode: data.payoutMode || null,
+                monthlyRate: data.monthlyRate || null,
+                contractMonths: data.contractMonths || null,
+                autoRenew: data.autoRenew !== undefined ? data.autoRenew : true,
+                withdrawalNoticeMonths: data.withdrawalNoticeMonths || null,
+                accountHolderName: data.accountHolderName || null,
                 status: 'PENDING'
             }
         });
