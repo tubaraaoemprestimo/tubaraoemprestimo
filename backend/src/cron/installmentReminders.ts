@@ -507,9 +507,9 @@ const scheduleCommissionCancellation = () => {
 export const initCronJobs = () => {
   scheduleInstallmentReminders();
   scheduleLatePaymentDetection();
-  scheduleWhatsAppStatus();
+  // scheduleWhatsAppStatus(); // Temporariamente desabilitado até migration completa
   schedulePartnerBonusEvaluation();
   scheduleCommissionCancellation();
-  console.log('[Cron] initialized (reminders + late detection + whatsapp status + partner bonus + commission cancellation)');
+  console.log('[Cron] initialized (reminders + late detection + partner bonus + commission cancellation)');
 };
 
