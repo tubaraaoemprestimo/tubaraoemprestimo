@@ -153,6 +153,7 @@ model Customer {
   userId              String?        @map("user_id")
   name                String
   cpf                 String         @unique
+  rg                  String?
   email               String
   phone               String
   status              String         @default("ACTIVE")
