@@ -35,6 +35,7 @@ import { SecurityHub } from './pages/admin/SecurityHub';
 import { AIHub } from './pages/admin/AIHub';
 import { AnalyticsHub } from './pages/admin/AnalyticsHub';
 import { ContractMigrations } from './pages/admin/ContractMigrations';
+import { CollectionAutomationPanel } from './pages/admin/CollectionAutomationPanel';
 
 // Pages - Admin (mantidas para rotas legadas)
 import { FinancePage } from './pages/admin/Finance';
@@ -198,6 +199,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <Link to="/admin/requests" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/requests')}`}><FileText size={18} /> Solicitações</Link>
         <Link to="/admin/investors" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/investors')}`}><Landmark size={18} /> Solicitações de Investidores</Link>
         <Link to="/admin/contract-migrations" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/contract-migrations')}`}><Users size={18} /> Migração de Contratos</Link>
+        <Link to="/admin/collection-automation" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/collection-automation')}`}><TrendingUp size={18} /> Réguas de Cobrança</Link>
         <Link to="/admin/import-contacts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/import-contacts')}`}><Upload size={18} /> Importar Contatos</Link>
         <Link to="/admin/data-search" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/data-search')}`}><Search size={18} /> Investigação</Link>
         <Link to="/admin/partners" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/partners')}`}><Handshake size={18} /> Parceiros</Link>
@@ -520,6 +522,7 @@ function App() {
             <Route path="/admin/customers" element={<AdminLayout><Customers /></AdminLayout>} />
             <Route path="/admin/investors" element={<AdminLayout><Investors /></AdminLayout>} />
             <Route path="/admin/contract-migrations" element={<AdminLayout><ContractMigrations /></AdminLayout>} />
+            <Route path="/admin/collection-automation" element={<AdminLayout><CollectionAutomationPanel /></AdminLayout>} />
             <Route path="/admin/import-contacts" element={<AdminLayout><ImportContacts /></AdminLayout>} />
             <Route path="/admin/data-search" element={<AdminLayout><DataSearch /></AdminLayout>} />
             <Route path="/admin/partners" element={<AdminLayout><Partners /></AdminLayout>} />
