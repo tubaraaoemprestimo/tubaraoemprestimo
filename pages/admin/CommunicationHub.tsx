@@ -13,6 +13,7 @@ import { apiService } from '../../services/apiService';
 import { whatsappService } from '../../services/whatsappService';
 import { useToast } from '../../components/Toast';
 import { AIGenerateCaption } from '../../components/AIGenerateCaption';
+import { ImageUpload } from '../../components/ImageUpload';
 import { MessageTemplate, Campaign, Customer, Referral } from '../../types';
 
 type TabType = 'templates' | 'campaigns' | 'status' | 'referrals';
@@ -37,6 +38,8 @@ interface Coupon {
     active: boolean;
     description?: string;
     partner_name?: string;
+    image_url?: string;
+    partner_logo?: string;
 }
 
 const inputStyle = "w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none transition-colors";
@@ -554,42 +557,47 @@ export const CommunicationHub: React.FC = () => {
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             {coupons.map(coupon => (
-                                <div key={coupon.id} className={`bg-black border rounded-lg p-4 ${coupon.active ? 'border-green-500/30' : 'border-zinc-700'}`}>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="font-mono font-bold text-[#D4AF37] text-lg">{coupon.code}</span>
-                                        <span className={`text-xs px-2 py-0.5 rounded ${coupon.active ? 'bg-green-900/30 text-green-400' : 'bg-zinc-800 text-zinc-500'}`}>
-                                            {coupon.active ? 'Ativo' : 'Inativo'}
-                                        </span>
+                                <div key={coupon.id} className={`bg-black border rounded-lg overflow-hidden ${coupon.active ? 'border-green-500/30' : 'border-zinc-700'}`}>
+                                    {coupon.image_url && (
+                                        <img src={coupon.image_url} className="w-full h-32 object-cover" alt={coupon.partner_name || 'Cupom'} />
+                                    )}
+                                    <div className="p-4">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="font-mono font-bold text-[#D4AF37] text-lg">{coupon.code}</span>
+                                            <span className={`text-xs px-2 py-0.5 rounded ${coupon.active ? 'bg-green-900/30 text-green-400' : 'bg-zinc-800 text-zinc-500'}`}>
+                                                {coupon.active ? 'Ativo' : 'Inativo'}
+                                            </span>
+                                        </div>
+                                        <p className="text-white font-bold text-2xl">{coupon.discount_percent}% OFF</p>
+                                        {coupon.partner_name && (
+                                            <p className="text-sm text-zinc-300 mt-1 flex items-center gap-1">
+                                                <UserPlus size={12} className="text-[#D4AF37]" /> {coupon.partner_name}
+                                            </p>
+                                        )}
+                                        {coupon.description && (
+                                            <p className="text-xs text-zinc-400 mt-1 line-clamp-2">{coupon.description}</p>
+                                        )}
+                                        <p className="text-xs text-zinc-500 mt-1">
+                                            Usado {coupon.times_used}/{coupon.usage_limit} vezes
+                                        </p>
+                                        <div className="flex gap-2 mt-3">
+                                            <button
+                                                onClick={() => { setEditingCoupon(coupon); setIsCouponModalOpen(true); }}
+                                                className="p-1.5 bg-zinc-800 text-zinc-400 rounded hover:bg-zinc-700"
+                                            >
+                                                <Edit2 size={12} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteCoupon(coupon.id)}
+                                                className="p-1.5 bg-red-900/30 text-red-400 rounded hover:bg-red-900/50"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
                                     </div>
-<p className="text-white font-bold text-2xl">{coupon.discount_percent}% OFF</p>
-              {coupon.partner_name && (
-                <p className="text-sm text-zinc-300 mt-1 flex items-center gap-1">
-                  <UserPlus size={12} className="text-[#D4AF37]" /> {coupon.partner_name}
-                </p>
-              )}
-              {coupon.description && (
-                <p className="text-xs text-zinc-400 mt-1 line-clamp-2">{coupon.description}</p>
-              )}
-              <p className="text-xs text-zinc-500 mt-1">
-                Usado {coupon.times_used}/{coupon.usage_limit} vezes
-              </p>
-              <div className="flex gap-2 mt-3">
-                <button
-                  onClick={() => { setEditingCoupon(coupon); setIsCouponModalOpen(true); }}
-                  className="p-1.5 bg-zinc-800 text-zinc-400 rounded hover:bg-zinc-700"
-                >
-                  <Edit2 size={12} />
-                </button>
-                <button
-                  onClick={() => handleDeleteCoupon(coupon.id)}
-                  className="p-1.5 bg-red-900/30 text-red-400 rounded hover:bg-red-900/50"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
@@ -857,6 +865,14 @@ export const CommunicationHub: React.FC = () => {
       <button onClick={() => setIsCouponModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
     </div>
     <div className="p-6 space-y-4">
+      <ImageUpload
+        label="Imagem do Cupom"
+        subtitle="Imagem promocional do parceiro (opcional)"
+        imageUrl={editingCoupon.image_url}
+        onUpload={(url) => setEditingCoupon(prev => ({ ...prev, image_url: url }))}
+        onRemove={() => setEditingCoupon(prev => ({ ...prev, image_url: undefined }))}
+        aspectRatio="16:9"
+      />
       <div>
         <label className="block text-sm text-zinc-400 mb-1">Código</label>
         <input
@@ -879,6 +895,34 @@ export const CommunicationHub: React.FC = () => {
         />
       </div>
       <div>
+        <label className="block text-sm text-zinc-400 mb-1">Parceiro</label>
+        <input
+          type="text"
+          value={editingCoupon.partner_name || ''}
+          onChange={e => setEditingCoupon(prev => ({ ...prev, partner_name: e.target.value }))}
+          className={inputStyle}
+          placeholder="Nome do parceiro (ex: iFood, Uber)"
+        />
+      </div>
+      <ImageUpload
+        label="Logo do Parceiro"
+        subtitle="Logo pequeno do parceiro (opcional)"
+        imageUrl={editingCoupon.partner_logo}
+        onUpload={(url) => setEditingCoupon(prev => ({ ...prev, partner_logo: url }))}
+        onRemove={() => setEditingCoupon(prev => ({ ...prev, partner_logo: undefined }))}
+        aspectRatio="1:1"
+        maxSize={5}
+      />
+      <div>
+        <label className="block text-sm text-zinc-400 mb-1">Descrição</label>
+        <textarea
+          value={editingCoupon.description || ''}
+          onChange={e => setEditingCoupon(prev => ({ ...prev, description: e.target.value }))}
+          className={`${inputStyle} h-24 resize-none`}
+          placeholder="Texto de marketing ou informações do parceiro"
+        />
+      </div>
+      <div>
         <label className="block text-sm text-zinc-400 mb-1">Limite de Uso</label>
         <input
           type="number"
@@ -895,25 +939,6 @@ export const CommunicationHub: React.FC = () => {
           value={editingCoupon.valid_until || ''}
           onChange={e => setEditingCoupon(prev => ({ ...prev, valid_until: e.target.value }))}
           className={inputStyle}
-        />
-      </div>
-      <div>
-        <label className="block text-sm text-zinc-400 mb-1">Parceiro</label>
-        <input
-          type="text"
-          value={editingCoupon.partner_name || ''}
-          onChange={e => setEditingCoupon(prev => ({ ...prev, partner_name: e.target.value }))}
-          className={inputStyle}
-          placeholder="Nome do parceiro (opcional)"
-        />
-      </div>
-      <div>
-        <label className="block text-sm text-zinc-400 mb-1">Descrição</label>
-        <textarea
-          value={editingCoupon.description || ''}
-          onChange={e => setEditingCoupon(prev => ({ ...prev, description: e.target.value }))}
-          className={`${inputStyle} h-24 resize-none`}
-          placeholder="Texto de marketing ou informações do parceiro (opcional)"
         />
       </div>
       <div className="flex items-center gap-2">

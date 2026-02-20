@@ -93,6 +93,7 @@ model Campaign {
   title       String
   description String
   imageUrl    String?  @map("image_url")
+  videoUrl    String?  @map("video_url")
   link        String?
   startDate   DateTime @map("start_date")
   endDate     DateTime @map("end_date")
@@ -131,6 +132,11 @@ model Coupon {
   code          String    @unique
   discount      Float
   description   String
+  imageUrl      String?   @map("image_url")
+  partnerName   String?   @map("partner_name")
+  partnerLogo   String?   @map("partner_logo")
+  usageLimit    Int       @default(100) @map("usage_limit")
+  usageCount    Int       @default(0) @map("usage_count")
   customerId    String?   @map("customer_id")
   customerEmail String?   @map("customer_email")
   expiresAt     DateTime  @map("expires_at")

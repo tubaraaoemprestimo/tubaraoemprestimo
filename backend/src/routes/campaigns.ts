@@ -51,14 +51,37 @@ async function sendWhatsApp(
 }
 
 /**
+ * Envia imagem WhatsApp via Evolution API
+ */
+async function sendWhatsAppImage(
+    config: { apiUrl: string; apiKey: string; instanceName: string },
+    phone: string, imageUrl: string, caption: string
+): Promise<boolean> {
+    try {
+        const url = `${config.apiUrl}/message/sendMedia/${config.instanceName}`;
+        await axios.post(url, {
+            number: normalizePhone(phone),
+            mediatype: 'image',
+            media: imageUrl,
+            caption,
+            options: { delay: 1500, presence: 'composing' }
+        }, { headers: { apikey: config.apiKey }, timeout: 15000 });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Envia email branded
  */
-async function sendEmail(to: string, subject: string, body: string): Promise<boolean> {
+async function sendEmail(to: string, subject: string, body: string, imageUrl?: string): Promise<boolean> {
     const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #000; color: #fff; padding: 30px; border-radius: 12px;">
         <div style="text-align: center; margin-bottom: 20px;">
             <h1 style="color: #D4AF37; font-size: 24px;">🦈 Tubarão Empréstimos</h1>
         </div>
+        ${imageUrl ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${imageUrl}" style="width: 100%; max-width: 600px; border-radius: 8px;" alt="Imagem promocional" /></div>` : ''}
         <div style="color: #ccc; font-size: 15px; line-height: 1.6;">
             ${body.replace(/\n/g, '<br>')}
         </div>
@@ -175,6 +198,7 @@ campaignsRouter.post('/send', requireAdmin, async (req: Request, res: Response) 
         }
 
         // ============= COUPON =============
+        let couponData: any = null;
         if (type === 'coupon') {
             const coupon = await prisma.coupon.findUnique({ where: { id } });
             if (!coupon) {
@@ -182,18 +206,25 @@ campaignsRouter.post('/send', requireAdmin, async (req: Request, res: Response) 
                 return;
             }
 
+            couponData = coupon;
+
             const expiresText = coupon.expiresAt
                 ? `\n⏰ Válido até: ${new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}`
                 : '';
 
+            const partnerText = coupon.partnerName ? `\n🏢 Parceiro: *${coupon.partnerName}*` : '';
+
             message = `🎉 *CUPOM EXCLUSIVO!*\n\n` +
                 `Use o código *${coupon.code}* e ganhe *${coupon.discount}% de desconto*!\n` +
                 `${coupon.description || ''}\n` +
+                `${partnerText}` +
                 `${expiresText}\n\n` +
                 `📱 *Acesse o App:*\nhttps://www.tubaraoemprestimo.com.br/\n\n` +
                 `_Tubarão Empréstimos 🦈_`;
 
-            emailSubject = '🎁 Cupom de Desconto Especial — Tubarão Empréstimos';
+            emailSubject = coupon.partnerName
+                ? `🎁 Cupom ${coupon.partnerName} — Tubarão Empréstimos`
+                : '🎁 Cupom de Desconto Especial — Tubarão Empréstimos';
 
             // Se cupom é para cliente específico
             if (coupon.customerEmail) {
@@ -218,7 +249,13 @@ campaignsRouter.post('/send', requireAdmin, async (req: Request, res: Response) 
                 // WhatsApp
                 if (customer.phone && waEnabled) {
                     try {
-                        const success = await sendWhatsApp(waConfig!, customer.phone, message);
+                        let success = false;
+                        // Se é cupom com imagem, envia imagem + legenda
+                        if (type === 'coupon' && couponData?.imageUrl) {
+                            success = await sendWhatsAppImage(waConfig!, customer.phone, couponData.imageUrl, message);
+                        } else {
+                            success = await sendWhatsApp(waConfig!, customer.phone, message);
+                        }
                         if (success) sent++; else failed++;
                     } catch { failed++; }
                     // Delay para evitar rate limiting
@@ -228,7 +265,8 @@ campaignsRouter.post('/send', requireAdmin, async (req: Request, res: Response) 
                 // Email
                 if (customer.email) {
                     try {
-                        const emailSent = await sendEmail(customer.email, emailSubject, message);
+                        const imageUrl = type === 'coupon' && couponData?.imageUrl ? couponData.imageUrl : undefined;
+                        const emailSent = await sendEmail(customer.email, emailSubject, message, imageUrl);
                         if (emailSent) emailsSent++;
                     } catch { /* email falhou, continua */ }
                 }
@@ -237,9 +275,17 @@ campaignsRouter.post('/send', requireAdmin, async (req: Request, res: Response) 
                 if (customer.pushSubscriptions && customer.pushSubscriptions.length > 0) {
                     for (const sub of customer.pushSubscriptions) {
                         try {
+                            const pushTitle = type === 'campaign' ? '🦈 Nova Promoção!' :
+                                (couponData?.partnerName ? `🎁 Cupom ${couponData.partnerName}` : '🎁 Novo Cupom!');
+
+                            const pushBody = type === 'campaign' ? 'Confira as novidades no app!' :
+                                `${couponData?.discount}% OFF - Código: ${couponData?.code}`;
+
                             const payload = JSON.stringify({
-                                title: type === 'campaign' ? '🦈 Nova Promoção!' : '🎁 Novo Cupom!',
-                                body: type === 'campaign' ? 'Confira as novidades no app!' : `Desconto exclusivo: ${message.substring(0, 50)}...`,
+                                title: pushTitle,
+                                body: pushBody,
+                                icon: couponData?.partnerLogo || couponData?.imageUrl || '/logo.png',
+                                image: couponData?.imageUrl || undefined,
                                 url: '/client/dashboard'
                             });
                             await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys as any }, payload);

@@ -97,12 +97,15 @@ communicationRouter.get('/coupons', async (_req: Request, res: Response) => {
 // POST /api/communication/coupons - Criar cupom
 communicationRouter.post('/coupons', async (req: Request, res: Response) => {
     try {
-        const { code, discount_percent, description, expires_at, usage_limit, active, customerEmail } = req.body;
+        const { code, discount_percent, description, expires_at, usage_limit, active, customerEmail, image_url, partner_name, partner_logo } = req.body;
         const coupon = await prisma.coupon.create({
             data: {
                 code: code || `TUB${Date.now().toString(36).toUpperCase()}`,
                 discount: discount_percent || 10,
                 description: description || '',
+                imageUrl: image_url || null,
+                partnerName: partner_name || null,
+                partnerLogo: partner_logo || null,
                 expiresAt: expires_at ? new Date(expires_at) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
                 usageLimit: usage_limit || 100,
                 usageCount: 0,
@@ -121,7 +124,7 @@ communicationRouter.post('/coupons', async (req: Request, res: Response) => {
 communicationRouter.put('/coupons/:id', async (req: Request, res: Response) => {
     try {
         const id = String(req.params.id);
-        const { code, discount_percent, description, expires_at, usage_limit, active } = req.body;
+        const { code, discount_percent, description, expires_at, usage_limit, active, image_url, partner_name, partner_logo } = req.body;
         const data: any = {};
         if (code !== undefined) data.code = code;
         if (discount_percent !== undefined) data.discount = discount_percent;
@@ -129,6 +132,9 @@ communicationRouter.put('/coupons/:id', async (req: Request, res: Response) => {
         if (expires_at !== undefined) data.expiresAt = new Date(expires_at);
         if (usage_limit !== undefined) data.usageLimit = usage_limit;
         if (active !== undefined) data.active = active;
+        if (image_url !== undefined) data.imageUrl = image_url;
+        if (partner_name !== undefined) data.partnerName = partner_name;
+        if (partner_logo !== undefined) data.partnerLogo = partner_logo;
 
         const coupon = await prisma.coupon.update({ where: { id }, data });
         res.json(coupon);
