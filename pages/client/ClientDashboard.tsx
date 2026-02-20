@@ -487,7 +487,7 @@ if (user) {
         </div>
 
         {/* Linha 2: Nível Ouro, Indicações, Histórico */}
-        <div className="mx-4 bg-[#1a1a1a] border border-zinc-800 rounded-2xl overflow-hidden mb-6">
+        <div className="mx-4 bg-[#1a1a1a] border border-zinc-800 rounded-2xl overflow-hidden mb-2">
           <div className="grid grid-cols-3">
             <button
               onClick={() => {
@@ -513,6 +513,23 @@ if (user) {
             </button>
           </div>
         </div>
+
+        {/* Mensagem Fixa do Nível Ouro */}
+        {activeLoanId && (
+          <div className="mx-4 mb-6 bg-gradient-to-r from-[#D4AF37]/10 to-[#FDB931]/5 border border-[#D4AF37]/30 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center shrink-0 mt-0.5">
+                <span className="text-[#D4AF37] text-lg">🟢</span>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[#D4AF37] mb-1">Nível Ouro Tubarão</p>
+                <p className="text-[11px] text-zinc-300 leading-relaxed">
+                  Apenas clientes disciplinados alcançam o Nível Ouro Tubarão. Complete 12 pagamentos consecutivos em dia para desbloquear essa oportunidade exclusiva.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
       </main>
 
