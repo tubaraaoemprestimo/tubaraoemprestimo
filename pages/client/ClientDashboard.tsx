@@ -21,7 +21,7 @@ export const ClientDashboard: React.FC = () => {
   // ... state declarations ...
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isRenegotiateOpen, setIsRenegotiateOpen] = useState(false);
+  const [isNivelOuroOpen, setIsNivelOuroOpen] = useState(false);
   const [isPrivacyEnabled, setIsPrivacyEnabled] = useState(false);
   const [pendingRequest, setPendingRequest] = useState<LoanRequest | null>(null);
   const [activeCampaigns, setActiveCampaigns] = useState<Campaign[]>([]);
@@ -50,9 +50,12 @@ export const ClientDashboard: React.FC = () => {
 const [loanHistory, setLoanHistory] = useState<LoanRequest[]>([]);
 const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
-  // ... renegotiation ...
-  const [renegotiateInstallments, setRenegotiateInstallments] = useState(12);
-  const [simulationResult, setSimulationResult] = useState({ monthly: 0, total: 0 });
+  // Nível Ouro Tubarão
+  const [nivelOuroEligibility, setNivelOuroEligibility] = useState<{
+    eligible: boolean;
+    reason: string;
+  } | null>(null);
+  const [activeLoanId, setActiveLoanId] = useState<string | null>(null);
 
   // ... userData ...
   const [userData, setUserData] = useState({
@@ -85,20 +88,6 @@ const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
   }, []);
 
-  // Recalculate simulation when balance or installments change
-  useEffect(() => {
-    if (userData.balance > 0) {
-      // Mock calculation: Balance * (1 + 0.05 rate)^months / months (Simplified amortization)
-      const rate = 0.05; // 5% mock interest for renegotiation
-      const totalWithInterest = userData.balance * (1 + (rate * (renegotiateInstallments / 12)));
-      const monthly = totalWithInterest / renegotiateInstallments;
-      setSimulationResult({
-        monthly,
-        total: totalWithInterest
-      });
-    }
-  }, [renegotiateInstallments, userData.balance]);
-
   const loadDashboardData = async () => {
     setLoading(true);
     const user = apiService.auth.getUser();
@@ -118,10 +107,16 @@ const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     let totalDebt = 0;
     let nextInstDate = '--/--';
     let nextInstVal = 0;
+    let activeLoan: string | null = null;
 
     if (loans.length > 0) {
       const activeLoans = loans.filter(l => l.status === 'APPROVED');
       totalDebt = activeLoans.reduce((acc, curr) => acc + curr.remainingAmount, 0);
+
+      // Pegar o primeiro empréstimo ativo para verificar elegibilidade Nível Ouro
+      if (activeLoans.length > 0) {
+        activeLoan = activeLoans[0].id;
+      }
 
       const allInstallments = activeLoans.flatMap(l => l.installments).filter(i => i.status === 'OPEN' || i.status === 'LATE');
       allInstallments.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
@@ -139,6 +134,18 @@ const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
       nextDue: nextInstDate,
       nextInstallmentValue: nextInstVal
     });
+
+    setActiveLoanId(activeLoan);
+
+    // Verificar elegibilidade para Nível Ouro
+    if (activeLoan) {
+      try {
+        const { data } = await api.get(`/loans/${activeLoan}/nivel-ouro/eligibility`);
+        setNivelOuroEligibility(data);
+      } catch (err) {
+        console.error('Erro ao verificar elegibilidade Nível Ouro:', err);
+      }
+    }
 
     setPendingRequest(pendingReq);
     setActiveCampaigns(campaigns);
@@ -165,7 +172,7 @@ const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 if (user) {
       const code = await referralService.getOrCreateCode(user.id, user.name);
       setReferralCode(code.code);
-      
+
       // Buscar histórico de solicitações (GET /loan-requests filtra por JWT auth)
       const { data: historyData } = await api.get('/loan-requests');
       if (historyData) {
@@ -176,9 +183,25 @@ if (user) {
     setLoading(false);
   };
 
-  const handleRenegotiateSubmit = () => {
-    addToast(`Proposta de ${renegotiateInstallments}x de R$ ${simulationResult.monthly.toFixed(2)} enviada!`, 'success');
-    setIsRenegotiateOpen(false);
+  const handleNivelOuroSubmit = async () => {
+    if (!activeLoanId) {
+      addToast('Nenhum empréstimo ativo encontrado', 'error');
+      return;
+    }
+
+    try {
+      const { data } = await api.post(`/loans/${activeLoanId}/nivel-ouro`);
+      addToast('🟢 Nível Ouro Tubarão ativado com sucesso!', 'success');
+      setIsNivelOuroOpen(false);
+
+      // Recarregar dados do dashboard
+      setTimeout(() => {
+        loadDashboardData();
+      }, 1000);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || 'Erro ao ativar Nível Ouro';
+      addToast(errorMsg, 'error');
+    }
   };
 
   const handleShare = async () => {
@@ -463,12 +486,22 @@ if (user) {
           </button>
         </div>
 
-        {/* Linha 2: Renegociar, Indicações, Histórico */}
+        {/* Linha 2: Nível Ouro, Indicações, Histórico */}
         <div className="mx-4 bg-[#1a1a1a] border border-zinc-800 rounded-2xl overflow-hidden mb-6">
           <div className="grid grid-cols-3">
-            <button onClick={() => setIsRenegotiateOpen(true)} disabled={userData.balance === 0} className="flex flex-col items-center gap-2 py-4 hover:bg-zinc-800/50 disabled:opacity-40 transition-all border-r border-zinc-800 active:scale-95">
-              <Percent size={20} className="text-zinc-300" />
-              <span className="text-[10px] font-semibold text-zinc-300">Renegociar</span>
+            <button
+              onClick={() => {
+                if (nivelOuroEligibility?.eligible) {
+                  setIsNivelOuroOpen(true);
+                } else {
+                  addToast(nivelOuroEligibility?.reason || 'Você não está elegível para o Nível Ouro Tubarão', 'info');
+                }
+              }}
+              disabled={!activeLoanId}
+              className="flex flex-col items-center gap-2 py-4 hover:bg-zinc-800/50 disabled:opacity-40 transition-all border-r border-zinc-800 active:scale-95"
+            >
+              <div className={`w-5 h-5 rounded-full ${nivelOuroEligibility?.eligible ? 'bg-green-500' : 'bg-zinc-600'}`}></div>
+              <span className="text-[10px] font-semibold text-zinc-300">Nível Ouro</span>
             </button>
             <button onClick={() => navigate('/client/referrals')} className="flex flex-col items-center gap-2 py-4 hover:bg-zinc-800/50 transition-all border-r border-zinc-800 active:scale-95">
               <Gift size={20} className="text-zinc-300" />
@@ -525,48 +558,52 @@ if (user) {
         </div>
       )}
 
-      {/* Renegotiation Modal */}
-      {isRenegotiateOpen && (
+      {/* Nível Ouro Tubarão Modal */}
+      {isNivelOuroOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in zoom-in duration-200">
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-md p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-[#D4AF37]">Renegociar Saldo</h3>
-              <button onClick={() => setIsRenegotiateOpen(false)}><X size={24} className="text-zinc-500 hover:text-white" /></button>
+              <h3 className="text-xl font-bold text-[#D4AF37]">🟢 Nível Ouro Tubarão</h3>
+              <button onClick={() => setIsNivelOuroOpen(false)}><X size={24} className="text-zinc-500 hover:text-white" /></button>
             </div>
 
-            <div className="mb-6 p-4 bg-black rounded-xl border border-zinc-800 text-center">
-              <p className="text-zinc-500 text-xs uppercase mb-1">Saldo Atual</p>
-              <p className="text-2xl font-bold text-white">{formatCurrency(userData.balance)}</p>
-            </div>
-
-            <div className="mb-8">
-              <label className="block text-sm text-zinc-400 mb-2">Parcelar em quantas vezes?</label>
-              <div className="flex items-center gap-4">
-                <input
-                  type="range"
-                  min="2"
-                  max="24"
-                  step="1"
-                  value={renegotiateInstallments}
-                  onChange={(e) => setRenegotiateInstallments(Number(e.target.value))}
-                  className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-[#D4AF37]"
-                />
-                <span className="font-bold text-white w-12 text-center">{renegotiateInstallments}x</span>
-              </div>
+            <div className="mb-6 p-4 bg-gradient-to-r from-[#D4AF37]/20 to-[#FDB931]/10 rounded-xl border border-[#D4AF37]/50 text-center">
+              <p className="text-sm text-white font-bold mb-2">🎉 Parabéns pela disciplina!</p>
+              <p className="text-xs text-zinc-300">Você completou 12 pagamentos consecutivos em dia e desbloqueou o Nível Ouro Tubarão!</p>
             </div>
 
             <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-900 mb-6">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-zinc-400 text-sm">Nova Parcela Estimada:</span>
-                <span className="text-[#D4AF37] font-bold text-lg">{formatCurrency(simulationResult.monthly)}</span>
-              </div>
-              <div className="flex justify-between items-center text-xs text-zinc-500">
-                <span>Total ao final:</span>
-                <span>{formatCurrency(simulationResult.total)}</span>
-              </div>
+              <h4 className="text-sm font-bold text-[#D4AF37] mb-3">✨ Benefícios Exclusivos:</h4>
+              <ul className="space-y-2 text-xs text-zinc-300">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Apenas 5 parcelas para quitar seu empréstimo</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Condições especiais de pagamento</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Reconhecimento pela sua pontualidade</span>
+                </li>
+              </ul>
             </div>
 
-            <Button className="w-full" onClick={handleRenegotiateSubmit}>Confirmar Renegociação</Button>
+            <div className="bg-black/50 p-4 rounded-xl border border-zinc-800 mb-6">
+              <p className="text-xs text-zinc-400 text-center leading-relaxed">
+                Apenas clientes disciplinados alcançam o Nível Ouro Tubarão. Complete 12 pagamentos consecutivos em dia para desbloquear essa oportunidade exclusiva.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="secondary" onClick={() => setIsNivelOuroOpen(false)} className="flex-1">
+                Cancelar
+              </Button>
+              <Button onClick={handleNivelOuroSubmit} className="flex-1 bg-[#D4AF37] hover:bg-[#FDB931] text-black font-bold">
+                Ativar Agora
+              </Button>
+            </div>
           </div>
         </div>
       )}

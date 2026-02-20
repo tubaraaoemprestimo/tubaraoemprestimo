@@ -323,18 +323,20 @@ model LoanRequest {
 }
 
 model Loan {
-  id                String        @id @default(uuid())
-  customerId        String        @map("customer_id")
-  requestId         String        @unique @map("request_id")
-  amount            Float
-  installmentsCount Int           @map("installments_count")
-  remainingAmount   Float         @map("remaining_amount")
-  status            String        @default("APPROVED")
-  startDate         DateTime      @map("start_date")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  installments      Installment[]
-  customer          Customer      @relation(fields: [customerId], references: [id])
-  loanRequest       LoanRequest   @relation(fields: [requestId], references: [id])
+  id                      String        @id @default(uuid())
+  customerId              String        @map("customer_id")
+  requestId               String        @unique @map("request_id")
+  amount                  Float
+  installmentsCount       Int           @map("installments_count")
+  remainingAmount         Float         @map("remaining_amount")
+  status                  String        @default("APPROVED")
+  startDate               DateTime      @map("start_date")
+  createdAt               DateTime      @default(now()) @map("created_at")
+  nivelOuroUtilizado      Boolean       @default(false) @map("nivel_ouro_utilizado")
+  dataAtivacaoNivelOuro   DateTime?     @map("data_ativacao_nivel_ouro")
+  installments            Installment[]
+  customer                Customer      @relation(fields: [customerId], references: [id])
+  loanRequest             LoanRequest   @relation(fields: [requestId], references: [id])
 
   @@map("loans")
 }

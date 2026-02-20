@@ -361,3 +361,322 @@ Saldo devedor: R$ ${remainingAmount.toLocaleString('pt-BR', { minimumFractionDig
         res.status(500).json({ error: 'Erro ao gerar cobrança' });
     }
 });
+
+// POST /api/loans/:loanId/nivel-ouro — Ativar Nível Ouro Tubarão
+loansRouter.post('/:loanId/nivel-ouro', authenticate, async (req: Request, res: Response) => {
+    try {
+        const { loanId } = req.params;
+
+        // 1. Buscar o empréstimo
+        const loan = await prisma.loan.findUnique({
+            where: { id: loanId },
+            include: {
+                installments: {
+                    orderBy: { dueDate: 'asc' }
+                },
+                customer: true
+            }
+        });
+
+        if (!loan) {
+            res.status(404).json({ error: 'Empréstimo não encontrado' });
+            return;
+        }
+
+        // Verificar se pertence ao usuário
+        const customer = await prisma.customer.findFirst({
+            where: { userId: req.user!.id }
+        });
+        if (!customer || customer.id !== loan.customerId) {
+            res.status(403).json({ error: 'Sem permissão' });
+            return;
+        }
+
+        // 2. VALIDAÇÕES DE ELEGIBILIDADE
+
+        // 2.1. Verificar se já foi utilizado
+        if (loan.nivelOuroUtilizado) {
+            res.status(400).json({
+                error: 'Nível Ouro já utilizado',
+                message: 'Você já utilizou o Nível Ouro Tubarão neste contrato.'
+            });
+            return;
+        }
+
+        // 2.2. Verificar se contrato está ativo
+        if (loan.status !== 'APPROVED') {
+            res.status(400).json({
+                error: 'Contrato inativo',
+                message: 'O contrato precisa estar ativo para usar o Nível Ouro Tubarão.'
+            });
+            return;
+        }
+
+        // 2.3. Verificar se tem parcelas em atraso
+        const overdueInstallments = loan.installments.filter(i =>
+            i.status === 'LATE' || i.status === 'OVERDUE'
+        );
+        if (overdueInstallments.length > 0) {
+            res.status(400).json({
+                error: 'Parcelas em atraso',
+                message: 'Você possui parcelas em atraso. Regularize sua situação para acessar o Nível Ouro Tubarão.'
+            });
+            return;
+        }
+
+        // 2.4. Verificar 12 pagamentos consecutivos em dia
+        const paidInstallments = loan.installments.filter(i => i.status === 'PAID');
+        if (paidInstallments.length < 12) {
+            res.status(400).json({
+                error: 'Pagamentos insuficientes',
+                message: `Você precisa de 12 pagamentos consecutivos em dia. Você tem ${paidInstallments.length} pagamentos confirmados.`
+            });
+            return;
+        }
+
+        // 2.5. Verificar se os 12 pagamentos foram em dia (sem atrasos)
+        const first12Paid = paidInstallments.slice(0, 12);
+        const hasDelays = first12Paid.some(inst => {
+            if (!inst.paidAt) return true;
+            const dueDate = new Date(inst.dueDate);
+            const paidDate = new Date(inst.paidAt);
+            return paidDate > dueDate; // Pagou após vencimento
+        });
+
+        if (hasDelays) {
+            res.status(400).json({
+                error: 'Pagamentos com atraso',
+                message: 'Os 12 pagamentos precisam ter sido feitos em dia, sem atrasos.'
+            });
+            return;
+        }
+
+        // 3. CALCULAR NOVO PLANO (5 PARCELAS)
+
+        // Buscar taxa de juros mensal do sistema
+        const interestSetting = await prisma.systemSettings.findFirst({
+            where: { key: 'monthlyInterestRate' }
+        });
+        const monthlyInterestAmount = parseFloat(interestSetting?.value || '300'); // R$ 300 padrão
+
+        // Valor do empréstimo original
+        const loanAmount = loan.amount;
+
+        // Nova parcela = Juros mensal (R$ 300) + (Valor empréstimo ÷ 5)
+        const principalPerInstallment = loanAmount / 5;
+        const newInstallmentValue = monthlyInterestAmount + principalPerInstallment;
+        const totalAmount = newInstallmentValue * 5;
+
+        // 4. CRIAR AS 5 NOVAS PARCELAS
+
+        // Cancelar parcelas abertas antigas
+        await prisma.installment.updateMany({
+            where: {
+                loanId: loan.id,
+                status: { in: ['OPEN', 'PENDING'] }
+            },
+            data: {
+                status: 'CANCELLED'
+            }
+        });
+
+        // Criar 5 novas parcelas
+        const today = new Date();
+        const newInstallments = [];
+
+        for (let i = 1; i <= 5; i++) {
+            const dueDate = new Date(today);
+            dueDate.setMonth(dueDate.getMonth() + i);
+
+            const installment = await prisma.installment.create({
+                data: {
+                    loanId: loan.id,
+                    amount: parseFloat(newInstallmentValue.toFixed(2)),
+                    dueDate: dueDate,
+                    status: 'OPEN'
+                }
+            });
+            newInstallments.push(installment);
+        }
+
+        // 5. ATUALIZAR O EMPRÉSTIMO
+        await prisma.loan.update({
+            where: { id: loan.id },
+            data: {
+                nivelOuroUtilizado: true,
+                dataAtivacaoNivelOuro: new Date(),
+                installmentsCount: 5,
+                remainingAmount: totalAmount
+            }
+        });
+
+        // 6. CRIAR NOTIFICAÇÃO PARA ADMIN
+        await prisma.notification.create({
+            data: {
+                title: `🟢 Nível Ouro Ativado — ${customer.name}`,
+                message: `${customer.name} (${customer.cpf}) ativou o Nível Ouro Tubarão!
+Contrato: #${loanId.slice(-6)}
+Novo plano: 5x de R$ ${newInstallmentValue.toFixed(2)}
+Total: R$ ${totalAmount.toFixed(2)}`,
+                type: 'SUCCESS',
+                customerId: customer.id,
+                customerEmail: customer.email
+            }
+        });
+
+        // 7. ENVIAR EMAIL PARA O CLIENTE
+        try {
+            const { emailService } = require('../services/email');
+            const emailHtml = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #000; color: #fff; padding: 30px; border-radius: 12px;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h1 style="color: #D4AF37; font-size: 24px;">🦈 Tubarão Empréstimos</h1>
+                </div>
+                <div style="background: linear-gradient(135deg, #D4AF37 0%, #FFD700 100%); padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px;">
+                    <h2 style="color: #000; margin: 0; font-size: 28px;">🟢 NÍVEL OURO ATIVADO!</h2>
+                    <p style="color: #000; margin: 10px 0 0 0; font-size: 14px;">Parabéns pela disciplina!</p>
+                </div>
+                <div style="background: #111; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <p style="color: #D4AF37; font-weight: bold; margin-bottom: 15px;">Seu Novo Plano:</p>
+                    <p style="color: #aaa; margin: 5px 0;">Parcelas: <strong style="color: #fff;">5x de R$ ${newInstallmentValue.toFixed(2)}</strong></p>
+                    <p style="color: #aaa; margin: 5px 0;">Total: <strong style="color: #fff;">R$ ${totalAmount.toFixed(2)}</strong></p>
+                    <p style="color: #aaa; margin: 5px 0;">Primeira parcela: <strong style="color: #fff;">${newInstallments[0].dueDate.toLocaleDateString('pt-BR')}</strong></p>
+                </div>
+                <div style="background: #1a1a00; border: 1px solid #D4AF37; border-radius: 8px; padding: 15px;">
+                    <p style="color: #D4AF37; font-weight: bold; margin-bottom: 10px;">✨ Benefícios do Nível Ouro:</p>
+                    <ul style="color: #fff; margin: 0; padding-left: 20px;">
+                        <li>Apenas 5 parcelas para quitar</li>
+                        <li>Condições especiais de pagamento</li>
+                        <li>Reconhecimento pela sua disciplina</li>
+                    </ul>
+                </div>
+                <p style="color: #666; font-size: 11px; text-align: center; margin-top: 20px;">
+                    Continue pagando em dia para manter seus benefícios!<br/>
+                    Tubarão Empréstimos — Plataforma de Crédito Premium
+                </p>
+            </div>`;
+            await emailService.send(
+                customer.email,
+                '🟢 Nível Ouro Tubarão Ativado — Parabéns!',
+                emailHtml
+            );
+        } catch (emailErr) {
+            console.error('[Loans] Email error:', emailErr);
+        }
+
+        // 8. NOTIFICAR ADMINS VIA WHATSAPP
+        try {
+            const admins = await prisma.user.findMany({ where: { role: 'ADMIN' } });
+            for (const admin of admins) {
+                if (admin.phone) {
+                    await sendWhatsAppMessage(admin.phone,
+                        `🟢 *NÍVEL OURO ATIVADO!*\n\nCliente: ${customer.name}\nCPF: ${customer.cpf}\nContrato: #${loanId.slice(-6)}\n\nNovo plano: 5x de R$ ${newInstallmentValue.toFixed(2)}\nTotal: R$ ${totalAmount.toFixed(2)}\n\nCliente completou 12 pagamentos consecutivos em dia! 🎉`
+                    );
+                }
+            }
+        } catch (whatsappErr) {
+            console.error('[Loans] WhatsApp error:', whatsappErr);
+        }
+
+        // 9. RETORNAR SUCESSO
+        res.json({
+            success: true,
+            message: 'Nível Ouro Tubarão ativado com sucesso!',
+            plan: {
+                installments: 5,
+                installmentValue: parseFloat(newInstallmentValue.toFixed(2)),
+                totalAmount: parseFloat(totalAmount.toFixed(2)),
+                firstDueDate: newInstallments[0].dueDate,
+                newInstallments: newInstallments.map(i => ({
+                    id: i.id,
+                    amount: i.amount,
+                    dueDate: i.dueDate,
+                    status: i.status
+                }))
+            }
+        });
+
+    } catch (error: any) {
+        console.error('[Loans] Nivel Ouro error:', error);
+        res.status(500).json({ error: 'Erro ao ativar Nível Ouro Tubarão' });
+    }
+});
+
+// GET /api/loans/:loanId/nivel-ouro/eligibility — Verificar elegibilidade para Nível Ouro
+loansRouter.get('/:loanId/nivel-ouro/eligibility', authenticate, async (req: Request, res: Response) => {
+    try {
+        const { loanId } = req.params;
+
+        const loan = await prisma.loan.findUnique({
+            where: { id: loanId },
+            include: {
+                installments: {
+                    orderBy: { dueDate: 'asc' }
+                }
+            }
+        });
+
+        if (!loan) {
+            res.status(404).json({ error: 'Empréstimo não encontrado' });
+            return;
+        }
+
+        // Verificar se pertence ao usuário
+        const customer = await prisma.customer.findFirst({
+            where: { userId: req.user!.id }
+        });
+        if (!customer || customer.id !== loan.customerId) {
+            res.status(403).json({ error: 'Sem permissão' });
+            return;
+        }
+
+        // Verificar elegibilidade
+        const alreadyUsed = loan.nivelOuroUtilizado;
+        const isActive = loan.status === 'APPROVED';
+        const overdueInstallments = loan.installments.filter(i =>
+            i.status === 'LATE' || i.status === 'OVERDUE'
+        );
+        const hasOverdue = overdueInstallments.length > 0;
+        const paidInstallments = loan.installments.filter(i => i.status === 'PAID');
+        const paidCount = paidInstallments.length;
+        const has12Payments = paidCount >= 12;
+
+        // Verificar se os pagamentos foram em dia
+        let allOnTime = true;
+        if (has12Payments) {
+            const first12Paid = paidInstallments.slice(0, 12);
+            allOnTime = !first12Paid.some(inst => {
+                if (!inst.paidAt) return true;
+                const dueDate = new Date(inst.dueDate);
+                const paidDate = new Date(inst.paidAt);
+                return paidDate > dueDate;
+            });
+        }
+
+        const isEligible = !alreadyUsed && isActive && !hasOverdue && has12Payments && allOnTime;
+
+        let reason = '';
+        if (alreadyUsed) reason = 'Nível Ouro já foi utilizado neste contrato';
+        else if (!isActive) reason = 'Contrato não está ativo';
+        else if (hasOverdue) reason = 'Existem parcelas em atraso';
+        else if (!has12Payments) reason = `Você tem ${paidCount} pagamentos. Precisa de 12 pagamentos consecutivos`;
+        else if (!allOnTime) reason = 'Os 12 pagamentos precisam ter sido feitos em dia';
+
+        res.json({
+            eligible: isEligible,
+            reason: isEligible ? 'Você está elegível para o Nível Ouro Tubarão!' : reason,
+            details: {
+                alreadyUsed,
+                isActive,
+                hasOverdue,
+                paidCount,
+                has12Payments,
+                allOnTime
+            }
+        });
+
+    } catch (error: any) {
+        console.error('[Loans] Eligibility check error:', error);
+        res.status(500).json({ error: 'Erro ao verificar elegibilidade' });
+    }
+});
