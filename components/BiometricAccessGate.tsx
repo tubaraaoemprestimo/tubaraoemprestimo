@@ -4,7 +4,7 @@ import { AlertCircle, Fingerprint, Loader2, Monitor, ShieldCheck } from 'lucide-
 import { Button } from './Button';
 import { biometricService } from '../services/biometricService';
 import { antifraudService } from '../services/antifraudService';
-import { supabaseService } from '../services/supabaseService';
+import { apiService } from '../services/apiService';
 
 interface BiometricAccessGateProps {
   children: React.ReactNode;
@@ -21,7 +21,7 @@ const isMobileDevice = (): boolean => {
 
 export const BiometricAccessGate: React.FC<BiometricAccessGateProps> = ({ children }) => {
   const navigate = useNavigate();
-  const user = useMemo(() => supabaseService.auth.getUser(), []);
+  const user = useMemo(() => apiService.auth.getUser(), []);
 
   const [verifying, setVerifying] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -189,7 +189,7 @@ export const BiometricAccessGate: React.FC<BiometricAccessGateProps> = ({ childr
         sessionStorage.removeItem(getSessionKey(user.id));
         sessionStorage.removeItem(getSkipKey(user.id));
       }
-      await supabaseService.auth.signOut();
+      await apiService.auth.signOut();
     } finally {
       navigate('/login');
     }

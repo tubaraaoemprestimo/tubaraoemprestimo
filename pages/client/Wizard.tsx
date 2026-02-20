@@ -5,13 +5,13 @@ import {
   AlertCircle, FileText, ScanFace, X, Plus, Loader2,
   Phone, Users, Video, DollarSign, Shield, Clock, Landmark, CheckCircle2, FileCheck, Percent,
   Car, Smartphone, Tv, Home, Package, Camera as CameraIcon,
-  Briefcase, Store, Bike, Banknote, Rocket, CreditCard, FileSignature, Scale
+  Briefcase, Store, Bike, Banknote, Rocket, CreditCard, FileSignature, Scale, Gift
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Camera } from '../../components/Camera';
 import { SignaturePad } from '../../components/SignaturePad';
 import { VideoUpload } from '../../components/VideoUpload';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { loanSettingsService, LoanSettings } from '../../services/loanSettingsService';
 import { antifraudService } from '../../services/antifraudService';
 import { emailService } from '../../services/emailService';
@@ -88,16 +88,15 @@ const profileOptions = [
 
 // Steps dinâmicos baseados no perfil
 const getStepsForProfile = (profile: ProfileType) => {
-  // INVESTIDOR tem fluxo próprio: Info > Dados > Investimento > Banco > Termos > Confirmar
+  // INVESTIDOR tem fluxo simplificado: Info > Dados > Investimento > Segurança > Confirmar
   if (profile === 'INVESTIDOR') {
     return [
       { id: 1, title: 'Serviço', icon: Users },
       { id: 2, title: 'Saiba Mais', icon: Shield },
       { id: 3, title: 'Dados', icon: User },
       { id: 4, title: 'Investimento', icon: DollarSign },
-      { id: 5, title: 'Banco', icon: Landmark },
-      { id: 6, title: 'Termos', icon: FileSignature },
-      { id: 7, title: 'Confirmar', icon: CheckCircle2 },
+      { id: 5, title: 'Segurança', icon: Shield },
+      { id: 6, title: 'Confirmar', icon: CheckCircle2 },
     ];
   }
   // LIMPA_NOME é um SERVIÇO simples - não precisa de documentos
@@ -176,8 +175,7 @@ export const Wizard: React.FC = () => {
   // Investidor - campos específicos
   const [investorData, setInvestorData] = useState({
     fullName: '', cpfCnpj: '', rgCnh: '', birthDate: '',
-    email: '', phone: '',
-    address: '', city: '', state: '', zipCode: '',
+    email: '', phone: '', preferredContactTime: '',
     bankName: '', pixKey: '', pixKeyType: 'cpf', accountHolderName: '',
     investmentAmount: 10000,
     customInvestmentAmount: '',
@@ -203,12 +201,16 @@ export const Wizard: React.FC = () => {
   });
 
   const [formData, setFormData] = useState({
-    name: '', cpf: '', email: '', phone: '', birthDate: '',
+    name: '', cpf: '', email: '', phone: '', birthDate: '', referralCode: '',
     whatsappPersonal: '',
-    contactTrust1: '', contactTrust1Name: '',
-    contactTrust2: '', contactTrust2Name: '',
+    contactTrust1: '', contactTrust1Name: '', contactTrust1Relationship: '',
+    contactTrust2: '', contactTrust2Name: '', contactTrust2Relationship: '',
     instagram: '',
     occupation: '', companyName: '', companyAddress: '', workTime: '',
+    // Endereço da empresa
+    companyCep: '', companyStreet: '', companyNumber: '', companyNeighborhood: '', companyCity: '', companyState: '',
+    // Indicação
+    referredByCode: '',
     // Autônomo
     cnpj: '', businessAddress: '',
     cep: '', address: '', number: '', income: '',
@@ -243,6 +245,8 @@ export const Wizard: React.FC = () => {
     limpaNomeContractSigned: false,
     // Moto - Cor selecionada
     motoColor: '',
+    // Declaração de veracidade
+    declarationAccepted: false,
   });
 
   // Carregar configurações REAIS do banco e registrar visita (antifraude)
@@ -253,6 +257,15 @@ export const Wizard: React.FC = () => {
       // Registrar início do wizard (antifraude - silencioso)
       antifraudService.initSession();
       antifraudService.logRiskEvent('wizard_start').catch(() => { });
+
+      // Verifica limite de dispositivos antes de iniciar o fluxo
+      const deviceCheck = await antifraudService.checkDevice();
+      if (!deviceCheck.allowed) {
+        addToast(deviceCheck.message || 'Acesso bloqueado por segurança do dispositivo.', 'error');
+        navigate('/client/dashboard');
+        setLoadingSettings(false);
+        return;
+      }
 
       const data = await loanSettingsService.getSettings();
       setSettings(data);
@@ -329,6 +342,22 @@ export const Wizard: React.FC = () => {
     } catch (e) { }
   };
 
+  const fetchCompanyAddress = async (cleanCep: string) => {
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await res.json();
+      if (!data.erro) {
+        setFormData(prev => ({
+          ...prev,
+          companyStreet: data.logradouro || '',
+          companyNeighborhood: data.bairro || '',
+          companyCity: data.localidade || '',
+          companyState: data.uf || '',
+        }));
+      }
+    } catch (e) { }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     let newValue = value;
@@ -344,11 +373,14 @@ export const Wizard: React.FC = () => {
       if (name === 'cpf') setErrors(prev => ({ ...prev, cpf: validateCPF(newValue) }));
     }
 
-    if (name === 'cep') {
+    if (name === 'cep' || name === 'companyCep') {
       let v = value.replace(/\D/g, '').slice(0, 8);
       if (v.length > 5) v = v.replace(/^(\d{5})(\d)/, '$1-$2');
       newValue = v;
-      if (v.replace(/\D/g, '').length === 8) fetchAddress(v.replace(/\D/g, ''));
+      if (v.replace(/\D/g, '').length === 8) {
+        if (name === 'cep') fetchAddress(v.replace(/\D/g, ''));
+        if (name === 'companyCep') fetchCompanyAddress(v.replace(/\D/g, ''));
+      }
     }
 
     if (['phone', 'whatsappPersonal', 'contactTrust1', 'contactTrust2'].includes(name)) {
@@ -414,19 +446,22 @@ export const Wizard: React.FC = () => {
 
     // === INVESTIDOR: Validações específicas por step ===
     if (profileType === 'INVESTIDOR') {
-      // Step 2: "Saiba Mais" - apenas informativo, sem validação
+      // Step 2: "Saiba Mais" - validar aceite dos termos
+      if (currentStep === 2) {
+        if (!termsAccepted) { addToast("Você precisa aceitar os termos para continuar.", 'warning'); return; }
+      }
       // Step 3: Dados pessoais
       if (currentStep === 3) {
         if (!investorData.fullName.trim()) { addToast("Informe seu nome completo ou razão social.", 'warning'); return; }
-        const cpfCnpjDigits = investorData.cpfCnpj.replace(/\D/g, '');
-        if (!cpfCnpjDigits || (cpfCnpjDigits.length !== 11 && cpfCnpjDigits.length !== 14)) {
-          addToast("Informe um CPF ou CNPJ válido.", 'warning'); return;
-        }
+        if (!investorData.birthDate) { addToast("Informe sua data de nascimento.", 'warning'); return; }
         if (!investorData.phone || investorData.phone.replace(/\D/g, '').length < 10) {
           addToast("Informe seu telefone.", 'warning'); return;
         }
         if (!investorData.email.trim() || !investorData.email.includes('@')) {
           addToast("Informe um email válido.", 'warning'); return;
+        }
+        if (!investorData.preferredContactTime) {
+          addToast("Selecione o melhor horário para contato.", 'warning'); return;
         }
       }
       // Step 4: Investimento (valor, modalidade)
@@ -455,10 +490,10 @@ export const Wizard: React.FC = () => {
         if (!investorData.pixKey.trim()) { addToast("Informe sua chave PIX.", 'warning'); return; }
         if (!investorData.accountHolderName.trim()) { addToast("Informe o nome do titular.", 'warning'); return; }
       }
-      // Step 6: Termos + Assinatura
-      if (currentStep === 6) {
-        if (!termsAccepted) { addToast("Aceite os termos para continuar.", 'warning'); return; }
-        if (!formData.signature) { addToast("Assine para confirmar.", 'warning'); return; }
+      // Step 6: Visualizar Termos (sem validação, apenas leitura)
+      // Step 7: Assinatura
+      if (currentStep === 7) {
+        if (!formData.signature) { addToast("Assine o contrato para confirmar.", 'warning'); return; }
       }
     }
 
@@ -497,7 +532,16 @@ export const Wizard: React.FC = () => {
     let dataStep = 4;
     if (profileType === 'MOTO' || profileType === 'LIMPA_NOME') dataStep = 3;
     if (profileType === 'GARANTIA') dataStep = 5;
-    if (currentStep === dataStep) {
+    // Validação Específica INVESTIDOR
+    if (profileType === 'INVESTIDOR' && currentStep === 3) {
+      if (!investorData.fullName.trim()) { addToast("Informe seu nome completo.", 'warning'); return; }
+      if (!investorData.birthDate) { addToast("Informe sua data de nascimento.", 'warning'); return; }
+      if (!investorData.phone.trim()) { addToast("Informe seu telefone.", 'warning'); return; }
+      if (!investorData.email.trim()) { addToast("Informe seu email.", 'warning'); return; }
+      if (!investorData.preferredContactTime) { addToast("Selecione o melhor horário para contato.", 'warning'); return; }
+    }
+
+    if (currentStep === dataStep && profileType !== 'INVESTIDOR') {
       // Dados pessoais básicos
       if (!formData.name.trim()) {
         addToast("Informe seu nome completo.", 'warning');
@@ -540,28 +584,70 @@ export const Wizard: React.FC = () => {
         return;
       }
 
-      // LIMPA_NOME: validar data de nascimento, sem endereço
-      if (profileType === 'LIMPA_NOME') {
-        if (!formData.birthDate) {
-          addToast("Informe sua data de nascimento.", 'warning');
-          return;
-        }
-      } else {
-        // Endereço obrigatório para outros perfis
+      // Data de nascimento obrigatória para TODOS os perfis
+      if (!formData.birthDate) {
+        addToast("Informe sua data de nascimento.", 'warning');
+        return;
+      }
+
+      // LIMPA_NOME não precisa de endereço
+      if (profileType !== 'LIMPA_NOME') {
+        // Endereço obrigatório
         if (!formData.cep || formData.cep.replace(/\D/g, '').length !== 8) {
           addToast("Informe seu CEP.", 'warning');
           return;
         }
+        if (!formData.address.trim()) {
+          addToast("Informe seu endereço (rua/avenida).", 'warning');
+          return;
+        }
+        if (!formData.number.trim()) {
+          addToast("Informe o número da residência.", 'warning');
+          return;
+        }
       }
 
-      // Específico por perfil
-      if (profileType === 'CLT') {
+      // Renda obrigatória para CLT, AUTONOMO, MOTO e GARANTIA
+      if (profileType === 'CLT' || profileType === 'AUTONOMO' || profileType === 'MOTO' || profileType === 'GARANTIA') {
         if (!formData.income.trim()) {
           addToast("Informe sua renda mensal.", 'warning');
           return;
         }
       }
 
+      // Contatos de confiança obrigatórios (exceto LIMPA_NOME)
+      if (profileType !== 'LIMPA_NOME') {
+        if (!formData.contactTrust1Name.trim()) {
+          addToast("Informe o nome do 1º contato de confiança.", 'warning');
+          return;
+        }
+        if (!formData.contactTrust1 || formData.contactTrust1.replace(/\D/g, '').length < 10) {
+          addToast("Informe o telefone do 1º contato de confiança.", 'warning');
+          return;
+        }
+        if (!formData.contactTrust2Name.trim()) {
+          addToast("Informe o nome do 2º contato de confiança.", 'warning');
+          return;
+        }
+        if (!formData.contactTrust2 || formData.contactTrust2.replace(/\D/g, '').length < 10) {
+          addToast("Informe o telefone do 2º contato de confiança.", 'warning');
+          return;
+        }
+      }
+
+      // Específico por perfil - CLT
+      if (profileType === 'CLT') {
+        if (!formData.occupation.trim()) {
+          addToast("Informe sua profissão/cargo.", 'warning');
+          return;
+        }
+        if (!formData.companyName.trim()) {
+          addToast("Informe o nome da empresa onde trabalha.", 'warning');
+          return;
+        }
+      }
+
+      // Específico por perfil - AUTONOMO
       if (profileType === 'AUTONOMO') {
         if (!formData.cnpj) {
           addToast("Informe seu CPF ou CNPJ do negócio.", 'warning');
@@ -569,13 +655,6 @@ export const Wizard: React.FC = () => {
         }
         if (!formData.businessAddress.trim()) {
           addToast("Informe o endereço do seu comércio.", 'warning');
-          return;
-        }
-      }
-
-      if (profileType === 'MOTO') {
-        if (!formData.income.trim()) {
-          addToast("Informe sua renda mensal.", 'warning');
           return;
         }
       }
@@ -617,8 +696,8 @@ export const Wizard: React.FC = () => {
     let docsStep = 5;
     if (profileType === 'MOTO') docsStep = 5;
     if (profileType === 'GARANTIA') docsStep = 6;
-    // LIMPA_NOME pula validação de documentos (não tem esse step)
-    if (profileType !== 'LIMPA_NOME' && currentStep === docsStep) {
+    // LIMPA_NOME e INVESTIDOR pulam validação de documentos (não tem esse step)
+    if (profileType !== 'LIMPA_NOME' && profileType !== 'INVESTIDOR' && currentStep === docsStep) {
       // Selfie obrigatória
       if (!formData.selfie) {
         addToast("Tire a selfie segurando o documento.", 'warning');
@@ -752,6 +831,10 @@ export const Wizard: React.FC = () => {
         addToast("Informe o nome do titular da conta.", 'warning');
         return;
       }
+      if (!formData.accountHolderCpf || formData.accountHolderCpf.replace(/\D/g, '').length !== 11) {
+        addToast("Informe o CPF do titular da conta.", 'warning');
+        return;
+      }
     }
 
     // Avançar para próximo step - usando tamanho dinâmico
@@ -821,8 +904,16 @@ export const Wizard: React.FC = () => {
           file = new File([blobFile], `${folder}_${timestamp}_${index}.${extension}`, { type: mime });
         }
       } else {
-        // Tratar data: URLs (base64 - imagens/selfie/assinatura)
-        extension = dataUrl.includes('image/png') ? 'png' : dataUrl.includes('image/jpeg') ? 'jpg' : 'jpg';
+        // Tratar data: URLs (base64 - imagens/selfie/assinatura/PDF)
+        if (dataUrl.includes('application/pdf')) {
+          extension = 'pdf';
+        } else if (dataUrl.includes('image/png')) {
+          extension = 'png';
+        } else if (dataUrl.includes('image/jpeg') || dataUrl.includes('image/jpg')) {
+          extension = 'jpg';
+        } else {
+          extension = 'jpg';
+        }
         const fileName = `${folder}_${timestamp}_${index}.${extension}`;
         file = dataURLtoFile(dataUrl, fileName);
       }
@@ -839,7 +930,7 @@ export const Wizard: React.FC = () => {
       let retries = 3;
 
       while (retries > 0 && !uploadedUrl) {
-        uploadedUrl = await supabaseService.uploadFile('documents', filePath, file);
+        uploadedUrl = await apiService.uploadFile('documents', filePath, file);
         if (!uploadedUrl) {
           retries--;
           if (retries > 0) {
@@ -886,21 +977,21 @@ export const Wizard: React.FC = () => {
       // Upload da assinatura
       const signatureUrl = formData.signature ? await uploadToStorage(formData.signature, 'investor_signature') : '';
 
-      const success = await supabaseService.submitInvestorRequest({
+      const success = await apiService.submitInvestorRequest({
         fullName: investorData.fullName,
-        cpfCnpj: investorData.cpfCnpj,
-        rgCnh: investorData.rgCnh,
+        clientName: investorData.fullName,
+        cpf: '', // Campo obrigatório no backend
+        cpfCnpj: '', // Campo removido do formulário mas pode ser necessário no backend
+        rgCnh: '', // Campo removido do formulário mas pode ser necessário no backend
         birthDate: investorData.birthDate,
         email: investorData.email,
         phone: investorData.phone,
-        address: investorData.address,
-        city: investorData.city,
-        state: investorData.state,
-        zipCode: investorData.zipCode,
+        preferredContactTime: investorData.preferredContactTime,
         bankName: investorData.bankName,
         pixKey: investorData.pixKey,
         pixKeyType: investorData.pixKeyType,
         accountHolderName: investorData.accountHolderName,
+        amount: investorData.investmentAmount, // Backend espera 'amount', não 'investmentAmount'
         investmentAmount: investorData.investmentAmount,
         investmentTier: investorData.investmentTier,
         payoutMode: investorData.payoutMode,
@@ -981,9 +1072,12 @@ export const Wizard: React.FC = () => {
         needsGuarantee && guarantee.video ? uploadToStorage(guarantee.video, 'guarantee_video') : Promise.resolve('')
       ]);
 
+      // Separar location para enviar como campos separados ao backend
+      const { location, ...formDataWithoutLocation } = formData;
+
       // Atualizar dados com URLs do Storage
       const uploadedData = {
-        ...formData,
+        ...formDataWithoutLocation,
         selfie: selfieUrl,
         idCardFront: idCardFrontUrls,
         idCardBack: idCardBackUrls,
@@ -997,13 +1091,19 @@ export const Wizard: React.FC = () => {
         videoHouse: videoHouseUrl,
         housePhotos: housePhotosUrls,
         billInName: billInNameUrls,
+        // Enviar localização como campos planos
+        latitude: location?.latitude ?? null,
+        longitude: location?.longitude ?? null,
+        accuracy: location?.accuracy ?? null,
+        locationCapturedAt: location ? new Date().toISOString() : null,
       };
 
       // Atualizar garantia se houver
       const uploadedGuarantee = needsGuarantee ? { ...guarantee, photos: guaranteePhotos, video: guaranteeVideoUrl } : null;
 
       // Registrar evento de submissão (antifraude)
-      const riskData = await antifraudService.logRiskEvent('form_submit', undefined, {
+      const user = apiService.auth.getUser();
+      const riskData = await antifraudService.logRiskEvent('form_submit', user?.id || undefined, {
         amount: getAmount(),
         hasGuarantee: needsGuarantee,
       });
@@ -1022,7 +1122,7 @@ export const Wizard: React.FC = () => {
       // Concatenar Perfil e CNPJ na profissão para visualização no admin
       const finalOccupation = `[${profileType}] ${uploadedData.occupation || ''} ${uploadedData.cnpj ? '- CNPJ: ' + uploadedData.cnpj : ''}`;
 
-      const success = await supabaseService.submitRequest({
+      const success = await apiService.submitRequest({
         ...uploadedData,
         occupation: finalOccupation,
         profileType,
@@ -1032,11 +1132,12 @@ export const Wizard: React.FC = () => {
         proofAddress: proofAddressUrls,
         vehicleFront: vehicleFrontUrls,
 
-        amount: getAmount(),
-        installments: settings.defaultInstallments,
-        totalAmount: calculateTotal(),
-        installmentValue: calculateInstallment(),
-        interestRate: settings.interestRateMonthly,
+        // Valores por tipo de serviço
+        amount: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 21996 : getAmount(),
+        installments: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 36 : settings.defaultInstallments,
+        totalAmount: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 29396 : calculateTotal(),
+        installmentValue: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 611 : calculateInstallment(),
+        interestRate: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 0 : settings.interestRateMonthly,
         lateFeeDaily: settings.lateFeeDaily,
         lateFeeMonthly: settings.lateFeeMonthly,
         lateFeeFixed: settings.lateFeeFixed,
@@ -1045,6 +1146,8 @@ export const Wizard: React.FC = () => {
         // Cliente recorrente
         isReturningClient: isReturningClient === 'sim',
         returningClientNote: isReturningClient === 'sim' ? returningClientNote : '',
+        // Código de indicação
+        referralCode: formData.referredByCode || undefined,
         // Dados antifraude
         sessionId: antifraudService.getSessionId(),
         riskScore: riskData?.riskScore || 0,
@@ -1058,7 +1161,7 @@ export const Wizard: React.FC = () => {
       // Gerar PDF do contrato assinado (silencioso - não bloqueia fluxo)
       (async () => {
         try {
-          const brandData = await supabaseService.getBrandSettings();
+          const brandData = await apiService.getBrandSettings() as any;
           const pdfUrl = await contractPdfService.generateAndUploadContract(
             profileType,
             {
@@ -1066,11 +1169,11 @@ export const Wizard: React.FC = () => {
               cpf: formData.cpf,
               phone: formData.phone,
               email: formData.email,
-              amount: getAmount(),
-              installments: settings.defaultInstallments,
-              installmentValue: calculateInstallment(),
-              interestRate: settings.interestRateMonthly,
-              totalAmount: calculateTotal(),
+              amount: profileType === 'MOTO' ? 21996 : getAmount(),
+              installments: profileType === 'MOTO' ? 36 : settings.defaultInstallments,
+              installmentValue: profileType === 'MOTO' ? 611 : calculateInstallment(),
+              interestRate: profileType === 'MOTO' ? 0 : settings.interestRateMonthly,
+              totalAmount: profileType === 'MOTO' ? 29396 : calculateTotal(),
             },
             signatureUrl,
             brandData ? {
@@ -1082,9 +1185,9 @@ export const Wizard: React.FC = () => {
           );
 
           // Buscar request mais recente do cliente para atualizar com o PDF URL
-          const latestReq = await supabaseService.getClientLatestRequest();
+          const latestReq = await apiService.getClientLatestRequest();
           if (latestReq?.id && pdfUrl) {
-            await supabaseService.updateContractPdfUrl(latestReq.id, pdfUrl);
+            await apiService.updateContractPdfUrl(latestReq.id, pdfUrl);
             console.log('✅ Contrato PDF salvo com sucesso!');
           }
         } catch (pdfErr) {
@@ -1098,20 +1201,26 @@ export const Wizard: React.FC = () => {
         termsAccepted: true,
       }).catch(() => { });
 
-      // Enviar emails de notificação (silencioso)
+      // Enviar emails de notificação
       // Envia para admin E para o cliente automaticamente
       emailService.notifyNewRequest({
         clientName: formData.name,
         clientEmail: formData.email,
-        amount: getAmount(),
-        installments: settings.defaultInstallments,
+        amount: profileType === 'LIMPA_NOME' ? 0
+          : profileType === 'MOTO' ? 21996
+            : profileType === 'INVESTIDOR' ? (investorData.customInvestmentAmount ? Number(investorData.customInvestmentAmount) : investorData.investmentAmount)
+              : getAmount(),
+        installments: profileType === 'LIMPA_NOME' ? 0
+          : profileType === 'MOTO' ? 36
+            : profileType === 'INVESTIDOR' ? 0
+              : settings.defaultInstallments,
         profileType,
-      }).catch(() => { });
+      }).catch((err) => { console.error('Erro ao enviar email de notificação:', err); });
 
       // 📱 Enviar WhatsApp e Notificação automática (silencioso)
       autoNotificationService.onLoanRequested(
         formData.email,
-        getAmount(),
+        profileType === 'MOTO' ? 21996 : getAmount(),
         formData.name,
         profileType
       ).catch(() => { });
@@ -1146,6 +1255,41 @@ export const Wizard: React.FC = () => {
           <input type="file" id={`${isGuarantee ? 'g-' : ''}${name}`} multiple accept="image/*" onChange={(e) => handleFileChange(e, name, isGuarantee)} className="hidden" />
           <label htmlFor={`${isGuarantee ? 'g-' : ''}${name}`} className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border border-dashed border-zinc-700 bg-zinc-900/50 hover:border-[#D4AF37] cursor-pointer">
             <Plus size={24} className="text-zinc-500" />
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Upload area que aceita PDF + Imagens (para CTPS Digital)
+  const renderPdfUploadArea = (name: string, label: string, files: string[], isGuarantee = false) => (
+    <div className="space-y-3">
+      <label className="text-sm text-zinc-400 font-medium block">{label}</label>
+      <div className="grid grid-cols-3 gap-2">
+        {files.map((file, idx) => {
+          const isPdf = file.includes('application/pdf') || file.endsWith('.pdf');
+          return (
+            <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-zinc-700 bg-black group">
+              {isPdf ? (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900">
+                  <FileText size={32} className="text-red-500 mb-1" />
+                  <span className="text-xs text-zinc-400">PDF</span>
+                  <span className="text-[10px] text-green-500 mt-1">✓ Enviado</span>
+                </div>
+              ) : (
+                <img src={file} alt="" className="w-full h-full object-cover" />
+              )}
+              <button onClick={() => removeFile(name, idx, isGuarantee)} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <X size={12} />
+              </button>
+            </div>
+          );
+        })}
+        <div className="relative group">
+          <input type="file" id={`${isGuarantee ? 'g-' : ''}${name}`} multiple accept="application/pdf,image/*" onChange={(e) => handleFileChange(e, name, isGuarantee)} className="hidden" />
+          <label htmlFor={`${isGuarantee ? 'g-' : ''}${name}`} className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border border-dashed border-zinc-700 bg-zinc-900/50 hover:border-[#D4AF37] cursor-pointer">
+            <Plus size={24} className="text-zinc-500" />
+            <span className="text-[10px] text-zinc-600 mt-1">PDF ou Foto</span>
           </label>
         </div>
       </div>
@@ -1227,6 +1371,28 @@ export const Wizard: React.FC = () => {
                   );
                 })}
               </div>
+
+              {/* Campo de Código de Indicação */}
+              {profileType && (
+                <div className="mt-6 p-5 bg-gradient-to-r from-emerald-900/30 to-zinc-900/50 rounded-2xl border border-emerald-700/50 animate-in fade-in slide-in-from-bottom-2">
+                  <h3 className="font-bold text-emerald-400 mb-3 flex items-center gap-2">
+                    <Gift size={18} />
+                    Código de Indicação (Opcional)
+                  </h3>
+                  <p className="text-sm text-zinc-400 mb-3">
+                    Se você foi indicado por alguém, digite o código para ganhar pontos e descontos!
+                  </p>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.referredByCode}
+                      onChange={(e) => setFormData({ ...formData, referredByCode: e.target.value.toUpperCase() })}
+                      placeholder="Ex: IND-JOAO-1234"
+                      className="w-full bg-black border border-emerald-700 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:border-emerald-500 outline-none uppercase"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Pergunta sobre cliente recorrente - apenas CLT, AUTONOMO e GARANTIA */}
               {profileType && profileType !== 'MOTO' && profileType !== 'LIMPA_NOME' && profileType !== 'INVESTIDOR' && (
@@ -1337,6 +1503,15 @@ export const Wizard: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Checkbox de aceite dos termos */}
+              <label className="flex items-start gap-3 p-4 bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer hover:border-cyan-500 transition-all">
+                <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="w-6 h-6 mt-0.5 accent-cyan-500 shrink-0" />
+                <span className="text-xs text-zinc-300 leading-relaxed">
+                  Li e aceito os termos e condições do programa de investimento Tubarão. Estou ciente das condições de remuneração, prazo de contrato e aviso prévio para resgate.
+                </span>
+              </label>
             </div>
           )}
 
@@ -1352,18 +1527,7 @@ export const Wizard: React.FC = () => {
               <Input label="Nome Completo / Razão Social" name="investorFullName" value={investorData.fullName}
                 onChange={(e: any) => setInvestorData({ ...investorData, fullName: e.target.value })} placeholder="Seu nome completo" required />
 
-              <Input label="CPF ou CNPJ" name="investorCpfCnpj" value={investorData.cpfCnpj}
-                onChange={(e: any) => {
-                  let v = e.target.value.replace(/\D/g, '');
-                  if (v.length <= 11) v = v.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-                  else v = v.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
-                  setInvestorData({ ...investorData, cpfCnpj: v });
-                }} placeholder="000.000.000-00" required />
-
-              <Input label="RG ou CNH" name="investorRgCnh" value={investorData.rgCnh}
-                onChange={(e: any) => setInvestorData({ ...investorData, rgCnh: e.target.value })} placeholder="Número do documento" />
-
-              <Input label="Data de Nascimento" name="investorBirthDate" type="date" value={investorData.birthDate}
+              <DateInput label="Data de Nascimento" name="investorBirthDate" value={investorData.birthDate}
                 onChange={(e: any) => setInvestorData({ ...investorData, birthDate: e.target.value })} />
 
               <Input label="Telefone / WhatsApp" name="investorPhone" value={investorData.phone}
@@ -1376,22 +1540,21 @@ export const Wizard: React.FC = () => {
               <Input label="Email" name="investorEmail" type="email" value={investorData.email}
                 onChange={(e: any) => setInvestorData({ ...investorData, email: e.target.value })} placeholder="seu@email.com" required />
 
-              <Input label="Endereço Completo" name="investorAddress" value={investorData.address}
-                onChange={(e: any) => setInvestorData({ ...investorData, address: e.target.value })} placeholder="Rua, número, bairro" />
-
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="Cidade" name="investorCity" value={investorData.city}
-                  onChange={(e: any) => setInvestorData({ ...investorData, city: e.target.value })} placeholder="São Paulo" />
-                <Input label="UF" name="investorState" value={investorData.state}
-                  onChange={(e: any) => setInvestorData({ ...investorData, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="SP" />
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Melhor horário para contato</label>
+                <select
+                  value={investorData.preferredContactTime || ''}
+                  onChange={(e: any) => setInvestorData({ ...investorData, preferredContactTime: e.target.value })}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:outline-none"
+                  required
+                >
+                  <option value="">Selecione o melhor horário</option>
+                  <option value="manha">Manhã (08h - 12h)</option>
+                  <option value="tarde">Tarde (12h - 18h)</option>
+                  <option value="noite">Noite (18h - 22h)</option>
+                  <option value="qualquer">Qualquer horário</option>
+                </select>
               </div>
-
-              <Input label="CEP" name="investorZipCode" value={investorData.zipCode}
-                onChange={(e: any) => {
-                  let v = e.target.value.replace(/\D/g, '').slice(0, 8);
-                  if (v.length > 5) v = v.replace(/^(\d{5})(\d)/, '$1-$2');
-                  setInvestorData({ ...investorData, zipCode: v });
-                }} placeholder="00000-000" />
             </div>
           )}
 
@@ -1404,43 +1567,69 @@ export const Wizard: React.FC = () => {
                 <p className="text-zinc-400 text-sm mt-1">Mínimo: R$ 10.000,00 | Prazo: 12 meses</p>
               </div>
 
-              {/* Valores pré-definidos */}
-              <div className="grid grid-cols-2 gap-3">
-                {[10000, 20000, 30000, 50000, 100000, 200000].map((val) => (
-                  <button key={val} onClick={() => {
-                    const tier = val >= 50000 ? 'PREMIUM' : 'STANDARD';
-                    const rate = tier === 'PREMIUM'
-                      ? (investorData.payoutMode === 'MONTHLY' ? 5.0 : 6.0)
-                      : (investorData.payoutMode === 'MONTHLY' ? 2.5 : 3.5);
-                    setInvestorData({ ...investorData, investmentAmount: val, customInvestmentAmount: '', investmentTier: tier, monthlyRate: rate });
-                  }}
-                    className={`p-4 rounded-xl border-2 transition-all ${investorData.investmentAmount === val && !investorData.customInvestmentAmount
-                      ? 'border-cyan-500 bg-cyan-500/10 scale-105'
-                      : 'border-zinc-800 bg-black hover:border-zinc-600'
-                      }`}>
-                    <span className="text-lg font-bold">R$ {val.toLocaleString('pt-BR')}</span>
-                    <p className="text-xs text-zinc-500 mt-1">{val >= 50000 ? 'Premium' : 'Standard'}</p>
-                  </button>
-                ))}
-              </div>
+              {/* Slider de Valor do Investimento */}
+              <div className="space-y-4">
+                <div className="bg-gradient-to-br from-cyan-500/10 to-zinc-900 border border-cyan-600/30 rounded-2xl p-6">
+                  <div className="text-center mb-6">
+                    <p className="text-sm text-zinc-400 mb-2">Valor do investimento</p>
+                    <p className="text-4xl font-bold text-cyan-400">
+                      R$ {investorData.investmentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-zinc-500 mt-2">
+                      Faixa: <span className={investorData.investmentTier === 'PREMIUM' ? 'text-[#D4AF37] font-bold' : 'text-cyan-400 font-bold'}>
+                        {investorData.investmentTier === 'PREMIUM' ? 'Premium (≥ R$ 50.000)' : 'Standard (R$ 10.000 - R$ 49.999)'}
+                      </span>
+                    </p>
+                  </div>
 
-              {/* Valor personalizado */}
-              <div className="space-y-2">
-                <label className="text-sm text-zinc-400">Ou digite o valor:</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">R$</span>
-                  <input type="number" value={investorData.customInvestmentAmount}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const numVal = parseFloat(val) || 0;
-                      const tier = numVal >= 50000 ? 'PREMIUM' : 'STANDARD';
-                      const rate = tier === 'PREMIUM'
-                        ? (investorData.payoutMode === 'MONTHLY' ? 5.0 : 6.0)
-                        : (investorData.payoutMode === 'MONTHLY' ? 2.5 : 3.5);
-                      setInvestorData({ ...investorData, customInvestmentAmount: val, investmentAmount: numVal, investmentTier: tier, monthlyRate: rate });
-                    }}
-                    placeholder="10000" min="10000"
-                    className="w-full bg-black border border-zinc-700 rounded-xl pl-12 pr-4 py-4 text-white text-xl font-bold focus:border-cyan-500 outline-none" />
+                  {/* Slider */}
+                  <div className="space-y-3">
+                    <input
+                      type="range"
+                      min={10000}
+                      max={500000}
+                      step={1000}
+                      value={investorData.investmentAmount}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        const tier = val >= 50000 ? 'PREMIUM' : 'STANDARD';
+                        const rate = tier === 'PREMIUM'
+                          ? (investorData.payoutMode === 'MONTHLY' ? 5.0 : 6.0)
+                          : (investorData.payoutMode === 'MONTHLY' ? 2.5 : 3.5);
+                        setInvestorData({ ...investorData, investmentAmount: val, customInvestmentAmount: '', investmentTier: tier, monthlyRate: rate });
+                      }}
+                      className="w-full h-3 bg-zinc-800 rounded-lg appearance-none cursor-pointer slider-thumb"
+                      style={{
+                        background: `linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(investorData.investmentAmount - 10000) / (500000 - 10000) * 100}%, #27272a ${(investorData.investmentAmount - 10000) / (500000 - 10000) * 100}%, #27272a 100%)`
+                      }}
+                    />
+                    <div className="flex justify-between text-xs text-zinc-500">
+                      <span>R$ 10.000</span>
+                      <span>R$ 500.000</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Valores Rápidos */}
+                <div>
+                  <p className="text-sm text-zinc-400 mb-3 text-center">Ou escolha um valor rápido:</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[10000, 20000, 30000, 50000, 100000, 200000].map((val) => (
+                      <button key={val} onClick={() => {
+                        const tier = val >= 50000 ? 'PREMIUM' : 'STANDARD';
+                        const rate = tier === 'PREMIUM'
+                          ? (investorData.payoutMode === 'MONTHLY' ? 5.0 : 6.0)
+                          : (investorData.payoutMode === 'MONTHLY' ? 2.5 : 3.5);
+                        setInvestorData({ ...investorData, investmentAmount: val, customInvestmentAmount: '', investmentTier: tier, monthlyRate: rate });
+                      }}
+                        className={`p-3 rounded-xl border-2 transition-all ${investorData.investmentAmount === val && !investorData.customInvestmentAmount
+                          ? 'border-cyan-500 bg-cyan-500/10 scale-105'
+                          : 'border-zinc-800 bg-black hover:border-zinc-600'
+                          }`}>
+                        <span className="text-sm font-bold">R$ {val.toLocaleString('pt-BR')}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -1482,14 +1671,33 @@ export const Wizard: React.FC = () => {
                 const monthlyReturn = amount * rate;
                 const annualReturn = monthlyReturn * 12;
                 return (
-                  <div className="bg-gradient-to-br from-cyan-900/20 to-zinc-900 border border-cyan-600/30 rounded-xl p-5">
-                    <h3 className="font-bold text-cyan-400 mb-3 text-center">Simulação de Rendimento</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-zinc-400">Valor investido:</span><span className="font-bold">R$ {amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-400">Taxa:</span><span className="font-bold text-cyan-400">{investorData.monthlyRate}% ao mês</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-400">Rendimento mensal:</span><span className="font-bold text-green-400">R$ {monthlyReturn.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                      <div className="flex justify-between border-t border-zinc-700 pt-2"><span className="text-zinc-400">Rendimento em 12 meses:</span><span className="font-bold text-[#D4AF37]">R$ {annualReturn.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-400">Total ao final:</span><span className="font-bold text-white text-lg">R$ {(amount + annualReturn).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
+                    <h3 className="font-bold text-cyan-400 text-center mb-4">Simulação de Rendimento</h3>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-black/50 rounded-xl p-4 text-center">
+                        <p className="text-xs text-zinc-400 mb-1">Rendimento Mensal</p>
+                        <p className="text-2xl font-bold text-green-400">
+                          R$ {monthlyReturn.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1">{investorData.monthlyRate}% a.m.</p>
+                      </div>
+
+                      <div className="bg-black/50 rounded-xl p-4 text-center">
+                        <p className="text-xs text-zinc-400 mb-1">Rendimento em 12 meses</p>
+                        <p className="text-2xl font-bold text-[#D4AF37]">
+                          R$ {annualReturn.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1">Total de juros</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-600/30 rounded-xl p-4 text-center">
+                      <p className="text-xs text-zinc-400 mb-1">Valor Total ao Final</p>
+                      <p className="text-3xl font-bold text-cyan-300">
+                        R$ {(amount + annualReturn).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">Capital + Rendimentos</p>
                     </div>
                   </div>
                 );
@@ -1497,109 +1705,54 @@ export const Wizard: React.FC = () => {
             </div>
           )}
 
-          {/* INVESTIDOR STEP 5: Dados Bancários */}
+          {/* INVESTIDOR STEP 5: Segurança e Transparência */}
           {currentStep === 5 && profileType === 'INVESTIDOR' && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center">
-                <Landmark size={48} className="mx-auto text-cyan-400 mb-3" />
-                <h2 className="text-xl font-bold">Dados Bancários para Recebimento</h2>
-                <p className="text-zinc-400 text-sm mt-1">Onde receberá seus rendimentos</p>
+                <Shield size={48} className="mx-auto text-cyan-400 mb-3" />
+                <h2 className="text-xl font-bold">🔒 Segurança e Transparência</h2>
               </div>
 
-              <Input label="Banco" name="investorBankName" value={investorData.bankName}
-                onChange={(e: any) => setInvestorData({ ...investorData, bankName: e.target.value })} placeholder="Ex: Nubank" required />
-
-              <div className="grid grid-cols-4 gap-2">
-                {[{ v: 'cpf', l: 'CPF' }, { v: 'phone', l: 'Celular' }, { v: 'email', l: 'Email' }, { v: 'random', l: 'Aleatória' }].map(o => (
-                  <button key={o.v} type="button" onClick={() => setInvestorData({ ...investorData, pixKeyType: o.v })}
-                    className={`p-2 rounded-lg border text-sm ${investorData.pixKeyType === o.v ? 'border-cyan-500 text-cyan-400' : 'border-zinc-700 text-zinc-400'}`}>{o.l}</button>
-                ))}
-              </div>
-
-              <Input label="Chave PIX" name="investorPixKey" value={investorData.pixKey}
-                onChange={(e: any) => setInvestorData({ ...investorData, pixKey: e.target.value })} placeholder="Sua chave" required />
-
-              <Input label="Nome do Titular da Conta" name="investorAccountHolder" value={investorData.accountHolderName}
-                onChange={(e: any) => setInvestorData({ ...investorData, accountHolderName: e.target.value })} placeholder="Seu nome completo" required />
-            </div>
-          )}
-
-          {/* INVESTIDOR STEP 6: Termos + Assinatura */}
-          {currentStep === 6 && profileType === 'INVESTIDOR' && (
-            <div className="space-y-6 animate-in slide-in-from-right">
-              <div className="text-center">
-                <FileSignature size={48} className="mx-auto text-cyan-400 mb-3" />
-                <h2 className="text-xl font-bold">CONTRATO DE ALOCAÇÃO DE CAPITAL - ACEITE ELETRÔNICO</h2>
-                <p className="text-zinc-400 text-sm mt-1">Leia atentamente antes de continuar.</p>
-              </div>
-
-              <div className="bg-cyan-900/20 border border-cyan-600/30 rounded-xl p-4">
-                <p className="text-sm text-zinc-300">
-                  {(SERVICE_TERMS as any).INVESTIDOR?.contractIntro}
+              <div className="bg-cyan-900/20 border border-cyan-600/30 rounded-xl p-6 space-y-4">
+                <p className="text-zinc-300 leading-relaxed">
+                  Para emissão do contrato oficial, nossos especialistas entram em contato via WhatsApp
+                  para validar os dados e enviar o contrato digital com assinatura pelo GOV.BR.
+                </p>
+                <p className="text-zinc-300 leading-relaxed">
+                  Seus dados são tratados conforme a LGPD e só são solicitados após confirmação do investimento.
                 </p>
               </div>
 
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                <h3 className="font-bold text-cyan-400 mb-3">Dados do Investidor (Cadastro)</h3>
-                <ul className="space-y-2">
-                  {(SERVICE_TERMS as any).INVESTIDOR?.registrationFields?.map((field: string, idx: number) => (
-                    <li key={idx} className="text-sm text-zinc-300 flex items-start gap-2">
-                      <CheckCircle2 size={14} className="text-cyan-500 mt-0.5 shrink-0" />
-                      {field}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Condições */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 max-h-[350px] overflow-y-auto">
-                <h3 className="font-bold text-cyan-400 mb-4 text-center">CONDIÇÕES DO INVESTIMENTO</h3>
-                <ul className="space-y-2">
-                  {(SERVICE_TERMS as any).INVESTIDOR?.conditions?.map((cond: string, idx: number) => (
-                    <li key={idx} className="text-sm text-zinc-300 flex items-start gap-2">
-                      <CheckCircle2 size={14} className="text-cyan-500 mt-0.5 shrink-0" />
-                      {cond}
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="mt-6 pt-4 border-t border-zinc-700">
-                  <h4 className="font-bold text-white mb-2">Resumo do seu Investimento:</h4>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between"><span className="text-zinc-400">Valor:</span><span className="font-bold">R$ {investorData.investmentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                    <div className="flex justify-between"><span className="text-zinc-400">Faixa:</span><span className="font-bold text-cyan-400">{investorData.investmentTier === 'PREMIUM' ? 'Premium (R$50k+)' : 'Standard (R$10k-49k)'}</span></div>
-                    <div className="flex justify-between"><span className="text-zinc-400">Modalidade:</span><span className="font-bold">{investorData.payoutMode === 'MONTHLY' ? 'Mensal' : 'Anual Acumulado'}</span></div>
-                    <div className="flex justify-between"><span className="text-zinc-400">Taxa:</span><span className="font-bold text-[#D4AF37]">{investorData.monthlyRate}% ao mês</span></div>
-                    <div className="flex justify-between"><span className="text-zinc-400">Prazo:</span><span className="font-bold">12 meses</span></div>
-                    <div className="flex justify-between"><span className="text-zinc-400">Aviso de Resgate:</span><span className="font-bold">3 meses antes</span></div>
-                  </div>
+              <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-600/30 rounded-xl p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <CheckCircle2 size={24} className="text-green-400 shrink-0" />
+                  <h3 className="font-bold text-white">Processo Seguro</h3>
                 </div>
-              </div>
-
-              {/* Checkbox de aceite */}
-              <label className="flex items-start gap-3 p-4 bg-zinc-900 border border-zinc-800 rounded-xl cursor-pointer hover:border-cyan-500 transition-all">
-                <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)}
-                  className="w-6 h-6 mt-0.5 accent-cyan-500 shrink-0" />
-                <span className="text-xs text-zinc-300 leading-relaxed">
-                  {(SERVICE_TERMS as any).INVESTIDOR?.finalCheckboxText || (SERVICE_TERMS as any).INVESTIDOR?.checkboxText}
-                </span>
-              </label>
-
-              {/* Assinatura */}
-              <div className="space-y-2">
-                <h3 className="font-bold text-cyan-400">Confirmar e Assinar</h3>
-                <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
-                  <p className="text-xs text-red-400">
-                    <strong>OBRIGATÓRIO:</strong> Assine no campo abaixo para confirmar sua adesão ao programa de investimento.
-                  </p>
-                </div>
-                <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
+                <ul className="space-y-2 text-sm text-zinc-300">
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-400 mt-0.5">✓</span>
+                    <span>Validação de dados via WhatsApp</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-400 mt-0.5">✓</span>
+                    <span>Contrato digital com assinatura GOV.BR</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-400 mt-0.5">✓</span>
+                    <span>Conformidade total com LGPD</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-400 mt-0.5">✓</span>
+                    <span>Dados solicitados apenas após confirmação</span>
+                  </li>
+                </ul>
               </div>
             </div>
           )}
 
-          {/* INVESTIDOR STEP 7: Confirmação Final */}
-          {currentStep === 7 && profileType === 'INVESTIDOR' && (
+
+          {/* INVESTIDOR STEP 6: Confirmação Final */}
+          {currentStep === 6 && profileType === 'INVESTIDOR' && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center">
                 <CheckCircle2 size={48} className="mx-auto text-green-500 mb-3" />
@@ -1610,14 +1763,13 @@ export const Wizard: React.FC = () => {
                 <div className="flex justify-between"><span className="text-zinc-400">Serviço:</span><span className="font-bold text-cyan-400">Investidor Tubarão</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Nome:</span><span className="font-bold">{investorData.fullName}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">CPF/CNPJ:</span><span className="font-bold">{investorData.cpfCnpj}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Email:</span><span className="font-bold">{investorData.email}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Telefone:</span><span className="font-bold">{investorData.phone}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Valor:</span><span className="font-bold text-[#D4AF37]">R$ {investorData.investmentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Faixa:</span><span className="font-bold">{investorData.investmentTier === 'PREMIUM' ? 'Premium' : 'Standard'}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Modalidade:</span><span className="font-bold">{investorData.payoutMode === 'MONTHLY' ? 'Mensal' : 'Anual Acumulado'}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Taxa:</span><span className="font-bold text-cyan-400">{investorData.monthlyRate}% ao mês</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Prazo:</span><span className="font-bold">12 meses</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Banco:</span><span className="font-bold">{investorData.bankName}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">PIX:</span><span className="font-bold">{investorData.pixKey}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Termos:</span><span className="font-bold text-green-400">Aceito e Assinado</span></div>
               </div>
 
               <div className="bg-cyan-900/20 border border-cyan-600/30 rounded-xl p-4">
@@ -1625,6 +1777,17 @@ export const Wizard: React.FC = () => {
                   Ao confirmar, sua solicitação será enviada para análise pela equipe Tubarão. Você receberá um retorno em até 48 horas.
                 </p>
               </div>
+
+              {/* Botão WhatsApp */}
+              <a
+                href={`https://wa.me/5511999999999?text=${encodeURIComponent(`Olá! Gostaria de falar sobre meu investimento de R$ ${investorData.investmentAmount.toLocaleString('pt-BR')}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-3 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-all"
+              >
+                <Phone size={20} />
+                🟢 Falar no WhatsApp
+              </a>
             </div>
           )}
 
@@ -1641,35 +1804,104 @@ export const Wizard: React.FC = () => {
                 <p className="text-zinc-400 text-sm mt-2">Simule agora e receba em instantes.</p>
               </div>
 
-              {/* Pacotes (Ocultar se for Moto/Garantia, ou mostrar valores maiores) */}
-              {profileType !== 'GARANTIA_VEICULO' && (
-                <div className="grid grid-cols-3 gap-3">
-                  {settings.loanPackages.map((pkg, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => { setSelectedAmount(pkg); setCustomAmount(''); }}
-                      className={`p-4 rounded-xl border-2 transition-all ${selectedAmount === pkg && !customAmount ? 'border-[#D4AF37] bg-[#D4AF37]/10 scale-105' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600'
-                        }`}
-                    >
-                      <span className="text-lg font-bold">R$ {pkg.toLocaleString('pt-BR')}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Slider de Valor */}
+              <div className="space-y-4">
+                <div className="bg-gradient-to-br from-[#D4AF37]/10 to-zinc-900 border border-[#D4AF37]/30 rounded-2xl p-6">
+                  <div className="text-center mb-6">
+                    <p className="text-sm text-zinc-400 mb-2">Valor solicitado</p>
+                    <p className="text-4xl font-bold text-[#D4AF37]">
+                      R$ {(customAmount ? parseFloat(customAmount) : selectedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
 
-              {/* Valor personalizado */}
-              <div className="space-y-2">
-                <label className="text-sm text-zinc-400">Digite o valor desejado:</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">R$</span>
-                  <input
-                    type="number"
-                    value={customAmount}
-                    onChange={(e) => setCustomAmount(e.target.value)}
-                    placeholder={profileType === 'GARANTIA_VEICULO' ? "Ex: 15000" : "0,00"}
-                    className="w-full bg-black border border-zinc-700 rounded-xl pl-12 pr-4 py-4 text-white text-xl font-bold focus:border-[#D4AF37] outline-none"
-                  />
+                  {/* Slider */}
+                  <div className="space-y-3">
+                    <input
+                      type="range"
+                      min={settings.minLoanAmount}
+                      max={settings.maxLoanAmount}
+                      step={100}
+                      value={customAmount ? parseFloat(customAmount) : selectedAmount}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setCustomAmount(val.toString());
+                        setSelectedAmount(val);
+                      }}
+                      className="w-full h-3 bg-zinc-800 rounded-lg appearance-none cursor-pointer slider-thumb"
+                      style={{
+                        background: `linear-gradient(to right, #D4AF37 0%, #D4AF37 ${((customAmount ? parseFloat(customAmount) : selectedAmount) - settings.minLoanAmount) / (settings.maxLoanAmount - settings.minLoanAmount) * 100}%, #27272a ${((customAmount ? parseFloat(customAmount) : selectedAmount) - settings.minLoanAmount) / (settings.maxLoanAmount - settings.minLoanAmount) * 100}%, #27272a 100%)`
+                      }}
+                    />
+                    <div className="flex justify-between text-xs text-zinc-500">
+                      <span>R$ {settings.minLoanAmount.toLocaleString('pt-BR')}</span>
+                      <span>R$ {settings.maxLoanAmount.toLocaleString('pt-BR')}</span>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Cálculos em Tempo Real */}
+                {(() => {
+                  const amount = customAmount ? parseFloat(customAmount) : selectedAmount;
+                  if (!amount || isNaN(amount) || !settings || !settings.interestRate) {
+                    return null;
+                  }
+                  const installmentsCount = 12; // Padrão 12 meses
+                  const monthlyRate = settings.interestRate / 100;
+                  const totalWithInterest = amount * Math.pow(1 + monthlyRate, installmentsCount);
+                  const monthlyPayment = totalWithInterest / installmentsCount;
+                  const totalInterest = totalWithInterest - amount;
+
+                  return (
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
+                      <h3 className="font-bold text-cyan-400 text-center mb-4">Simulação do Empréstimo</h3>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-black/50 rounded-xl p-4 text-center">
+                          <p className="text-xs text-zinc-400 mb-1">Parcela Mensal</p>
+                          <p className="text-2xl font-bold text-green-400">
+                            R$ {monthlyPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-zinc-500 mt-1">{installmentsCount}x</p>
+                        </div>
+
+                        <div className="bg-black/50 rounded-xl p-4 text-center">
+                          <p className="text-xs text-zinc-400 mb-1">Total de Juros</p>
+                          <p className="text-2xl font-bold text-orange-400">
+                            R$ {totalInterest.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-zinc-500 mt-1">{settings.interestRate}% a.m.</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-600/30 rounded-xl p-4 text-center">
+                        <p className="text-xs text-zinc-400 mb-1">Valor Total a Pagar</p>
+                        <p className="text-3xl font-bold text-cyan-300">
+                          R$ {totalWithInterest.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1">Quitação em {installmentsCount} meses</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Pacotes Rápidos */}
+                {profileType !== 'GARANTIA_VEICULO' && (
+                  <div>
+                    <p className="text-sm text-zinc-400 mb-3 text-center">Ou escolha um valor rápido:</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {settings.loanPackages.map((pkg, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => { setSelectedAmount(pkg); setCustomAmount(''); }}
+                          className={`p-3 rounded-xl border-2 transition-all ${selectedAmount === pkg && !customAmount ? 'border-[#D4AF37] bg-[#D4AF37]/10 scale-105' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600'
+                            }`}
+                        >
+                          <span className="text-sm font-bold">R$ {pkg.toLocaleString('pt-BR')}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Checkbox Moto */}
@@ -2137,16 +2369,19 @@ export const Wizard: React.FC = () => {
                     <Input label="Nome Completo" name="name" value={formData.name} onChange={handleChange} placeholder="Como no documento" />
                     <Input label="Telefone" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
                     <Input label="CPF ou CNPJ" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00 ou 00.000.000/0000-00" error={errors.cpf} />
-                    <Input label="Data de Nascimento" type="date" name="birthDate" value={formData.birthDate} onChange={handleChange} />
+                    <DateInput label="Data de Nascimento" name="birthDate" value={formData.birthDate} onChange={handleChange} />
                     <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="seu@email.com" />
+                    <Input label="Cupom de Indicação (Opcional)" name="referralCode" value={formData.referralCode} onChange={handleChange} placeholder="Código ou CPF de quem indicou" />
                   </div>
                 ) : (
                   <>
                     <div className="space-y-4">
                       <Input label="Nome Completo" name="name" value={formData.name} onChange={handleChange} placeholder="Como no documento" />
                       <Input label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} placeholder="000.000.000-00" error={errors.cpf} />
+                      <DateInput label="Data de Nascimento" name="birthDate" value={formData.birthDate} onChange={handleChange} />
                       <Input label="WhatsApp Principal" name="phone" value={formData.phone} onChange={handleChange} placeholder="(00) 00000-0000" />
                       <Input label="Email" type="email" name="email" value={formData.email} onChange={handleChange} />
+                      <Input label="Cupom de Indicação (Opcional)" name="referralCode" value={formData.referralCode} onChange={handleChange} placeholder="Insira seu cupom aqui" />
                       <Input label="Instagram" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="@seu_usuario" required />
                     </div>
 
@@ -2160,14 +2395,43 @@ export const Wizard: React.FC = () => {
                       </div>
                     )}
 
-                    {(profileType === 'MOTO' || profileType === 'GARANTIA_VEICULO' || profileType === 'CLT') && (
+                    {(profileType === 'MOTO' || profileType === 'GARANTIA' || profileType === 'CLT') && (
                       <div className="pt-4 border-t border-zinc-800 space-y-4">
                         <h3 className="text-sm font-bold text-[#D4AF37]">Dados Profissionais</h3>
                         <Input label="Profissão" name="occupation" value={formData.occupation} onChange={handleChange} />
+                        {(profileType === 'CLT' || profileType === 'MOTO') && (
+                          <Input label="Nome da Empresa" name="companyName" value={formData.companyName} onChange={handleChange} placeholder="Empresa onde trabalha" />
+                        )}
                         <div className="grid grid-cols-2 gap-4">
                           <Input label="Renda Mensal" name="income" value={formData.income} onChange={handleChange} />
                           <Input label="Dia Pagamento" name="workTime" value={formData.workTime} onChange={handleChange} placeholder="Dia 05" />
                         </div>
+
+                        {/* Endereço da Empresa */}
+                        {(profileType === 'CLT' || profileType === 'MOTO') && (
+                          <div className="pt-3 space-y-3">
+                            <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wide">Endereço da Empresa</h4>
+                            <div className="grid grid-cols-2 gap-3">
+                              <Input label="CEP da Empresa" name="companyCep" value={formData.companyCep} onChange={handleChange} placeholder="00000-000" />
+                              <Input label="Número" name="companyNumber" value={formData.companyNumber} onChange={handleChange} placeholder="123" />
+                            </div>
+                            <Input label="Logradouro" name="companyStreet" value={formData.companyStreet} onChange={handleChange} placeholder="Rua, Av, etc." />
+                            <div className="grid grid-cols-3 gap-3">
+                              <Input label="Bairro" name="companyNeighborhood" value={formData.companyNeighborhood} onChange={handleChange} placeholder="Bairro" />
+                              <Input label="Cidade" name="companyCity" value={formData.companyCity} onChange={handleChange} placeholder="Cidade" />
+                              <div>
+                                <label className="text-sm text-zinc-400 font-medium block mb-1">UF</label>
+                                <select name="companyState" value={formData.companyState} onChange={handleChange as any}
+                                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-[#D4AF37] outline-none">
+                                  <option value="">UF</option>
+                                  {['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'].map(uf => (
+                                    <option key={uf} value={uf}>{uf}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -2183,13 +2447,49 @@ export const Wizard: React.FC = () => {
                       <div className="pt-4 border-t border-zinc-800 space-y-4">
                         <h3 className="text-sm font-bold text-[#D4AF37]">Referências (Pessoas Próximas)</h3>
                         <p className="text-xs text-zinc-500">Informe 2 contatos de pessoas próximas para referência.</p>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-3">
                           <Input label="Nome da Referência 1" name="contactTrust1Name" value={formData.contactTrust1Name} onChange={handleChange} placeholder="Nome completo" />
                           <Input label="WhatsApp Referência 1" name="contactTrust1" value={formData.contactTrust1} onChange={handleChange} placeholder="(99) 99999-9999" />
+                          <div>
+                            <label className="text-sm text-zinc-400 font-medium block mb-1">Parentesco</label>
+                            <select name="contactTrust1Relationship" value={formData.contactTrust1Relationship} onChange={handleChange as any}
+                              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-[#D4AF37] outline-none">
+                              <option value="">Selecione</option>
+                              <option value="pai">Pai</option>
+                              <option value="mae">Mãe</option>
+                              <option value="irmao">Irmão(ã)</option>
+                              <option value="conjuge">Cônjuge</option>
+                              <option value="filho">Filho(a)</option>
+                              <option value="tio">Tio(a)</option>
+                              <option value="primo">Primo(a)</option>
+                              <option value="amigo">Amigo(a)</option>
+                              <option value="colega">Colega de trabalho</option>
+                              <option value="vizinho">Vizinho(a)</option>
+                              <option value="outro">Outro</option>
+                            </select>
+                          </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-3">
                           <Input label="Nome da Referência 2" name="contactTrust2Name" value={formData.contactTrust2Name} onChange={handleChange} placeholder="Nome completo" />
                           <Input label="WhatsApp Referência 2" name="contactTrust2" value={formData.contactTrust2} onChange={handleChange} placeholder="(99) 99999-9999" />
+                          <div>
+                            <label className="text-sm text-zinc-400 font-medium block mb-1">Parentesco</label>
+                            <select name="contactTrust2Relationship" value={formData.contactTrust2Relationship} onChange={handleChange as any}
+                              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-[#D4AF37] outline-none">
+                              <option value="">Selecione</option>
+                              <option value="pai">Pai</option>
+                              <option value="mae">Mãe</option>
+                              <option value="irmao">Irmão(ã)</option>
+                              <option value="conjuge">Cônjuge</option>
+                              <option value="filho">Filho(a)</option>
+                              <option value="tio">Tio(a)</option>
+                              <option value="primo">Primo(a)</option>
+                              <option value="amigo">Amigo(a)</option>
+                              <option value="colega">Colega de trabalho</option>
+                              <option value="vizinho">Vizinho(a)</option>
+                              <option value="outro">Outro</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -2450,7 +2750,7 @@ export const Wizard: React.FC = () => {
                         <li>Envie o arquivo aqui</li>
                       </ol>
                     </div>
-                    {renderUploadArea('workCard', 'Carteira de Trabalho - PDF (OBRIGATÓRIO)', formData.workCard)}
+                    {renderPdfUploadArea('workCard', 'Carteira de Trabalho - PDF (OBRIGATÓRIO)', formData.workCard)}
                     <p className="text-xs text-red-400">❌ Não aceitamos foto da carteira física. Apenas PDF do app oficial.</p>
                   </div>
                 )}
@@ -2604,8 +2904,10 @@ export const Wizard: React.FC = () => {
                       className={`p-2 rounded-lg border text-sm ${formData.pixKeyType === o.v ? 'border-[#D4AF37] text-[#D4AF37]' : 'border-zinc-700 text-zinc-400'}`}>{o.l}</button>
                   ))}
                 </div>
-                <Input label="Chave PIX (OBRIGATÓRIO)" name="pixKey" value={formData.pixKey} onChange={handleChange} placeholder="Sua chave" />
+                <Input label="Chave PIX (OBRIGATÓRIO)" name="pixKey" value={formData.pixKey} onChange={handleChange}
+                  placeholder={formData.pixKeyType === 'cpf' ? '000.000.000-00' : formData.pixKeyType === 'phone' ? '(00) 00000-0000' : formData.pixKeyType === 'email' ? 'seu@email.com' : 'Chave aleatória'} />
                 <Input label="Nome do Titular da Conta (OBRIGATÓRIO)" name="accountHolderName" value={formData.accountHolderName} onChange={handleChange} placeholder="Seu nome completo" />
+                <Input label="CPF do Titular da Conta (OBRIGATÓRIO)" name="accountHolderCpf" value={formData.accountHolderCpf} onChange={handleChange} placeholder="000.000.000-00" />
               </div>
             )}
 
@@ -2676,6 +2978,18 @@ export const Wizard: React.FC = () => {
                       <div className="flex justify-between"><span className="text-zinc-400">Juros Mensais:</span><span className="font-bold text-[#D4AF37]">{settings.interestRateMonthly}% ao mês</span></div>
                     </div>
 
+                    {/* DECLARAÇÃO DE VERACIDADE - OBRIGATÓRIA */}
+                    <label className="flex items-start gap-3 p-4 bg-yellow-900/20 border-2 border-yellow-600/50 rounded-xl cursor-pointer hover:border-[#D4AF37] transition-all">
+                      <input type="checkbox" checked={formData.declarationAccepted} onChange={(e) => setFormData({ ...formData, declarationAccepted: e.target.checked })}
+                        className="w-6 h-6 mt-0.5 accent-yellow-500 shrink-0" />
+                      <div>
+                        <span className="text-white font-bold text-sm">📜 DECLARAÇÃO DE VERACIDADE</span>
+                        <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                          Declaro que <strong className="text-white">TODAS</strong> as informações fornecidas neste formulário são <strong className="text-white">verdadeiras e corretas</strong>, incluindo dados pessoais, profissionais, referências e documentos. Estou ciente de que a <strong className="text-red-400">falsidade ideológica</strong> configura crime previsto no Art. 299 do Código Penal, sujeito a pena de reclusão de 1 a 5 anos, e que informações falsas resultarão no <strong className="text-red-400">cancelamento imediato</strong> da solicitação e possíveis medidas judiciais.
+                        </p>
+                      </div>
+                    </label>
+
                     {/* TERMO FINAL */}
                     <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-2">
                       <h3 className="font-bold text-red-400 text-xs uppercase">TERMO DE COMPROMISSO (OBRIGATÓRIO)</h3>
@@ -2705,10 +3019,15 @@ export const Wizard: React.FC = () => {
               {currentStep === 1 ? 'Começar Simulação' : 'Continuar'}
             </Button>
           ) : (
-            <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading} disabled={!formData.signature}>
+            <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading}
+              disabled={
+                profileType === 'INVESTIDOR' ? false :
+                profileType === 'LIMPA_NOME' ? !formData.signature :
+                (!formData.signature || !formData.declarationAccepted)
+              }>
               {profileType === 'INVESTIDOR' ? 'QUERO SER INVESTIDOR' :
                 profileType === 'LIMPA_NOME' ? 'SOLICITAR SERVIÇO' :
-                profileType === 'MOTO' ? 'SOLICITAR FINANCIAMENTO' : 'SOLICITAR MEU EMPRÉSTIMO'}
+                  profileType === 'MOTO' ? 'SOLICITAR FINANCIAMENTO' : 'SOLICITAR MEU EMPRÉSTIMO'}
             </Button>
           )}
         </div>
@@ -2726,3 +3045,97 @@ const Input = ({ label, error, className = "", required, ...props }: any) => (
     {error && <p className="text-xs text-red-500 mt-1 ml-1">{error}</p>}
   </div>
 );
+
+const DateInput = ({ label, error, className = "", required, value, onChange, name }: any) => {
+  const toDisplay = (v: string) => {
+    if (!v) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      const [y, m, d] = v.split('-');
+      return `${d}/${m}/${y}`;
+    }
+    return v;
+  };
+
+  const [display, setDisplay] = React.useState(() => toDisplay(value));
+
+  React.useEffect(() => {
+    setDisplay(toDisplay(value || ''));
+  }, [value]);
+
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 8);
+    let masked = raw;
+    if (raw.length > 4) masked = raw.replace(/^(\d{2})(\d{2})(\d{1,4})/, '$1/$2/$3');
+    else if (raw.length > 2) masked = raw.replace(/^(\d{2})(\d{1,2})/, '$1/$2');
+    setDisplay(masked);
+    let isoValue = raw;
+    if (raw.length === 8) {
+      isoValue = `${raw.slice(4, 8)}-${raw.slice(2, 4)}-${raw.slice(0, 2)}`;
+    }
+    if (onChange) onChange({ target: { name, value: isoValue } });
+  };
+
+  return (
+    <div>
+      <label className="block text-xs text-zinc-400 mb-1.5 ml-1">
+        {label}{required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <input
+        type="text"
+        inputMode="numeric"
+        placeholder="DD/MM/AAAA"
+        value={display}
+        onChange={handleInput}
+        name={name}
+        className={`w-full bg-black border rounded-lg p-3 text-white text-sm focus:border-[#D4AF37] outline-none ${error ? 'border-red-900' : 'border-zinc-700'} ${className}`}
+      />
+      {error && <p className="text-xs text-red-500 mt-1 ml-1">{error}</p>}
+    </div>
+  );
+};
+
+// CSS para o slider customizado
+const sliderStyles = `
+  input[type="range"].slider-thumb::-webkit-slider-thumb {
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #D4AF37;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+    transition: all 0.2s ease;
+  }
+
+  input[type="range"].slider-thumb::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.8);
+  }
+
+  input[type="range"].slider-thumb::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #D4AF37;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+    transition: all 0.2s ease;
+  }
+
+  input[type="range"].slider-thumb::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.8);
+  }
+`;
+
+// Injetar estilos
+if (typeof document !== 'undefined') {
+  const styleElement = document.getElementById('slider-styles');
+  if (!styleElement) {
+    const style = document.createElement('style');
+    style.id = 'slider-styles';
+    style.textContent = sliderStyles;
+    document.head.appendChild(style);
+  }
+}

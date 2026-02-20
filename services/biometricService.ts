@@ -1,15 +1,15 @@
 /**
  * 🔐 Serviço de Autenticação Biométrica (WebAuthn)
- * 
+ *
  * Usa a Web Authentication API para:
  * - Registrar credencial biométrica (Face ID, Touch ID, Windows Hello)
  * - Autenticar com biometria
- * 
- * Armazena credenciais no Supabase (tabela webauthn_credentials)
+ *
+ * Armazena credenciais via API REST (tabela webauthn_credentials)
  * e localmente no dispositivo via navigator.credentials
  */
 
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 
 // Converte ArrayBuffer para base64url (para armazenamento)
 function bufferToBase64url(buffer: ArrayBuffer): string {
@@ -75,18 +75,14 @@ export const biometricService = {
      */
     hasCredential: async (userId: string): Promise<boolean> => {
         try {
-            const { data, error } = await supabase
-                .from('webauthn_credentials')
-                .select('id')
-                .eq('user_id', userId)
-                .limit(1);
+            const { data, error } = await api.get<any[]>(`/antifraud/biometric/check?user_id=${userId}`);
 
             if (error) {
                 console.error('[Biometric] Error checking credential:', error);
                 return false;
             }
 
-            return (data && data.length > 0);
+            return (data && (data as any[]).length > 0);
         } catch {
             return false;
         }
@@ -122,16 +118,13 @@ export const biometricService = {
      */
     getUserCredentialIds: async (userId: string): Promise<string[]> => {
         try {
-            const { data, error } = await supabase
-                .from('webauthn_credentials')
-                .select('credential_id')
-                .eq('user_id', userId);
+            const { data, error } = await api.get<any[]>(`/antifraud/biometric/credentials?user_id=${userId}`);
 
             if (error || !data) {
                 return [];
             }
 
-            return data.map((item) => item.credential_id);
+            return (data as any[]).map((item) => item.credential_id);
         } catch {
             return [];
         }
@@ -155,12 +148,9 @@ export const biometricService = {
             const challenge = generateChallenge();
 
             // Buscar credenciais existentes para excluir (evitar duplicatas)
-            const { data: existingCreds } = await supabase
-                .from('webauthn_credentials')
-                .select('credential_id')
-                .eq('user_id', userId);
+            const { data: existingCreds } = await api.get<any[]>(`/antifraud/biometric/credentials?user_id=${userId}`);
 
-            const excludeCredentials = (existingCreds || []).map(c => ({
+            const excludeCredentials = ((existingCreds as any[]) || []).map(c => ({
                 id: base64urlToBuffer(c.credential_id),
                 type: 'public-key' as const,
                 transports: ['internal' as AuthenticatorTransport],
@@ -208,18 +198,16 @@ export const biometricService = {
             // Detectar nome do dispositivo
             const deviceName = detectDeviceName();
 
-            // Salvar no Supabase
-            const { error: dbError } = await supabase
-                .from('webauthn_credentials')
-                .insert({
-                    user_id: userId,
-                    user_email: userEmail,
-                    credential_id: credentialId,
-                    public_key: publicKeyData,
-                    attestation_object: attestationObject,
-                    device_name: deviceName,
-                    sign_count: 0,
-                });
+            // Salvar via API
+            const { error: dbError } = await api.post('/antifraud/biometric', {
+                user_id: userId,
+                user_email: userEmail,
+                credential_id: credentialId,
+                public_key: publicKeyData,
+                attestation_object: attestationObject,
+                device_name: deviceName,
+                sign_count: 0,
+            });
 
             if (dbError) {
                 console.error('[Biometric] DB save error:', dbError);
@@ -287,38 +275,32 @@ export const biometricService = {
 
             const credentialId = bufferToBase64url(credential.rawId);
 
-            // Buscar credencial no banco
-            const { data: credData, error: dbError } = await supabase
-                .from('webauthn_credentials')
-                .select('user_id, user_email, sign_count')
-                .eq('credential_id', credentialId)
-                .single();
+            // Buscar credencial via API
+            const { data: credData, error: dbError } = await api.get<any>(`/antifraud/biometric/verify?credential_id=${credentialId}`);
 
             if (dbError || !credData) {
                 console.error('[Biometric] Credential not found:', dbError);
                 return { success: false, error: 'Credencial biométrica não encontrada. Cadastre novamente.' };
             }
 
-            // Atualizar sign count
-            await supabase
-                .from('webauthn_credentials')
-                .update({
-                    sign_count: (credData.sign_count || 0) + 1,
-                    last_used_at: new Date().toISOString(),
-                })
-                .eq('credential_id', credentialId);
+            // Atualizar sign count via API
+            await api.put(`/antifraud/biometric/update-count`, {
+                credential_id: credentialId,
+                sign_count: ((credData as any).sign_count || 0) + 1,
+                last_used_at: new Date().toISOString(),
+            });
 
             // Atualizar referência local
             localStorage.setItem('biometric_credential', JSON.stringify({
                 credentialId,
-                userId: credData.user_id,
-                userEmail: credData.user_email,
+                userId: (credData as any).user_id,
+                userEmail: (credData as any).user_email,
             }));
 
             return {
                 success: true,
-                userId: credData.user_id,
-                userEmail: credData.user_email,
+                userId: (credData as any).user_id,
+                userEmail: (credData as any).user_email,
             };
         } catch (err: any) {
             console.error('[Biometric] Auth error:', err);
@@ -370,13 +352,11 @@ export const biometricService = {
 
             const usedCredentialId = bufferToBase64url(credential.rawId);
 
-            await supabase
-                .from('webauthn_credentials')
-                .update({
-                    last_used_at: new Date().toISOString(),
-                })
-                .eq('credential_id', usedCredentialId)
-                .eq('user_id', userId);
+            await api.put('/antifraud/biometric/update-count', {
+                credential_id: usedCredentialId,
+                user_id: userId,
+                last_used_at: new Date().toISOString(),
+            });
 
             return { success: true, credentialId: usedCredentialId };
         } catch (err: any) {
@@ -392,10 +372,7 @@ export const biometricService = {
      */
     removeCredential: async (userId: string): Promise<boolean> => {
         try {
-            const { error } = await supabase
-                .from('webauthn_credentials')
-                .delete()
-                .eq('user_id', userId);
+            const { error } = await api.delete(`/antifraud/biometric?user_id=${userId}`);
 
             if (error) {
                 console.error('[Biometric] Remove error:', error);

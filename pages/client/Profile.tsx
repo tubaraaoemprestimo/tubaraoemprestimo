@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, User, Shield, FileText, LogOut, Lock, Camera, Loader2, X, Gift, Copy, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { ScoreGauge } from '../../components/ScoreGauge';
 import { useToast } from '../../components/Toast';
-import { supabase } from '../../services/supabaseClient';
+import { api } from '../../services/apiClient';
 
 export const Profile: React.FC = () => {
   const navigate = useNavigate();
@@ -30,13 +30,13 @@ export const Profile: React.FC = () => {
   }, []);
 
   const loadUser = async () => {
-    const u = supabaseService.auth.getUser();
+    const u = apiService.auth.getUser();
     if (u) {
       setUser(u);
 
       // Buscar dados reais do cliente
       try {
-        const { data: customer } = await supabase
+        const { data: customer } = await api
           .from('customers')
           .select('*')
           .eq('email', u.email)
@@ -56,7 +56,7 @@ export const Profile: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await supabaseService.auth.signOut();
+    await apiService.auth.signOut();
     navigate('/login');
   };
 
@@ -66,7 +66,7 @@ export const Profile: React.FC = () => {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const result = reader.result as string;
-        await supabaseService.updateUserAvatar(result);
+        await apiService.updateUserAvatar(result);
         setUser((prev: any) => ({ ...prev, avatarUrl: result }));
         addToast("Foto de perfil atualizada!", 'success');
       };
@@ -85,7 +85,7 @@ export const Profile: React.FC = () => {
     }
 
     setLoadingPass(true);
-    await supabaseService.changePassword(passData.current, passData.new);
+    await apiService.changePassword(passData.current, passData.new);
     setLoadingPass(false);
 
     addToast("Senha alterada com sucesso!", 'success');

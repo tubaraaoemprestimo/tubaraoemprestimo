@@ -1,9 +1,9 @@
-// ⭐ Score & Renegotiation - Score de clientes e simulador de renegociação
+﻿// ⭐ Score & Renegotiation - Score de clientes e simulador de renegociação
 import React, { useState, useEffect } from 'react';
 import { Star, TrendingUp, TrendingDown, Calculator, RefreshCw, Users, AlertTriangle, CheckCircle, Zap, Target, DollarSign, Percent, Clock, X } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { scoreService, renegotiationService } from '../../services/adminService';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { ClientScore, RenegotiationProposal, Customer, Loan } from '../../types';
 import { useToast } from '../../components/Toast';
 
@@ -30,8 +30,8 @@ export const ScorePage: React.FC = () => {
 
     const loadData = async () => {
         const [customersData, loansData] = await Promise.all([
-            supabaseService.getCustomers(),
-            supabaseService.getClientLoans()
+            apiService.getCustomers(),
+            apiService.getClientLoans()
         ]);
         setCustomers(customersData);
         setLoans(loansData);

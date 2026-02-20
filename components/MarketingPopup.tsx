@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, ExternalLink } from 'lucide-react';
 import { Button } from './Button';
 import { Campaign } from '../types';
-import { supabaseService } from '../services/supabaseService';
+import { apiService } from '../services/apiService';
 
 export const MarketingPopup: React.FC = () => {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
@@ -13,7 +13,7 @@ export const MarketingPopup: React.FC = () => {
   }, []);
 
   const checkCampaigns = async () => {
-    const activeCampaigns = await supabaseService.getActiveCampaigns();
+    const activeCampaigns = await apiService.getActiveCampaigns();
     
     for (const camp of activeCampaigns) {
        if (shouldShowCampaign(camp)) {

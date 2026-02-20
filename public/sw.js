@@ -5,7 +5,7 @@
  * ============================================
  */
 
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const CACHE_STATIC = `tubarao-static-${CACHE_VERSION}`;
 const CACHE_DYNAMIC = `tubarao-dynamic-${CACHE_VERSION}`;
 const CACHE_IMAGES = `tubarao-images-${CACHE_VERSION}`;

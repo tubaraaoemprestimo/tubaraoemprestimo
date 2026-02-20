@@ -1,6 +1,7 @@
 
 import { WhatsappConfig } from '../types';
-import { supabaseService } from './supabaseService';
+import { apiService } from './apiService';
+import { getApiBaseUrl } from './runtimeConfig';
 
 const cleanUrl = (url: string) => {
     if (!url) return '';
@@ -11,12 +12,12 @@ const cleanUrl = (url: string) => {
 export const whatsappService = {
     // Get connection status and config form local storage
     getConfig: async (): Promise<WhatsappConfig> => {
-        return await supabaseService.getWhatsappConfig();
+        return await apiService.getWhatsappConfig();
     },
 
     // Save new configuration to local storage
     updateConfig: async (config: WhatsappConfig): Promise<boolean> => {
-        return await supabaseService.saveWhatsappConfig(config);
+        return await apiService.saveWhatsappConfig(config);
     },
 
     // --- EVOLUTION API REAL INTEGRATION (v2.3.7 Compatible) ---
@@ -24,7 +25,7 @@ export const whatsappService = {
     // Ensure Webhook is Configured
     ensureWebhookConfigured: async (config: WhatsappConfig): Promise<boolean> => {
         const baseUrl = cleanUrl(config.apiUrl);
-        const webhookUrl = "https://cwhiujeragsethxjekkb.supabase.co/functions/v1/whatsapp-webhook";
+        const webhookUrl = getApiBaseUrl() + '/webhook/whatsapp';
 
         try {
             console.log(`[WhatsApp] Configuring webhook for ${config.instanceName}...`);
@@ -61,7 +62,7 @@ export const whatsappService = {
 
     // Check Connection State
     checkConnectionState: async (): Promise<'open' | 'close' | 'connecting' | 'unknown'> => {
-        const config = await supabaseService.getWhatsappConfig();
+        const config = await apiService.getWhatsappConfig();
         if (!config.apiUrl || !config.apiKey || !config.instanceName) return 'unknown';
 
         try {
@@ -144,7 +145,7 @@ export const whatsappService = {
 
     // Fetch QR Code from Evolution API
     getQrCode: async (): Promise<string | null> => {
-        const config = await supabaseService.getWhatsappConfig();
+        const config = await apiService.getWhatsappConfig();
         if (!config.apiUrl || !config.apiKey || !config.instanceName) {
             throw new Error("Configurações da API incompletas.");
         }
@@ -210,7 +211,7 @@ export const whatsappService = {
 
     // Disconnect instance
     disconnect: async (): Promise<boolean> => {
-        const config = await supabaseService.getWhatsappConfig();
+        const config = await apiService.getWhatsappConfig();
         if (!config.apiUrl || !config.apiKey) return false;
 
         try {
@@ -227,7 +228,7 @@ export const whatsappService = {
 
             // Update local state
             config.isConnected = false;
-            await supabaseService.saveWhatsappConfig(config);
+            await apiService.saveWhatsappConfig(config);
             return true;
         } catch (e) {
             console.error("[WhatsApp] Error disconnecting:", e);
@@ -237,7 +238,7 @@ export const whatsappService = {
 
     // Send Text Message
     sendMessage: async (phone: string, text: string): Promise<boolean> => {
-        const config = await supabaseService.getWhatsappConfig();
+        const config = await apiService.getWhatsappConfig();
         if (!config.apiUrl || !config.apiKey) return false;
 
         // Validate and clean formatting
@@ -297,7 +298,7 @@ export const whatsappService = {
 
     // Buscar Contatos da API
     fetchContacts: async (): Promise<any[]> => {
-        const config = await supabaseService.getWhatsappConfig();
+        const config = await apiService.getWhatsappConfig();
         if (!config.apiUrl || !config.apiKey) return [];
 
         const baseUrl = cleanUrl(config.apiUrl);
@@ -360,7 +361,7 @@ export const whatsappService = {
         }
     },
 
-    // Sincronizar contatos com Supabase
+    // Sincronizar contatos com API
     syncContacts: async (): Promise<{ added: number, updated: number, errors: number }> => {
         const contacts = await whatsappService.fetchContacts();
         if (contacts.length === 0) return { added: 0, updated: 0, errors: 0 };
@@ -408,7 +409,7 @@ export const whatsappService = {
                 // Prioridade de nome
                 const displayName = contact.pushName || contact.name || contact.verifiedName || `Desconhecido ${phone.slice(-4)}`;
 
-                const result = await supabaseService.importLead(displayName, phone, contact.profilePictureUrl);
+                const result = await apiService.importLead(displayName, phone, contact.profilePictureUrl);
 
                 if (result === 'added') added++;
                 else if (result === 'updated') updated++;

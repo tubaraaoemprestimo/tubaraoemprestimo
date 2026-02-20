@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { User, Lock, ArrowRight, ShieldCheck, ScanFace, AlertCircle, Smartphone, Mail, Loader2, CheckCircle2, X, Fingerprint } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { InstallPwaButton } from '../../components/InstallPwaButton';
 import { biometricService } from '../../services/biometricService';
 import { antifraudService } from '../../services/antifraudService';
+import { locationTrackingService } from '../../services/locationTrackingService';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -16,6 +17,8 @@ export const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricHasCredential, setBiometricHasCredential] = useState(false);
+  const [biometricNeedsPassword, setBiometricNeedsPassword] = useState(false);
+  const [biometricEmail, setBiometricEmail] = useState('');
 
   // Modal Esqueceu Senha
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
@@ -46,7 +49,7 @@ export const Login: React.FC = () => {
     checkBiometric();
 
     // Limpar sessão para fresh login
-    supabaseService.auth.signOut();
+    apiService.auth.signOut();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,7 +75,7 @@ export const Login: React.FC = () => {
     }
 
     try {
-      const result = await supabaseService.auth.signIn(creds) as any;
+      const result = await apiService.auth.signIn(creds) as any;
       if (result.user) {
         // Antifraud Log com localização capturada
         await antifraudService.logRiskEvent('LOGIN_SUCCESS', result.user.id, {
@@ -80,6 +83,17 @@ export const Login: React.FC = () => {
           method: creds.identifier === 'admin' ? 'PASSWORD_ADMIN' : 'PASSWORD_CLIENT',
           locationCaptured: locationData
         });
+
+        // Verificação de dispositivo (limite 2 por usuário)
+        if (result.user.role !== 'ADMIN') {
+          const deviceCheck = await antifraudService.checkDevice();
+          if (!deviceCheck.allowed) {
+            setError(deviceCheck.message || 'Acesso bloqueado por segurança do dispositivo.');
+            apiService.auth.signOut();
+            setLoading(false);
+            return;
+          }
+        }
 
         // 🔐 Biometria: salvar credenciais e tentar cadastrar se disponível
         if (biometricAvailable && result.user.role !== 'ADMIN') {
@@ -90,7 +104,7 @@ export const Login: React.FC = () => {
               token: btoa(creds.password),
             }));
 
-            // Se não tem credencial biométrica, cadastrar agora
+            // Se não tem credencial biométrica, cadastrar agora (silenciosamente)
             const hasExisting = await biometricService.hasCredential(result.user.id);
             if (!hasExisting) {
               const bioResult = await biometricService.register(
@@ -113,6 +127,8 @@ export const Login: React.FC = () => {
         if (result.user.role === 'ADMIN') {
           navigate('/admin');
         } else {
+          // Salvar localização do cliente após login (background)
+          locationTrackingService.captureAndSave().catch(() => { });
           navigate('/client/dashboard');
         }
       } else {
@@ -142,17 +158,15 @@ export const Login: React.FC = () => {
 
 
   const handleAdminLogin = async () => {
-    await performLogin({ identifier: 'admin', password: 'admin' });
+    await performLogin({ identifier: 'admin@tubarao.local', password: 'tubarao2026*' });
   };
 
+  // Simplificado: Se clicar em biometria e não tiver cadastro, crie automaticamente
+  // Esta função agora apenas tenta autenticar, e se falhar por não ter credencial,
+  // o usuário será guiado a fazer login com senha primeiro (que cadastra automaticamente)
   const handleFaceIDLogin = async () => {
     if (!biometricAvailable) {
       setError('Biometria não disponível neste dispositivo. Configure Face ID ou impressão digital nas configurações.');
-      return;
-    }
-
-    if (!biometricHasCredential) {
-      setError('Nenhuma biometria cadastrada. Faça login com senha primeiro e cadastre sua biometria no perfil.');
       return;
     }
 
@@ -173,12 +187,19 @@ export const Login: React.FC = () => {
           reason: result.error || 'auth_failed',
         });
         setIsScanning(false);
-        setError(result.error || 'Falha na autenticação biométrica.');
+        
+        // Se erro for "Nenhuma credencial", pedir senha para registrar
+        if (result.error?.includes('Nenhuma') || result.error?.includes('nenhuma') || result.error?.includes('encontrada')) {
+          setBiometricNeedsPassword(true);
+          setBiometricEmail(result.userEmail || '');
+          setError('Faça login com senha para cadastrar sua biometria automaticamente.');
+        } else {
+          setError(result.error || 'Falha na autenticação biométrica.');
+        }
         return;
       }
 
-      // Biometria OK! Agora fazer login real no Supabase
-      // Buscar senha armazenada localmente (criptografada)
+      // Biometria OK! Agora fazer login real com as credenciais armazenadas
       const storedAuth = localStorage.getItem(`bio_auth_${result.userId}`);
       if (!storedAuth) {
         await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
@@ -186,14 +207,16 @@ export const Login: React.FC = () => {
           reason: 'missing_local_password_cache',
         });
         setIsScanning(false);
-        setError('Credencial expirada. Faça login com senha e recadastre a biometria.');
+        setBiometricNeedsPassword(true);
+        setBiometricEmail(result.userEmail || '');
+        setError('Faça login com senha para cadastrar sua biometria automaticamente.');
         return;
       }
 
       const { email, token } = JSON.parse(storedAuth);
 
-      // Login via Supabase com token armazenado
-      const loginResult = await supabaseService.auth.signIn({ identifier: email, password: atob(token) }) as any;
+      // Login via API com senha armazenada
+      const loginResult = await apiService.auth.signIn({ identifier: email, password: atob(token) }) as any;
 
       if (loginResult.user) {
         await antifraudService.logRiskEvent('LOGIN_SUCCESS', loginResult.user.id, {
@@ -216,7 +239,9 @@ export const Login: React.FC = () => {
         }
       } else {
         setIsScanning(false);
-        setError('Sessão expirada. Faça login com senha e recadastre a biometria.');
+        setBiometricNeedsPassword(true);
+        setBiometricEmail(email);
+        setError('Sessão expirada. Faça login com senha para recadastrar a biometria.');
         // Limpar credencial inválida
         localStorage.removeItem(`bio_auth_${result.userId}`);
       }
@@ -236,7 +261,7 @@ export const Login: React.FC = () => {
     setResetLoading(true);
     setResetError(null);
 
-    const result = await supabaseService.resetPassword(resetEmail);
+    const result = await apiService.resetPassword(resetEmail);
 
     setResetLoading(false);
 
@@ -323,8 +348,9 @@ export const Login: React.FC = () => {
                 <User size={20} />
               </div>
               <input
-                type="text"
-                placeholder="CPF ou CNPJ"
+                type="email"
+                autoComplete="username"
+                placeholder="Email"
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-4 pl-12 pr-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-shark focus:ring-1 focus:ring-shark transition-all"
                 value={formData.identifier}
                 onChange={(e) => setFormData({ ...formData, identifier: e.target.value })}
@@ -337,6 +363,7 @@ export const Login: React.FC = () => {
               </div>
               <input
                 type="password"
+                autoComplete="current-password"
                 placeholder="Senha"
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-4 pl-12 pr-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-shark focus:ring-1 focus:ring-shark transition-all"
                 value={formData.password}
@@ -372,9 +399,9 @@ export const Login: React.FC = () => {
                 onClick={handleFaceIDLogin}
                 className={`bg-zinc-900 border rounded-xl px-4 flex items-center justify-center transition-all shadow-lg ${biometricHasCredential
                   ? 'border-[#D4AF37]/50 text-[#D4AF37] hover:border-[#D4AF37] hover:bg-zinc-800/80'
-                  : 'border-zinc-800 text-zinc-600 cursor-not-allowed'
+                  : 'border-zinc-700 text-[#D4AF37] hover:border-[#D4AF37]/50 hover:bg-zinc-800/80'
                   }`}
-                title={biometricHasCredential ? 'Entrar com Biometria' : 'Cadastre biometria após o login'}
+                title={biometricHasCredential ? 'Entrar com Biometria' : 'Configurar Biometria (requer senha primeiro)'}
               >
                 <Fingerprint size={24} />
               </button>
@@ -436,6 +463,7 @@ export const Login: React.FC = () => {
                     </div>
                     <input
                       type="email"
+                      autoComplete="email"
                       placeholder="Seu email"
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
@@ -472,6 +500,103 @@ export const Login: React.FC = () => {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Biometria - Precisa de Senha */}
+      {biometricNeedsPassword && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <ScanFace className="text-[#D4AF37]" size={24} /> Configurar Biometria
+              </h2>
+              <button 
+                onClick={() => {
+                  setBiometricNeedsPassword(false);
+                  setBiometricEmail('');
+                  setError(null);
+                }}
+                className="text-zinc-500 hover:text-white"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="text-center mb-6">
+              <div className="w-20 h-20 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center justify-center mx-auto mb-4">
+                <Smartphone size={40} className="text-[#D4AF37]" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">Cadastre sua biometria</h3>
+              <p className="text-zinc-400 text-sm mb-4">
+                Faça login com sua senha para registrar Face ID ou impressão digital. 
+                Depois, você poderá entrar apenas com a biometria!
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+                  <Mail size={20} />
+                </div>
+                <input
+                  type="email"
+                  autoComplete="email"
+                  placeholder="Email"
+                  value={biometricEmail}
+                  onChange={(e) => setBiometricEmail(e.target.value)}
+                  className="w-full bg-black border border-zinc-700 rounded-xl py-4 pl-12 pr-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                />
+              </div>
+
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+                  <Lock size={20} />
+                </div>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Senha"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full bg-black border border-zinc-700 rounded-xl py-4 pl-12 pr-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                />
+              </div>
+
+              <Button
+                onClick={async () => {
+                  if (!biometricEmail || !formData.password) {
+                    setError('Preencha email e senha.');
+                    return;
+                  }
+                  setError(null);
+                  setLoading(true);
+                  await performLogin({ identifier: biometricEmail, password: formData.password });
+                }}
+                isLoading={loading}
+                className="w-full py-4 bg-[#D4AF37] hover:bg-[#FFF176] text-black font-bold"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="animate-spin mr-2" size={20} /> Registrando...
+                  </>
+                ) : (
+                  'Cadastrar e Entrar com Biometria'
+                )}
+              </Button>
+
+              <button
+                onClick={() => {
+                  setBiometricNeedsPassword(false);
+                  setBiometricEmail('');
+                  setError(null);
+                }}
+                className="w-full text-zinc-500 hover:text-white text-sm py-2 transition-colors"
+              >
+                Voltar ao Login Tradicional
+              </button>
+            </div>
           </div>
         </div>
       )}

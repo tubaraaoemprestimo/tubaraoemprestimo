@@ -1,7 +1,7 @@
-
+﻿
 import React, { useState, useEffect } from 'react';
 import { Bot, MessageSquare, Terminal } from 'lucide-react';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { InteractionLog } from '../../types';
 
 export const Interactions: React.FC = () => {
@@ -9,7 +9,7 @@ export const Interactions: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabaseService.getInteractionLogs().then(data => {
+    apiService.getInteractionLogs().then(data => {
       setLogs(data);
       setLoading(false);
     });

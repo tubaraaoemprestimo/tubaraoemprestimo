@@ -1,4 +1,4 @@
-// 🎮 Finance Hub - Pagamentos, Comprovantes e Gamificação Unificados
+﻿// 🎮 Finance Hub - Pagamentos, Comprovantes e Gamificação Unificados
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -8,8 +8,8 @@ import {
     RefreshCw, Gift, Medal, Sparkles, ArrowUpRight, ArrowDownRight, Calculator
 } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabase } from '../../services/supabaseClient';
-import { supabaseService } from '../../services/supabaseService';
+import { api } from '../../services/apiClient';
+import { apiService } from '../../services/apiService';
 import { paymentService, LoanPayment } from '../../services/paymentService';
 import { loanSettingsService } from '../../services/loanSettingsService';
 import { LoanRequest, PaymentReceipt } from '../../types';
@@ -79,32 +79,29 @@ export const FinanceHub: React.FC = () => {
         try {
             const [paymentsData, requestsData] = await Promise.all([
                 paymentService.getAllPayments(),
-                supabaseService.getRequests()
+                apiService.getRequests()
             ]);
             setPayments(paymentsData);
             setRequests(requestsData);
 
-            // Carregar comprovantes
-            const { data: receiptsData } = await supabase
-                .from('payment_receipts')
-                .select('*')
-                .order('submitted_at', { ascending: false });
+            // Carregar comprovantes via API
+            const { data: receiptsData } = await api.get('/finance/receipts');
 
             if (receiptsData) {
-                setReceipts(receiptsData.map(r => ({
+                setReceipts((receiptsData as any[]).map((r: any) => ({
                     id: r.id,
-                    installmentId: r.installment_id,
-                    loanId: r.loan_id,
-                    customerId: r.customer_id,
-                    customerName: r.customer_name,
+                    installmentId: r.installment_id || r.installmentId || '',
+                    loanId: r.loan_id || r.loanId || '',
+                    customerId: r.customer_id || r.customerId || '',
+                    customerName: r.customer_name || r.customerName || '',
                     amount: r.amount,
-                    receiptUrl: r.receipt_url,
-                    receiptType: r.receipt_type,
+                    receiptUrl: r.receipt_url || r.receiptUrl || '',
+                    receiptType: r.receipt_type || r.receiptType || '',
                     status: r.status,
-                    submittedAt: r.submitted_at,
-                    reviewedAt: r.reviewed_at,
-                    reviewedBy: r.reviewed_by,
-                    rejectionReason: r.rejection_reason
+                    submittedAt: r.submitted_at || r.submittedAt || '',
+                    reviewedAt: r.reviewed_at || r.reviewedAt || null,
+                    reviewedBy: r.reviewed_by || r.reviewedBy || null,
+                    rejectionReason: r.rejection_reason || r.rejectionReason || null
                 })));
             }
 
@@ -236,16 +233,7 @@ export const FinanceHub: React.FC = () => {
     const handleApproveReceipt = async (receipt: PaymentReceipt) => {
         setProcessing(receipt.id);
         try {
-            const user = JSON.parse(localStorage.getItem('tubarao_user') || '{}');
-
-            await supabase
-                .from('payment_receipts')
-                .update({
-                    status: 'APPROVED',
-                    reviewed_at: new Date().toISOString(),
-                    reviewed_by: user.id
-                })
-                .eq('id', receipt.id);
+            await api.put(`/finance/receipts/${receipt.id}/approve`, {});
 
             // Criar pagamento automaticamente
             await paymentService.createPayment({
@@ -275,17 +263,9 @@ export const FinanceHub: React.FC = () => {
 
         setProcessing(receipt.id);
         try {
-            const user = JSON.parse(localStorage.getItem('tubarao_user') || '{}');
-
-            await supabase
-                .from('payment_receipts')
-                .update({
-                    status: 'REJECTED',
-                    reviewed_at: new Date().toISOString(),
-                    reviewed_by: user.id,
-                    rejection_reason: rejectionReason
-                })
-                .eq('id', receipt.id);
+            await api.put(`/finance/receipts/${receipt.id}/reject`, {
+                rejectionReason
+            });
 
             addToast('Comprovante rejeitado', 'info');
             setSelectedReceipt(null);

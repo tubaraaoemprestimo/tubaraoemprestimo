@@ -2,7 +2,7 @@
 // Triggers automáticos para enviar notificações ao cliente
 // Integrado com Firebase Push Notifications e WhatsApp
 
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 import { scoreService } from './scoreService';
 import { firebasePushService } from './firebasePushService';
 import { whatsappService } from './whatsappService';
@@ -11,21 +11,29 @@ const APP_LINK = 'https://www.tubaraoemprestimo.com.br/';
 
 // Helper para buscar telefone do cliente pelo email
 async function getCustomerPhone(email: string): Promise<string | null> {
-    const { data } = await supabase
-        .from('customers')
-        .select('phone, name')
-        .eq('email', email)
-        .single();
-    return data?.phone || null;
+    const { data } = await api.get<any>(`/customers?email=${encodeURIComponent(email)}`);
+    const customer = Array.isArray(data) ? data[0] : data;
+    return customer?.phone || null;
+}
+
+// Helper para buscar chave PIX
+async function getPixKey(): Promise<string | null> {
+    try {
+        const { data } = await api.get<any[]>('/settings');
+        if (data && typeof data === 'object' && data.pix_key) {
+            return data.pix_key as string;
+        }
+        return null;
+    } catch (error) {
+        console.error('[AutoNotification] Erro ao buscar chave PIX:', error);
+        return null;
+    }
 }
 
 async function getCustomerData(email: string): Promise<{ phone: string | null; name: string }> {
-    const { data } = await supabase
-        .from('customers')
-        .select('phone, name')
-        .eq('email', email)
-        .single();
-    return { phone: data?.phone || null, name: data?.name || 'Cliente' };
+    const { data } = await api.get<any>(`/customers?email=${encodeURIComponent(email)}`);
+    const customer = Array.isArray(data) ? data[0] : data;
+    return { phone: customer?.phone || null, name: customer?.name || 'Cliente' };
 }
 
 const shouldFallbackLegacy = (error: any): boolean => {
@@ -41,12 +49,12 @@ async function insertScopedNotification(payload: {
     link: string | null;
     for_role: 'CLIENT' | 'ADMIN' | 'ALL';
 }): Promise<boolean> {
-    let { error } = await supabase.from('notifications').insert(payload);
+    let { error } = await api.post('/notifications', payload);
 
     if (error && shouldFallbackLegacy(error)) {
         const legacyPayload: any = { ...payload };
         delete legacyPayload.for_role;
-        const fallback = await supabase.from('notifications').insert(legacyPayload);
+        const fallback = await api.post('/notifications', legacyPayload);
         error = fallback.error;
     }
 
@@ -189,17 +197,17 @@ export const autoNotificationService = {
                 customer.phone,
                 isLimpaNome
                     ? `📝 *SOLICITAÇÃO RECEBIDA!*\n\n` +
-                      `Olá ${customer.name.split(' ')[0]}!\n\n` +
-                      `Recebemos sua solicitação do serviço *Limpa Nome*.\n\n` +
-                      `⏳ Nossa equipe está analisando e em breve você receberá uma resposta.\n\n` +
-                      `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
-                      `_Tubarão Empréstimos 🦈_`
+                    `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                    `Recebemos sua solicitação do serviço *Limpa Nome*.\n\n` +
+                    `⏳ Nossa equipe está analisando e em breve você receberá uma resposta.\n\n` +
+                    `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                    `_Tubarão Empréstimos 🦈_`
                     : `📝 *SOLICITAÇÃO RECEBIDA!*\n\n` +
-                      `Olá ${customer.name.split(' ')[0]}!\n\n` +
-                      `Recebemos sua solicitação de empréstimo no valor de *R$ ${formattedAmount}*.\n\n` +
-                      `⏳ Nossa equipe está analisando e em breve você receberá uma resposta.\n\n` +
-                      `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
-                      `_Tubarão Empréstimos 🦈_`
+                    `Olá ${customer.name.split(' ')[0]}!\n\n` +
+                    `Recebemos sua solicitação de empréstimo no valor de *R$ ${formattedAmount}*.\n\n` +
+                    `⏳ Nossa equipe está analisando e em breve você receberá uma resposta.\n\n` +
+                    `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                    `_Tubarão Empréstimos 🦈_`
             ).catch(console.error);
         }
 
@@ -237,25 +245,39 @@ export const autoNotificationService = {
     onLoanApproved: async (customerEmail: string, amount: number): Promise<void> => {
         const customer = await getCustomerData(customerEmail);
         const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        const pixKey = await getPixKey();
+
+        let notificationMessage = `Parabéns! Seu empréstimo de R$ ${formattedAmount} foi aprovado! O valor será liberado em breve.`;
+        if (pixKey) {
+            notificationMessage += ` Chave PIX para pagamentos: ${pixKey}`;
+        }
 
         await autoNotificationService.createNotification(
             customerEmail,
             'Empréstimo Aprovado! 🎉',
-            `Parabéns! Seu empréstimo de R$ ${formattedAmount} foi aprovado! O valor será liberado em breve.`,
+            notificationMessage,
             'SUCCESS',
             '/client/contracts'
         );
 
         // 📱 Enviar WhatsApp
         if (customer.phone) {
-            whatsappService.sendMessage(
-                customer.phone,
-                `🎉 *EMPRÉSTIMO APROVADO!*\n\n` +
+            let message = `🎉 *EMPRÉSTIMO APROVADO!*\n\n` +
                 `Parabéns ${customer.name.split(' ')[0]}!\n\n` +
                 `Seu empréstimo de *R$ ${formattedAmount}* foi *APROVADO*!\n\n` +
-                `O valor será liberado em até 24 horas após assinatura do contrato.\n\n` +
-                `📱 *Acesse o App para assinar:*\n${APP_LINK}\n\n` +
-                `_Tubarão Empréstimos 🦈_`
+                `O valor será liberado em até 24 horas após assinatura do contrato.\n\n`;
+
+            if (pixKey) {
+                message += `📱 *Chave PIX:* ${pixKey}\n` +
+                    `Use esta chave para pagar suas parcelas.\n\n`;
+            }
+
+            message += `📱 *Acesse o App para assinar:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`;
+
+            whatsappService.sendMessage(
+                customer.phone,
+                message
             ).catch(console.error);
         }
 
@@ -263,7 +285,8 @@ export const autoNotificationService = {
         firebasePushService.sendPush({
             to: customerEmail,
             title: '✅ Empréstimo Aprovado!',
-            body: `Parabéns! Seu empréstimo de R$ ${formattedAmount} foi aprovado!`,
+            body: `Parabéns! Seu empréstimo de R$ ${formattedAmount} foi aprovado!` +
+                (pixKey ? ` Chave PIX: ${pixKey}` : ''),
             link: '/client/contracts'
         }).catch(() => { });
     },
@@ -304,8 +327,13 @@ export const autoNotificationService = {
 
     // Contrato assinado
     onContractSigned: async (customerEmail: string, clientName?: string): Promise<void> => {
+        const pixKey = await getPixKey();
         const title = "Contrato Assinado!";
-        const message = "Seu contrato foi assinado com sucesso. Aguarde a liberação do valor.";
+        let message = "Seu contrato foi assinado com sucesso. Aguarde a liberação do valor.";
+
+        if (pixKey) {
+            message += ` Chave PIX para pagamentos: ${pixKey}`;
+        }
 
         await autoNotificationService.createNotification(customerEmail, title, message, 'SUCCESS');
 
@@ -315,16 +343,18 @@ export const autoNotificationService = {
             if (phone) {
                 let content = `Olá ${name?.split(' ')[0] || clientName?.split(' ')[0]}! Seu contrato foi assinado com sucesso. O valor será liberado em breve.`;
 
+                if (pixKey) {
+                    content += ` 📱 *Chave PIX:* ${pixKey}\nUse esta chave para futuros pagamentos.`;
+                }
+
                 // Tenta buscar template
-                const { data: template } = await supabase
-                    .from('message_templates')
-                    .select('content')
-                    .eq('trigger_event', 'CONTRACT_SIGNED')
-                    .eq('is_active', true)
-                    .single();
+                const { data: templates } = await api.get<any[]>('/settings/templates?trigger_event=CONTRACT_SIGNED&is_active=true');
+                const template = Array.isArray(templates) ? templates[0] : templates;
 
                 if (template) {
-                    content = template.content.replace('{nome}', name?.split(' ')[0] || clientName?.split(' ')[0] || 'Cliente');
+                    content = template.content
+                        .replace('{nome}', name?.split(' ')[0] || clientName?.split(' ')[0] || 'Cliente')
+                        .replace('{pix_key}', pixKey || 'não configurada');
                 } else {
                     content += `\n\n📱 *Acesse:* ${APP_LINK}`;
                 }
@@ -345,11 +375,12 @@ export const autoNotificationService = {
         const customer = await getCustomerData(customerEmail);
         const date = new Date(dueDate).toLocaleDateString('pt-BR');
         const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        const pixKey = await getPixKey();
 
         await autoNotificationService.createNotification(
             customerEmail,
             'Parcela Vencendo',
-            `Sua parcela de R$ ${formattedAmount} vence em ${date}. Evite juros!`,
+            `Sua parcela de R$ ${formattedAmount} vence em ${date}. Evite juros! Chave PIX: ${pixKey || 'não configurada'}`,
             'WARNING',
             '/client/contracts'
         );
@@ -363,14 +394,21 @@ export const autoNotificationService = {
 
         // 📱 Enviar WhatsApp
         if (customer.phone) {
-            whatsappService.sendMessage(
-                customer.phone,
-                `📅 *LEMBRETE DE VENCIMENTO*\n\n` +
+            let message = `📅 *LEMBRETE DE VENCIMENTO*\n\n` +
                 `Olá ${customer.name.split(' ')[0]}!\n\n` +
                 `Sua parcela de *R$ ${formattedAmount}* vence em *${date}*.\n\n` +
-                `💡 Pague em dia e evite juros!\n\n` +
-                `📱 *Acesse o App para pagar:*\n${APP_LINK}\n\n` +
-                `_Tubarão Empréstimos 🦈_`
+                `💡 Pague em dia e evite juros!\n\n`;
+
+            if (pixKey) {
+                message += `📱 *Chave PIX:* ${pixKey}\n\n`;
+            }
+
+            message += `📱 *Acesse o App para pagar:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`;
+
+            whatsappService.sendMessage(
+                customer.phone,
+                message
             ).catch(console.error);
         }
     },
@@ -379,25 +417,33 @@ export const autoNotificationService = {
     onInstallmentDueToday: async (customerEmail: string, amount: number): Promise<void> => {
         const customer = await getCustomerData(customerEmail);
         const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        const pixKey = await getPixKey();
 
         await autoNotificationService.createNotification(
             customerEmail,
             '⚠️ Parcela Vence Hoje!',
-            `Sua parcela de R$ ${formattedAmount} vence HOJE. Pague agora para evitar multa.`,
+            `Sua parcela de R$ ${formattedAmount} vence HOJE. Pague agora para evitar multa. Chave PIX: ${pixKey || 'não configurada'}`,
             'ALERT',
             '/client/contracts'
         );
 
         // 📱 Enviar WhatsApp
         if (customer.phone) {
-            whatsappService.sendMessage(
-                customer.phone,
-                `🔔 *VENCIMENTO HOJE!*\n\n` +
+            let message = `🔔 *VENCIMENTO HOJE!*\n\n` +
                 `Olá ${customer.name.split(' ')[0]}!\n\n` +
                 `Sua parcela de *R$ ${formattedAmount}* vence *HOJE*.\n\n` +
-                `⚡ Pague agora e evite cobranças adicionais!\n\n` +
-                `📱 *Acesse o App para pagar:*\n${APP_LINK}\n\n` +
-                `_Tubarão Empréstimos 🦈_`
+                `⚡ Pague agora e evite cobranças adicionais!\n\n`;
+
+            if (pixKey) {
+                message += `📱 *Chave PIX:* ${pixKey}\n\n`;
+            }
+
+            message += `📱 *Acesse o App para pagar:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`;
+
+            whatsappService.sendMessage(
+                customer.phone,
+                message
             ).catch(console.error);
         }
     },
@@ -406,11 +452,12 @@ export const autoNotificationService = {
     onInstallmentOverdue: async (customerEmail: string, amount: number, daysLate: number): Promise<void> => {
         const customer = await getCustomerData(customerEmail);
         const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        const pixKey = await getPixKey();
 
         await autoNotificationService.createNotification(
             customerEmail,
             '🚨 Parcela em Atraso',
-            `Você possui uma parcela de R$ ${formattedAmount} em atraso há ${daysLate} dia(s). Regularize para evitar juros adicionais.`,
+            `Você possui uma parcela de R$ ${formattedAmount} em atraso há ${daysLate} dia(s). Regularize para evitar juros adicionais. Chave PIX: ${pixKey || 'não configurada'}`,
             'ALERT',
             '/client/contracts'
         );
@@ -424,14 +471,21 @@ export const autoNotificationService = {
 
         // 📱 Enviar WhatsApp
         if (customer.phone) {
-            whatsappService.sendMessage(
-                customer.phone,
-                `⚠️ *PARCELA EM ATRASO*\n\n` +
+            let message = `⚠️ *PARCELA EM ATRASO*\n\n` +
                 `Olá ${customer.name.split(' ')[0]}!\n\n` +
                 `Sua parcela de *R$ ${formattedAmount}* está em atraso há *${daysLate} dia(s)*.\n\n` +
-                `💡 Regularize o quanto antes para evitar juros adicionais.\n\n` +
-                `📱 *Acesse o App para pagar:*\n${APP_LINK}\n\n` +
-                `_Tubarão Empréstimos 🦈_`
+                `💡 Regularize o quanto antes para evitar juros adicionais.\n\n`;
+
+            if (pixKey) {
+                message += `📱 *Chave PIX:* ${pixKey}\n\n`;
+            }
+
+            message += `📱 *Acesse o App para pagar:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`;
+
+            whatsappService.sendMessage(
+                customer.phone,
+                message
             ).catch(console.error);
         }
 
@@ -443,6 +497,7 @@ export const autoNotificationService = {
     onPaymentConfirmed: async (customerEmail: string, amount: number, wasOnTime: boolean, wasEarly: boolean): Promise<void> => {
         const customer = await getCustomerData(customerEmail);
         const formattedAmount = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        const pixKey = await getPixKey();
         let message: string;
 
         if (wasEarly) {
@@ -458,7 +513,7 @@ export const autoNotificationService = {
         await autoNotificationService.createNotification(
             customerEmail,
             'Pagamento Confirmado ✓',
-            message,
+            pixKey ? `${message} Chave PIX: ${pixKey}` : message,
             'SUCCESS',
             '/client/contracts'
         );
@@ -472,14 +527,22 @@ export const autoNotificationService = {
 
         // 📱 Enviar WhatsApp
         if (customer.phone) {
-            whatsappService.sendMessage(
-                customer.phone,
-                `✅ *PAGAMENTO CONFIRMADO!*\n\n` +
+            let whatsappMessage = `✅ *PAGAMENTO CONFIRMADO!*\n\n` +
                 `Olá ${customer.name.split(' ')[0]}!\n\n` +
                 `Recebemos seu pagamento de *R$ ${formattedAmount}*.\n\n` +
-                `${wasEarly ? '🌟 Pagamento antecipado! Seu score aumentou!' : wasOnTime ? '👏 Obrigado por pagar em dia!' : ''}\n\n` +
-                `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
-                `_Tubarão Empréstimos 🦈_`
+                `${wasEarly ? '🌟 Pagamento antecipado! Seu score aumentou!' : wasOnTime ? '👏 Obrigado por pagar em dia!' : ''}\n\n`;
+
+            if (pixKey) {
+                whatsappMessage += `📱 *Chave PIX:* ${pixKey}\n` +
+                    `Use esta chave para futuros pagamentos.\n\n`;
+            }
+
+            whatsappMessage += `📱 *Acesse o App:*\n${APP_LINK}\n\n` +
+                `_Tubarão Empréstimos 🦈_`;
+
+            whatsappService.sendMessage(
+                customer.phone,
+                whatsappMessage
             ).catch(console.error);
         }
     },
@@ -546,12 +609,9 @@ export const autoNotificationService = {
         threeDaysFromNow.setDate(today.getDate() + 3);
 
         // Buscar parcelas que vencem em 3 dias
-        const { data: dueSoon } = await supabase
-            .from('installments')
-            .select('id, due_date, amount, loans(customers(email))')
-            .eq('status', 'OPEN')
-            .gte('due_date', today.toISOString().split('T')[0])
-            .lte('due_date', threeDaysFromNow.toISOString().split('T')[0]);
+        const { data: dueSoon } = await api.get<any[]>(
+            `/installments?status=OPEN&due_date_gte=${today.toISOString().split('T')[0]}&due_date_lte=${threeDaysFromNow.toISOString().split('T')[0]}`
+        );
 
         if (dueSoon) {
             for (const installment of dueSoon) {
@@ -567,11 +627,9 @@ export const autoNotificationService = {
         }
 
         // Buscar parcelas atrasadas
-        const { data: overdue } = await supabase
-            .from('installments')
-            .select('id, due_date, amount, loans(customers(email))')
-            .eq('status', 'OPEN')
-            .lt('due_date', today.toISOString().split('T')[0]);
+        const { data: overdue } = await api.get<any[]>(
+            `/installments?status=OPEN&due_date_lt=${today.toISOString().split('T')[0]}`
+        );
 
         if (overdue) {
             for (const installment of overdue) {
@@ -598,19 +656,15 @@ export const autoNotificationService = {
     // ============================================
 
     /**
-     * Envia uma campanha para todos os clientes via WhatsApp
-     */
-    /**
-     * Dispara automação de CAMPANHA (WhatsApp + Email + Push)
+     * Dispara automação de CAMPANHA (WhatsApp + Email)
+     * Usa o novo endpoint /campaigns/send do backend
      */
     triggerManualCampaign: async (campaignId: string): Promise<{ success: boolean; results?: any; error?: string }> => {
         try {
-            const { data, error } = await supabase.functions.invoke('auto-notifications', {
-                body: { action: 'campaign', campaignId: campaignId }
-            });
+            const { data, error } = await api.post<any>('/campaigns/send', { type: 'campaign', id: campaignId });
 
             if (error) throw error;
-            return { success: true, results: data.results };
+            return { success: true, results: { campaigns: data } };
         } catch (error: any) {
             console.error('[Auto] Campaign error:', error);
             return { success: false, error: error.message || 'Erro ao processar campanha' };
@@ -618,16 +672,15 @@ export const autoNotificationService = {
     },
 
     /**
-     * Dispara automação de CUPOM (WhatsApp + Email + Push)
+     * Dispara automação de CUPOM (WhatsApp + Email)
+     * Usa o novo endpoint /campaigns/send do backend
      */
     triggerManualCoupon: async (couponId: string): Promise<{ success: boolean; results?: any; error?: string }> => {
         try {
-            const { data, error } = await supabase.functions.invoke('auto-notifications', {
-                body: { action: 'coupon', couponId: couponId }
-            });
+            const { data, error } = await api.post<any>('/campaigns/send', { type: 'coupon', id: couponId });
 
             if (error) throw error;
-            return { success: true, results: data.results };
+            return { success: true, results: { coupons: data } };
         } catch (error: any) {
             console.error('[Auto] Coupon error:', error);
             return { success: false, error: error.message || 'Erro ao processar cupom' };
@@ -639,12 +692,10 @@ export const autoNotificationService = {
      */
     triggerManualCollections: async (): Promise<{ success: boolean; results?: any; error?: string }> => {
         try {
-            const { data, error } = await supabase.functions.invoke('auto-notifications', {
-                body: { action: 'collections' }
-            });
+            const { data, error } = await api.post<any>('/collections/dispatch', {});
 
             if (error) throw error;
-            return { success: true, results: data.results };
+            return { success: true, results: data?.results };
         } catch (error: any) {
             console.error('[Auto] Collections error:', error);
             return { success: false, error: error.message || 'Erro ao processar cobranças' };
@@ -656,11 +707,7 @@ export const autoNotificationService = {
      */
     getWhatsAppHistory: async (limit: number = 50) => {
         try {
-            const { data, error } = await supabase
-                .from('notification_logs')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(limit);
+            const { data, error } = await api.get<any[]>(`/notifications/logs?limit=${limit}`);
 
             if (error) throw error;
             return data || [];

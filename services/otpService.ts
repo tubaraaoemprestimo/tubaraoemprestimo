@@ -3,7 +3,7 @@
  * Gera e valida códigos de verificação via WhatsApp/SMS
  */
 
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 import { whatsappService } from './whatsappService';
 
 export interface OTPRequest {
@@ -37,19 +37,11 @@ export const otpService = {
 
         try {
             // Verificar se já existe OTP não expirado para este telefone
-            const { data: existingOtp } = await supabase
-                .from('otp_codes')
-                .select('*')
-                .eq('phone', phone)
-                .eq('verified', false)
-                .gt('expires_at', new Date().toISOString())
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
+            const { data: existingOtp } = await api.get<any>(`/auth/otp/check?phone=${phone}`);
 
             // Se existe OTP recente (menos de 1 minuto), não enviar novo
             if (existingOtp) {
-                const createdAt = new Date(existingOtp.created_at);
+                const createdAt = new Date((existingOtp as any).created_at);
                 const timeDiff = Date.now() - createdAt.getTime();
                 if (timeDiff < 60000) { // 1 minuto
                     return {
@@ -59,8 +51,8 @@ export const otpService = {
                 }
             }
 
-            // Salvar OTP no banco
-            const { error: insertError } = await supabase.from('otp_codes').insert({
+            // Salvar OTP via API
+            const { error: insertError } = await api.post('/auth/otp', {
                 user_id: request.userId,
                 phone,
                 code,
@@ -102,58 +94,23 @@ export const otpService = {
         remainingAttempts?: number;
     }> {
         const phone = validation.phone.replace(/\D/g, '');
-        const MAX_ATTEMPTS = 5;
 
         try {
-            // Buscar OTP válido
-            const { data: otp, error } = await supabase
-                .from('otp_codes')
-                .select('*')
-                .eq('phone', phone)
-                .eq('verified', false)
-                .gt('expires_at', new Date().toISOString())
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
+            const { data, error } = await api.post<any>('/auth/otp/validate', {
+                phone,
+                code: validation.code
+            });
 
-            if (error || !otp) {
+            if (error || !data) {
                 return { valid: false, message: 'Código expirado ou inválido.' };
             }
 
-            // Verificar tentativas
-            if (otp.attempts >= MAX_ATTEMPTS) {
-                return {
-                    valid: false,
-                    message: 'Muitas tentativas. Solicite um novo código.',
-                    remainingAttempts: 0
-                };
-            }
-
-            // Verificar código
-            if (otp.code !== validation.code) {
-                // Incrementar tentativas
-                await supabase
-                    .from('otp_codes')
-                    .update({ attempts: otp.attempts + 1 })
-                    .eq('id', otp.id);
-
-                return {
-                    valid: false,
-                    message: 'Código incorreto.',
-                    remainingAttempts: MAX_ATTEMPTS - otp.attempts - 1
-                };
-            }
-
-            // Código correto - marcar como verificado
-            await supabase
-                .from('otp_codes')
-                .update({
-                    verified: true,
-                    verified_at: new Date().toISOString()
-                })
-                .eq('id', otp.id);
-
-            return { valid: true, message: 'Código validado!' };
+            const result = data as any;
+            return {
+                valid: result.valid || false,
+                message: result.message || 'Erro ao validar código.',
+                remainingAttempts: result.remainingAttempts
+            };
         } catch (e) {
             console.error('Erro ao validar OTP:', e);
             return { valid: false, message: 'Erro ao validar código.' };
@@ -165,27 +122,17 @@ export const otpService = {
      */
     async isPhoneVerified(phone: string, withinHours: number = 24): Promise<boolean> {
         const cleanPhone = phone.replace(/\D/g, '');
-        const since = new Date(Date.now() - withinHours * 60 * 60 * 1000);
 
-        const { data } = await supabase
-            .from('otp_codes')
-            .select('*')
-            .eq('phone', cleanPhone)
-            .eq('verified', true)
-            .gte('verified_at', since.toISOString())
-            .limit(1);
+        const { data } = await api.get<any>(`/auth/otp/verified?phone=${cleanPhone}&hours=${withinHours}`);
 
-        return data && data.length > 0;
+        return (data as any)?.verified || false;
     },
 
     /**
      * Limpa OTPs expirados (pode ser chamado periodicamente)
      */
     async cleanupExpired(): Promise<void> {
-        await supabase
-            .from('otp_codes')
-            .delete()
-            .lt('expires_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        await api.delete('/auth/otp/cleanup');
     },
 };
 

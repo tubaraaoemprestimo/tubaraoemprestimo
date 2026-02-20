@@ -1,9 +1,9 @@
 /**
  * Serviço de Configurações de Empréstimo
- * Busca todas as taxas e configurações do banco via supabaseService
+ * Busca todas as taxas e configurações do banco via apiService
  */
 
-import { supabaseService } from './supabaseService';
+import { apiService } from './apiService';
 import { SystemSettings } from '../types';
 
 export interface LoanSettings {
@@ -37,7 +37,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 export const loanSettingsService = {
     /**
-     * Busca configurações do banco via supabaseService
+     * Busca configurações do banco via apiService
      */
     async getSettings(): Promise<LoanSettings> {
         // Cache
@@ -46,8 +46,8 @@ export const loanSettingsService = {
         }
 
         try {
-            // Buscar settings do supabaseService
-            const dbSettings: SystemSettings = await supabaseService.getSettings();
+            // Buscar settings do apiService
+            const dbSettings: SystemSettings = await apiService.getSettings();
 
             // Taxa mensal vem do banco
             const interestRateMonthly = dbSettings.monthlyInterestRate || 30;
@@ -67,7 +67,7 @@ export const loanSettingsService = {
                 minLoanAmount: 300,
                 maxLoanNoGuarantee: 3000,
                 maxLoanAmount: 10000,
-                defaultInstallments: 4,
+                defaultInstallments: 1,
 
                 // Pacotes
                 loanPackages: [500, 1000, 1500, 2000, 2500, 3000],
@@ -100,7 +100,7 @@ export const loanSettingsService = {
             minLoanAmount: 300,
             maxLoanNoGuarantee: 3000,
             maxLoanAmount: 10000,
-            defaultInstallments: 4,
+            defaultInstallments: 1,
             loanPackages: [500, 1000, 1500, 2000, 2500, 3000],
             releaseTimeHours: 72,
         };

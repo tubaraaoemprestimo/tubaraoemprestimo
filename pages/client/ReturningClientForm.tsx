@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '../../components/Logo';
 import { useToast } from '../../components/Toast';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { api } from '../../services/apiClient';
 import { SystemSettings } from '../../types';
 
@@ -109,7 +109,7 @@ export const ReturningClientForm: React.FC = () => {
     });
 
     useEffect(() => {
-        supabaseService.getSettings().then(setSettings);
+        apiService.getSettings().then(setSettings);
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

@@ -69,11 +69,6 @@ export const LoanTimeline: React.FC<LoanTimelineProps> = ({ status, date, amount
             <span className="text-2xl font-bold text-white">
               R$ {amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </span>
-            {installments && (
-              <span className="text-sm text-zinc-400">
-                em <span className="text-[#D4AF37] font-bold">{installments}x</span>
-              </span>
-            )}
           </div>
         </div>
       )}

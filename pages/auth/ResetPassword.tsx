@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, ArrowRight, ShieldCheck, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabase } from '../../services/supabaseClient';
+import { api } from '../../services/apiClient';
 import { useToast } from '../../components/Toast';
 
 const ResetPassword: React.FC = () => {
@@ -30,7 +30,7 @@ const ResetPassword: React.FC = () => {
             setChecking(true);
 
             // Ouvir evento de PASSWORD_RECOVERY
-            const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            const { data: { subscription } } = api.auth.onAuthStateChange((event, session) => {
                 console.log('[ResetPassword] Auth event:', event);
                 if (event === 'PASSWORD_RECOVERY') {
                     setSessionReady(true);
@@ -43,7 +43,7 @@ const ResetPassword: React.FC = () => {
             });
 
             // Verificar se já tem sessão ativa (caso o evento já tenha disparado)
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await api.auth.getSession();
             if (session) {
                 setSessionReady(true);
             }
@@ -76,7 +76,7 @@ const ResetPassword: React.FC = () => {
         setError('');
 
         try {
-            const { error: updateError } = await supabase.auth.updateUser({
+            const { error: updateError } = await api.auth.updateUser({
                 password: newPassword
             });
 
@@ -90,7 +90,7 @@ const ResetPassword: React.FC = () => {
             addToast('Senha redefinida com sucesso!', 'success');
 
             // Fazer logout para limpar sessão de recovery
-            await supabase.auth.signOut();
+            await api.auth.signOut();
         } catch (err: any) {
             setError('Erro ao redefinir senha. Tente solicitar um novo link.');
         } finally {

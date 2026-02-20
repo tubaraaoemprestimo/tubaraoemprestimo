@@ -1,4 +1,4 @@
-// 📊 Central de Análises - Relatórios, Auditoria, Geolocalização e Open Finance
+﻿// 📊 Central de Análises - Relatórios, Auditoria, Geolocalização e Open Finance
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -9,8 +9,8 @@ import {
     XCircle, AlertTriangle, PieChart, CreditCard, Shield, X
 } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabase } from '../../services/supabaseClient';
-import { supabaseService } from '../../services/supabaseService';
+import { api } from '../../services/apiClient';
+import { apiService } from '../../services/apiService';
 import { auditService } from '../../services/adminService';
 import { geolocationService } from '../../services/geolocationService';
 import { openFinanceService } from '../../services/openFinanceService';
@@ -90,7 +90,7 @@ export const AnalyticsHub: React.FC = () => {
             setAuditLogs(logs);
 
             // Customers
-            const customersData = await supabaseService.getCustomers();
+            const customersData = await apiService.getCustomers();
             setCustomers(customersData);
 
             // Customer locations

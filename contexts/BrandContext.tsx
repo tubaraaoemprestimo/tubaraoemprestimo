@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabaseService } from '../services/supabaseService';
+import { apiService } from '../services/apiService';
 import { BrandSettings } from '../types';
 
 interface BrandContextType {
@@ -34,7 +34,7 @@ export const BrandProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const loadBrand = async () => {
     try {
-      const data = await supabaseService.getBrandSettings();
+      const data = await apiService.getBrandSettings();
       const mergedData = { ...settings, ...data };
       setSettings(mergedData);
       applyTheme(mergedData);
@@ -54,13 +54,13 @@ export const BrandProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateSettings = async (newSettings: BrandSettings) => {
-    await supabaseService.updateBrandSettings(newSettings);
+    await apiService.updateBrandSettings(newSettings);
     setSettings(newSettings);
     applyTheme(newSettings);
   };
 
   const resetSettings = async () => {
-    const defaults = await supabaseService.resetBrandSettings();
+    const defaults = await apiService.resetBrandSettings();
     setSettings(defaults);
     applyTheme(defaults);
   };

@@ -6,7 +6,7 @@ import { X, Clock } from 'lucide-react';
 import { Button } from './Button';
 import { PixQrCode } from './PixQrCode';
 import { PaymentReceiptUpload } from './PaymentReceiptUpload';
-import { supabaseService } from '../services/supabaseService';
+import { apiService } from '../services/apiService';
 
 interface PixModalProps {
   amount: number;
@@ -42,7 +42,7 @@ export const PixModal: React.FC<PixModalProps> = ({
   const loadPixConfig = async () => {
     setLoading(true);
     try {
-      const settings = await supabaseService.getSettings();
+      const settings = await apiService.getSettings();
       setPixConfig({
         pixKey: settings.pixKey || '',
         pixKeyType: settings.pixKeyType || 'ALEATORIA',

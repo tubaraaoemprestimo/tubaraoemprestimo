@@ -1,7 +1,7 @@
 // 🎨 Theme Service - Sistema de Paleta de Cores em Tempo Real
 // Tubarão Empréstimos
 
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 
 export interface ThemeColors {
     primaryColor: string;
@@ -60,27 +60,24 @@ export const themeService = {
     // Carregar tema do banco de dados
     getTheme: async (): Promise<ThemeColors> => {
         try {
-            const { data, error } = await supabase
-                .from('theme_settings')
-                .select('*')
-                .eq('id', THEME_ID)
-                .single();
+            const { data, error } = await api.get<any>(`/settings/theme?id=${THEME_ID}`);
 
             if (error || !data) {
                 console.log('Using default theme');
                 return loadCachedTheme();
             }
 
+            const d = data as any;
             const theme: ThemeColors = {
-                primaryColor: data.primary_color || DEFAULT_THEME.primaryColor,
-                secondaryColor: data.secondary_color || DEFAULT_THEME.secondaryColor,
-                accentColor: data.accent_color || DEFAULT_THEME.accentColor,
-                dangerColor: data.danger_color || DEFAULT_THEME.dangerColor,
-                warningColor: data.warning_color || DEFAULT_THEME.warningColor,
-                successColor: data.success_color || DEFAULT_THEME.successColor,
-                backgroundColor: data.background_color || DEFAULT_THEME.backgroundColor,
-                cardColor: data.card_color || DEFAULT_THEME.cardColor,
-                textColor: data.text_color || DEFAULT_THEME.textColor
+                primaryColor: d.primary_color || d.primaryColor || DEFAULT_THEME.primaryColor,
+                secondaryColor: d.secondary_color || d.secondaryColor || DEFAULT_THEME.secondaryColor,
+                accentColor: d.accent_color || d.accentColor || DEFAULT_THEME.accentColor,
+                dangerColor: d.danger_color || d.dangerColor || DEFAULT_THEME.dangerColor,
+                warningColor: d.warning_color || d.warningColor || DEFAULT_THEME.warningColor,
+                successColor: d.success_color || d.successColor || DEFAULT_THEME.successColor,
+                backgroundColor: d.background_color || d.backgroundColor || DEFAULT_THEME.backgroundColor,
+                cardColor: d.card_color || d.cardColor || DEFAULT_THEME.cardColor,
+                textColor: d.text_color || d.textColor || DEFAULT_THEME.textColor
             };
 
             // Aplicar e cachear
@@ -94,21 +91,19 @@ export const themeService = {
     // Salvar tema (apenas admin)
     saveTheme: async (theme: Partial<ThemeColors>): Promise<boolean> => {
         try {
-            const { error } = await supabase
-                .from('theme_settings')
-                .upsert({
-                    id: THEME_ID,
-                    primary_color: theme.primaryColor,
-                    secondary_color: theme.secondaryColor,
-                    accent_color: theme.accentColor,
-                    danger_color: theme.dangerColor,
-                    warning_color: theme.warningColor,
-                    success_color: theme.successColor,
-                    background_color: theme.backgroundColor,
-                    card_color: theme.cardColor,
-                    text_color: theme.textColor,
-                    updated_at: new Date().toISOString()
-                });
+            const { error } = await api.put('/settings/theme', {
+                id: THEME_ID,
+                primary_color: theme.primaryColor,
+                secondary_color: theme.secondaryColor,
+                accent_color: theme.accentColor,
+                danger_color: theme.dangerColor,
+                warning_color: theme.warningColor,
+                success_color: theme.successColor,
+                background_color: theme.backgroundColor,
+                card_color: theme.cardColor,
+                text_color: theme.textColor,
+                updated_at: new Date().toISOString()
+            });
 
             if (!error) {
                 applyThemeToDOM({ ...DEFAULT_THEME, ...theme });
@@ -135,23 +130,16 @@ export const themeService = {
         await themeService.getTheme();
     },
 
-    // Escutar mudanças em tempo real
+    // Escutar mudanças em tempo real (Polling)
     subscribeToChanges: (callback: (theme: ThemeColors) => void): (() => void) => {
-        const channel = supabase
-            .channel('theme-changes')
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'theme_settings' },
-                async (payload) => {
-                    console.log('Theme changed:', payload);
-                    const theme = await themeService.getTheme();
-                    callback(theme);
-                }
-            )
-            .subscribe();
+        // Poll every 60 seconds as a replacement for Supabase real-time
+        const interval = setInterval(async () => {
+            const theme = await themeService.getTheme();
+            callback(theme);
+        }, 60000);
 
         return () => {
-            supabase.removeChannel(channel);
+            clearInterval(interval);
         };
     }
 };

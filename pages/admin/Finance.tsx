@@ -1,8 +1,8 @@
-// 💰 Financial Dashboard - Fluxo de Caixa, DRE, Ranking
+﻿// 💰 Financial Dashboard - Fluxo de Caixa, DRE, Ranking
 import React, { useState, useEffect } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, BarChart2, PieChart, Users, Calendar, ArrowUpRight, ArrowDownRight, Download, Zap, Loader2 } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell } from 'recharts';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { financialService, scoreService } from '../../services/adminService';
 import { FinancialSummary, Customer, Loan, ClientScore } from '../../types';
 import { Button } from '../../components/Button';
@@ -24,8 +24,8 @@ export const FinancePage: React.FC = () => {
 
     const loadData = async () => {
         const [customersData, loansData] = await Promise.all([
-            supabaseService.getCustomers(),
-            supabaseService.getClientLoans()
+            apiService.getCustomers(),
+            apiService.getClientLoans()
         ]);
         setCustomers(customersData);
         setLoans(loansData);

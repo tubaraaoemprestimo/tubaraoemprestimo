@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Clock3, ExternalLink, Mail, Phone, Search, ShieldCheck, TrendingUp, XCircle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
 import { InvestorStatus } from '../../types';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 
 type InvestorRow = {
   id: string;
@@ -17,6 +17,7 @@ type InvestorRow = {
   city: string;
   state: string;
   zipCode: string;
+  preferredContactTime: string;
   investmentAmount: number;
   investmentTier: string;
   payoutMode: string;
@@ -86,8 +87,8 @@ const digitsOnly = (value: string) => value.replace(/\D/g, '');
 
 const toInvestorRow = (raw: any): InvestorRow => ({
   id: raw.id,
-  fullName: raw.full_name ?? raw.fullName ?? '-',
-  cpfCnpj: raw.cpf_cnpj ?? raw.cpfCnpj ?? '-',
+  fullName: raw.client_name ?? raw.clientName ?? raw.full_name ?? raw.fullName ?? '-',
+  cpfCnpj: raw.cpf ?? raw.cpf_cnpj ?? raw.cpfCnpj ?? '-',
   email: raw.email ?? '-',
   phone: raw.phone ?? '-',
   rgCnh: raw.rg_cnh ?? raw.rgCnh ?? '-',
@@ -96,10 +97,11 @@ const toInvestorRow = (raw: any): InvestorRow => ({
   city: raw.city ?? '-',
   state: raw.state ?? '-',
   zipCode: raw.zip_code ?? raw.zipCode ?? '-',
-  investmentAmount: Number(raw.investment_amount ?? raw.investmentAmount ?? 0),
-  investmentTier: raw.investment_tier ?? raw.investmentTier ?? '-',
-  payoutMode: raw.payout_mode ?? raw.payoutMode ?? '-',
-  monthlyRate: Number(raw.monthly_rate ?? raw.monthlyRate ?? 0),
+  preferredContactTime: raw.preferred_contact_time ?? raw.preferredContactTime ?? '-',
+  investmentAmount: Number(raw.amount ?? raw.investment_amount ?? raw.investmentAmount ?? 0),
+  investmentTier: raw.investment_tier ?? raw.investmentTier ?? 'STANDARD',
+  payoutMode: raw.payout_mode ?? raw.payoutMode ?? 'MONTHLY',
+  monthlyRate: Number(raw.monthly_rate ?? raw.monthlyRate ?? 2.5),
   contractMonths: Number(raw.contract_months ?? raw.contractMonths ?? 12),
   autoRenew: Boolean(raw.auto_renew ?? raw.autoRenew ?? true),
   withdrawalNoticeMonths: Number(raw.withdrawal_notice_months ?? raw.withdrawalNoticeMonths ?? 3),
@@ -137,7 +139,7 @@ export const Investors: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
-    const data = await supabaseService.getInvestorRequests();
+    const data = await apiService.getInvestorRequests();
     setItems((data || []).map(toInvestorRow));
     setLoading(false);
   };
@@ -202,7 +204,7 @@ export const Investors: React.FC = () => {
   const updateStatus = async () => {
     if (!selected) return;
     setSaving(true);
-    const ok = await supabaseService.updateInvestorStatus(selected.id, nextStatus, notes);
+    const ok = await apiService.updateInvestorStatus(selected.id, nextStatus, notes);
     setSaving(false);
 
     if (!ok) {
@@ -384,18 +386,25 @@ export const Investors: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5 text-sm">
-              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 lg:col-span-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5 text-sm">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
                 <p className="text-zinc-400 text-xs mb-1">Dados pessoais</p>
                 <p className="font-semibold text-base">{selected.fullName}</p>
-                <p className="text-zinc-400">CPF/CNPJ: {selected.cpfCnpj}</p>
-                <p className="text-zinc-400">RG/CNH: {selected.rgCnh}</p>
                 <p className="text-zinc-400">Nascimento: {formatDate(selected.birthDate)}</p>
               </div>
               <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
                 <p className="text-zinc-400 text-xs mb-1">Contato</p>
                 <p className="text-zinc-200 flex items-center gap-2"><Mail size={14} /> {selected.email}</p>
                 <p className="text-zinc-200 flex items-center gap-2 mt-1"><Phone size={14} /> {selected.phone}</p>
+                <p className="text-zinc-400 text-xs mt-2">
+                  Melhor horário: {
+                    selected.preferredContactTime === 'manha' ? 'Manhã (08h - 12h)' :
+                    selected.preferredContactTime === 'tarde' ? 'Tarde (12h - 18h)' :
+                    selected.preferredContactTime === 'noite' ? 'Noite (18h - 22h)' :
+                    selected.preferredContactTime === 'qualquer' ? 'Qualquer horário' :
+                    'Não informado'
+                  }
+                </p>
                 <div className="mt-3 flex gap-2">
                   <a href={selectedWhatsApp ? `https://wa.me/55${selectedWhatsApp}` : '#'} target="_blank" rel="noreferrer" className={`text-xs px-2 py-1 rounded border ${selectedWhatsApp ? 'border-green-500/50 text-green-300 hover:bg-green-900/20' : 'border-zinc-700 text-zinc-500 pointer-events-none'}`}>
                     WhatsApp
@@ -407,13 +416,7 @@ export const Investors: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5 text-sm">
-              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
-                <p className="text-zinc-400 text-xs mb-1">Endereço</p>
-                <p>{selected.address}</p>
-                <p className="text-zinc-400">{selected.city} - {selected.state}</p>
-                <p className="text-zinc-400">CEP: {selected.zipCode}</p>
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5 text-sm">
               <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
                 <p className="text-zinc-400 text-xs mb-1">Dados do investimento</p>
                 <p className="font-bold text-[#D4AF37]">{formatCurrency(selected.investmentAmount)}</p>

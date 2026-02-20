@@ -8,7 +8,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { User, Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff, Loader2, Phone } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { useToast } from '../../components/Toast';
 import { UserRole } from '../../types';
 
@@ -21,6 +21,7 @@ const Register: React.FC = () => {
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [referralCode, setReferralCode] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -62,14 +63,22 @@ const Register: React.FC = () => {
         setLoading(true);
         try {
             const cleanPhone = phone.replace(/\D/g, '');
-            const { data, error } = await supabaseService.auth.signUp(email, password, name, UserRole.CLIENT, cleanPhone);
+            const { data, error } = await apiService.auth.signUp({
+                email,
+                password,
+                name,
+                phone: cleanPhone,
+                referralCode
+            });
 
             if (error) {
-                const errMsg = (error as any)?.message || '';
-                if (errMsg.includes('already registered') || errMsg.includes('already exists')) {
+                const errObj = error as any;
+                const errMsg = errObj?.error || errObj?.message || '';
+
+                if (errMsg.includes('already') || errMsg.includes('exists') || errMsg.includes('cadastrado')) {
                     addToast('Este email já está cadastrado. Faça login.', 'error');
                 } else {
-                    addToast(`Erro ao cadastrar: ${errMsg}`, 'error');
+                    addToast(errMsg ? `Erro ao cadastrar: ${errMsg}` : 'Erro ao cadastrar. Tente novamente.', 'error');
                 }
                 return;
             }
@@ -78,7 +87,7 @@ const Register: React.FC = () => {
             addToast('Cadastro realizado com sucesso!', 'success');
 
             try {
-                const loginResult = await supabaseService.auth.signIn({ identifier: email, password }) as any;
+                const loginResult = await apiService.auth.signIn({ identifier: email, password }) as any;
                 if (loginResult.user) {
                     navigate('/client/dashboard');
                     return;
@@ -117,6 +126,7 @@ const Register: React.FC = () => {
                             <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                             <input
                                 type="text"
+                                autoComplete="name"
                                 value={name}
                                 onChange={e => setName(e.target.value)}
                                 placeholder="Seu nome completo"
@@ -132,6 +142,7 @@ const Register: React.FC = () => {
                             <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                             <input
                                 type="email"
+                                autoComplete="email"
                                 value={email}
                                 onChange={e => setEmail(e.target.value)}
                                 placeholder="seuemail@exemplo.com"
@@ -147,6 +158,7 @@ const Register: React.FC = () => {
                             <Phone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                             <input
                                 type="tel"
+                                autoComplete="tel"
                                 value={phone}
                                 onChange={e => setPhone(formatPhone(e.target.value))}
                                 placeholder="(00) 00000-0000"
@@ -163,6 +175,7 @@ const Register: React.FC = () => {
                             <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                             <input
                                 type={showPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                                 placeholder="Mínimo 6 caracteres"
@@ -188,6 +201,7 @@ const Register: React.FC = () => {
                             <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                             <input
                                 type={showPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
                                 value={confirmPassword}
                                 onChange={e => setConfirmPassword(e.target.value)}
                                 placeholder="Repita a senha"
@@ -197,6 +211,23 @@ const Register: React.FC = () => {
                         {confirmPassword.length > 0 && password !== confirmPassword && (
                             <p className="text-red-400 text-xs mt-1">As senhas não conferem</p>
                         )}
+                    </div>
+
+                    {/* Código de Indicação (Opcional) */}
+                    <div>
+                        <label className="block text-sm font-bold text-zinc-400 mb-1">Código de Indicação (Opcional)</label>
+                        <div className="relative">
+                            <ShieldCheck size={18} className="text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="text"
+                                autoComplete="off"
+                                value={referralCode}
+                                onChange={e => setReferralCode(e.target.value.toUpperCase())}
+                                placeholder="Código do amigo que te indicou"
+                                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-600 focus:border-[#D4AF37] outline-none transition-all uppercase"
+                            />
+                        </div>
+                        <p className="text-zinc-600 text-xs mt-1">Insira o código para ganhar benefícios exclusivos.</p>
                     </div>
 
                     {/* Botão Registrar */}

@@ -1,17 +1,20 @@
 // 📍 Location Tracking Service - Rastreamento de Localização em Tempo Real
 // Tubarão Empréstimos
 
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 
 export interface CustomerLocation {
     customerEmail: string;
     customerName?: string;
+    phone?: string;
     latitude: number;
     longitude: number;
     accuracy?: number;
     address?: string;
     city?: string;
     state?: string;
+    deviceInfo?: string;
+    lastIp?: string;
     updatedAt?: string;
 }
 
@@ -83,21 +86,15 @@ export const locationTrackingService = {
                     const geoData = await reverseGeocode(latitude, longitude);
 
                     // Salvar no banco (upsert)
-                    const { error } = await supabase
-                        .from('customer_locations')
-                        .upsert({
-                            customer_email: user.email,
-                            customer_name: user.name,
-                            latitude,
-                            longitude,
-                            accuracy,
-                            address: geoData?.address || null,
-                            city: geoData?.city || null,
-                            state: geoData?.state || null,
-                            updated_at: new Date().toISOString()
-                        }, {
-                            onConflict: 'customer_email'
-                        });
+                    // A rota usa o email do token, então não enviar customer_email no body
+                    const { error } = await api.put('/customers/location', {
+                        latitude,
+                        longitude,
+                        accuracy,
+                        address: geoData?.address || null,
+                        city: geoData?.city || null,
+                        state: geoData?.state || null
+                    });
 
                     if (error) {
                         console.error('Error saving location:', error);
@@ -122,33 +119,29 @@ export const locationTrackingService = {
 
     // Obter todas as localizações (para admin)
     getAllLocations: async (): Promise<CustomerLocation[]> => {
-        const { data, error } = await supabase
-            .from('customer_locations')
-            .select('*')
-            .order('updated_at', { ascending: false });
+        const { data, error } = await api.get<any[]>('/customers/locations');
 
         if (error || !data) return [];
 
         return data.map((loc: any) => ({
             customerEmail: loc.customer_email,
             customerName: loc.customer_name,
+            phone: loc.phone,
             latitude: loc.latitude,
             longitude: loc.longitude,
             accuracy: loc.accuracy,
             address: loc.address,
             city: loc.city,
             state: loc.state,
+            deviceInfo: loc.device_info,
+            lastIp: loc.last_ip,
             updatedAt: loc.updated_at
         }));
     },
 
     // Obter localização de um cliente específico
     getCustomerLocation: async (email: string): Promise<CustomerLocation | null> => {
-        const { data, error } = await supabase
-            .from('customer_locations')
-            .select('*')
-            .eq('customer_email', email)
-            .single();
+        const { data, error } = await api.get<any>(`/customers/locations/${encodeURIComponent(email)}`);
 
         if (error || !data) return null;
 

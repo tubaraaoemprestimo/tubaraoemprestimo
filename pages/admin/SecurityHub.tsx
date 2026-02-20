@@ -1,4 +1,4 @@
-// 🛡️ Central de Segurança - Antifraude, Blacklist e Acessos Unificados
+﻿// 🛡️ Central de Segurança - Antifraude, Blacklist e Acessos Unificados
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -8,8 +8,8 @@ import {
     Globe, Fingerprint, User, Key, X, Save, Edit2, Phone, Mail
 } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabase } from '../../services/supabaseClient';
-import { supabaseService } from '../../services/supabaseService';
+import { api } from '../../services/apiClient';
+import { apiService } from '../../services/apiService';
 import { blacklistService } from '../../services/adminService';
 import { useToast } from '../../components/Toast';
 import { BlacklistEntry, UserAccess, UserRole } from '../../types';
@@ -60,6 +60,8 @@ export const SecurityHub: React.FC = () => {
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<Partial<UserAccess> | null>(null);
     const [newPassword, setNewPassword] = useState('');
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [selectedUserForPassword, setSelectedUserForPassword] = useState<UserAccess | null>(null);
 
     // Search
     const [searchTerm, setSearchTerm] = useState('');
@@ -79,12 +81,8 @@ export const SecurityHub: React.FC = () => {
     const loadAllData = async () => {
         setLoading(true);
         try {
-            // Risk logs
-            const { data: logsData } = await supabase
-                .from('risk_logs')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(100);
+            // Risk logs via API
+            const { data: logsData } = await api.get('/finance/risk-logs');
             if (logsData) setRiskLogs(logsData);
 
             // Blacklist
@@ -92,43 +90,20 @@ export const SecurityHub: React.FC = () => {
             setBlacklist(blacklistData);
 
             // Users
-            const usersData = await supabaseService.getUsers();
+            const usersData = await apiService.getUsers();
             setUsers(usersData);
 
-            // Mapa de biometria por usuário (WebAuthn)
-            const { data: biometricRows } = await supabase
-                .from('webauthn_credentials')
-                .select('user_id');
+            // Mapa de biometria por usuário (WebAuthn) via API
+            const { data: biometricMap } = await api.get('/finance/biometrics');
+            setBiometricCountByUser(biometricMap || {});
 
-            const biometricMap: Record<string, number> = {};
-            (biometricRows || []).forEach((row: any) => {
-                const uid = row.user_id as string;
-                biometricMap[uid] = (biometricMap[uid] || 0) + 1;
-            });
-            setBiometricCountByUser(biometricMap);
+            // Mapa de customers por email via API
+            const { data: customersMap } = await api.get('/finance/customers-map');
+            setCustomerByEmail(customersMap || {});
 
-            const { data: customersData } = await supabase
-                .from('customers')
-                .select('email');
-
-            const customersMap: Record<string, boolean> = {};
-            (customersData || []).forEach((row: any) => {
-                const email = String(row.email || '').toLowerCase();
-                if (email) customersMap[email] = true;
-            });
-            setCustomerByEmail(customersMap);
-
-            const { data: requestsData } = await supabase
-                .from('loan_requests')
-                .select('email');
-
-            const requestsMap: Record<string, number> = {};
-            (requestsData || []).forEach((row: any) => {
-                const email = String(row.email || '').toLowerCase();
-                if (!email) return;
-                requestsMap[email] = (requestsMap[email] || 0) + 1;
-            });
-            setRequestCountByEmail(requestsMap);
+            // Mapa de requests por email via API
+            const { data: requestsMap } = await api.get('/finance/requests-map');
+            setRequestCountByEmail(requestsMap || {});
         } catch (error) {
             console.error('Error loading data:', error);
         }
@@ -210,7 +185,7 @@ export const SecurityHub: React.FC = () => {
         }
 
         if (editingUser.id) {
-            const updated = await supabaseService.updateUser(editingUser.id, {
+            const updated = await apiService.updateUser(editingUser.id, {
                 name: editingUser.name,
                 role: editingUser.role as UserRole,
             });
@@ -232,7 +207,7 @@ export const SecurityHub: React.FC = () => {
             return;
         }
 
-        const created = await supabaseService.createUser({
+        const created = await apiService.createUser({
             email: editingUser.email,
             name: editingUser.name,
             role: editingUser.role || UserRole.CLIENT,
@@ -253,41 +228,41 @@ export const SecurityHub: React.FC = () => {
     const handleResetUserBiometrics = async (userId: string) => {
         if (!confirm('Remover todas as credenciais biométricas deste usuário? Ele terá que cadastrar novamente no próximo acesso.')) return;
 
-        const { error } = await supabase
-            .from('webauthn_credentials')
-            .delete()
-            .eq('user_id', userId);
-
-        if (error) {
+        try {
+            const { error } = await api.delete(`/finance/biometrics/${userId}`);
+            if (error) {
+                addToast('Erro ao resetar biometria do usuário', 'error');
+                return;
+            }
+            addToast('Biometria resetada. Novo cadastro será exigido no próximo login.', 'success');
+            loadAllData();
+        } catch {
             addToast('Erro ao resetar biometria do usuário', 'error');
-            return;
         }
-
-        await supabase
-            .from('risk_logs')
-            .insert({
-                user_id: userId,
-                session_id: `admin_${Date.now()}`,
-                ip: 'admin-panel',
-                user_agent: navigator.userAgent,
-                platform: navigator.platform || 'web',
-                screen_resolution: `${window.screen.width}x${window.screen.height}`,
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                action: 'BIOMETRIC_ADMIN_RESET',
-                risk_score: 0,
-                risk_factors: ['RESET_BY_ADMIN'],
-                additional_data: { source: 'SECURITY_HUB' },
-            });
-
-        addToast('Biometria resetada. Novo cadastro será exigido no próximo login.', 'success');
-        loadAllData();
     };
 
     const handleDeleteUser = async (id: string) => {
         if (!confirm('Excluir usuário?')) return;
-        await supabaseService.deleteUser(id);
+        await apiService.deleteUser(id);
         addToast('Usuário excluído', 'success');
         loadAllData();
+    };
+
+    const handleResetPasswordSubmit = async () => {
+        if (!newPassword || !selectedUserForPassword) {
+            addToast('Informe a nova senha', 'warning');
+            return;
+        }
+
+        try {
+            await apiService.resetUserPassword(selectedUserForPassword.id, newPassword);
+            addToast('Senha alterada com sucesso!', 'success');
+            setIsPasswordModalOpen(false);
+            setSelectedUserForPassword(null);
+            setNewPassword('');
+        } catch (error) {
+            addToast('Erro ao resetar senha', 'error');
+        }
     };
 
     const getRoleColor = (role: UserRole) => {
@@ -510,8 +485,16 @@ export const SecurityHub: React.FC = () => {
                                         <button
                                             onClick={() => { setEditingUser(user); setIsUserModalOpen(true); }}
                                             className="p-2 bg-zinc-800 rounded hover:bg-zinc-700"
+                                            title="Editar"
                                         >
                                             <Edit2 size={14} />
+                                        </button>
+                                        <button
+                                            onClick={() => { setSelectedUserForPassword(user); setNewPassword(''); setIsPasswordModalOpen(true); }}
+                                            className="p-2 bg-zinc-800 rounded hover:bg-zinc-700 text-yellow-400"
+                                            title="Redefinir Senha"
+                                        >
+                                            <Key size={14} />
                                         </button>
                                         <button
                                             onClick={() => handleDeleteUser(user.id)}
@@ -995,6 +978,37 @@ export const SecurityHub: React.FC = () => {
                                     {selectedLog.user_agent}
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Password Reset Modal */}
+            {isPasswordModalOpen && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md">
+                        <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Key className="text-yellow-400" /> Redefinir Senha
+                            </h3>
+                            <button onClick={() => setIsPasswordModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-zinc-400 text-sm">
+                                Definindo nova senha para <strong>{selectedUserForPassword?.name}</strong>
+                            </p>
+                            <div>
+                                <label className="block text-sm text-zinc-400 mb-1">Nova Senha</label>
+                                <input
+                                    type="text"
+                                    value={newPassword}
+                                    onChange={e => setNewPassword(e.target.value)}
+                                    placeholder="Digite a nova senha"
+                                    className={inputStyle}
+                                />
+                            </div>
+                            <Button onClick={handleResetPasswordSubmit} className="w-full">
+                                <Save size={18} /> Salvar Nova Senha
+                            </Button>
                         </div>
                     </div>
                 </div>

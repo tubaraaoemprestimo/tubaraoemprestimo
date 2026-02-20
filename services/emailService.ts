@@ -1,9 +1,9 @@
 /**
  * Serviço de Email - Sistema Completo de Notificações
- * Templates e envio de emails via Edge Function (Resend API)
+ * Templates e envio de emails via API REST
  */
 
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 
 export interface EmailData {
   to: string;
@@ -60,9 +60,29 @@ const emailTemplates = {
   // ==========================================
   // ADMIN: Nova Solicitação
   // ==========================================
-  adminNewRequest: (data: LoanEmailData) => ({
-    subject: `🔔 Nova Solicitação - ${data.clientName} - R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-    html: `
+  adminNewRequest: (data: LoanEmailData) => {
+    const isMoto = data.profileType === 'MOTO';
+    const isLimpaNome = data.profileType === 'LIMPA_NOME';
+    const isInvestidor = data.profileType === 'INVESTIDOR';
+    const profileLabels: Record<string, string> = {
+      CLT: 'Empréstimo Pessoal (CLT)',
+      AUTONOMO: 'Capital de Giro (Comércio)',
+      MOTO: 'Financiamento de Motocicleta',
+      GARANTIA: 'Empréstimo com Garantia',
+      LIMPA_NOME: 'Serviço Limpa Nome',
+      INVESTIDOR: 'Cadastro de Investidor',
+    };
+    const typeLabel = profileLabels[data.profileType || ''] || 'Empréstimo';
+    const subjectLabel = isLimpaNome
+      ? `🔔 Nova Solicitação - ${data.clientName} - Serviço Limpa Nome`
+      : isInvestidor
+        ? `🔔 Nova Solicitação - ${data.clientName} - Investidor`
+        : isMoto
+          ? `🔔 Nova Solicitação - ${data.clientName} - Financiamento Moto`
+          : `🔔 Nova Solicitação - ${data.clientName} - R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    return {
+      subject: subjectLabel,
+      html: `
       <!DOCTYPE html>
       <html>
       <head><style>${baseStyles}</style></head>
@@ -82,9 +102,33 @@ const emailTemplates = {
               <div class="value">${data.clientEmail}</div>
             </div>
             <div class="info-box">
+              <div class="label">Tipo</div>
+              <div class="value">${typeLabel}</div>
+            </div>
+            ${isLimpaNome ? `
+            <div class="info-box" style="border-left-color: #7C3AED;">
+              <div class="label">Serviço</div>
+              <div class="value" style="color: #7C3AED;">Contestação Administrativa de Negativação</div>
+              <p style="color: #888; font-size: 13px; margin-top: 5px;">Limpa Nome - Contrato assinado digitalmente</p>
+            </div>
+            ` : isInvestidor ? `
+            <div class="info-box" style="border-left-color: #06B6D4;">
+              <div class="label">Investimento</div>
+              <div class="value" style="color: #06B6D4;">R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+              <p style="color: #888; font-size: 13px; margin-top: 5px;">Novo investidor cadastrado</p>
+            </div>
+            ` : isMoto ? `
+            <div class="info-box">
+              <div class="label">Produto</div>
+              <div class="value highlight">Honda Pop 110i 2026</div>
+              <p style="color: #888; font-size: 13px; margin-top: 5px;">Entrada: R$ 2.000,00 | 36x R$ 611,00 + Seguro R$ 150,00/mês</p>
+            </div>
+            ` : `
+            <div class="info-box">
               <div class="label">Valor Solicitado</div>
               <div class="value highlight">R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
+            `}
 
             <div style="text-align: center;">
               <a href="https://tubaraoemprestimo.com.br/#/admin/requests" class="button">Ver Solicitação</a>
@@ -97,14 +141,30 @@ const emailTemplates = {
       </body>
       </html>
     `,
-  }),
+    };
+  },
 
   // ==========================================
   // CLIENTE: Solicitação Recebida
   // ==========================================
-  clientRequestReceived: (data: LoanEmailData) => ({
-    subject: `✅ Recebemos sua Solicitação - Tubarão Empréstimos`,
-    html: `
+  clientRequestReceived: (data: LoanEmailData) => {
+    const isMoto = data.profileType === 'MOTO';
+    const isLimpaNome = data.profileType === 'LIMPA_NOME';
+    const isInvestidor = data.profileType === 'INVESTIDOR';
+    const profileLabels: Record<string, string> = {
+      CLT: 'empréstimo pessoal',
+      AUTONOMO: 'capital de giro',
+      MOTO: 'financiamento de motocicleta',
+      GARANTIA: 'empréstimo com garantia',
+      LIMPA_NOME: 'serviço Limpa Nome',
+      INVESTIDOR: 'cadastro como investidor',
+    };
+    const typeLabel = profileLabels[data.profileType || ''] || 'empréstimo';
+    return {
+      subject: isMoto
+        ? `✅ Recebemos sua Solicitação de Financiamento - Tubarão Empréstimos`
+        : `✅ Recebemos sua Solicitação - Tubarão Empréstimos`,
+      html: `
       <!DOCTYPE html>
       <html>
       <head><style>${baseStyles}</style></head>
@@ -115,19 +175,38 @@ const emailTemplates = {
           </div>
           <div class="content">
             <h2>Olá, ${data.clientName}! 👋</h2>
-            <p>Recebemos sua solicitação de empréstimo e ela está em análise.</p>
-            
+            <p>Recebemos sua solicitação de ${typeLabel} e ela está em análise.</p>
+
+            ${isLimpaNome ? `
+            <div class="info-box" style="border-left-color: #7C3AED;">
+              <div class="label">Serviço Solicitado</div>
+              <div class="value" style="color: #7C3AED;">Limpa Nome</div>
+              <p style="color: #888; font-size: 13px; margin-top: 5px;">Contestação administrativa de negativação</p>
+            </div>
+            ` : isInvestidor ? `
+            <div class="info-box" style="border-left-color: #06B6D4;">
+              <div class="label">Investimento</div>
+              <div class="value" style="color: #06B6D4;">R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+            </div>
+            ` : isMoto ? `
+            <div class="info-box">
+              <div class="label">Financiamento</div>
+              <div class="value highlight">Honda Pop 110i 2026</div>
+              <p style="color: #888; font-size: 13px; margin-top: 5px;">Entrada: R$ 2.000,00 | 36x R$ 611,00 + Seguro R$ 150,00/mês</p>
+            </div>
+            ` : `
             <div class="info-box">
               <div class="label">Valor Solicitado</div>
               <div class="value highlight">R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
-            
+            `}
 
-            
+
+
             <div style="text-align: center; margin: 25px 0;">
               <span class="badge badge-info">⏳ EM ANÁLISE</span>
             </div>
-            
+
             <h3>Próximos Passos:</h3>
             <div class="steps">
               <div class="step">
@@ -140,7 +219,7 @@ const emailTemplates = {
               </div>
               <div class="step">
                 <div class="step-number">3</div>
-                <span>Se aprovado, o valor será depositado via PIX</span>
+                <span>${data.profileType === 'MOTO' ? 'Se aprovado, entraremos em contato para entrega da moto' : 'Se aprovado, o valor será depositado via PIX'}</span>
               </div>
             </div>
           </div>
@@ -152,7 +231,8 @@ const emailTemplates = {
       </body>
       </html>
     `,
-  }),
+    };
+  },
 
   // ==========================================
   // CLIENTE: Empréstimo APROVADO
@@ -172,17 +252,17 @@ const emailTemplates = {
             <div style="text-align: center;">
               <span class="badge badge-success" style="font-size: 24px; padding: 15px 40px;">✅ APROVADO!</span>
             </div>
-            
+
             <h2 style="text-align: center; margin-top: 20px;">Parabéns, ${data.clientName}!</h2>
             <p style="text-align: center;">Seu empréstimo foi aprovado e será depositado em breve.</p>
-            
+
             <div class="info-box" style="border-left-color: #28A745;">
               <div class="label">Valor Aprovado</div>
               <div class="value success">R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
-            
 
-            
+
+
             <div style="background: #D4EDDA; padding: 20px; border-radius: 12px; margin: 20px 0; text-align: center;">
               <strong>⏱️ Prazo de Liberação:</strong><br>
               O valor será depositado via PIX em até 72 horas.
@@ -216,22 +296,22 @@ const emailTemplates = {
           </div>
           <div class="content">
             <h2>Olá, ${data.clientName}</h2>
-            
+
             <div style="text-align: center; margin: 25px 0;">
               <span class="badge badge-danger">Solicitação Não Aprovada</span>
             </div>
-            
+
             <p>Infelizmente, não foi possível aprovar sua solicitação de empréstimo neste momento.</p>
-            
+
             ${data.message ? `
             <div class="info-box" style="border-left-color: #DC3545;">
               <strong>Motivo:</strong>
               <p>${data.message}</p>
             </div>
             ` : ''}
-            
+
             <p>Você pode fazer uma nova solicitação após 30 dias.</p>
-            
+
             <div style="text-align: center;">
               <a href="https://tubaraoemprestimo.com.br" class="button">Tentar Novamente</a>
             </div>
@@ -262,24 +342,24 @@ const emailTemplates = {
           </div>
           <div class="content">
             <h2>Olá, ${data.clientName}! 👋</h2>
-            
+
             <div style="text-align: center; margin: 25px 0;">
               <span class="badge badge-warning">📄 Documentos Pendentes</span>
             </div>
-            
+
             <p>Precisamos de documentos adicionais para prosseguir com sua solicitação de <strong>R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>.</p>
-            
+
             ${data.message ? `
             <div class="info-box" style="border-left-color: #FFC107; background: #FFF3CD;">
               <strong>📋 Documentos Solicitados:</strong>
               <p style="white-space: pre-line;">${data.message}</p>
             </div>
             ` : ''}
-            
+
             <div style="text-align: center;">
               <a href="https://tubaraoemprestimo.com.br/#/client/dashboard" class="button">Enviar Documentos</a>
             </div>
-            
+
             <p style="text-align: center; margin-top: 20px; color: #856404;">
               ⚠️ Envie os documentos o mais rápido possível para agilizar a análise.
             </p>
@@ -310,28 +390,28 @@ const emailTemplates = {
           </div>
           <div class="content">
             <h2>Olá, ${data.clientName}! 👋</h2>
-            
+
             <div style="text-align: center; margin: 25px 0;">
               <span class="badge badge-info">⏰ Lembrete de Pagamento</span>
             </div>
-            
+
             <p>Sua parcela está próxima do vencimento. Não esqueça de realizar o pagamento!</p>
-            
+
             <div class="info-box">
               <div class="label">Parcela</div>
               <div class="value">${data.installmentNumber}/${data.totalInstallments}</div>
             </div>
-            
+
             <div class="info-box">
               <div class="label">Valor</div>
               <div class="value highlight">R$ ${data.paymentAmount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
-            
+
             <div class="info-box" style="border-left-color: #17A2B8;">
               <div class="label">Vencimento</div>
               <div class="value">${data.dueDate}</div>
             </div>
-            
+
             <div style="text-align: center;">
               <a href="https://tubaraoemprestimo.com.br/#/client/contracts" class="button">Ver Parcelas</a>
             </div>
@@ -362,32 +442,32 @@ const emailTemplates = {
           </div>
           <div class="content">
             <h2>Olá, ${data.clientName}</h2>
-            
+
             <div style="text-align: center; margin: 25px 0;">
               <span class="badge badge-danger" style="font-size: 18px;">🚨 PARCELA EM ATRASO</span>
             </div>
-            
+
             <p>Identificamos que sua parcela está em atraso. Regularize sua situação o mais rápido possível para evitar juros e multas.</p>
-            
+
             <div class="info-box" style="border-left-color: #DC3545;">
               <div class="label">Parcela</div>
               <div class="value">${data.installmentNumber}/${data.totalInstallments}</div>
             </div>
-            
+
             <div class="info-box" style="border-left-color: #DC3545;">
               <div class="label">Valor (com juros)</div>
               <div class="value danger">R$ ${data.paymentAmount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
-            
+
             <div class="info-box" style="border-left-color: #DC3545;">
               <div class="label">Vencimento Original</div>
               <div class="value">${data.dueDate}</div>
             </div>
-            
+
             <div style="background: #F8D7DA; padding: 20px; border-radius: 12px; margin: 20px 0; text-align: center; color: #721C24;">
               <strong>⚠️ Atenção:</strong> O atraso pode gerar juros diários e afetar seu score de crédito.
             </div>
-            
+
             <div style="text-align: center;">
               <a href="https://tubaraoemprestimo.com.br/#/client/contracts" class="button" style="background: linear-gradient(135deg, #DC3545 0%, #C82333 100%); color: #fff;">Pagar Agora</a>
             </div>
@@ -420,21 +500,21 @@ const emailTemplates = {
             <div style="text-align: center;">
               <span class="badge badge-success" style="font-size: 20px;">✅ Pagamento Confirmado!</span>
             </div>
-            
+
             <h2 style="text-align: center; margin-top: 20px;">Obrigado, ${data.clientName}!</h2>
-            
+
             <p style="text-align: center;">Seu pagamento foi recebido e processado com sucesso.</p>
-            
+
             <div class="info-box" style="border-left-color: #28A745;">
               <div class="label">Parcela Paga</div>
               <div class="value">${data.installmentNumber}/${data.totalInstallments}</div>
             </div>
-            
+
             <div class="info-box" style="border-left-color: #28A745;">
               <div class="label">Valor Pago</div>
               <div class="value success">R$ ${data.paymentAmount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
-            
+
             <div style="background: #D4EDDA; padding: 20px; border-radius: 12px; margin: 20px 0; text-align: center; color: #155724;">
               <strong>🎯 Continue assim!</strong><br>
               Pagando em dia, você mantém seu histórico positivo e garante acesso a melhores condições no futuro.
@@ -468,22 +548,22 @@ const emailTemplates = {
             <div style="text-align: center;">
               <span class="badge badge-success" style="font-size: 24px; padding: 20px 40px;">🎉 QUITADO!</span>
             </div>
-            
+
             <h2 style="text-align: center; margin-top: 20px;">Parabéns, ${data.clientName}!</h2>
-            
+
             <p style="text-align: center; font-size: 18px;">Você quitou seu empréstimo! Todas as parcelas foram pagas.</p>
-            
+
             <div class="info-box" style="border-left-color: #D4AF37; background: linear-gradient(135deg, #FFF8E1 0%, #FFF3CD 100%);">
               <div class="label">Valor Total Pago</div>
               <div class="value highlight">R$ ${data.amount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
-            
+
             <div style="background: #D4EDDA; padding: 25px; border-radius: 12px; margin: 20px 0; text-align: center;">
               <strong style="font-size: 18px;">🌟 Cliente Especial!</strong><br><br>
               Por ser um bom pagador, você tem acesso a condições especiais para novos empréstimos.<br>
               Entre em contato para saber mais!
             </div>
-            
+
             <div style="text-align: center;">
               <a href="https://tubaraoemprestimo.com.br" class="button">Fazer Novo Empréstimo</a>
             </div>
@@ -515,15 +595,15 @@ const emailTemplates = {
           </div>
           <div class="content">
             <h2 style="text-align: center; color: #D4AF37;">${data.campaignTitle}</h2>
-            
+
             <p style="text-align: center; font-size: 16px;">${data.campaignDescription}</p>
-            
+
             <div style="text-align: center; margin: 30px 0;">
               <a href="${data.campaignLink || 'https://tubaraoemprestimo.com.br'}" class="button" style="font-size: 18px; padding: 20px 50px;">
                 Aproveitar Oferta
               </a>
             </div>
-            
+
             <p style="text-align: center; color: #888; font-size: 12px;">
               Oferta por tempo limitado. Condições sujeitas a análise de crédito.
             </p>
@@ -657,22 +737,22 @@ const emailTemplates = {
               <div class="label">Cliente</div>
               <div class="value">${data.clientName}</div>
             </div>
-            
+
             <div class="info-box">
               <div class="label">Email</div>
               <div class="value">${data.clientEmail}</div>
             </div>
-            
+
             <div class="info-box">
               <div class="label">Parcela</div>
               <div class="value">${data.installmentNumber}/${data.totalInstallments}</div>
             </div>
-            
+
             <div class="info-box">
               <div class="label">Valor Recebido</div>
               <div class="value success">R$ ${data.paymentAmount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
-            
+
             <div style="text-align: center;">
               <a href="https://tubaraoemprestimo.com.br/#/admin/dashboard" class="button">Ver Dashboard</a>
             </div>
@@ -706,27 +786,27 @@ const emailTemplates = {
               <div class="label">Cliente</div>
               <div class="value">${data.clientName}</div>
             </div>
-            
+
             <div class="info-box">
               <div class="label">Email</div>
               <div class="value">${data.clientEmail}</div>
             </div>
-            
+
             <div class="info-box">
               <div class="label">Parcela Atrasada</div>
               <div class="value">${data.installmentNumber}/${data.totalInstallments}</div>
             </div>
-            
+
             <div class="info-box">
               <div class="label">Valor Pendente</div>
               <div class="value danger">R$ ${data.paymentAmount?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
             </div>
-            
+
             <div class="info-box">
               <div class="label">Vencimento</div>
               <div class="value">${data.dueDate}</div>
             </div>
-            
+
             <div style="text-align: center;">
               <a href="https://tubaraoemprestimo.com.br/#/admin/customers" class="button" style="background: linear-gradient(135deg, #DC3545 0%, #C82333 100%); color: #fff;">Ver Cliente</a>
             </div>
@@ -744,13 +824,11 @@ const emailTemplates = {
 // Serviço de Email
 export const emailService = {
   /**
-   * Envia email via Edge Function (Resend)
+   * Envia email via API REST
    */
   async sendEmail(data: EmailData): Promise<boolean> {
     try {
-      const { data: result, error } = await supabase.functions.invoke('send-email', {
-        body: data,
-      });
+      const { data: result, error } = await api.post<any>('/email/send', data);
 
       if (error) {
         console.error('Erro ao enviar email:', error);
@@ -758,7 +836,7 @@ export const emailService = {
       }
 
       console.log('Email enviado:', result);
-      return result?.success || false;
+      return (result as any)?.success || false;
     } catch (e) {
       console.error('Erro ao enviar email:', e);
       return false;
@@ -770,12 +848,8 @@ export const emailService = {
    */
   async getAdminEmail(): Promise<string> {
     try {
-      const { data } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'admin_email')
-        .single();
-      return data?.value || 'tubaraao.emprestimo@gmail.com';
+      const { data } = await api.get<any>('/settings?key=admin_email');
+      return (data as any)?.value || 'tubaraao.emprestimo@gmail.com';
     } catch {
       return 'tubaraao.emprestimo@gmail.com';
     }

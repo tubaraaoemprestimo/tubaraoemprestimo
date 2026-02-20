@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ArrowUpRight, ArrowDownLeft, FileText, Download } from 'lucide-react';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { Transaction } from '../../types';
 import { Skeleton } from '../../components/Skeleton';
 import { Button } from '../../components/Button';
@@ -12,7 +12,7 @@ export const Statement: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabaseService.getTransactions().then(data => {
+    apiService.getTransactions().then(data => {
       setTransactions(data);
       setLoading(false);
     });

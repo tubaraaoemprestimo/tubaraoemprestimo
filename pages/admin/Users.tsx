@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { UserPlus, Trash2, Search, Shield, User, Users as UsersIcon, Phone, MapPin, FileText, Edit2, Key, X, Save } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { UserAccess, UserRole } from '../../types';
 import { useToast } from '../../components/Toast';
 
@@ -33,7 +33,7 @@ export const Users: React.FC = () => {
 
   const loadUsers = async () => {
     setLoading(true);
-    const data = await supabaseService.getUsers();
+    const data = await apiService.getUsers();
     setUsers(data);
     setLoading(false);
   };
@@ -51,7 +51,7 @@ export const Users: React.FC = () => {
     }
 
     setCreatingUser(true);
-    const success = await supabaseService.createUser(formData);
+    const success = await apiService.createUser(formData);
     setCreatingUser(false);
 
     if (success) {
@@ -69,7 +69,7 @@ export const Users: React.FC = () => {
 
   const handleDeleteUser = async (id: string) => {
     if (confirm("Tem certeza que deseja remover este usuário?")) {
-      await supabaseService.deleteUser(id);
+      await apiService.deleteUser(id);
       addToast("Usuário removido.", 'info');
       loadUsers();
     }
@@ -107,7 +107,7 @@ export const Users: React.FC = () => {
     if (!editingUser) return;
 
     setUpdatingUser(true);
-    const success = await supabaseService.updateUser(editingUser.id, editFormData);
+    const success = await apiService.updateUser(editingUser.id, editFormData);
     setUpdatingUser(false);
 
     if (success) {
@@ -131,7 +131,7 @@ export const Users: React.FC = () => {
     }
 
     setUpdatingUser(true);
-    const success = await supabaseService.resetUserPassword(editingUser.id, newPassword);
+    const success = await apiService.resetUserPassword(editingUser.id, newPassword);
     setUpdatingUser(false);
 
     if (success) {

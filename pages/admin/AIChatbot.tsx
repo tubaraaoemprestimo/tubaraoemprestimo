@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Bot, Save, MessageSquare, Settings2, Brain, Clock, TestTube, Send, History, User, Trash2, RefreshCw, Search, Phone, Calendar, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { aiChatbotService } from '../../services/aiChatbotService';
 import { useToast } from '../../components/Toast';
-import { supabase } from '../../services/supabaseClient';
+import { api } from '../../services/apiClient';
 
 interface ChatbotConfig {
     id: string;
@@ -171,18 +171,12 @@ export const AIChatbot: React.FC = () => {
     const loadHistory = async () => {
         setHistoryLoading(true);
         try {
-            // Fetch chat history
-            const { data: historyData, error } = await supabase
-                .from('ai_chat_history')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(500);
-
-            if (error) throw error;
+            // Fetch chat history via API
+            const { data: historyData } = await api.get('/chatbot/history-all');
 
             // Group by phone
             const grouped: Record<string, ChatHistoryItem[]> = {};
-            (historyData || []).forEach((item: ChatHistoryItem) => {
+            ((historyData as any[]) || []).forEach((item: ChatHistoryItem) => {
                 if (!grouped[item.phone]) {
                     grouped[item.phone] = [];
                 }
@@ -205,13 +199,14 @@ export const AIChatbot: React.FC = () => {
             setConversations(conversationList);
 
             // Calculate stats
+            const allItems = (historyData as any[]) || [];
             const today = new Date().toDateString();
-            const todayMessages = (historyData || []).filter((m: ChatHistoryItem) =>
+            const todayMessages = allItems.filter((m: ChatHistoryItem) =>
                 new Date(m.created_at).toDateString() === today
             );
 
             setHistoryStats({
-                total: historyData?.length || 0,
+                total: allItems.length,
                 today: todayMessages.length,
                 uniquePhones: Object.keys(grouped).length
             });
@@ -290,15 +285,8 @@ export const AIChatbot: React.FC = () => {
         }
 
         try {
-            let query = supabase.from('ai_chat_history').delete();
-
-            if (phone) {
-                query = query.eq('phone', phone);
-            } else {
-                query = query.neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
-            }
-
-            const { error } = await query;
+            const url = phone ? `/chatbot/history?phone=${encodeURIComponent(phone)}` : '/chatbot/history';
+            const { error } = await api.delete(url);
             if (error) throw error;
 
             addToast('Histórico apagado com sucesso', 'success');

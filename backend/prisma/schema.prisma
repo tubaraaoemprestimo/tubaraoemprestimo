@@ -1,0 +1,822 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:tubarao123@localhost:5432/tubarao_db"
+}
+
+model AiChatHistory {
+  id        String   @id @default(uuid())
+  phone     String
+  role      String
+  content   String
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ai_chat_history")
+}
+
+model AiChatbotConfig {
+  id                String   @id @default(uuid())
+  enabled           Boolean  @default(false)
+  provider          String   @default("gemini")
+  apiKey            String   @default("") @map("api_key")
+  geminiApiKey       String   @default("") @map("gemini_api_key")
+  perplexityApiKey   String   @default("") @map("perplexity_api_key")
+  openaiApiKey      String   @default("") @map("openai_api_key")
+  openrouterApiKey   String   @default("") @map("openrouter_api_key")
+  nvidiaApiKey      String   @default("") @map("nvidia_api_key")
+  zaiApiKey          String   @default("") @map("zai_api_key")
+  anthropicApiKey    String   @default("") @map("anthropic_api_key")
+  groqApiKey         String   @default("") @map("groq_api_key")
+  grokApiKey         String   @default("") @map("grok_api_key")
+  systemPrompt      String   @default("") @map("system_prompt")
+  welcomeMessage    String   @default("") @map("welcome_message")
+  fallbackMessage   String   @default("") @map("fallback_message")
+  autoReplyEnabled  Boolean  @default(true) @map("auto_reply_enabled")
+  workingHoursOnly  Boolean  @default(false) @map("working_hours_only")
+  workingHoursStart String   @default("08:00") @map("working_hours_start")
+  workingHoursEnd   String   @default("18:00") @map("working_hours_end")
+  maxMessagesPerChat Int     @default(50) @map("max_messages_per_chat")
+  transferKeywords  String[] @default(["atendente", "humano", "pessoa"]) @map("transfer_keywords")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_chatbot_config")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  userName  String   @map("user_name")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  details   String?
+  ipAddress String?  @map("ip_address")
+  timestamp DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+model Blacklist {
+  id      String   @id @default(uuid())
+  cpf     String   @unique
+  name    String
+  reason  String
+  addedBy String   @map("added_by")
+  active  Boolean  @default(true)
+  addedAt DateTime @default(now()) @map("added_at")
+
+  @@map("blacklist")
+}
+
+model BrandSettings {
+  id              String   @id @default(uuid())
+  systemName      String   @map("system_name")
+  logoUrl         String?  @map("logo_url")
+  primaryColor    String   @default("#FF0000") @map("primary_color")
+  secondaryColor  String   @default("#D4AF37") @map("secondary_color")
+  backgroundColor String   @default("#000000") @map("background_color")
+  companyName     String   @default("") @map("company_name")
+  cnpj            String   @default("")
+  address         String   @default("")
+  phone           String   @default("")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("brand_settings")
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  imageUrl    String?  @map("image_url")
+  videoUrl    String?  @map("video_url")
+  link        String?
+  startDate   DateTime @map("start_date")
+  endDate     DateTime @map("end_date")
+  frequency   String   @default("ONCE")
+  active      Boolean  @default(true)
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("campaigns")
+}
+
+model CollectionRule {
+  id              String   @id @default(uuid())
+  daysOffset      Int      @map("days_offset")
+  type            String
+  messageTemplate String   @map("message_template")
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("collection_rules")
+}
+
+model ContractSignature {
+  id            String   @id @default(uuid())
+  loanRequestId String   @map("loan_request_id")
+  signatureUrl  String   @map("signature_url")
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  signedAt      DateTime @default(now()) @map("signed_at")
+
+  @@map("contract_signatures")
+}
+
+model Coupon {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  discount      Float
+  description   String
+  imageUrl      String?   @map("image_url")
+  partnerName   String?   @map("partner_name")
+  partnerLogo   String?   @map("partner_logo")
+  usageLimit    Int       @default(100) @map("usage_limit")
+  usageCount    Int       @default(0) @map("usage_count")
+  customerId    String?   @map("customer_id")
+  customerEmail String?   @map("customer_email")
+  expiresAt     DateTime  @map("expires_at")
+  active        Boolean   @default(true)
+  usedAt        DateTime? @map("used_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  customer      Customer? @relation(fields: [customerId], references: [id])
+
+  @@map("coupons")
+}
+
+model Customer {
+  id                  String         @id @default(uuid())
+  userId              String?        @map("user_id")
+  name                String
+  cpf                 String         @unique
+  rg                  String?
+  email               String
+  phone               String
+  status              String         @default("ACTIVE")
+  internalScore       Int            @default(0) @map("internal_score")
+  totalDebt           Float          @default(0) @map("total_debt")
+  activeLoansCount    Int            @default(0) @map("active_loans_count")
+  address             String?
+  neighborhood        String?
+  city                String?
+  state               String?
+  zipCode             String?        @map("zip_code")
+  latitude            Float?
+  longitude           Float?
+  locationUpdatedAt   DateTime?      @map("location_updated_at")
+  deviceInfo          String?        @map("device_info")
+  lastIp              String?        @map("last_ip")
+  monthlyIncome       Float?         @map("monthly_income")
+  preApprovedAmount   Float?         @map("pre_approved_amount")
+  preApprovedAt       DateTime?      @map("pre_approved_at")
+  instagram           String?
+  source              String?        @default("MANUAL")
+  profilePic          String?        @map("profile_pic")
+  birthDate           String?        @map("birth_date")
+  monthlyInterestRate Float?         @map("monthly_interest_rate")
+  lateFixedFee        Float?         @map("late_fixed_fee")
+  lateInterestDaily   Float?         @map("late_interest_daily")
+  lateInterestMonthly Float?         @map("late_interest_monthly")
+  installmentOffer    Json?          @map("installment_offer")
+  referralCode        String?        @unique @map("referral_code")
+  referralPoints      Int            @default(0) @map("referral_points")
+  joinedAt            DateTime       @default(now()) @map("joined_at")
+  partnerId           String?        @map("partner_id") // ID do parceiro que trouxe o cliente
+  isPartnerCustomer   Boolean        @default(false) @map("is_partner_customer") // Indica se o cliente veio de um parceiro
+  partnerCommissionRate Float?       @map("partner_commission_rate") // Taxa de comissão do parceiro
+  contractTermsAccepted Boolean      @default(false) @map("contract_terms_accepted") // Termo de veracidade aceito
+
+  coupons             Coupon[]
+  user                User?          @relation(fields: [userId], references: [id], name: "CustomerUser") // Relacionamento com usuário (agente)
+  partner             User?          @relation(fields: [partnerId], references: [id], name: "CustomerPartner") // Relacionamento com parceiro
+  loanRequests        LoanRequest[]  @relation("LoanRequestCustomer")
+  loans               Loan[]
+  notifications       Notification[]
+  referralsGiven      Referral[]     @relation("ReferrerCustomer")
+  referralsReceived   Referral[]     @relation("ReferredCustomer")
+
+  @@map("customers")
+}
+
+model GoalsSettings {
+  id                      String   @id @default(uuid())
+  monthlyLoanGoal         Float    @default(0) @map("monthly_loan_goal")
+  monthlyClientGoal       Int      @default(0) @map("monthly_client_goal")
+  monthlyApprovalRateGoal Float    @default(0) @map("monthly_approval_rate_goal")
+  projections             Json?
+  expectedGrowthRate      Float    @default(0) @map("expected_growth_rate")
+  goalPeriod              String   @default("") @map("goal_period")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@map("goals_settings")
+}
+
+model Installment {
+  id        String    @id @default(uuid())
+  loanId    String    @map("loan_id")
+  dueDate   DateTime  @map("due_date")
+  amount    Float
+  status    String    @default("OPEN")
+  pixCode   String?   @map("pix_code")
+  proofUrl  String?   @map("proof_url")
+  paidAt    DateTime? @map("paid_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  loan      Loan      @relation(fields: [loanId], references: [id])
+
+  @@map("installments")
+}
+
+model LoanPackage {
+  id              String   @id @default(uuid())
+  name            String
+  minValue        Float    @map("min_value")
+  maxValue        Float    @map("max_value")
+  minInstallments Int      @map("min_installments")
+  maxInstallments Int      @map("max_installments")
+  interestRate    Float    @map("interest_rate")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("loan_packages")
+}
+
+model LoanRequest {
+  id                      String    @id @default(uuid())
+  customerId              String?   @map("customer_id")
+  userId                  String?   @map("user_id")
+  clientName              String    @map("client_name")
+  cpf                     String
+  email                   String
+  phone                   String
+  preferredContactTime    String?   @map("preferred_contact_time")
+  amount                  Float     @default(0)
+  installments            Int       @default(1)
+  status                  String    @default("PENDING")
+  profileType             String?   @map("profile_type")
+  fatherPhone             String?   @map("father_phone")
+  motherPhone             String?   @map("mother_phone")
+  spousePhone             String?   @map("spouse_phone")
+  fatherPhoneRelationship String?   @map("father_phone_relationship")
+  motherPhoneRelationship String?   @map("mother_phone_relationship")
+  spousePhoneRelationship String?   @map("spouse_phone_relationship")
+  address                 String?
+  neighborhood            String?
+  city                    String?
+  state                   String?
+  zipCode                 String?   @map("zip_code")
+  birthDate               String?   @map("birth_date")
+  preferredDueDay         Int?      @map("preferred_due_day")
+  instagram               String?
+  monthlyIncome           Float?    @map("monthly_income")
+  selfieUrl               String?   @map("selfie_url")
+  idCardUrl               String?   @map("id_card_url")
+  idCardBackUrl           String?   @map("id_card_back_url")
+  proofOfAddressUrl       String?   @map("proof_of_address_url")
+  proofIncomeUrl          String?   @map("proof_income_url")
+  vehicleUrl              String?   @map("vehicle_url")
+  videoSelfieUrl          String?   @map("video_selfie_url")
+  videoHouseUrl           String?   @map("video_house_url")
+  videoVehicleUrl         String?   @map("video_vehicle_url")
+  signatureUrl            String?   @map("signature_url")
+  workCardUrl             String?   @map("work_card_url")
+  companyAddress          Json?     @map("company_address")
+  companyProfession       String?   @map("company_profession")
+  companyWorkSince        String?   @map("company_work_since")
+  companyIncome           Float?    @map("company_income")
+  companyPaymentDay       Int?      @map("company_payment_day")
+  companyName             String?   @map("company_name")
+  supplementalDescription String?   @map("supplemental_description")
+  supplementalDocUrl      String?   @map("supplemental_doc_url")
+  supplementalRequestedAt DateTime? @map("supplemental_requested_at")
+  supplementalUploadedAt  DateTime? @map("supplemental_uploaded_at")
+  latitude                Float?
+  longitude               Float?
+  accuracy                Float?
+  contractAccepted        Boolean   @default(false) @map("contract_accepted")
+  contractTermsAccepted   Boolean   @default(false) @map("contract_terms_accepted")
+  declarationAccepted     Boolean   @default(false) @map("declaration_accepted")
+  bankName                String?   @map("bank_name")
+  bankAgency              String?   @map("bank_agency")
+  bankAccount             String?   @map("bank_account")
+  bankAccountType         String?   @map("bank_account_type")
+  pixKey                  String?   @map("pix_key")
+  pixKeyType              String?   @map("pix_key_type")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  contractPdfUrl          String?   @map("contract_pdf_url")
+  referralCode            String?   @map("referral_code")
+  partnerId               String?   @map("partner_id")
+  isPartnerReferral       Boolean   @default(false) @map("is_partner_referral")
+  partnerCommissionRate   Float?    @map("partner_commission_rate")
+  // Campos específicos para INVESTIDOR
+  investmentTier          String?   @map("investment_tier")
+  payoutMode              String?   @map("payout_mode")
+  monthlyRate             Float?    @map("monthly_rate")
+  contractMonths          Int?      @map("contract_months")
+  autoRenew               Boolean   @default(true) @map("auto_renew")
+  withdrawalNoticeMonths  Int?      @map("withdrawal_notice_months")
+  accountHolderName       String?   @map("account_holder_name")
+  // Flags de classificação de contrato
+  isService               Boolean   @default(false) @map("is_service")      // LIMPA_NOME
+  isInvestment            Boolean   @default(false) @map("is_investment")   // INVESTIDOR
+  isLoan                  Boolean   @default(true) @map("is_loan")          // EMPRÉSTIMO (CLT, AUTONOMO, MOTO, GARANTIA)
+
+  customer                Customer? @relation(fields: [customerId], references: [id], name: "LoanRequestCustomer")
+  user                    User?     @relation(fields: [userId], references: [id], name: "LoanRequestUser")
+  partner                 User?     @relation(fields: [partnerId], references: [id], name: "LoanRequestPartner")
+  loan                    Loan?
+  partnerCommissions      PartnerCommission[] @relation("PartnerCommissionLoanRequest")
+
+  @@map("loan_requests")
+}
+
+model Loan {
+  id                      String        @id @default(uuid())
+  customerId              String        @map("customer_id")
+  requestId               String        @unique @map("request_id")
+  amount                  Float
+  installmentsCount       Int           @map("installments_count")
+  remainingAmount         Float         @map("remaining_amount")
+  status                  String        @default("APPROVED")
+  startDate               DateTime      @map("start_date")
+  createdAt               DateTime      @default(now()) @map("created_at")
+  nivelOuroUtilizado      Boolean       @default(false) @map("nivel_ouro_utilizado")
+  dataAtivacaoNivelOuro   DateTime?     @map("data_ativacao_nivel_ouro")
+  // Flags de classificação de contrato
+  isService               Boolean       @default(false) @map("is_service")      // LIMPA_NOME
+  isInvestment            Boolean       @default(false) @map("is_investment")   // INVESTIDOR
+  isLoan                  Boolean       @default(true) @map("is_loan")          // EMPRÉSTIMO
+  installments            Installment[]
+  customer                Customer      @relation(fields: [customerId], references: [id])
+  loanRequest             LoanRequest   @relation(fields: [requestId], references: [id])
+
+  @@map("loans")
+}
+
+model MessageTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  category    String
+  triggerEvent String?  @map("trigger_event")
+  channel     String?  // email, whatsapp, notification
+  subject     String?  // subject for emails
+  content     String
+  variables   String[]
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("message_templates")
+  @@index([triggerEvent])
+  @@index([isActive])
+  @@index([category])
+}
+
+model NotificationLog {
+  id           String   @id @default(uuid())
+  type         String
+  recipient    String
+  subject      String?
+  content      String?
+  status       String   @default("SENT")
+  errorMessage String?  @map("error_message")
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("notification_logs")
+}
+
+model Notification {
+  id            String    @id @default(uuid())
+  customerEmail String?   @map("customer_email")
+  title         String
+  message       String
+  type          String    @default("INFO")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  customerId    String?   @map("customer_id")
+  isRead        Boolean   @default(false) @map("is_read")
+  customer      Customer? @relation(fields: [customerId], references: [id])
+
+  @@map("notifications")
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  type      String   @default("EMAIL_VERIFY")
+  used      Boolean  @default(false)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("otp_codes")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  endpoint  String
+  p256dh    String
+  auth      String
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("push_subscriptions")
+}
+
+model RiskEvent {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  eventType String   @map("event_type")
+  riskLevel String?  @map("risk_level")
+  details   Json?
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@map("risk_events")
+}
+
+model ScheduledStatus {
+  id                  String    @id @default(uuid())
+  title               String?
+  content             String?
+  mediaType           String?   @map("media_type")
+  mediaUrl            String?   @map("media_url")
+  imageUrl            String?   @map("image_url")
+  caption             String?
+  aiGeneratedCaption  Boolean   @default(false) @map("ai_generated_caption")
+  recurrence          String    @default("ONCE")
+  selectedDays        String[]  @map("selected_days")
+  postsPerDay         Int       @default(1) @map("posts_per_day")
+  totalDays           Int       @default(1) @map("total_days")
+  startDate           DateTime  @map("start_date")
+  endDate             DateTime? @map("end_date")
+  postTimes           String[]  @map("post_times")
+  status              String    @default("SCHEDULED")
+  nextPostAt          DateTime? @map("next_post_at")
+  lastPostedAt        DateTime? @map("last_posted_at")
+  postsCount          Int       @default(0) @map("posts_count")
+  errorMessage        String?   @map("error_message")
+  scheduledAt         DateTime  @default(now()) @map("scheduled_at")
+  postedAt            DateTime? @map("posted_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  createdBy           String?   @map("created_by")
+
+  @@map("scheduled_status")
+}
+
+model SecurityAlert {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  userName    String   @map("user_name")
+  userEmail   String   @map("user_email")
+  alertType   String   @map("alert_type")
+  severity    String
+  title       String
+  description String
+  deviceInfo  Json?    @map("device_info")
+  ipAddress   String?  @map("ip_address")
+  location    Json?
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("security_alerts")
+}
+
+model SecurityBlock {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  blockType         String    @map("block_type")
+  blockReason       String    @map("block_reason")
+  deviceFingerprint String?   @map("device_fingerprint")
+  ipAddress         String?   @map("ip_address")
+  deviceInfo        Json?     @map("device_info")
+  isResolved        Boolean   @default(false) @map("is_resolved")
+  resolvedAt        DateTime? @map("resolved_at")
+  resolvedBy        String?   @map("resolved_by")
+  resolutionNotes   String?   @map("resolution_notes")
+  expiresAt         DateTime? @map("expires_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  user              User      @relation(fields: [userId], references: [id])
+
+  @@map("security_blocks")
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+model TemporaryLink {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  type      String
+  userId    String?  @map("user_id")
+  email     String?
+  metadata  Json?
+  used      Boolean  @default(false)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("temporary_links")
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  type        String
+  description String
+  amount      Float
+  category    String
+  date        DateTime
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("transactions")
+}
+
+model TrustedDevice {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  deviceFingerprint String   @map("device_fingerprint")
+  deviceName        String   @map("device_name")
+  deviceModel       String?  @map("device_model")
+  platform          String?
+  browser           String?
+  screenResolution  String?  @map("screen_resolution")
+  lastIp            String?  @map("last_ip")
+  lastLocationLat   Float?   @map("last_location_lat")
+  lastLocationLng   Float?   @map("last_location_lng")
+  isVerified        Boolean  @default(false) @map("is_verified")
+  isPrimary         Boolean  @default(false) @map("is_primary")
+  trustScore        Int      @default(0) @map("trust_score")
+  loginCount        Int      @default(0) @map("login_count")
+  firstSeenAt       DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt        DateTime @default(now()) @map("last_seen_at")
+  user              User     @relation(fields: [userId], references: [id])
+
+  @@map("trusted_devices")
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  authId              String?              @unique @map("auth_id")
+  name                String
+  email               String               @unique
+  password            String
+  role                String               @default("CLIENT")
+  phone               String?
+  address             String?
+  city                String?
+  neighborhood        String?
+  avatarUrl           String?              @map("avatar_url")
+  referralCode        String?              @unique @map("referral_code")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  isPartner           Boolean              @default(false) @map("is_partner")
+  partnerScore        Float?               @map("partner_score")
+  customers           Customer[]           @relation("CustomerUser")
+  loanRequests        LoanRequest[]        @relation("LoanRequestUser")
+  partnerCustomers    Customer[]           @relation("CustomerPartner")
+  partnerLoanRequests LoanRequest[]        @relation("LoanRequestPartner")
+  partnerCommissions  PartnerCommission[]  @relation("PartnerCommissionPartner")
+  partnerBonuses      PartnerBonus[]       @relation("PartnerBonusPartner")
+  partnerInvites      PartnerInvite[]      @relation("PartnerInvitePartner")
+  pushSubscriptions   PushSubscription[]
+  riskEvents          RiskEvent[]
+  securityBlocks      SecurityBlock[]
+  trustedDevices      TrustedDevice[]
+  webauthnCredentials WebAuthnCredential[]
+
+  @@map("users")
+}
+
+model WebAuthnCredential {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  userEmail         String    @map("user_email")
+  credentialId      String    @unique @map("credential_id")
+  publicKey         String?   @map("public_key")
+  attestationObject String?   @map("attestation_object")
+  deviceName        String?   @map("device_name")
+  signCount         Int       @default(0) @map("sign_count")
+  lastUsedAt        DateTime? @map("last_used_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  user              User      @relation(fields: [userId], references: [id])
+
+  @@map("webauthn_credentials")
+}
+
+model WhatsappConfig {
+  id           String   @id @default(uuid())
+  apiUrl       String   @map("api_url")
+  apiKey       String   @map("api_key")
+  instanceName String   @map("instance_name")
+  isConnected  Boolean  @default(false) @map("is_connected")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("whatsapp_config")
+}
+
+model QualificationLead {
+  id                String   @id @default(uuid())
+  name              String
+  email             String
+  phone             String
+  city              String?
+  state             String?
+  mainInterest      String?  @map("main_interest")
+  creditExperience  String?  @map("credit_experience")
+  hasCapital        Boolean  @default(false) @map("has_capital")
+  capitalAmount     String?  @map("capital_amount")
+  intention         String?
+  investmentCapacity String? @map("investment_capacity")
+  interests         String[] @default([])
+  weeklyTime        String?  @map("weekly_time")
+  hasExperience     Boolean  @default(false) @map("has_experience")
+  experienceLevel   String?  @map("experience_level")
+  wantsToLearn      Boolean  @default(false) @map("wants_to_learn")
+  learningInterest  String?  @map("learning_interest")
+  hasTime           Boolean  @default(false) @map("has_time")
+  timeAvailability  String?  @map("time_availability")
+  wantsPartnership  Boolean  @default(false) @map("wants_partnership")
+  partnershipType   String?  @map("partnership_type")
+  tags              String[] @default([])
+  status            String   @default("NEW")
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("qualification_leads")
+}
+
+model Referral {
+  id                 String    @id @default(uuid())
+  referrerCustomerId String    @map("referrer_customer_id")
+  referrerCode       String    @map("referrer_code")
+  referredCustomerId String?   @map("referred_customer_id")
+  referredName       String    @map("referred_name")
+  referredPhone      String?   @map("referred_phone")
+  status             String    @default("PENDING")
+  pointsAwarded      Int       @default(0) @map("points_awarded")
+  bonusAmount        Float     @default(0) @map("bonus_amount")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  approvedAt         DateTime? @map("approved_at")
+  referrer           Customer  @relation("ReferrerCustomer", fields: [referrerCustomerId], references: [id])
+  referred           Customer? @relation("ReferredCustomer", fields: [referredCustomerId], references: [id])
+
+  @@map("referrals")
+}
+
+model PaymentReceipt {
+  id            String    @id @default(uuid())
+  installmentId String    @map("installment_id")
+  customerId    String    @map("customer_id")
+  receiptUrl    String    @map("receipt_url")
+  amount        Float?
+  status        String    @default("PENDING")
+  notes         String?
+  reviewedBy    String?   @map("reviewed_by")
+  reviewedAt    DateTime? @map("reviewed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@map("payment_receipts")
+}
+
+model CreditScore {
+  id             String   @id @default(uuid())
+  customerId     String   @map("customer_id")
+  score          Int
+  classification String
+  source         String   @default("INTERNAL")
+  factors        Json?
+  restrictions   Json?
+  consultedAt    DateTime @default(now()) @map("consulted_at")
+
+  @@map("credit_scores")
+}
+
+model IncomeAnalysis {
+  id                  String   @id @default(uuid())
+  customerId          String   @map("customer_id")
+  monthlyIncome       Float    @map("monthly_income")
+  averageBalance      Float?   @map("average_balance")
+  incomeSource        String?  @map("income_source")
+  stability           String?
+  currentCommitment   Float?   @map("current_commitment")
+  availableCommitment Float?   @map("available_commitment")
+  maxLoanAmount       Float?   @map("max_loan_amount")
+  recommendation      String?
+  analyzedAt          DateTime @default(now()) @map("analyzed_at")
+
+  @@map("income_analyses")
+}
+
+model OpenFinanceConsent {
+  id         String    @id @default(uuid())
+  customerId String    @map("customer_id")
+  scope      String[]
+  status     String    @default("ACTIVE")
+  grantedAt  DateTime  @default(now()) @map("granted_at")
+  expiresAt  DateTime? @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  @@map("open_finance_consents")
+}
+
+model PartnerProgram {
+  id                String    @id @default(uuid())
+  name              String    // Nome do programa de parceiros
+  description       String    // Descrição do programa
+  commissionRate    Float     @map("commission_rate") // Taxa de comissão (em porcentagem)
+  minimumCommission Float     @map("minimum_commission") // Valor mínimo de comissão
+  maximumCommission Float     @map("maximum_commission") // Valor máximo de comissão
+  isActive          Boolean   @default(true) @map("is_active") // Programa ativo ou não
+  startDate         DateTime  @map("start_date") // Data de início do programa
+  endDate           DateTime? @map("end_date") // Data de término do programa
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@map("partner_programs")
+}
+
+model PartnerCommission {
+  id                    String    @id @default(uuid())
+  partnerId             String    @map("partner_id")
+  loanRequestId         String    @map("loan_request_id")
+  contractId            String?   @map("contract_id") // ID do empréstimo/contrato
+  totalCommission       Float     @map("total_commission") // Valor total da comissão
+  commissionAmount      Float     @map("commission_amount") // Valor já liberado da comissão
+  commissionRate        Float     @map("commission_rate")
+  installmentsReleased  Int       @default(0) @map("installments_released") // Parcelas pagas (0, 1, 2, 3)
+  releasedPercent       Float     @default(0) @map("released_percent") // % já liberado (0, 40, 70, 100)
+  release1Amount        Float?    @map("release_1_amount") // 40% liberado na 1ª parcela
+  release1At            DateTime? @map("release_1_at")
+  release2Amount        Float?    @map("release_2_amount") // 30% liberado na 2ª parcela
+  release2At            DateTime? @map("release_2_at")
+  release3Amount        Float?    @map("release_3_amount") // 30% liberado na 3ª parcela
+  release3At            DateTime? @map("release_3_at")
+  status                String    @default("PENDING") // PENDING, PARTIAL, PAID, CANCELLED
+  cancelReason          String?   @map("cancel_reason")
+  paidAt                DateTime? @map("paid_at")
+  paymentMethod         String?   @map("payment_method")
+  paymentReference      String?   @map("payment_reference")
+  notes                 String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  partner               User        @relation(fields: [partnerId], references: [id], name: "PartnerCommissionPartner")
+  loanRequest           LoanRequest @relation(fields: [loanRequestId], references: [id], name: "PartnerCommissionLoanRequest")
+
+  @@map("partner_commissions")
+  @@index([partnerId])
+  @@index([loanRequestId])
+  @@index([contractId])
+  @@index([status])
+}
+
+model PartnerBonus {
+  id              String    @id @default(uuid())
+  partnerId       String    @map("partner_id")
+  month           String    // YYYY-MM
+  contractsCount  Int       @default(0) @map("contracts_count")
+  defaultRate     Float     @default(0) @map("default_rate") // Taxa de inadimplência %
+  bonusAmount     Float     @map("bonus_amount")
+  bonusTier       String    @map("bonus_tier") // SILVER (R$500) ou GOLD (R$1000)
+  status          String    @default("PENDING") // PENDING, PAID, CANCELLED
+  paidAt          DateTime? @map("paid_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  partner         User      @relation(fields: [partnerId], references: [id], name: "PartnerBonusPartner")
+
+  @@map("partner_bonuses")
+  @@unique([partnerId, month])
+  @@index([partnerId])
+  @@index([month])
+}
+
+model PartnerInvite {
+  id                  String    @id @default(uuid())
+  partnerId           String    @map("partner_id")
+  invitedEmail        String    @map("invited_email")
+  inviteCode          String    @unique @map("invite_code")
+  status              String    @default("PENDING")
+  acceptedAt          DateTime? @map("accepted_at")
+  expiredAt           DateTime  @map("expired_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  partner             User    @relation(fields: [partnerId], references: [id], name: "PartnerInvitePartner")
+
+  @@map("partner_invites")
+  @@index([partnerId])
+  @@index([invitedEmail])
+  @@index([inviteCode])
+}

@@ -1,10 +1,10 @@
-// 💳 Payment Receipts Management - Gestão de Comprovantes de Pagamento
+﻿// 💳 Payment Receipts Management - Gestão de Comprovantes de Pagamento
 // Admin pode aprovar ou rejeitar comprovantes enviados pelos clientes
 
 import React, { useState, useEffect } from 'react';
 import { Receipt, Check, X, Eye, Clock, Filter, Download, Search, AlertCircle, CheckCircle, XCircle, Image, FileText, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabase } from '../../services/supabaseClient';
+import { api } from '../../services/apiClient';
 import { PaymentReceipt } from '../../types';
 import { useToast } from '../../components/Toast';
 import { autoNotificationService } from '../../services/autoNotificationService';
@@ -26,40 +26,26 @@ export const PaymentReceipts: React.FC = () => {
     const loadReceipts = async () => {
         setLoading(true);
         try {
-            let query = supabase
-                .from('payment_receipts')
-                .select('*')
-                .order('submitted_at', { ascending: false });
+            const { data } = await api.get(`/finance/receipts?status=${filter}`);
 
-            if (filter !== 'ALL') {
-                query = query.eq('status', filter);
-            }
-
-            const { data, error } = await query;
-
-            if (error) {
-                console.warn('Supabase error, trying localStorage:', error);
-                // Fallback localStorage
-                const localReceipts = JSON.parse(localStorage.getItem('tubarao_payment_receipts') || '[]');
-                setReceipts(localReceipts.filter((r: PaymentReceipt) =>
-                    filter === 'ALL' || r.status === filter
-                ));
-            } else {
-                setReceipts(data?.map(r => ({
+            if (data) {
+                setReceipts((data as any[]).map((r: any) => ({
                     id: r.id,
-                    installmentId: r.installment_id,
-                    loanId: r.loan_id,
-                    customerId: r.customer_id,
-                    customerName: r.customer_name,
+                    installmentId: r.installment_id || r.installmentId || '',
+                    loanId: r.loan_id || r.loanId || '',
+                    customerId: r.customer_id || r.customerId || '',
+                    customerName: r.customer_name || r.customerName || '',
                     amount: r.amount,
-                    receiptUrl: r.receipt_url,
-                    receiptType: r.receipt_type,
+                    receiptUrl: r.receipt_url || r.receiptUrl || '',
+                    receiptType: r.receipt_type || r.receiptType || '',
                     status: r.status,
-                    submittedAt: r.submitted_at,
-                    reviewedAt: r.reviewed_at,
-                    reviewedBy: r.reviewed_by,
-                    rejectionReason: r.rejection_reason
-                })) || []);
+                    submittedAt: r.submitted_at || r.submittedAt || '',
+                    reviewedAt: r.reviewed_at || r.reviewedAt || null,
+                    reviewedBy: r.reviewed_by || r.reviewedBy || null,
+                    rejectionReason: r.rejection_reason || r.rejectionReason || null
+                })));
+            } else {
+                setReceipts([]);
             }
         } catch (err) {
             console.error('Error loading receipts:', err);
@@ -70,41 +56,17 @@ export const PaymentReceipts: React.FC = () => {
     const handleApprove = async (receipt: PaymentReceipt) => {
         setProcessing(receipt.id);
         try {
-            const user = JSON.parse(localStorage.getItem('tubarao_user') || '{}');
-
-            const { error } = await supabase
-                .from('payment_receipts')
-                .update({
-                    status: 'APPROVED',
-                    reviewed_at: new Date().toISOString(),
-                    reviewed_by: user.id
-                })
-                .eq('id', receipt.id);
-
-            if (error) throw error;
-
-            // Marcar parcela como paga
-            await supabase
-                .from('installments')
-                .update({ status: 'PAID', paid_at: new Date().toISOString() })
-                .eq('id', receipt.installmentId);
-
-            // Buscar email do cliente para notificação
-            const { data: customer } = await supabase
-                .from('customers')
-                .select('email')
-                .eq('id', receipt.customerId)
-                .single();
+            await api.put(`/finance/receipts/${receipt.id}/approve`, {});
 
             // Enviar notificação e atualizar score
-            if (customer?.email) {
+            try {
                 await autoNotificationService.onPaymentConfirmed(
-                    customer.email,
+                    '',
                     receipt.amount,
-                    true, // wasOnTime - podemos calcular depois
-                    false // wasEarly
+                    true,
+                    false
                 );
-            }
+            } catch { /* notification optional */ }
 
             addToast('Pagamento aprovado! Parcela baixada.', 'success');
             setSelectedReceipt(null);
@@ -124,19 +86,9 @@ export const PaymentReceipts: React.FC = () => {
 
         setProcessing(receipt.id);
         try {
-            const user = JSON.parse(localStorage.getItem('tubarao_user') || '{}');
-
-            const { error } = await supabase
-                .from('payment_receipts')
-                .update({
-                    status: 'REJECTED',
-                    reviewed_at: new Date().toISOString(),
-                    reviewed_by: user.id,
-                    rejection_reason: rejectionReason
-                })
-                .eq('id', receipt.id);
-
-            if (error) throw error;
+            await api.put(`/finance/receipts/${receipt.id}/reject`, {
+                rejectionReason
+            });
 
             addToast('Comprovante rejeitado', 'info');
             setSelectedReceipt(null);

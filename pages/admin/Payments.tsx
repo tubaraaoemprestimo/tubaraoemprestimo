@@ -1,11 +1,11 @@
-// 💰 Página de Controle de Pagamentos
+﻿// 💰 Página de Controle de Pagamentos
 import React, { useState, useEffect } from 'react';
 import {
     DollarSign, Check, X, Upload, Calendar, Search, Filter,
     Eye, Trash2, CheckCircle2, Clock, AlertTriangle, Plus, Download
 } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { paymentService, LoanPayment } from '../../services/paymentService';
 import { LoanRequest } from '../../types';
 import { useToast } from '../../components/Toast';
@@ -37,7 +37,7 @@ export const PaymentsPage: React.FC = () => {
         setLoading(true);
         const [paymentsData, requestsData] = await Promise.all([
             paymentService.getAllPayments(),
-            supabaseService.getRequests()
+            apiService.getRequests()
         ]);
         setPayments(paymentsData);
         // Carregar todas as solicitações para o select

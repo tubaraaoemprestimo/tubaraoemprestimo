@@ -1,7 +1,7 @@
 // 🔧 Admin Service - Gerenciamento completo para o administrador
 // Inclui: Blacklist, Auditoria, Permissões, Score, Renegociação, Templates, Documentos
 
-import { supabase } from './supabaseClient';
+import { api } from './apiClient';
 import {
     BlacklistEntry, AuditLog, UserPermission, PermissionLevel, ClientScore,
     RenegotiationProposal, MessageTemplate, MassMessage, ConversationMessage,
@@ -58,10 +58,7 @@ const getCurrentUser = () => {
 export const blacklistService = {
     getAll: async (): Promise<BlacklistEntry[]> => {
         try {
-            const { data, error } = await supabase
-                .from('blacklist')
-                .select('*')
-                .order('added_at', { ascending: false });
+            const { data, error } = await api.get<any[]>('/admin/blacklist');
 
             if (error || !data) {
                 console.error('Error fetching blacklist:', error);
@@ -86,17 +83,13 @@ export const blacklistService = {
         const user = getCurrentUser();
 
         try {
-            const { data, error } = await supabase
-                .from('blacklist')
-                .insert({
+            const { data, error } = await api.post<any>('/admin/blacklist', {
                     cpf: entry.cpf,
                     name: entry.name,
                     reason: entry.reason,
                     added_by: user.name || 'Admin',
                     active: true
-                })
-                .select()
-                .single();
+                });
 
             if (error || !data) {
                 throw error;
@@ -131,16 +124,9 @@ export const blacklistService = {
 
     remove: async (id: string): Promise<boolean> => {
         try {
-            const { data: entry } = await supabase
-                .from('blacklist')
-                .select('cpf')
-                .eq('id', id)
-                .single();
+            const { data: entry } = await api.get<any>(`/admin/blacklist/${id}`);
 
-            const { error } = await supabase
-                .from('blacklist')
-                .delete()
-                .eq('id', id);
+            const { error } = await api.delete(`/admin/blacklist/${id}`);
 
             if (!error && entry) {
                 await auditService.log('DELETE', 'BLACKLIST', id, `CPF ${entry.cpf} removido da blacklist`);
@@ -155,19 +141,12 @@ export const blacklistService = {
 
     toggle: async (id: string): Promise<boolean> => {
         try {
-            const { data: current } = await supabase
-                .from('blacklist')
-                .select('active')
-                .eq('id', id)
-                .single();
+            const { data: current } = await api.get<any>(`/admin/blacklist/${id}`);
 
             if (!current) return false;
 
-            const newActive = !current.active;
-            const { error } = await supabase
-                .from('blacklist')
-                .update({ active: newActive })
-                .eq('id', id);
+            const newActive = !(current as any).active;
+            const { error } = await api.put(`/admin/blacklist/${id}`, { active: newActive });
 
             if (!error) {
                 await auditService.log('UPDATE', 'BLACKLIST', id, `Status alterado para ${newActive ? 'ativo' : 'inativo'}`);
@@ -181,14 +160,9 @@ export const blacklistService = {
     check: async (cpf: string): Promise<boolean> => {
         try {
             const cleanCpf = cpf.replace(/\D/g, '');
-            const { data } = await supabase
-                .from('blacklist')
-                .select('id')
-                .eq('cpf', cleanCpf)
-                .eq('active', true)
-                .limit(1);
+            const { data } = await api.get<any>(`/admin/blacklist/check?cpf=${cleanCpf}`);
 
-            return (data && data.length > 0);
+            return !!(data as any)?.blocked;
         } catch (e) {
             const list = loadFromStorage<BlacklistEntry[]>(STORAGE_KEYS.BLACKLIST, []);
             return list.some(e => e.cpf.replace(/\D/g, '') === cpf.replace(/\D/g, '') && e.active);
@@ -210,7 +184,7 @@ export const auditService = {
         const user = getCurrentUser();
 
         try {
-            await supabase.from('audit_logs').insert({
+            await api.post('/finance/audit-log', {
                 user_id: user.id || 'system',
                 user_name: user.name || 'Sistema',
                 action,
@@ -244,26 +218,14 @@ export const auditService = {
         limit?: number;
     }): Promise<AuditLog[]> => {
         try {
-            let query = supabase
-                .from('audit_logs')
-                .select('*')
-                .order('timestamp', { ascending: false })
-                .limit(filters?.limit || 100);
+            const params = new URLSearchParams();
+            params.set('limit', String(filters?.limit || 100));
+            if (filters?.action) params.set('action', filters.action);
+            if (filters?.entity) params.set('entity', filters.entity);
+            if (filters?.startDate) params.set('startDate', filters.startDate);
+            if (filters?.endDate) params.set('endDate', filters.endDate);
 
-            if (filters?.action) {
-                query = query.eq('action', filters.action);
-            }
-            if (filters?.entity) {
-                query = query.eq('entity', filters.entity);
-            }
-            if (filters?.startDate) {
-                query = query.gte('timestamp', filters.startDate);
-            }
-            if (filters?.endDate) {
-                query = query.lte('timestamp', filters.endDate);
-            }
-
-            const { data, error } = await query;
+            const { data, error } = await api.get<any[]>(`/finance/audit-log?${params.toString()}`);
 
             if (error || !data) {
                 throw error;
@@ -301,7 +263,7 @@ export const auditService = {
 
     clear: async (): Promise<void> => {
         try {
-            await supabase.from('audit_logs').delete().neq('id', '');
+            await api.delete('/finance/audit-log/clear');
         } catch (e) {
             saveToStorage(STORAGE_KEYS.AUDIT_LOGS, []);
         }
@@ -561,10 +523,7 @@ export const renegotiationService = {
 export const templateService = {
     getAll: async (): Promise<MessageTemplate[]> => {
         try {
-            const { data, error } = await supabase
-                .from('message_templates')
-                .select('*')
-                .order('created_at', { ascending: false });
+            const { data, error } = await api.get<any[]>('/admin/templates');
 
             if (error || !data || data.length === 0) {
                 return getDefaultTemplates();
@@ -588,17 +547,13 @@ export const templateService = {
         const variables = extractVariables(template.content);
 
         try {
-            const { data, error } = await supabase
-                .from('message_templates')
-                .insert({
+            const { data, error } = await api.post<any>('/admin/templates', {
                     name: template.name,
                     category: template.category,
                     content: template.content,
                     variables: variables,
                     is_active: template.isActive
-                })
-                .select()
-                .single();
+                });
 
             if (error || !data) throw error;
 
@@ -639,10 +594,7 @@ export const templateService = {
             }
             if (data.isActive !== undefined) updateData.is_active = data.isActive;
 
-            await supabase
-                .from('message_templates')
-                .update(updateData)
-                .eq('id', id);
+            await api.put(`/admin/templates/${id}`, updateData);
 
             await auditService.log('UPDATE', 'TEMPLATE', id, `Template atualizado`);
         } catch (e) {
@@ -660,10 +612,7 @@ export const templateService = {
 
     delete: async (id: string): Promise<void> => {
         try {
-            await supabase
-                .from('message_templates')
-                .delete()
-                .eq('id', id);
+            await api.delete(`/admin/templates/${id}`);
 
             await auditService.log('DELETE', 'TEMPLATE', id, `Template removido`);
         } catch (e) {

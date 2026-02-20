@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Save, Plus, Trash2, Edit2, X, Percent, Zap, Smartphone, QrCode, CheckCircle2, RotateCcw, MessageSquare, Clock, Palette, Upload, Image as ImageIcon, Building2, Settings as SettingsIcon, RefreshCw, AlertCircle, Target, TrendingUp, DollarSign, Users } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { whatsappService } from '../../services/whatsappService';
 import { emailService } from '../../services/emailService';
 import { useBrand } from '../../contexts/BrandContext';
 import { themeService, ThemeColors } from '../../services/themeService';
 import { LoanPackage, SystemSettings, CollectionRule, CollectionRuleType, WhatsappConfig, GoalsSettings } from '../../types';
 import { useToast } from '../../components/Toast';
+import { PIXSettings } from './PIXSettings';
 
 const inputStyle = "w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none transition-colors";
 
@@ -15,7 +16,7 @@ export const Settings: React.FC = () => {
   const { addToast } = useToast();
   const { settings: brandSettings, updateSettings: updateBrand, resetSettings: resetBrand } = useBrand();
 
-  const [activeTab, setActiveTab] = useState<'FINANCIAL' | 'AUTOMATION' | 'INTEGRATION' | 'BRANDING' | 'GOALS' | 'TEMA'>('FINANCIAL');
+  const [activeTab, setActiveTab] = useState<'FINANCIAL' | 'AUTOMATION' | 'INTEGRATION' | 'BRANDING' | 'GOALS' | 'TEMA' | 'PAYMENTS'>('FINANCIAL');
 
   // Financial State
   const [settings, setSettings] = useState<SystemSettings>({ monthlyInterestRate: 0, lateFeeRate: 0 });
@@ -64,11 +65,11 @@ export const Settings: React.FC = () => {
 
   const loadData = async () => {
     const [settingsData, packagesData, rulesData, waData, goalsData] = await Promise.all([
-      supabaseService.getSettings(),
-      supabaseService.getPackages(),
-      supabaseService.getCollectionRules(),
+      apiService.getSettings(),
+      apiService.getPackages(),
+      apiService.getCollectionRules(),
       whatsappService.getConfig(),
-      supabaseService.getGoalsSettings()
+      apiService.getGoalsSettings()
     ]);
     setSettings(settingsData);
     setPackages(packagesData);
@@ -110,7 +111,7 @@ export const Settings: React.FC = () => {
     setWaStatus(status);
     if (status === 'open') {
       setWaConfig(prev => ({ ...prev, isConnected: true }));
-      supabaseService.saveWhatsappConfig({ ...waConfig, isConnected: true });
+      apiService.saveWhatsappConfig({ ...waConfig, isConnected: true });
       setQrCode(null);
     } else {
       setWaConfig(prev => ({ ...prev, isConnected: false }));
@@ -121,7 +122,7 @@ export const Settings: React.FC = () => {
   // --- Financial Handlers ---
   const handleSaveSettings = async () => {
     setLoadingFinancial(true);
-    await supabaseService.updateSettings(settings);
+    await apiService.updateSettings(settings);
     setLoadingFinancial(false);
     addToast('Taxas atualizadas!', 'success');
   };
@@ -137,7 +138,7 @@ export const Settings: React.FC = () => {
       maxInstallments: currentPkg.maxInstallments || 12,
     } as LoanPackage;
 
-    await supabaseService.savePackage(pkgToSave);
+    await apiService.savePackage(pkgToSave);
     setLoadingPkg(false);
     setIsPkgModalOpen(false);
     loadData();
@@ -145,7 +146,7 @@ export const Settings: React.FC = () => {
 
   const handleDeletePackage = async (id: string) => {
     if (confirm('Excluir este pacote?')) {
-      await supabaseService.deletePackage(id);
+      await apiService.deletePackage(id);
       loadData();
     }
   };
@@ -162,7 +163,7 @@ export const Settings: React.FC = () => {
       active: currentRule.active ?? true
     } as CollectionRule;
 
-    await supabaseService.saveCollectionRule(ruleToSave);
+    await apiService.saveCollectionRule(ruleToSave);
     setLoadingAutomation(false);
     setIsRuleModalOpen(false);
     loadData();
@@ -170,7 +171,7 @@ export const Settings: React.FC = () => {
 
   const handleDeleteRule = async (id: string) => {
     if (confirm('Excluir esta regra de automação?')) {
-      await supabaseService.deleteCollectionRule(id);
+      await apiService.deleteCollectionRule(id);
       loadData();
     }
   };
@@ -243,7 +244,7 @@ export const Settings: React.FC = () => {
     const success = await emailService.sendCustomEmail(
       testEmail,
       'Teste de Configuração - Tubarão',
-      '<h1>Configuração Validada! ✅</h1><p>Se você recebeu este email, o sistema de envio está funcionando perfeitamente via Resend para tubaraoemprestimo.com.br.</p>'
+      '<h1>Configuração Validada! ?</h1><p>Se você recebeu este email, o sistema de envio está funcionando perfeitamente via Resend para tubaraoemprestimo.com.br.</p>'
     );
 
     setTestingEmail(false);
@@ -283,7 +284,7 @@ export const Settings: React.FC = () => {
   const handleSaveGoals = async () => {
     if (!goals) return;
     setLoadingGoals(true);
-    await supabaseService.saveGoalsSettings(goals);
+    await apiService.saveGoalsSettings(goals);
     setLoadingGoals(false);
     addToast('Metas e projeções atualizadas!', 'success');
   };
@@ -324,23 +325,23 @@ export const Settings: React.FC = () => {
             {/* Multa Fixa */}
             <div>
               <label className="block text-sm font-bold text-zinc-300 mb-2">Multa por Atraso</label>
-              <div className="flex gap-3">
-                <select
-                  value={settings.lateFixedFeeType || 'FIXED'}
-                  onChange={(e) => setSettings({ ...settings, lateFixedFeeType: e.target.value as any })}
-                  className={`${inputStyle} w-28 text-center font-bold`}
-                >
-                  <option value="FIXED">R$</option>
-                  <option value="PERCENT">%</option>
-                </select>
+              <div className="flex gap-2 items-center">
                 <input
                   type="number"
                   step="0.01"
                   value={settings.lateFixedFee || 0}
                   onChange={(e) => setSettings({ ...settings, lateFixedFee: Number(e.target.value) })}
-                  className={`${inputStyle} flex-1 text-lg font-bold`}
+                  className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white text-lg font-bold focus:border-[#D4AF37] outline-none transition-colors"
                   placeholder="0.00"
                 />
+                <select
+                  value={settings.lateFixedFeeType || 'FIXED'}
+                  onChange={(e) => setSettings({ ...settings, lateFixedFeeType: e.target.value as any })}
+                  className="w-16 bg-black border border-zinc-700 rounded-lg p-3 text-white text-center font-bold focus:border-[#D4AF37] outline-none"
+                >
+                  <option value="FIXED">R$</option>
+                  <option value="PERCENT">%</option>
+                </select>
               </div>
               <p className="text-xs text-zinc-600 mt-2">
                 {settings.lateFixedFeeType === 'PERCENT'
@@ -352,23 +353,23 @@ export const Settings: React.FC = () => {
             {/* Juros/Dia */}
             <div>
               <label className="block text-sm font-bold text-zinc-300 mb-2">Juros por Dia de Atraso</label>
-              <div className="flex gap-3">
-                <select
-                  value={settings.lateInterestDailyType || 'PERCENT'}
-                  onChange={(e) => setSettings({ ...settings, lateInterestDailyType: e.target.value as any })}
-                  className={`${inputStyle} w-28 text-center font-bold`}
-                >
-                  <option value="PERCENT">%</option>
-                  <option value="FIXED">R$</option>
-                </select>
+              <div className="flex gap-2 items-center">
                 <input
                   type="number"
                   step="0.01"
                   value={settings.lateInterestDaily || 0}
                   onChange={(e) => setSettings({ ...settings, lateInterestDaily: Number(e.target.value) })}
-                  className={`${inputStyle} flex-1 text-lg font-bold`}
+                  className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white text-lg font-bold focus:border-[#D4AF37] outline-none transition-colors"
                   placeholder="0.033"
                 />
+                <select
+                  value={settings.lateInterestDailyType || 'PERCENT'}
+                  onChange={(e) => setSettings({ ...settings, lateInterestDailyType: e.target.value as any })}
+                  className="w-16 bg-black border border-zinc-700 rounded-lg p-3 text-white text-center font-bold focus:border-[#D4AF37] outline-none"
+                >
+                  <option value="PERCENT">%</option>
+                  <option value="FIXED">R$</option>
+                </select>
               </div>
               <p className="text-xs text-zinc-600 mt-2">Aplicado a cada dia de atraso</p>
             </div>
@@ -376,23 +377,23 @@ export const Settings: React.FC = () => {
             {/* Juros/Mês */}
             <div>
               <label className="block text-sm font-bold text-zinc-300 mb-2">Juros por Mês de Atraso</label>
-              <div className="flex gap-3">
-                <select
-                  value={settings.lateInterestMonthlyType || 'PERCENT'}
-                  onChange={(e) => setSettings({ ...settings, lateInterestMonthlyType: e.target.value as any })}
-                  className={`${inputStyle} w-28 text-center font-bold`}
-                >
-                  <option value="PERCENT">%</option>
-                  <option value="FIXED">R$</option>
-                </select>
+              <div className="flex gap-2 items-center">
                 <input
                   type="number"
                   step="0.1"
                   value={settings.lateInterestMonthly || 0}
                   onChange={(e) => setSettings({ ...settings, lateInterestMonthly: Number(e.target.value) })}
-                  className={`${inputStyle} flex-1 text-lg font-bold`}
+                  className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white text-lg font-bold focus:border-[#D4AF37] outline-none transition-colors"
                   placeholder="1.0"
                 />
+                <select
+                  value={settings.lateInterestMonthlyType || 'PERCENT'}
+                  onChange={(e) => setSettings({ ...settings, lateInterestMonthlyType: e.target.value as any })}
+                  className="w-16 bg-black border border-zinc-700 rounded-lg p-3 text-white text-center font-bold focus:border-[#D4AF37] outline-none"
+                >
+                  <option value="PERCENT">%</option>
+                  <option value="FIXED">R$</option>
+                </select>
               </div>
               <p className="text-xs text-zinc-600 mt-2">Juros moratórios mensais</p>
             </div>
@@ -400,23 +401,23 @@ export const Settings: React.FC = () => {
             {/* Juros/Ano */}
             <div>
               <label className="block text-sm font-bold text-zinc-300 mb-2">Juros por Ano de Atraso</label>
-              <div className="flex gap-3">
-                <select
-                  value={settings.lateInterestYearlyType || 'PERCENT'}
-                  onChange={(e) => setSettings({ ...settings, lateInterestYearlyType: e.target.value as any })}
-                  className={`${inputStyle} w-28 text-center font-bold`}
-                >
-                  <option value="PERCENT">%</option>
-                  <option value="FIXED">R$</option>
-                </select>
+              <div className="flex gap-2 items-center">
                 <input
                   type="number"
                   step="0.5"
                   value={settings.lateInterestYearly || 0}
                   onChange={(e) => setSettings({ ...settings, lateInterestYearly: Number(e.target.value) })}
-                  className={`${inputStyle} flex-1 text-lg font-bold`}
+                  className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white text-lg font-bold focus:border-[#D4AF37] outline-none transition-colors"
                   placeholder="12.0"
                 />
+                <select
+                  value={settings.lateInterestYearlyType || 'PERCENT'}
+                  onChange={(e) => setSettings({ ...settings, lateInterestYearlyType: e.target.value as any })}
+                  className="w-16 bg-black border border-zinc-700 rounded-lg p-3 text-white text-center font-bold focus:border-[#D4AF37] outline-none"
+                >
+                  <option value="PERCENT">%</option>
+                  <option value="FIXED">R$</option>
+                </select>
               </div>
               <p className="text-xs text-zinc-600 mt-2">Taxa anual de referência</p>
             </div>
@@ -425,13 +426,13 @@ export const Settings: React.FC = () => {
             <div className="bg-black/50 p-4 rounded-xl border border-zinc-800">
               <p className="text-xs text-zinc-500 mb-2">Exemplo de cálculo (parcela de R$ 500, 10 dias de atraso):</p>
               <div className="text-sm text-zinc-300 space-y-1">
-                <p>• Multa: {settings.lateFixedFeeType === 'PERCENT' ? `${settings.lateFixedFee || 0}% = R$ ${((500 * (settings.lateFixedFee || 0)) / 100).toFixed(2)}` : `R$ ${(settings.lateFixedFee || 0).toFixed(2)}`}</p>
-                <p>• Juros 10 dias: {settings.lateInterestDailyType === 'FIXED' ? `R$ ${((settings.lateInterestDaily || 0) * 10).toFixed(2)}` : `${settings.lateInterestDaily || 0}% x 10 = R$ ${(500 * ((settings.lateInterestDaily || 0) / 100) * 10).toFixed(2)}`}</p>
+                <p>• Multa: {settings.lateFixedFeeType === 'PERCENT' ? `${settings.lateFixedFee || 0}% = R$ ${(500 * Number(settings.lateFixedFee || 0) / 100).toFixed(2)}` : `R$ ${Number(settings.lateFixedFee || 0).toFixed(2)}`}</p>
+                <p>• Juros 10 dias: {settings.lateInterestDailyType === 'FIXED' ? `R$ ${(Number(settings.lateInterestDaily || 0) * 10).toFixed(2)}` : `${settings.lateInterestDaily || 0}% x 10 = R$ ${(500 * (Number(settings.lateInterestDaily || 0) / 100) * 10).toFixed(2)}`}</p>
                 <p className="text-[#D4AF37] font-bold pt-2 border-t border-zinc-800">
-                  Total: R$ {(
+                  Total: R$ {Number(
                     500 +
-                    (settings.lateFixedFeeType === 'PERCENT' ? (500 * (settings.lateFixedFee || 0) / 100) : (settings.lateFixedFee || 0)) +
-                    (settings.lateInterestDailyType === 'FIXED' ? ((settings.lateInterestDaily || 0) * 10) : (500 * ((settings.lateInterestDaily || 0) / 100) * 10))
+                    (settings.lateFixedFeeType === 'PERCENT' ? (500 * Number(settings.lateFixedFee || 0) / 100) : Number(settings.lateFixedFee || 0)) +
+                    (settings.lateInterestDailyType === 'FIXED' ? (Number(settings.lateInterestDaily || 0) * 10) : (500 * (Number(settings.lateInterestDaily || 0) / 100) * 10))
                   ).toFixed(2)}
                 </p>
               </div>
@@ -849,7 +850,25 @@ export const Settings: React.FC = () => {
   );
 
   const renderGoalsTab = () => {
-    if (!goals) return <div className="text-zinc-500">Carregando...</div>;
+    if (!goals) return <div className="text-zinc-500 p-8 text-center">Carregando metas...</div>;
+
+    // Ensure projections array exists with defaults
+    const safeGoals = {
+      ...goals,
+      projections: goals.projections || [
+        { month: 'Jan', target: 0 }, { month: 'Fev', target: 0 },
+        { month: 'Mar', target: 0 }, { month: 'Abr', target: 0 },
+        { month: 'Mai', target: 0 }, { month: 'Jun', target: 0 },
+        { month: 'Jul', target: 0 }, { month: 'Ago', target: 0 },
+        { month: 'Set', target: 0 }, { month: 'Out', target: 0 },
+        { month: 'Nov', target: 0 }, { month: 'Dez', target: 0 },
+      ],
+      monthlyLoanGoal: goals.monthlyLoanGoal || 0,
+      monthlyClientGoal: goals.monthlyClientGoal || 0,
+      monthlyApprovalRateGoal: goals.monthlyApprovalRateGoal || 0,
+      expectedGrowthRate: goals.expectedGrowthRate || 0,
+      goalPeriod: goals.goalPeriod || new Date().toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' }),
+    };
 
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
@@ -877,8 +896,8 @@ export const Settings: React.FC = () => {
                 <span className="text-zinc-500">R$</span>
                 <input
                   type="number"
-                  value={goals.monthlyLoanGoal}
-                  onChange={(e) => setGoals({ ...goals, monthlyLoanGoal: Number(e.target.value) })}
+                  value={safeGoals.monthlyLoanGoal}
+                  onChange={(e) => setGoals({ ...safeGoals, monthlyLoanGoal: Number(e.target.value) })}
                   className={inputStyle}
                   step="10000"
                 />
@@ -895,8 +914,8 @@ export const Settings: React.FC = () => {
               </div>
               <input
                 type="number"
-                value={goals.monthlyClientGoal}
-                onChange={(e) => setGoals({ ...goals, monthlyClientGoal: Number(e.target.value) })}
+                value={safeGoals.monthlyClientGoal}
+                onChange={(e) => setGoals({ ...safeGoals, monthlyClientGoal: Number(e.target.value) })}
                 className={inputStyle}
               />
               <p className="text-xs text-zinc-600 mt-2">Quantidade de novos clientes</p>
@@ -912,8 +931,8 @@ export const Settings: React.FC = () => {
               <div className="flex items-center gap-2">
                 <input
                   type="number"
-                  value={goals.monthlyApprovalRateGoal}
-                  onChange={(e) => setGoals({ ...goals, monthlyApprovalRateGoal: Number(e.target.value) })}
+                  value={safeGoals.monthlyApprovalRateGoal}
+                  onChange={(e) => setGoals({ ...safeGoals, monthlyApprovalRateGoal: Number(e.target.value) })}
                   className={inputStyle}
                   min="0"
                   max="100"
@@ -935,8 +954,8 @@ export const Settings: React.FC = () => {
               <div className="flex items-center gap-2">
                 <input
                   type="number"
-                  value={goals.expectedGrowthRate}
-                  onChange={(e) => setGoals({ ...goals, expectedGrowthRate: Number(e.target.value) })}
+                  value={safeGoals.expectedGrowthRate}
+                  onChange={(e) => setGoals({ ...safeGoals, expectedGrowthRate: Number(e.target.value) })}
                   className={inputStyle}
                   step="0.5"
                 />
@@ -953,8 +972,8 @@ export const Settings: React.FC = () => {
               </div>
               <input
                 type="text"
-                value={goals.goalPeriod}
-                onChange={(e) => setGoals({ ...goals, goalPeriod: e.target.value })}
+                value={safeGoals.goalPeriod}
+                onChange={(e) => setGoals({ ...safeGoals, goalPeriod: e.target.value })}
                 className={inputStyle}
                 placeholder="12/2024"
               />
@@ -976,7 +995,7 @@ export const Settings: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {goals.projections.map((proj, index) => (
+            {safeGoals.projections.map((proj, index) => (
               <div key={proj.month} className="bg-black border border-zinc-800 rounded-xl p-4">
                 <label className="block text-xs text-zinc-500 mb-2 font-bold uppercase">{proj.month}</label>
                 <div className="flex items-center gap-1">
@@ -997,7 +1016,7 @@ export const Settings: React.FC = () => {
             <div className="flex justify-between items-center">
               <span className="text-zinc-400 text-sm">Total Projeção Anual:</span>
               <span className="text-[#D4AF37] font-bold text-lg">
-                R$ {goals.projections.reduce((acc, p) => acc + p.target, 0).toLocaleString()}
+                R$ {safeGoals.projections.reduce((acc, p) => acc + p.target, 0).toLocaleString()}
               </span>
             </div>
           </div>
@@ -1076,7 +1095,7 @@ export const Settings: React.FC = () => {
         {/* Preview */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
           <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            👁️ Preview em Tempo Real
+            ??? Preview em Tempo Real
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-4 rounded-xl" style={{ backgroundColor: themeColors.cardColor }}>
@@ -1120,7 +1139,7 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-8 bg-zinc-900/50 p-1 rounded-xl w-fit border border-zinc-800">
-        {['FINANCIAL', 'GOALS', 'AUTOMATION', 'INTEGRATION', 'BRANDING', 'TEMA'].map((tab) => (
+        {['FINANCIAL', 'GOALS', 'AUTOMATION', 'INTEGRATION', 'BRANDING', 'TEMA', 'PAYMENTS'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab as any)}
@@ -1133,7 +1152,9 @@ export const Settings: React.FC = () => {
               tab === 'GOALS' ? 'Metas' :
                 tab === 'AUTOMATION' ? 'Automação' :
                   tab === 'INTEGRATION' ? 'Integrações' :
-                    tab === 'BRANDING' ? 'Identidade Visual' : '🎨 Cores'}
+                    tab === 'BRANDING' ? 'Identidade Visual' :
+                      tab === 'TEMA' ? 'Cores' :
+                        tab === 'PAYMENTS' ? 'Pagamentos' : tab}
           </button>
         ))}
       </div>
@@ -1144,6 +1165,7 @@ export const Settings: React.FC = () => {
       {activeTab === 'INTEGRATION' && renderIntegrationTab()}
       {activeTab === 'BRANDING' && renderBrandingTab()}
       {activeTab === 'TEMA' && renderThemeTab()}
+      {activeTab === 'PAYMENTS' && <PIXSettings settings={settings} onUpdate={loadData} />}
 
       {/* Modals */}
       {isPkgModalOpen && (
@@ -1242,3 +1264,9 @@ const Modal = ({ title, onClose, children }: any) => (
     </div>
   </div>
 );
+
+
+
+
+
+

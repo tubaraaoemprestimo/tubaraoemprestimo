@@ -12,7 +12,7 @@ import {
     CheckCircle, Clock, XCircle, ArrowUpRight, ArrowDownRight, Zap,
     Calendar, RefreshCw, Percent
 } from 'lucide-react';
-import { supabaseService } from '../services/supabaseService';
+import { apiService } from '../services/apiService';
 import { LoanStatus, GoalsSettings } from '../types';
 
 interface KPIData {
@@ -90,10 +90,10 @@ export const AdvancedKPIs: React.FC = () => {
         setLoading(true);
         try {
             const [requests, customers, loans, goalsData] = await Promise.all([
-                supabaseService.getRequests(),
-                supabaseService.getCustomers(),
-                supabaseService.getClientLoans(),
-                supabaseService.getGoalsSettings()
+                apiService.getRequests(),
+                apiService.getCustomers(),
+                apiService.getClientLoans(),
+                apiService.getGoalsSettings()
             ]);
 
             setGoals(goalsData);
@@ -117,7 +117,8 @@ export const AdvancedKPIs: React.FC = () => {
             });
 
             // Calculate projected revenue from goals
-            const projectedRevenue = goalsData.projections.reduce((acc, p) => acc + p.target, 0) / 12;
+            const projections = Array.isArray(goalsData?.projections) ? goalsData.projections : [];
+            const projectedRevenue = projections.reduce((acc, p) => acc + (p?.target || 0), 0) / 12;
 
             setKpis({
                 totalLent: totalLent,
@@ -258,7 +259,7 @@ export const AdvancedKPIs: React.FC = () => {
                     <p className="text-zinc-500 text-sm mb-6">Configurado em Configurações &gt; Metas</p>
                     <div className="h-[280px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={goals?.projections.map((p, i) => ({
+                            <LineChart data={(Array.isArray(goals?.projections) ? goals.projections : []).map((p, i) => ({
                                 name: p.month,
                                 projetado: p.target,
                                 real: i < 7 ? emptyMonthlyData[i]?.emprestado : null

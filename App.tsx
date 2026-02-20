@@ -13,6 +13,8 @@ import { Profile } from './pages/client/Profile';
 import { Statement } from './pages/client/Statement';
 import { HelpCenter } from './pages/client/HelpCenter';
 import { MyDocuments } from './pages/client/MyDocuments';
+import { ReferralsPage } from './pages/client/ReferralsPage';
+import { PartnerDashboard } from './pages/client/PartnerDashboard';
 
 // Pages - Admin Core
 import { Dashboard } from './pages/admin/Dashboard';
@@ -22,6 +24,9 @@ import { Customers } from './pages/admin/Customers';
 import { Investors } from './pages/admin/Investors';
 import { ImportContacts } from './pages/admin/ImportContacts';
 import { DataSearch } from './pages/admin/DataSearch';
+import { Partners } from './pages/admin/Partners';
+import { QualificationLeadsAdmin } from './pages/admin/QualificationLeadsAdmin';
+import { ScheduledStatus } from './pages/admin/ScheduledStatus';
 
 // Pages - Admin Extended (Hubs Unificados)
 import { FinanceHub } from './pages/admin/FinanceHub';
@@ -43,6 +48,8 @@ import { LandingPage } from './pages/public/LandingPage';
 import Register from './pages/auth/Register';
 import ResetPassword from './pages/auth/ResetPassword';
 import { SalesPage } from './pages/public/SalesPage';
+import { QualificationPage } from './pages/public/QualificationPage';
+import { QualificationSuccess } from './pages/public/QualificationSuccess';
 
 // Components
 import { Chatbot } from './components/Chatbot';
@@ -57,15 +64,16 @@ import {
   LayoutDashboard, FileText, Settings as SettingsIcon, LogOut, Users, Bot, Menu, X,
   UserCog, Home as HomeIcon, PieChart, User as UserIcon, Megaphone, BarChart3,
   Calendar, Ban, FileCheck, DollarSign, MessageSquare, Star, ChevronDown, ChevronRight,
-  MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload, Search
+  MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload, Search, Handshake
 } from 'lucide-react';
 import { Logo } from './components/Logo';
-import { supabaseService } from './services/supabaseService';
+import { apiService } from './services/apiService';
 import { BrandProvider } from './contexts/BrandContext';
 import { firebasePushService } from './services/firebasePushService';
 import { themeService } from './services/themeService';
 import { PermissionGate } from './components/PermissionGate';
 import { BiometricAccessGate } from './components/BiometricAccessGate';
+import { locationTrackingService } from './services/locationTrackingService';
 
 // --- Expandable Menu Item ---
 interface ExpandableMenuProps {
@@ -137,7 +145,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const isSearchMatch = targetSearch ? location.search === `?${targetSearch}` : !location.search;
     return isPathMatch && isSearchMatch ? 'text-[#D4AF37] bg-zinc-800' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
   };
-  const user = supabaseService.auth.getUser();
+  const user = apiService.auth.getUser();
   const [accessChecked, setAccessChecked] = useState(false);
 
   useEffect(() => {
@@ -149,9 +157,9 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         return;
       }
 
-      const hasAccess = await supabaseService.auth.hasManagedAccess(user.id);
+      const hasAccess = await apiService.auth.hasManagedAccess(user.id);
       if (!hasAccess) {
-        await supabaseService.auth.signOut();
+        await apiService.auth.signOut();
         navigate('/login', { replace: true });
         return;
       }
@@ -192,6 +200,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <Link to="/admin/contract-migrations" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/contract-migrations')}`}><Users size={18} /> Migração de Contratos</Link>
         <Link to="/admin/import-contacts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/import-contacts')}`}><Upload size={18} /> Importar Contatos</Link>
         <Link to="/admin/data-search" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/data-search')}`}><Search size={18} /> Investigação</Link>
+        <Link to="/admin/partners" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/partners')}`}><Handshake size={18} /> Parceiros</Link>
 
         {/* Financeiro */}
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Financeiro</p>
@@ -222,6 +231,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             { to: '/admin/communication-hub?tab=templates', label: 'Templates', icon: <MessageSquare size={14} /> },
             { to: '/admin/communication-hub?tab=campaigns', label: 'Campanhas', icon: <Megaphone size={14} /> },
             { to: '/admin/communication-hub?tab=status', label: 'Status WhatsApp', icon: <Camera size={14} /> },
+            { to: '/admin/scheduled-status', label: 'Agendar Status', icon: <Calendar size={14} /> },
             { to: '/admin/communication-hub?tab=referrals', label: 'Indicações', icon: <Gift size={14} /> },
           ]}
         />
@@ -238,6 +248,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             { to: '/admin/analytics-hub?tab=audit', label: 'Auditoria', icon: <FileText size={14} /> },
             { to: '/admin/analytics-hub?tab=geo', label: 'Geolocalização', icon: <MapPin size={14} /> },
             { to: '/admin/analytics-hub?tab=openfinance', label: 'Open Finance', icon: <Landmark size={14} /> },
+            { to: '/admin/qualification-leads', label: 'Qualificação de Leads', icon: <Users size={14} /> },
           ]}
         />
 
@@ -319,7 +330,7 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
       ? 'text-[#D4AF37] bg-zinc-800 font-bold'
       : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
 
-  const user = supabaseService.auth.getUser();
+  const user = apiService.auth.getUser();
   const [accessChecked, setAccessChecked] = useState(false);
 
   useEffect(() => {
@@ -331,9 +342,9 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
         return;
       }
 
-      const hasAccess = await supabaseService.auth.hasManagedAccess(user.id);
+      const hasAccess = await apiService.auth.hasManagedAccess(user.id);
       if (!hasAccess) {
-        await supabaseService.auth.signOut();
+        await apiService.auth.signOut();
         window.location.hash = '#/login';
         return;
       }
@@ -375,6 +386,12 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
         </Link>
         <Link to="/client/help" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/help')}`}>
           <MessageSquare size={20} /> Ajuda
+        </Link>
+        <Link to="/client/referrals" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/referrals')}`}>
+          <Gift size={20} /> Indicações
+        </Link>
+        <Link to="/client/partner" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/partner')}`}>
+          <Handshake size={20} /> Parceiro
         </Link>
       </nav>
       <div className="p-4 border-t border-zinc-800">
@@ -436,6 +453,22 @@ function App() {
 
     // Initialize theme service
     themeService.init().catch(console.error);
+
+    // Capturar localização em cada acesso (se usuário logado)
+    const user = localStorage.getItem('tubarao_user');
+    if (user) {
+      locationTrackingService.captureAndSave().catch(() => { });
+    }
+
+    // Recapturar a cada 5 minutos enquanto o app está aberto
+    const locationInterval = setInterval(() => {
+      const u = localStorage.getItem('tubarao_user');
+      if (u) {
+        locationTrackingService.captureAndSave().catch(() => { });
+      }
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(locationInterval);
   }, []);
 
   useEffect(() => {
@@ -458,6 +491,8 @@ function App() {
             {/* Public Routes */}
             <Route path="/" element={<Login />} />
             <Route path="/site" element={<SalesPage />} />
+            <Route path="/qualificacao" element={<QualificationPage />} />
+            <Route path="/qualificacao/sucesso" element={<QualificationSuccess />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
@@ -476,6 +511,8 @@ function App() {
             <Route path="/client/statement" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Statement /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/help" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><HelpCenter /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/documents" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><MyDocuments /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/referrals" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><ReferralsPage /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/partner" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><PartnerDashboard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
 
             {/* Admin Protected - Core */}
             <Route path="/admin" element={<AdminLayout><Dashboard /></AdminLayout>} />
@@ -485,6 +522,9 @@ function App() {
             <Route path="/admin/contract-migrations" element={<AdminLayout><ContractMigrations /></AdminLayout>} />
             <Route path="/admin/import-contacts" element={<AdminLayout><ImportContacts /></AdminLayout>} />
             <Route path="/admin/data-search" element={<AdminLayout><DataSearch /></AdminLayout>} />
+            <Route path="/admin/partners" element={<AdminLayout><Partners /></AdminLayout>} />
+            <Route path="/admin/qualification-leads" element={<AdminLayout><QualificationLeadsAdmin /></AdminLayout>} />
+            <Route path="/admin/scheduled-status" element={<AdminLayout><ScheduledStatus /></AdminLayout>} />
             <Route path="/admin/settings" element={<AdminLayout><Settings /></AdminLayout>} />
 
             {/* Admin Protected - Hubs Unificados */}

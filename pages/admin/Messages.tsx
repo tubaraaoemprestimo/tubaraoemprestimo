@@ -1,10 +1,10 @@
-// 📝 Templates & Mass Messaging - Gerenciamento de templates e disparo em massa
+﻿// 📝 Templates & Mass Messaging - Gerenciamento de templates e disparo em massa
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Plus, Edit2, Trash2, Send, Users, CheckCircle, Clock, XCircle, X, Copy, Filter, PlayCircle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { templateService, massMessageService, conversationService } from '../../services/adminService';
 import { whatsappService } from '../../services/whatsappService';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { MessageTemplate, MassMessage, Customer } from '../../types';
 import { useToast } from '../../components/Toast';
 
@@ -32,7 +32,7 @@ export const MessagesPage: React.FC = () => {
         const templatesData = await templateService.getAll();
         setTemplates(templatesData);
         setMassMessages(massMessageService.getAll());
-        setCustomers(await supabaseService.getCustomers());
+        setCustomers(await apiService.getCustomers());
     };
 
     const handleSaveTemplate = async () => {
@@ -115,7 +115,7 @@ export const MessagesPage: React.FC = () => {
 
                     // 🔔 Criar Notificação na tela do cliente
                     if (customer.email) {
-                        await supabaseService.createNotification(
+                        await apiService.createNotification(
                             customer.email,
                             template?.name || '📢 Nova Mensagem',
                             finalMessage.substring(0, 150) + (finalMessage.length > 150 ? '...' : ''),

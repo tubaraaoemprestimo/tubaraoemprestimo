@@ -1,10 +1,10 @@
-
+﻿
 
 
 import React, { useState, useEffect } from 'react';
 import { Check, X, Eye, Maximize, Layers, Download, Filter, Video, Users, Phone, FileWarning, Send, AlertTriangle, MapPin } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { emailService } from '../../services/emailService';
 import { LoanRequest, LoanStatus } from '../../types';
 import { ImageViewer } from '../../components/ImageViewer';
@@ -64,14 +64,14 @@ export const Requests: React.FC = () => {
     }, []);
 
     const loadRequests = async () => {
-        const data = await supabaseService.getRequests();
+        const data = await apiService.getRequests();
         setRequests(data);
     };
 
     const handleApprove = async (id: string) => {
         if (!selectedRequest) return;
         setProcessing(id);
-        await supabaseService.approveLoan(id);
+        await apiService.approveLoan(id);
 
         // Enviar email de aprovação
         emailService.notifyApproved({
@@ -90,7 +90,7 @@ export const Requests: React.FC = () => {
     const handleReject = async (id: string) => {
         if (!selectedRequest) return;
         setProcessing(id);
-        await supabaseService.rejectLoan(id);
+        await apiService.rejectLoan(id);
 
         // Enviar email de reprovação
         emailService.notifyRejected({
@@ -110,7 +110,7 @@ export const Requests: React.FC = () => {
         if (!selectedRequest || !docRequestDesc) return;
 
         setProcessing(selectedRequest.id);
-        await supabaseService.requestSupplementalDoc(selectedRequest.id, docRequestDesc);
+        await apiService.requestSupplementalDoc(selectedRequest.id, docRequestDesc);
 
         // Enviar email solicitando documentos
         emailService.notifyWaitingDocs({
@@ -366,7 +366,7 @@ export const Requests: React.FC = () => {
                                                 return;
                                             }
                                             setProcessing('saving');
-                                            const success = await supabaseService.updateLoanRequestValues(selectedRequest.id, editAmount, editInstallments);
+                                            const success = await apiService.updateLoanRequestValues(selectedRequest.id, editAmount, editInstallments);
                                             if (success) {
                                                 addToast('Proposta atualizada!', 'success');
                                                 setSelectedRequest({ ...selectedRequest, amount: editAmount, installments: editInstallments });
@@ -456,6 +456,16 @@ export const Requests: React.FC = () => {
                                 </div>
                             )}
 
+                            {/* Instagram do Cliente */}
+                            {selectedRequest.instagram && (
+                                <div className="flex items-center gap-3 p-3 bg-zinc-900 border border-pink-500/30 rounded-xl">
+                                    <div className="flex-1">
+                                        <p className="text-xs text-zinc-500">Instagram</p>
+                                        <a href={`https://instagram.com/${selectedRequest.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="text-pink-400 font-bold text-sm hover:underline">{selectedRequest.instagram}</a>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Contrato PDF Download */}
                             {selectedRequest.contractPdfUrl && (
                                 <div className="flex items-center gap-3 p-3 bg-zinc-900 border border-emerald-500/30 rounded-xl">
@@ -540,50 +550,118 @@ export const Requests: React.FC = () => {
                                     <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
                                         <Users size={16} /> Referências Pessoais
                                     </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="flex items-center gap-2 bg-black p-3 rounded-lg border border-zinc-800">
-                                            <Phone size={16} className="text-zinc-500" />
-                                            <div>
-                                                <p className="text-xs text-zinc-500 uppercase">Referência 1</p>
-                                                <p className="font-bold text-white">{selectedRequest.references.fatherPhone || 'N/A'}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 bg-black p-3 rounded-lg border border-zinc-800">
-                                            <Phone size={16} className="text-zinc-500" />
-                                            <div>
-                                                <p className="text-xs text-zinc-500 uppercase">Referência 2</p>
-                                                <p className="font-bold text-white">{selectedRequest.references.motherPhone || 'N/A'}</p>
-                                            </div>
-                                        </div>
-                                        {selectedRequest.references.spousePhone && (
-                                            <div className="flex items-center gap-2 bg-black p-3 rounded-lg border border-zinc-800">
-                                                <Phone size={16} className="text-zinc-500" />
-                                                <div>
-                                                    <p className="text-xs text-zinc-500 uppercase">Referência 3</p>
-                                                    <p className="font-bold text-white">{selectedRequest.references.spousePhone}</p>
+                                    {(() => {
+                                        let extraData: any = {};
+                                        try {
+                                            if (selectedRequest.supplementalDescription) {
+                                                extraData = JSON.parse(selectedRequest.supplementalDescription);
+                                            }
+                                        } catch { /* ignore */ }
+
+                                        const relationshipLabels: Record<string, string> = {
+                                            pai: 'Pai', mae: 'Mãe', irmao: 'Irmão(ã)', conjuge: 'Cônjuge',
+                                            filho: 'Filho(a)', tio: 'Tio(a)', primo: 'Primo(a)',
+                                            amigo: 'Amigo(a)', colega: 'Colega de trabalho', vizinho: 'Vizinho(a)', outro: 'Outro',
+                                        };
+
+                                        return (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                    <p className="text-xs text-zinc-500 uppercase mb-1">Referência 1</p>
+                                                    {extraData.contactTrust1Name && (
+                                                        <p className="font-bold text-white">{extraData.contactTrust1Name}</p>
+                                                    )}
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <Phone size={14} className="text-zinc-500" />
+                                                        <p className="text-white text-sm">{selectedRequest.references.fatherPhone || 'N/A'}</p>
+                                                    </div>
+                                                    {extraData.contactTrust1Relationship && (
+                                                        <p className="text-xs text-[#D4AF37] mt-1">{relationshipLabels[extraData.contactTrust1Relationship] || extraData.contactTrust1Relationship}</p>
+                                                    )}
+                                                </div>
+                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                    <p className="text-xs text-zinc-500 uppercase mb-1">Referência 2</p>
+                                                    {extraData.contactTrust2Name && (
+                                                        <p className="font-bold text-white">{extraData.contactTrust2Name}</p>
+                                                    )}
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <Phone size={14} className="text-zinc-500" />
+                                                        <p className="text-white text-sm">{selectedRequest.references.motherPhone || 'N/A'}</p>
+                                                    </div>
+                                                    {extraData.contactTrust2Relationship && (
+                                                        <p className="text-xs text-[#D4AF37] mt-1">{relationshipLabels[extraData.contactTrust2Relationship] || extraData.contactTrust2Relationship}</p>
+                                                    )}
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
+                                        );
+                                    })()}
                                 </div>
                             )}
 
+                            {/* Dados Profissionais e Endereço da Empresa */}
+                            {selectedRequest.profileType !== 'LIMPA_NOME' && (() => {
+                                let extraData: any = {};
+                                try {
+                                    if (selectedRequest.supplementalDescription) {
+                                        extraData = JSON.parse(selectedRequest.supplementalDescription);
+                                    }
+                                } catch { /* ignore */ }
+
+                                if (!extraData.occupation && !extraData.companyAddress && !extraData.whatsappPersonal) return null;
+
+                                return (
+                                    <div className="bg-zinc-950 border border-zinc-800 p-4 rounded-xl">
+                                        <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider mb-4">Dados Profissionais</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            {extraData.occupation && (
+                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                    <p className="text-xs text-zinc-500 uppercase">Profissão</p>
+                                                    <p className="font-bold text-white">{extraData.occupation}</p>
+                                                </div>
+                                            )}
+                                            {extraData.whatsappPersonal && (
+                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                    <p className="text-xs text-zinc-500 uppercase">WhatsApp Pessoal</p>
+                                                    <p className="font-bold text-white">{extraData.whatsappPersonal}</p>
+                                                </div>
+                                            )}
+                                            {extraData.companyAddress && (
+                                                <>
+                                                    <div className="bg-black p-3 rounded-lg border border-zinc-800 md:col-span-3">
+                                                        <p className="text-xs text-zinc-500 uppercase mb-1">Endereço da Empresa</p>
+                                                        <p className="font-bold text-white">
+                                                            {extraData.companyAddress.street || ''}
+                                                            {extraData.companyAddress.number ? `, ${extraData.companyAddress.number}` : ''}
+                                                            {extraData.companyAddress.neighborhood ? ` - ${extraData.companyAddress.neighborhood}` : ''}
+                                                        </p>
+                                                        <p className="text-sm text-zinc-400">
+                                                            {extraData.companyAddress.city || ''}{extraData.companyAddress.state ? `/${extraData.companyAddress.state}` : ''}
+                                                            {extraData.companyAddress.cep ? ` - CEP: ${extraData.companyAddress.cep}` : ''}
+                                                        </p>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
                             {/* Video Gallery - hide for LIMPA_NOME */}
-                            {selectedRequest.profileType !== 'LIMPA_NOME' && <div className="space-y-4">
+                            {selectedRequest.profileType !== 'LIMPA_NOME' && selectedRequest.documents && <div className="space-y-4">
                                 <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4 flex items-center gap-2">
                                     <Video size={16} /> Validação por Vídeo
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    {selectedRequest.documents.videoSelfieUrl && (
+                                    {selectedRequest.documents?.videoSelfieUrl && (
                                         <VideoCard title="Vídeo do Usuário" url={selectedRequest.documents.videoSelfieUrl} />
                                     )}
-                                    {selectedRequest.documents.videoHouseUrl && (
+                                    {selectedRequest.documents?.videoHouseUrl && (
                                         <VideoCard title="Vídeo da Casa" url={selectedRequest.documents.videoHouseUrl} />
                                     )}
-                                    {selectedRequest.documents.videoVehicleUrl && (
+                                    {selectedRequest.documents?.videoVehicleUrl && (
                                         <VideoCard title="Vídeo do Veículo" url={selectedRequest.documents.videoVehicleUrl} />
                                     )}
-                                    {!selectedRequest.documents.videoSelfieUrl && (
+                                    {!selectedRequest.documents?.videoSelfieUrl && (
                                         <div className="text-zinc-500 italic text-sm p-4">Nenhum vídeo anexado.</div>
                                     )}
                                 </div>
@@ -598,18 +676,18 @@ export const Requests: React.FC = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <DocCard
                                             title="Selfie (Prova de Vida)"
-                                            urls={ensureArray(selectedRequest.documents.selfieUrl)}
-                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.selfieUrl), title: "Selfie" })}
+                                            urls={ensureArray(selectedRequest.documents?.selfieUrl)}
+                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.selfieUrl), title: "Selfie" })}
                                         />
                                         <DocCard
                                             title="RG/CNH (Frente)"
-                                            urls={ensureArray(selectedRequest.documents.idCardUrl)}
-                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.idCardUrl), title: "RG/CNH Frente" })}
+                                            urls={ensureArray(selectedRequest.documents?.idCardUrl)}
+                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.idCardUrl), title: "RG/CNH Frente" })}
                                         />
                                         <DocCard
                                             title="RG/CNH (Verso)"
-                                            urls={ensureArray(selectedRequest.documents.idCardBackUrl || selectedRequest.documents.idCardUrl)}
-                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.idCardBackUrl || selectedRequest.documents.idCardUrl), title: "RG/CNH Verso" })}
+                                            urls={ensureArray(selectedRequest.documents?.idCardBackUrl || selectedRequest.documents?.idCardUrl)}
+                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.idCardBackUrl || selectedRequest.documents?.idCardUrl), title: "RG/CNH Verso" })}
                                         />
                                     </div>
                                 </div>
@@ -620,13 +698,13 @@ export const Requests: React.FC = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <DocCard
                                             title="Comp. Residência"
-                                            urls={ensureArray(selectedRequest.documents.proofOfAddressUrl)}
-                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.proofOfAddressUrl), title: "Comp. Residência" })}
+                                            urls={ensureArray(selectedRequest.documents?.proofOfAddressUrl)}
+                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.proofOfAddressUrl), title: "Comp. Residência" })}
                                         />
                                         <DocCard
                                             title="Comp. Renda"
-                                            urls={ensureArray(selectedRequest.documents.proofIncomeUrl)}
-                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.proofIncomeUrl), title: "Comp. Renda" })}
+                                            urls={ensureArray(selectedRequest.documents?.proofIncomeUrl)}
+                                            onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.proofIncomeUrl), title: "Comp. Renda" })}
                                         />
                                         <DocCard
                                             title="Assinatura Digital"
@@ -638,14 +716,14 @@ export const Requests: React.FC = () => {
                                 </div>
 
                                 {/* Vehicle Documents (Conditional) */}
-                                {selectedRequest.documents.vehicleUrl && ensureArray(selectedRequest.documents.vehicleUrl).length > 0 && (
+                                {selectedRequest.documents?.vehicleUrl && ensureArray(selectedRequest.documents.vehicleUrl).length > 0 && (
                                     <div>
                                         <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4">Garantia Veicular</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                                             <DocCard
                                                 title="Veículo (Fotos)"
-                                                urls={ensureArray(selectedRequest.documents.vehicleUrl)}
-                                                onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents.vehicleUrl), title: "Veículo (Galeria)" })}
+                                                urls={ensureArray(selectedRequest.documents?.vehicleUrl)}
+                                                onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.vehicleUrl), title: "Veículo (Galeria)" })}
                                             />
                                         </div>
                                     </div>
@@ -766,7 +844,7 @@ export const Requests: React.FC = () => {
                         {/* Actions Footer */}
                         {(selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === LoanStatus.WAITING_DOCS || selectedRequest.status === 'RETURNING_PENDING') && (
                             <div className="p-6 border-t border-zinc-800 bg-zinc-950 flex flex-col md:flex-row justify-between items-center gap-4">
-                                <span className="text-xs text-zinc-500 text-center md:text-left">
+                                <span className="text-xs text-zinc-500 text-center md:text-left max-w-md">
                                     {selectedRequest.profileType === 'LIMPA_NOME'
                                         ? 'Ao aprovar, o serviço Limpa Nome será iniciado para este cliente.'
                                         : selectedRequest.profileType === 'MOTO'
@@ -776,16 +854,16 @@ export const Requests: React.FC = () => {
                                                 : 'Se aprovar agora, o saldo será liberado na carteira.'
                                     }
                                 </span>
-                                <div className="flex gap-4 w-full md:w-auto">
+                                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full sm:w-auto">
                                     {/* Request Doc Button */}
-                                    <Button variant="secondary" className="flex-1 md:flex-initial" onClick={() => setIsDocRequestOpen(true)}>
+                                    <Button variant="secondary" className="flex-1 sm:flex-initial" onClick={() => setIsDocRequestOpen(true)}>
                                         <FileWarning size={18} className="mr-2" /> Solicitar Doc.
                                     </Button>
 
-                                    <Button variant="danger" className="flex-1 md:flex-initial" onClick={() => handleReject(selectedRequest.id)} isLoading={processing === selectedRequest.id}>
+                                    <Button variant="danger" className="flex-1 sm:flex-initial" onClick={() => handleReject(selectedRequest.id)} isLoading={processing === selectedRequest.id}>
                                         <X size={18} className="mr-2" /> REPROVAR
                                     </Button>
-                                    <Button variant="gold" className="flex-1 md:flex-initial bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]" onClick={() => handleApprove(selectedRequest.id)} isLoading={processing === selectedRequest.id}>
+                                    <Button variant="gold" className="flex-1 sm:flex-initial bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]" onClick={() => handleApprove(selectedRequest.id)} isLoading={processing === selectedRequest.id}>
                                         <Check size={18} className="mr-2" /> {selectedRequest.profileType === 'LIMPA_NOME' ? 'APROVAR SERVIÇO' :
                                             selectedRequest.profileType === 'MOTO' ? 'APROVAR FINANCIAMENTO' : 'APROVAR EMPRÉSTIMO'}
                                     </Button>
@@ -850,36 +928,44 @@ const VideoCard = ({ title, url }: { title: string, url: string }) => (
     <div className="space-y-2 group">
         <p className="text-xs text-zinc-400 pl-1">{title}</p>
         <div className="rounded-xl border border-zinc-800 bg-black overflow-hidden relative aspect-video">
-            <video
-                src={url}
-                controls
-                playsInline
-                preload="metadata"
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                    const target = e.target as HTMLVideoElement;
-                    target.style.display = 'none';
-                    if (target.parentElement) {
-                        target.parentElement.innerHTML = `
-                            <div class="w-full h-full flex items-center justify-center text-zinc-500 text-sm flex-col gap-3 p-4">
-                                <span>Vídeo não carregou</span>
-                                <a href="${url}" target="_blank" rel="noopener noreferrer" class="bg-[#D4AF37] text-black px-4 py-2 rounded-lg text-sm font-bold hover:opacity-80">📺 Abrir Vídeo</a>
-                                <span class="text-[10px] text-zinc-600">Se o vídeo não abrir, verifique se o arquivo foi enviado corretamente</span>
-                            </div>
-                        `;
-                    }
-                }}
-            />
+            {url ? (
+                <video
+                    src={url}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                        const target = e.target as HTMLVideoElement;
+                        target.style.display = 'none';
+                        if (target.parentElement) {
+                            target.parentElement.innerHTML = `
+                                <div class="w-full h-full flex items-center justify-center text-zinc-500 text-sm flex-col gap-3 p-4">
+                                    <span>Vídeo não carregou</span>
+                                    <a href="${url}" target="_blank" rel="noopener noreferrer" class="bg-[#D4AF37] text-black px-4 py-2 rounded-lg text-sm font-bold hover:opacity-80">📺 Abrir Vídeo</a>
+                                    <span class="text-[10px] text-zinc-600">Se o vídeo não abrir, verifique se o arquivo foi enviado corretamente</span>
+                                </div>
+                            `;
+                        }
+                    }}
+                />
+            ) : (
+                <div className="w-full h-full flex items-center justify-center text-zinc-600 text-sm">
+                    Nenhum vídeo disponível
+                </div>
+            )}
         </div>
         {/* Link direto para baixar/abrir - sempre visível */}
-        <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[10px] text-[#D4AF37] hover:underline flex items-center gap-1"
-        >
-            📥 Baixar / Abrir em nova aba
-        </a>
+        {url && (
+            <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-[#D4AF37] hover:underline flex items-center gap-1"
+            >
+                📥 Baixar / Abrir em nova aba
+            </a>
+        )}
     </div>
 );
 

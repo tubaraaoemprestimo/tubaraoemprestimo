@@ -1,14 +1,10 @@
 /**
- * Open Finance Service
- * Provides credit score consultation, income analysis, and financial health assessment
+ * Open Finance Service - Real API Integration
+ * Credit score consultation, income analysis, and financial health assessment
  */
 
+import { api } from './apiClient';
 import { Customer, CreditScore, IncomeAnalysis, OpenFinanceConsent } from '../types';
-
-// Storage keys
-const SCORES_KEY = 'tubarao_credit_scores';
-const ANALYSES_KEY = 'tubarao_income_analyses';
-const CONSENTS_KEY = 'tubarao_of_consents';
 
 // Score classification based on value
 const getScoreClassification = (score: number): CreditScore['classification'] => {
@@ -19,241 +15,68 @@ const getScoreClassification = (score: number): CreditScore['classification'] =>
     return 'E';
 };
 
-// Generate mock credit score based on customer data
-const generateMockScore = (customer: Customer): CreditScore => {
-    // Calculate factors based on customer data
-    const paymentHistory = customer.status === 'ACTIVE'
-        ? Math.min(100, 60 + Math.random() * 40)
-        : Math.max(0, 40 - Math.random() * 20);
-
-    const debtRatio = customer.totalDebt > 0
-        ? Math.max(0, 100 - (customer.totalDebt / 10000) * 100)
-        : 80 + Math.random() * 20;
-
-    const creditAge = Math.min(100, (new Date().getTime() - new Date(customer.joinedAt).getTime()) / (365 * 24 * 60 * 60 * 1000) * 20);
-
-    const recentInquiries = 70 + Math.random() * 30;
-
-    // Weighted average
-    const score = Math.round(
-        (paymentHistory * 0.35 + debtRatio * 0.30 + creditAge * 0.15 + recentInquiries * 0.20) * 10
-    );
-
-    // Check for restrictions
-    const hasRestriction = customer.status === 'BLOCKED' || customer.totalDebt > 5000;
-
-    return {
-        id: `score-${customer.id}-${Date.now()}`,
-        customerId: customer.id,
-        score: Math.min(1000, Math.max(0, score)),
-        classification: getScoreClassification(score),
-        source: 'INTERNAL',
-        consultedAt: new Date().toISOString(),
-        factors: {
-            paymentHistory: Math.round(paymentHistory),
-            debtRatio: Math.round(debtRatio),
-            creditAge: Math.round(creditAge),
-            recentInquiries: Math.round(recentInquiries)
-        },
-        restrictions: hasRestriction ? {
-            hasRestriction: true,
-            type: customer.status === 'BLOCKED' ? 'Inadimplência' : 'Dívida em Aberto',
-            value: customer.totalDebt,
-            origin: 'Sistema Interno'
-        } : undefined
-    };
+// Consult credit score via API
+const consultScore = async (customerId: string, source: 'INTERNAL' | 'SERASA' | 'SPC' = 'INTERNAL'): Promise<CreditScore> => {
+    const { data, error } = await api.post<CreditScore>(`/open-finance/score/${customerId}`, { source });
+    if (error || !data) throw new Error('Erro ao consultar score');
+    return data;
 };
 
-// Simulate Serasa/SPC consultation
-const consultExternalScore = async (customer: Customer, source: 'SERASA' | 'SPC'): Promise<CreditScore> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    const baseScore = generateMockScore(customer);
-
-    // Add some variation for external source
-    const variation = (Math.random() - 0.5) * 100;
-    const externalScore = Math.min(1000, Math.max(0, baseScore.score + variation));
-
-    return {
-        ...baseScore,
-        id: `${source.toLowerCase()}-${customer.id}-${Date.now()}`,
-        score: Math.round(externalScore),
-        classification: getScoreClassification(externalScore),
-        source,
-        restrictions: Math.random() > 0.7 ? {
-            hasRestriction: true,
-            type: 'Pendência Financeira',
-            value: Math.round(Math.random() * 5000),
-            origin: source === 'SERASA' ? 'Serasa Experian' : 'SPC Brasil'
-        } : undefined
-    };
+// Get score history via API
+const getScores = async (customerId?: string): Promise<CreditScore[]> => {
+    if (!customerId) return [];
+    const { data, error } = await api.get<CreditScore[]>(`/open-finance/scores/${customerId}`);
+    if (error || !data) return [];
+    return data;
 };
 
-// Analyze income and calculate commitment
-const analyzeIncome = (customer: Customer, declaredIncome?: number): IncomeAnalysis => {
-    const monthlyIncome = declaredIncome || customer.monthlyIncome || 3000;
-
-    // Simulate average balance (mock)
-    const averageBalance = monthlyIncome * (0.5 + Math.random() * 0.5);
-
-    // Determine income source based on patterns
-    const incomeSource: IncomeAnalysis['incomeSource'] =
-        monthlyIncome > 10000 ? 'BUSINESS' :
-            monthlyIncome > 5000 ? 'SALARY' :
-                'FREELANCE';
-
-    // Determine stability
-    const stability: IncomeAnalysis['stability'] =
-        incomeSource === 'SALARY' ? 'HIGH' :
-            incomeSource === 'BUSINESS' ? 'MEDIUM' :
-                'LOW';
-
-    // Calculate current commitment (debt / income ratio)
-    const currentCommitment = Math.min(100, (customer.totalDebt / monthlyIncome) * 100);
-
-    // Brazilian regulation: max 30% commitment for new loans
-    const maxCommitment = 30;
-    const availableCommitment = Math.max(0, maxCommitment - currentCommitment);
-
-    // Calculate max loan amount based on available commitment
-    // Assuming 12-month loan
-    const maxLoanAmount = (monthlyIncome * (availableCommitment / 100)) * 12;
-
-    // Recommendation
-    let recommendation: IncomeAnalysis['recommendation'];
-    if (availableCommitment >= 20 && customer.status === 'ACTIVE') {
-        recommendation = 'APPROVE';
-    } else if (availableCommitment >= 10 && customer.status === 'ACTIVE') {
-        recommendation = 'REVIEW';
-    } else {
-        recommendation = 'DENY';
-    }
-
-    return {
-        id: `analysis-${customer.id}-${Date.now()}`,
-        customerId: customer.id,
-        analyzedAt: new Date().toISOString(),
-        monthlyIncome,
-        averageBalance: Math.round(averageBalance),
-        incomeSource,
-        stability,
-        currentCommitment: Math.round(currentCommitment * 10) / 10,
-        availableCommitment: Math.round(availableCommitment * 10) / 10,
-        maxLoanAmount: Math.round(maxLoanAmount),
-        recommendation
-    };
+// Analyze income via API
+const analyzeIncome = async (customerId: string, declaredIncome?: number): Promise<IncomeAnalysis> => {
+    const { data, error } = await api.post<IncomeAnalysis>(`/open-finance/income-analysis/${customerId}`, { declaredIncome });
+    if (error || !data) throw new Error('Erro ao analisar renda');
+    return data;
 };
 
-// Create Open Finance consent
-const createConsent = (customerId: string, scope: OpenFinanceConsent['scope']): OpenFinanceConsent => {
-    const consent: OpenFinanceConsent = {
-        id: `consent-${customerId}-${Date.now()}`,
-        customerId,
-        grantedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days
-        scope,
-        status: 'ACTIVE'
-    };
-
-    saveConsent(consent);
-    return consent;
+// Get analysis history via API
+const getAnalyses = async (customerId?: string): Promise<IncomeAnalysis[]> => {
+    if (!customerId) return [];
+    const { data, error } = await api.get<IncomeAnalysis[]>(`/open-finance/analyses/${customerId}`);
+    if (error || !data) return [];
+    return data;
 };
 
-// Storage operations
-const getScores = (customerId?: string): CreditScore[] => {
-    const data = localStorage.getItem(SCORES_KEY);
-    const scores: CreditScore[] = data ? JSON.parse(data) : [];
-    return customerId ? scores.filter(s => s.customerId === customerId) : scores;
+// Create consent via API
+const createConsent = async (customerId: string, scope: OpenFinanceConsent['scope']): Promise<OpenFinanceConsent> => {
+    const { data, error } = await api.post<OpenFinanceConsent>('/open-finance/consent', { customerId, scope });
+    if (error || !data) throw new Error('Erro ao criar consentimento');
+    return data;
 };
 
-const saveScore = (score: CreditScore): void => {
-    const scores = getScores();
-    scores.push(score);
-    localStorage.setItem(SCORES_KEY, JSON.stringify(scores));
+// Get consents via API
+const getConsents = async (customerId?: string): Promise<OpenFinanceConsent[]> => {
+    if (!customerId) return [];
+    const { data, error } = await api.get<OpenFinanceConsent[]>(`/open-finance/consents/${customerId}`);
+    if (error || !data) return [];
+    return data;
 };
 
-const getAnalyses = (customerId?: string): IncomeAnalysis[] => {
-    const data = localStorage.getItem(ANALYSES_KEY);
-    const analyses: IncomeAnalysis[] = data ? JSON.parse(data) : [];
-    return customerId ? analyses.filter(a => a.customerId === customerId) : analyses;
+// Revoke consent via API
+const revokeConsent = async (consentId: string): Promise<void> => {
+    const { error } = await api.put(`/open-finance/consent/${consentId}/revoke`, {});
+    if (error) throw new Error('Erro ao revogar consentimento');
 };
 
-const saveAnalysis = (analysis: IncomeAnalysis): void => {
-    const analyses = getAnalyses();
-    analyses.push(analysis);
-    localStorage.setItem(ANALYSES_KEY, JSON.stringify(analyses));
-};
-
-const getConsents = (customerId?: string): OpenFinanceConsent[] => {
-    const data = localStorage.getItem(CONSENTS_KEY);
-    const consents: OpenFinanceConsent[] = data ? JSON.parse(data) : [];
-    return customerId ? consents.filter(c => c.customerId === customerId) : consents;
-};
-
-const saveConsent = (consent: OpenFinanceConsent): void => {
-    const consents = getConsents();
-    const existingIndex = consents.findIndex(c => c.id === consent.id);
-    if (existingIndex >= 0) {
-        consents[existingIndex] = consent;
-    } else {
-        consents.push(consent);
-    }
-    localStorage.setItem(CONSENTS_KEY, JSON.stringify(consents));
-};
-
-const revokeConsent = (consentId: string): void => {
-    const consents = getConsents();
-    const consent = consents.find(c => c.id === consentId);
-    if (consent) {
-        consent.status = 'REVOKED';
-        saveConsent(consent);
-    }
-};
-
-// Full credit analysis
-const performFullAnalysis = async (customer: Customer): Promise<{
+// Full credit analysis via API
+const performFullAnalysis = async (customer: Customer, declaredIncome?: number): Promise<{
     internalScore: CreditScore;
     serasaScore: CreditScore;
     incomeAnalysis: IncomeAnalysis;
     overallRecommendation: 'APPROVE' | 'REVIEW' | 'DENY';
     suggestedLimit: number;
 }> => {
-    // Get internal score
-    const internalScore = generateMockScore(customer);
-    saveScore(internalScore);
-
-    // Consult Serasa
-    const serasaScore = await consultExternalScore(customer, 'SERASA');
-    saveScore(serasaScore);
-
-    // Analyze income
-    const incomeAnalysis = analyzeIncome(customer);
-    saveAnalysis(incomeAnalysis);
-
-    // Calculate overall recommendation
-    const avgScore = (internalScore.score + serasaScore.score) / 2;
-    let overallRecommendation: 'APPROVE' | 'REVIEW' | 'DENY';
-
-    if (avgScore >= 600 && incomeAnalysis.recommendation === 'APPROVE' && !serasaScore.restrictions?.hasRestriction) {
-        overallRecommendation = 'APPROVE';
-    } else if (avgScore >= 400 && incomeAnalysis.recommendation !== 'DENY') {
-        overallRecommendation = 'REVIEW';
-    } else {
-        overallRecommendation = 'DENY';
-    }
-
-    // Suggested limit based on score and income
-    const scoreFactor = avgScore / 1000;
-    const suggestedLimit = Math.round(incomeAnalysis.maxLoanAmount * scoreFactor);
-
-    return {
-        internalScore,
-        serasaScore,
-        incomeAnalysis,
-        overallRecommendation,
-        suggestedLimit
-    };
+    const { data, error } = await api.post<any>(`/open-finance/full-analysis/${customer.id}`, { declaredIncome });
+    if (error || !data) throw new Error('Erro ao realizar análise completa');
+    return data;
 };
 
 // Get classification color
@@ -279,18 +102,20 @@ const getRecommendationColor = (recommendation: IncomeAnalysis['recommendation']
 };
 
 export const openFinanceService = {
-    generateMockScore,
-    consultExternalScore,
-    analyzeIncome,
-    createConsent,
+    consultScore,
     getScores,
-    saveScore,
+    analyzeIncome,
     getAnalyses,
-    saveAnalysis,
+    createConsent,
     getConsents,
     revokeConsent,
     performFullAnalysis,
     getClassificationColor,
     getRecommendationColor,
-    getScoreClassification
+    getScoreClassification,
+    // Legacy compatibility
+    generateMockScore: (customer: Customer) => consultScore(customer.id, 'INTERNAL'),
+    consultExternalScore: (customer: Customer, source: 'SERASA' | 'SPC') => consultScore(customer.id, source),
+    saveScore: () => { /* no-op: saved via API */ },
+    saveAnalysis: () => { /* no-op: saved via API */ },
 };

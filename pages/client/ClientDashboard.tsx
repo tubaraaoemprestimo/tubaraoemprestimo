@@ -1,31 +1,34 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronRight, Wallet, Plus, Calendar, FileText, TrendingUp, X, Percent, Eye, EyeOff, Gift, Tag, Sparkles, AlertTriangle, Upload, CheckCircle, Calculator, Ticket, Megaphone, Briefcase, Download } from 'lucide-react';
+import { Bell, ChevronRight, Wallet, Plus, Calendar, FileText, TrendingUp, X, Percent, Eye, EyeOff, Gift, Tag, Sparkles, AlertTriangle, Upload, CheckCircle, Calculator, Ticket, Megaphone, Briefcase, Download, History, Clock } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Skeleton } from '../../components/Skeleton';
-import { supabaseService } from '../../services/supabaseService';
+import { apiService } from '../../services/apiService';
 import { useToast } from '../../components/Toast';
 import { LoanTimeline } from '../../components/LoanTimeline';
 import { LoanRequest, Campaign, LoanStatus } from '../../types';
+import { api } from '../../services/apiClient';
 import { MarketingPopup } from '../../components/MarketingPopup';
 import { Logo } from '../../components/Logo';
 import { referralService } from '../../services/referralService';
 import { locationTrackingService } from '../../services/locationTrackingService';
+import { antifraudService } from '../../services/antifraudService';
 
 export const ClientDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  // ... state declarations ...
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isRenegotiateOpen, setIsRenegotiateOpen] = useState(false);
+  const [isNivelOuroOpen, setIsNivelOuroOpen] = useState(false);
   const [isPrivacyEnabled, setIsPrivacyEnabled] = useState(false);
   const [pendingRequest, setPendingRequest] = useState<LoanRequest | null>(null);
   const [activeCampaigns, setActiveCampaigns] = useState<Campaign[]>([]);
   const [preApprovedAmount, setPreApprovedAmount] = useState<number | null>(null);
   const [referralCode, setReferralCode] = useState<string>('');
 
-  // Propostas e Cupons
+  // ... other states ...
   const [installmentOffer, setInstallmentOffer] = useState<{
     amount: number;
     installments: number;
@@ -34,26 +37,38 @@ export const ClientDashboard: React.FC = () => {
     totalAmount: number;
     createdAt: string;
   } | null>(null);
-  const [coupons, setCoupons] = useState<{ code: string; discount: number; description: string; expiresAt: string }[]>([]);
+  const [coupons, setCoupons] = useState<{
+    id: string;
+    code: string;
+    discount: number;
+    description: string;
+    expiresAt: string;
+    imageUrl?: string;
+    partnerName?: string;
+    partnerLogo?: string;
+    usageLimit?: number;
+    usageCount?: number;
+  }[]>([]);
   const [realNotifications, setRealNotifications] = useState<{ id: string; title: string; message: string; type: string; created_at: string; read: boolean }[]>([]);
 
-  // Modais separados para Campanhas, Cupons e Ofertas
+  // ... modals ...
   const [isCampaignsModalOpen, setIsCampaignsModalOpen] = useState(false);
   const [isCouponsModalOpen, setIsCouponsModalOpen] = useState(false);
   const [isOffersModalOpen, setIsOffersModalOpen] = useState(false);
-
-  // Upload Modal for Waiting Docs
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
-
-  // Contract PDF
   const [contractPdfUrl, setContractPdfUrl] = useState<string | null>(null);
+const [loanHistory, setLoanHistory] = useState<LoanRequest[]>([]);
+const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
-  // Renegotiation State
-  const [renegotiateInstallments, setRenegotiateInstallments] = useState(12);
-  const [simulationResult, setSimulationResult] = useState({ monthly: 0, total: 0 });
+  // Nível Ouro Tubarão
+  const [nivelOuroEligibility, setNivelOuroEligibility] = useState<{
+    eligible: boolean;
+    reason: string;
+  } | null>(null);
+  const [activeLoanId, setActiveLoanId] = useState<string | null>(null);
 
-  // Dynamic Data State
+  // ... userData ...
   const [userData, setUserData] = useState({
     name: '',
     balance: 0,
@@ -66,45 +81,53 @@ export const ClientDashboard: React.FC = () => {
 
     // Capturar localização do cliente em background (silencioso)
     locationTrackingService.captureAndSave().catch(() => { });
-  }, []);
 
-  // Recalculate simulation when balance or installments change
-  useEffect(() => {
-    if (userData.balance > 0) {
-      // Mock calculation: Balance * (1 + 0.05 rate)^months / months (Simplified amortization)
-      const rate = 0.05; // 5% mock interest for renegotiation
-      const totalWithInterest = userData.balance * (1 + (rate * (renegotiateInstallments / 12)));
-      const monthly = totalWithInterest / renegotiateInstallments;
-      setSimulationResult({
-        monthly,
-        total: totalWithInterest
-      });
-    }
-  }, [renegotiateInstallments, userData.balance]);
+    // Verificar se dispositivo é permitido (max 2 devices)
+    antifraudService.checkDevice().then(({ allowed, message }) => {
+      if (!allowed) {
+        addToast(message || 'Acesso bloqueado: Limite de dispositivos atingido.', 'error');
+        setTimeout(() => {
+          apiService.auth.signOut().then(() => navigate('/login'));
+        }, 3000);
+      }
+    });
+
+    // Subscribe to Web Push Notifications
+    import('../../services/webPushService').then(({ webPushService }) => {
+      webPushService.subscribe();
+    });
+
+  }, []);
 
   const loadDashboardData = async () => {
     setLoading(true);
-    const user = supabaseService.auth.getUser();
-    const loans = await supabaseService.getClientLoans();
-    const pendingReq = await supabaseService.getClientPendingRequest();
-    const campaigns = await supabaseService.getActiveCampaigns();
-    const preApproved = await supabaseService.getPreApproval();
+    const user = apiService.auth.getUser();
+    const loans = await apiService.getClientLoans() as any[];
+    const pendingReq = await apiService.getClientPendingRequest();
+    const campaigns = await apiService.getActiveCampaigns() as any[];
+    const preApproved = await apiService.getPreApproval();
 
     // Buscar oferta de parcelamento e cupons
-    const offer = await supabaseService.getClientInstallmentOffer();
-    const clientCoupons = await supabaseService.getClientCoupons();
+    const offer = await apiService.getClientInstallmentOffer();
+    const clientCoupons = await apiService.getClientCoupons();
 
     // Buscar notificações reais do banco
-    const notifs = await supabaseService.getClientNotifications();
+    const notifs = await apiService.getClientNotifications();
     setRealNotifications(notifs);
 
     let totalDebt = 0;
     let nextInstDate = '--/--';
     let nextInstVal = 0;
+    let activeLoan: string | null = null;
 
     if (loans.length > 0) {
       const activeLoans = loans.filter(l => l.status === 'APPROVED');
       totalDebt = activeLoans.reduce((acc, curr) => acc + curr.remainingAmount, 0);
+
+      // Pegar o primeiro empréstimo ativo para verificar elegibilidade Nível Ouro
+      if (activeLoans.length > 0) {
+        activeLoan = activeLoans[0].id;
+      }
 
       const allInstallments = activeLoans.flatMap(l => l.installments).filter(i => i.status === 'OPEN' || i.status === 'LATE');
       allInstallments.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
@@ -123,6 +146,18 @@ export const ClientDashboard: React.FC = () => {
       nextInstallmentValue: nextInstVal
     });
 
+    setActiveLoanId(activeLoan);
+
+    // Verificar elegibilidade para Nível Ouro
+    if (activeLoan) {
+      try {
+        const { data } = await api.get(`/loans/${activeLoan}/nivel-ouro/eligibility`);
+        setNivelOuroEligibility(data);
+      } catch (err) {
+        console.error('Erro ao verificar elegibilidade Nível Ouro:', err);
+      }
+    }
+
     setPendingRequest(pendingReq);
     setActiveCampaigns(campaigns);
     setPreApprovedAmount(preApproved);
@@ -131,7 +166,7 @@ export const ClientDashboard: React.FC = () => {
 
     // Buscar URL do contrato PDF (se existir)
     try {
-      const latestReq = await supabaseService.getClientLatestRequest();
+      const latestReq = await apiService.getClientLatestRequest();
       if (latestReq) {
         // Tentar campo dedicado primeiro, depois fallback para supplemental_description
         let pdfUrl = latestReq.contract_pdf_url;
@@ -145,17 +180,39 @@ export const ClientDashboard: React.FC = () => {
       }
     } catch { }
 
-    if (user) {
+if (user) {
       const code = await referralService.getOrCreateCode(user.id, user.name);
       setReferralCode(code.code);
+
+      // Buscar histórico de solicitações (GET /loan-requests filtra por JWT auth)
+      const { data: historyData } = await api.get('/loan-requests');
+      if (historyData) {
+        setLoanHistory(historyData as LoanRequest[]);
+      }
     }
 
     setLoading(false);
   };
 
-  const handleRenegotiateSubmit = () => {
-    addToast(`Proposta de ${renegotiateInstallments}x de R$ ${simulationResult.monthly.toFixed(2)} enviada!`, 'success');
-    setIsRenegotiateOpen(false);
+  const handleNivelOuroSubmit = async () => {
+    if (!activeLoanId) {
+      addToast('Nenhum empréstimo ativo encontrado', 'error');
+      return;
+    }
+
+    try {
+      const { data } = await api.post(`/loans/${activeLoanId}/nivel-ouro`);
+      addToast('🟢 Nível Ouro Tubarão ativado com sucesso!', 'success');
+      setIsNivelOuroOpen(false);
+
+      // Recarregar dados do dashboard
+      setTimeout(() => {
+        loadDashboardData();
+      }, 1000);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || 'Erro ao ativar Nível Ouro';
+      addToast(errorMsg, 'error');
+    }
   };
 
   const handleShare = async () => {
@@ -187,7 +244,7 @@ export const ClientDashboard: React.FC = () => {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const result = reader.result as string;
-        await supabaseService.uploadSupplementalDoc(pendingRequest.id, result);
+        await apiService.uploadSupplementalDoc(pendingRequest.id, result);
         setUploadingDoc(false);
         setIsUploadModalOpen(false);
         addToast("Documento enviado! Sua análise continuará.", 'success');
@@ -273,180 +330,218 @@ export const ClientDashboard: React.FC = () => {
         </div>
       </header>
 
-      <main className="p-6 max-w-lg mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-        <div className="pl-1">
-          <h1 className="text-zinc-500 text-sm font-medium tracking-wide">Bem-vindo de volta,</h1>
-          {loading ? <Skeleton className="h-8 w-48 mt-1" /> : <h2 className="text-2xl font-bold text-white tracking-tight">{userData.name}</h2>}
+      <main className="max-w-lg mx-auto animate-in slide-in-from-bottom-4 duration-500">
+
+        {/* Saudação */}
+        <div className="px-5 pt-5 pb-3">
+          {loading ? <Skeleton className="h-7 w-44" /> : (
+            <h2 className="text-2xl font-bold text-white">Bem-vindo, {userData.name.split(' ')[0]}</h2>
+          )}
         </div>
 
-        {/* Pre-Approved Offer Banner */}
+        {/* Alerts dinâmicos */}
         {preApprovedAmount && (
-          <div className="bg-gradient-to-r from-[#D4AF37] to-[#FDB931] rounded-2xl p-4 shadow-lg shadow-[#D4AF37]/20 relative overflow-hidden animate-pulse">
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <Sparkles size={64} className="text-black" />
-            </div>
-            <div className="relative z-10 text-black">
-              <div className="flex items-center gap-2 mb-1">
-                <Sparkles size={16} />
-                <span className="text-xs font-bold uppercase tracking-wider">Oferta Especial</span>
-              </div>
-              <h3 className="text-lg font-bold leading-tight mb-2">Crédito Pré-Aprovado</h3>
-              <div className="text-3xl font-extrabold mb-3">R$ {preApprovedAmount.toLocaleString()}</div>
-              <Button
-                onClick={() => navigate(`/wizard?amount=${preApprovedAmount}`)}
-                className="w-full bg-black text-[#D4AF37] hover:bg-zinc-800 border-none"
-              >
-                Contratar Agora
-              </Button>
+          <div className="mx-4 mb-3 bg-gradient-to-r from-[#D4AF37] to-[#FDB931] rounded-xl p-3.5 relative overflow-hidden">
+            <div className="absolute right-3 top-2 opacity-20"><Sparkles size={40} className="text-black" /></div>
+            <div className="text-black">
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5">Oferta Especial</p>
+              <p className="text-base font-bold mb-1">Crédito Pré-Aprovado — R$ {preApprovedAmount.toLocaleString()}</p>
+              <button onClick={() => navigate(`/wizard?amount=${preApprovedAmount}`)} className="text-xs font-bold bg-black text-[#D4AF37] px-3 py-1.5 rounded-lg">
+                Contratar Agora →
+              </button>
             </div>
           </div>
         )}
 
-        {/* Waiting Docs Action Card */}
         {pendingRequest && pendingRequest.status === LoanStatus.WAITING_DOCS && (
-          <div className="bg-blue-900/20 border border-blue-500/50 rounded-2xl p-4 flex flex-col gap-3">
-            <div className="flex items-center gap-3 text-blue-400 font-bold">
-              <AlertTriangle size={20} /> Pendência na Análise
+          <div className="mx-4 mb-3 bg-blue-900/20 border border-blue-500/40 rounded-xl p-3.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-blue-400">
+              <AlertTriangle size={16} />
+              <span className="text-sm font-bold">Documento pendente</span>
             </div>
-            <p className="text-sm text-zinc-300">
-              Precisamos de um documento complementar: <br />
-              <span className="text-white font-bold italic">"{pendingRequest.supplementalInfo?.description}"</span>
-            </p>
-            <Button onClick={() => setIsUploadModalOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none">
-              <Upload size={16} className="mr-2" /> Enviar Documento
-            </Button>
+            <button onClick={() => setIsUploadModalOpen(true)} className="text-xs font-bold bg-blue-600 text-white px-3 py-1.5 rounded-lg shrink-0">
+              Enviar
+            </button>
           </div>
         )}
 
-        {/* Loan Progress Timeline */}
-        {pendingRequest && (
-          <LoanTimeline
-            status={pendingRequest.status}
-            date={pendingRequest.date}
-            amount={pendingRequest.amount}
-            installments={pendingRequest.installments}
-          />
-        )}
+        {pendingRequest && <div className="px-4 mb-3"><LoanTimeline status={pendingRequest.status} date={pendingRequest.date} amount={pendingRequest.amount} installments={pendingRequest.installments} /></div>}
 
-        {/* Contract PDF Download Card */}
         {contractPdfUrl && (
-          <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-green-900/20 rounded-2xl p-4 border border-green-500/30 flex items-center gap-4">
-            <div className="bg-green-500/20 p-3 rounded-xl">
-              <FileText size={24} className="text-green-400" />
-            </div>
-            <div className="flex-1">
-              <p className="font-bold text-white text-sm">Contrato Assinado</p>
-              <p className="text-xs text-zinc-400">Seu contrato foi gerado em PDF</p>
-            </div>
-            <a href={contractPdfUrl} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-sm transition-all shrink-0">
-              <Download size={16} /> Baixar PDF
+          <div className="mx-4 mb-3 bg-zinc-900 border border-green-500/30 rounded-xl p-3 flex items-center gap-3">
+            <div className="bg-green-500/20 p-2 rounded-lg"><FileText size={18} className="text-green-400" /></div>
+            <p className="flex-1 text-xs font-bold text-white">Contrato disponível em PDF</p>
+            <a href={contractPdfUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold bg-green-600 text-white px-3 py-1.5 rounded-lg shrink-0 flex items-center gap-1">
+              <Download size={12} /> Baixar
             </a>
           </div>
         )}
 
-        {/* Main Debt Card */}
-        <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-[#D4AF37]/10 rounded-3xl p-6 border border-zinc-800 relative overflow-hidden shadow-2xl">
-          <div className="relative z-10">
+        {/* ── CARD SALDO DEVEDOR ── */}
+        <div className="mx-4 mb-4 bg-[#1a1a1a] rounded-2xl overflow-hidden border border-zinc-800 shadow-xl">
+          {/* Topo do card */}
+          <div className="p-5 pb-4">
             <div className="flex items-center gap-2 text-zinc-400 mb-2">
-              <Wallet size={16} />
-              <span className="text-xs font-bold uppercase tracking-widest">Saldo Devedor</span>
+              <Wallet size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-widest">Saldo Devedor</span>
             </div>
-
-            {loading ? <Skeleton className="h-10 w-40 mb-8" /> : (
-              <div className="text-4xl font-bold text-[#D4AF37] mb-8 transition-all">
-                {formatCurrency(userData.balance)}
+            {loading ? <Skeleton className="h-10 w-36" /> : (
+              <div className="text-[2.2rem] font-bold text-white leading-none">
+                {isPrivacyEnabled ? 'R$ ••••••' : (
+                  <>
+                    <span className="text-xl font-semibold text-zinc-300">R$ </span>
+                    {userData.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </>
+                )}
               </div>
             )}
+          </div>
 
-            <div className="flex items-center justify-between p-4 bg-black/40 rounded-xl border border-zinc-800/50 mb-6">
-              <div>
-                <div className="text-[10px] text-zinc-500 uppercase">Próxima Parcela</div>
-                <div className="text-white font-semibold flex items-center gap-2">
-                  <Calendar size={14} className="text-shark" />
-                  {loading ? <Skeleton className="h-4 w-16" /> : userData.nextDue}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] text-zinc-500 uppercase">Valor</div>
-                <div className="text-white font-bold">
-                  {loading ? <Skeleton className="h-4 w-20 ml-auto" /> : formatCurrency(userData.nextInstallmentValue)}
-                </div>
+          {/* Próxima parcela */}
+          <div className="mx-4 mb-4 bg-black/50 rounded-xl p-3.5 flex items-center justify-between">
+            <div>
+              <p className="text-[9px] text-zinc-500 uppercase tracking-widest mb-1">Próxima Parcela</p>
+              <div className="flex items-center gap-1.5">
+                <Calendar size={13} className="text-[#FF0000]" />
+                <span className="text-white font-bold text-sm">
+                  {loading ? '...' : (() => {
+                    const parts = userData.nextDue.split('/');
+                    return parts.length >= 2 ? (
+                      <><span className="text-white font-extrabold">{parts[0]}/{parts[1]}</span>{parts[2] ? `/${parts[2]}` : ''}</>
+                    ) : userData.nextDue;
+                  })()}
+                </span>
               </div>
             </div>
-
-            <Button onClick={() => navigate('/client/contracts')} className="w-full bg-shark hover:bg-red-600 shadow-lg" disabled={loading || userData.balance === 0}>
-              Pagar Parcela <ChevronRight size={18} />
-            </Button>
+            <div className="text-right">
+              <p className="text-[9px] text-zinc-500 uppercase tracking-widest mb-1">Valor</p>
+              <span className="text-white font-bold text-sm">
+                {loading ? '...' : formatCurrency(userData.nextInstallmentValue)}
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-4 gap-3">
-          <ActionButton icon={Briefcase} label="Solicitar" onClick={() => navigate('/client/wizard')} />
-          <ActionButton icon={FileText} label="Contratos" onClick={() => navigate('/client/contracts')} />
-          <ActionButton icon={TrendingUp} label="Extrato" onClick={() => navigate('/client/statement')} />
-          <ActionButton icon={Percent} label="Renegociar" onClick={() => setIsRenegotiateOpen(true)} disabled={userData.balance === 0} />
-        </div>
-
-        {/* Cards de Acesso: Ofertas, Cupons, Campanhas */}
-        <div className="grid grid-cols-3 gap-3">
-          {/* Ofertas/Propostas */}
+          {/* Botão Pagar Parcela */}
           <button
-            onClick={() => setIsOffersModalOpen(true)}
-            className="relative flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-emerald-900/30 to-emerald-900/10 border border-emerald-600/50 hover:border-emerald-400 transition-all"
+            onClick={() => navigate('/client/contracts')}
+            disabled={loading || userData.balance === 0}
+            className="w-full bg-[#FF0000] hover:bg-red-700 active:bg-red-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm tracking-widest uppercase py-4 flex items-center justify-center gap-2 transition-all"
           >
-            <Calculator size={24} className="text-emerald-400" />
+            PAGAR PARCELA <ChevronRight size={18} />
+          </button>
+        </div>
+
+        {/* ── MEUS SERVIÇOS ── */}
+        <div className="px-4 mb-1">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Meus Serviços</p>
+        </div>
+
+        <div className="mx-4 rounded-2xl overflow-hidden border border-zinc-800 bg-[#1a1a1a] mb-4">
+          {/* Solicitar Crédito */}
+          <button onClick={() => navigate('/client/wizard')} className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-zinc-800/50 active:bg-zinc-800 transition-all border-b border-zinc-800">
+            <div className="w-9 h-9 rounded-lg bg-[#FF0000] flex items-center justify-center shrink-0">
+              <Plus size={18} strokeWidth={2.5} className="text-white" />
+            </div>
+            <span className="flex-1 text-left text-sm font-semibold text-white">Solicitar Crédito</span>
+            <ChevronRight size={16} className="text-zinc-500" />
+          </button>
+
+          {/* Meus Contratos */}
+          <button onClick={() => navigate('/client/contracts')} className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-zinc-800/50 active:bg-zinc-800 transition-all border-b border-zinc-800">
+            <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0">
+              <FileText size={18} className="text-zinc-300" />
+            </div>
+            <span className="flex-1 text-left text-sm font-semibold text-white">Meus Contratos</span>
+            <ChevronRight size={16} className="text-zinc-500" />
+          </button>
+
+          {/* Extrato */}
+          <button onClick={() => navigate('/client/statement')} className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-zinc-800/50 active:bg-zinc-800 transition-all">
+            <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0">
+              <TrendingUp size={18} className="text-zinc-300" />
+            </div>
+            <span className="flex-1 text-left text-sm font-semibold text-white">Extrato</span>
+            <ChevronRight size={16} className="text-zinc-500" />
+          </button>
+        </div>
+
+        {/* ── OPORTUNIDADES ── */}
+        <div className="px-4 mb-1">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Oportunidades</p>
+        </div>
+
+        {/* Linha 1: Ofertas, Cupons, Campanhas */}
+        <div className="mx-4 grid grid-cols-3 gap-2 mb-2">
+          <button onClick={() => setIsOffersModalOpen(true)} className="relative flex items-center gap-2.5 px-3 py-3 rounded-xl bg-[#1a2a1e] border border-emerald-900/60 hover:border-emerald-600 active:scale-95 transition-all">
+            <Calculator size={18} className="text-emerald-400 shrink-0" />
             <span className="text-xs font-bold text-white">Ofertas</span>
             {(preApprovedAmount || installmentOffer) && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-black text-xs font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 text-black text-[9px] font-bold rounded-full flex items-center justify-center">
                 {(preApprovedAmount ? 1 : 0) + (installmentOffer ? 1 : 0)}
               </span>
             )}
           </button>
-
-          {/* Cupons */}
-          <button
-            onClick={() => setIsCouponsModalOpen(true)}
-            className="relative flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-purple-900/30 to-purple-900/10 border border-purple-600/50 hover:border-purple-400 transition-all"
-          >
-            <Ticket size={24} className="text-purple-400" />
+          <button onClick={() => setIsCouponsModalOpen(true)} className="relative flex items-center gap-2.5 px-3 py-3 rounded-xl bg-[#1e1a2a] border border-purple-900/60 hover:border-purple-600 active:scale-95 transition-all">
+            <Ticket size={18} className="text-purple-400 shrink-0" />
             <span className="text-xs font-bold text-white">Cupons</span>
             {coupons.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 text-white text-xs font-bold rounded-full flex items-center justify-center">{coupons.length}</span>
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{coupons.length}</span>
             )}
           </button>
-
-          {/* Campanhas */}
-          <button
-            onClick={() => setIsCampaignsModalOpen(true)}
-            className="relative flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-amber-900/30 to-amber-900/10 border border-amber-600/50 hover:border-amber-400 transition-all"
-          >
-            <Megaphone size={24} className="text-amber-400" />
+          <button onClick={() => setIsCampaignsModalOpen(true)} className="relative flex items-center gap-2.5 px-3 py-3 rounded-xl bg-[#2a221a] border border-amber-900/60 hover:border-amber-600 active:scale-95 transition-all">
+            <Megaphone size={18} className="text-amber-400 shrink-0" />
             <span className="text-xs font-bold text-white">Campanhas</span>
             {activeCampaigns.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-black text-xs font-bold rounded-full flex items-center justify-center">{activeCampaigns.length}</span>
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-black text-[9px] font-bold rounded-full flex items-center justify-center">{activeCampaigns.length}</span>
             )}
           </button>
         </div>
 
-        {/* Refer a Friend Banner */}
-        <div onClick={handleShare} className="bg-gradient-to-r from-zinc-900 to-black border border-zinc-800 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-[#D4AF37]/30 transition-colors active:scale-95">
-          <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37] shrink-0">
-            <Gift size={24} />
+        {/* Linha 2: Nível Ouro, Indicações, Histórico */}
+        <div className="mx-4 bg-[#1a1a1a] border border-zinc-800 rounded-2xl overflow-hidden mb-2">
+          <div className="grid grid-cols-3">
+            <button
+              onClick={() => {
+                if (nivelOuroEligibility?.eligible) {
+                  setIsNivelOuroOpen(true);
+                } else {
+                  addToast(nivelOuroEligibility?.reason || 'Você não está elegível para o Nível Ouro Tubarão', 'info');
+                }
+              }}
+              disabled={!activeLoanId}
+              className="flex flex-col items-center gap-2 py-4 hover:bg-zinc-800/50 disabled:opacity-40 transition-all border-r border-zinc-800 active:scale-95"
+            >
+              <div className={`w-5 h-5 rounded-full ${nivelOuroEligibility?.eligible ? 'bg-green-500' : 'bg-zinc-600'}`}></div>
+              <span className="text-[10px] font-semibold text-zinc-300">Nível Ouro</span>
+            </button>
+            <button onClick={() => navigate('/client/referrals')} className="flex flex-col items-center gap-2 py-4 hover:bg-zinc-800/50 transition-all border-r border-zinc-800 active:scale-95">
+              <Gift size={20} className="text-zinc-300" />
+              <span className="text-[10px] font-semibold text-zinc-300">Indicações</span>
+            </button>
+            <button onClick={() => setIsHistoryModalOpen(true)} className="flex flex-col items-center gap-2 py-4 hover:bg-zinc-800/50 transition-all active:scale-95">
+              <History size={20} className="text-zinc-300" />
+              <span className="text-[10px] font-semibold text-zinc-300">Histórico</span>
+            </button>
           </div>
-          <div>
-            <h3 className="font-bold text-white text-sm">Indique e Ganhe</h3>
-            <p className="text-xs text-zinc-500">Ganhe descontos indicando amigos.</p>
-          </div>
-          <ChevronRight size={16} className="text-zinc-600 ml-auto" />
         </div>
 
-        {/* FAB - Solicitar Serviço */}
-        <div className="fixed bottom-20 right-6 md:right-[calc(50%-14rem)] z-30">
-          <button onClick={() => navigate('/client/wizard')} className="bg-shark text-white px-6 py-4 rounded-full shadow-lg hover:bg-red-600 hover:scale-105 transition-all flex items-center gap-3 font-bold border border-white/10">
-            <Plus size={24} /> <span>Novo Serviço</span>
-          </button>
-        </div>
+        {/* Mensagem Fixa do Nível Ouro */}
+        {activeLoanId && (
+          <div className="mx-4 mb-6 bg-gradient-to-r from-[#D4AF37]/10 to-[#FDB931]/5 border border-[#D4AF37]/30 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center shrink-0 mt-0.5">
+                <span className="text-[#D4AF37] text-lg">🟢</span>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[#D4AF37] mb-1">Nível Ouro Tubarão</p>
+                <p className="text-[11px] text-zinc-300 leading-relaxed">
+                  Apenas clientes disciplinados alcançam o Nível Ouro Tubarão. Complete 12 pagamentos consecutivos em dia para desbloquear essa oportunidade exclusiva.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
 
       {/* Upload Supplemental Doc Modal */}
@@ -491,48 +586,52 @@ export const ClientDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Renegotiation Modal */}
-      {isRenegotiateOpen && (
+      {/* Nível Ouro Tubarão Modal */}
+      {isNivelOuroOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in zoom-in duration-200">
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-md p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-[#D4AF37]">Renegociar Saldo</h3>
-              <button onClick={() => setIsRenegotiateOpen(false)}><X size={24} className="text-zinc-500 hover:text-white" /></button>
+              <h3 className="text-xl font-bold text-[#D4AF37]">🟢 Nível Ouro Tubarão</h3>
+              <button onClick={() => setIsNivelOuroOpen(false)}><X size={24} className="text-zinc-500 hover:text-white" /></button>
             </div>
 
-            <div className="mb-6 p-4 bg-black rounded-xl border border-zinc-800 text-center">
-              <p className="text-zinc-500 text-xs uppercase mb-1">Saldo Atual</p>
-              <p className="text-2xl font-bold text-white">{formatCurrency(userData.balance)}</p>
-            </div>
-
-            <div className="mb-8">
-              <label className="block text-sm text-zinc-400 mb-2">Parcelar em quantas vezes?</label>
-              <div className="flex items-center gap-4">
-                <input
-                  type="range"
-                  min="2"
-                  max="24"
-                  step="1"
-                  value={renegotiateInstallments}
-                  onChange={(e) => setRenegotiateInstallments(Number(e.target.value))}
-                  className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-[#D4AF37]"
-                />
-                <span className="font-bold text-white w-12 text-center">{renegotiateInstallments}x</span>
-              </div>
+            <div className="mb-6 p-4 bg-gradient-to-r from-[#D4AF37]/20 to-[#FDB931]/10 rounded-xl border border-[#D4AF37]/50 text-center">
+              <p className="text-sm text-white font-bold mb-2">🎉 Parabéns pela disciplina!</p>
+              <p className="text-xs text-zinc-300">Você completou 12 pagamentos consecutivos em dia e desbloqueou o Nível Ouro Tubarão!</p>
             </div>
 
             <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-900 mb-6">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-zinc-400 text-sm">Nova Parcela Estimada:</span>
-                <span className="text-[#D4AF37] font-bold text-lg">{formatCurrency(simulationResult.monthly)}</span>
-              </div>
-              <div className="flex justify-between items-center text-xs text-zinc-500">
-                <span>Total ao final:</span>
-                <span>{formatCurrency(simulationResult.total)}</span>
-              </div>
+              <h4 className="text-sm font-bold text-[#D4AF37] mb-3">✨ Benefícios Exclusivos:</h4>
+              <ul className="space-y-2 text-xs text-zinc-300">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Condições especiais para quitar seu empréstimo</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Condições especiais de pagamento</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span>Reconhecimento pela sua pontualidade</span>
+                </li>
+              </ul>
             </div>
 
-            <Button className="w-full" onClick={handleRenegotiateSubmit}>Confirmar Renegociação</Button>
+            <div className="bg-black/50 p-4 rounded-xl border border-zinc-800 mb-6">
+              <p className="text-xs text-zinc-400 text-center leading-relaxed">
+                Apenas clientes disciplinados alcançam o Nível Ouro Tubarão. Complete 12 pagamentos consecutivos em dia para desbloquear essa oportunidade exclusiva.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="secondary" onClick={() => setIsNivelOuroOpen(false)} className="flex-1">
+                Cancelar
+              </Button>
+              <Button onClick={handleNivelOuroSubmit} className="flex-1 bg-[#D4AF37] hover:bg-[#FDB931] text-black font-bold">
+                Ativar Agora
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -579,7 +678,7 @@ export const ClientDashboard: React.FC = () => {
                 <div className="bg-gradient-to-r from-emerald-900/30 to-emerald-900/10 border border-emerald-600/50 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Calculator size={16} className="text-emerald-400" />
-                    <span className="text-xs font-bold uppercase text-emerald-400">Oferta de Parcelamento</span>
+                    <span className="text-xs font-bold uppercase text-emerald-400">Oferta Especial</span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div className="bg-black/30 p-3 rounded-xl">
@@ -590,13 +689,9 @@ export const ClientDashboard: React.FC = () => {
                       <p className="text-xs text-zinc-500">Taxa</p>
                       <p className="text-lg font-bold text-white">{installmentOffer.interestRate}% a.m.</p>
                     </div>
-                    <div className="bg-black/30 p-3 rounded-xl">
-                      <p className="text-xs text-zinc-500">Total</p>
-                      <p className="text-lg font-bold text-white">R$ {installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                    </div>
-                    <div className="bg-black/30 p-3 rounded-xl">
-                      <p className="text-xs text-zinc-500">Parcela</p>
-                      <p className="text-lg font-bold text-emerald-400">{installmentOffer.installments}x R$ {installmentOffer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <div className="bg-black/30 p-3 rounded-xl col-span-2">
+                      <p className="text-xs text-zinc-500">Total a Pagar</p>
+                      <p className="text-lg font-bold text-emerald-400">R$ {installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                     </div>
                   </div>
                   <p className="text-xs text-zinc-500 text-center mb-3">
@@ -605,7 +700,7 @@ export const ClientDashboard: React.FC = () => {
                   <Button
                     onClick={() => {
                       setIsOffersModalOpen(false);
-                      navigate(`/wizard?amount=${installmentOffer.amount}&installments=${installmentOffer.installments}&rate=${installmentOffer.interestRate}`);
+                      navigate(`/wizard?amount=${installmentOffer.amount}&rate=${installmentOffer.interestRate}`);
                     }}
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-none"
                   >
@@ -641,20 +736,66 @@ export const ClientDashboard: React.FC = () => {
               <div className="space-y-3">
                 {coupons.map((coupon, idx) => (
                   <div
-                    key={idx}
-                    className="bg-gradient-to-r from-purple-900/30 to-purple-900/10 border border-purple-600/50 rounded-xl p-4"
+                    key={coupon.id || idx}
+                    className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded">{coupon.code}</span>
-                        <span className="text-purple-400 font-bold">{coupon.discount}% OFF</span>
+                    {/* Imagem do Cupom */}
+                    {coupon.imageUrl && (
+                      <div className="w-full h-40 bg-zinc-900">
+                        <img
+                          src={coupon.imageUrl}
+                          alt={coupon.partnerName || 'Cupom'}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
-                      <Button size="sm" variant="secondary" className="bg-purple-900/50 border-purple-700 text-purple-300">
-                        Usar
-                      </Button>
+                    )}
+
+                    <div className="p-4">
+                      {/* Logo do Parceiro */}
+                      {coupon.partnerLogo && (
+                        <div className="mb-3">
+                          <img
+                            src={coupon.partnerLogo}
+                            alt={coupon.partnerName || 'Parceiro'}
+                            className="h-8 object-contain"
+                          />
+                        </div>
+                      )}
+
+                      {/* Nome do Parceiro */}
+                      {coupon.partnerName && (
+                        <h4 className="font-bold text-white mb-2">{coupon.partnerName}</h4>
+                      )}
+
+                      {/* Código e Desconto */}
+                      <div className="bg-gradient-to-r from-[#D4AF37]/20 to-[#FDB931]/10 border border-[#D4AF37]/30 rounded-lg p-3 mb-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-mono font-bold text-[#D4AF37] text-lg">{coupon.code}</span>
+                          <span className="text-white font-bold text-xl">{coupon.discount}% OFF</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="w-full bg-[#D4AF37] text-black hover:bg-[#FDB931]"
+                          onClick={() => {
+                            navigator.clipboard.writeText(coupon.code);
+                            addToast('Código copiado!', 'success');
+                          }}
+                        >
+                          Copiar Código
+                        </Button>
+                      </div>
+
+                      {/* Descrição */}
+                      <p className="text-sm text-zinc-300 mb-2">{coupon.description}</p>
+
+                      {/* Informações adicionais */}
+                      <div className="flex items-center justify-between text-xs text-zinc-500">
+                        <span>Válido até {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}</span>
+                        {coupon.usageLimit && coupon.usageCount !== undefined && (
+                          <span>{coupon.usageCount}/{coupon.usageLimit} usos</span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs text-zinc-400">{coupon.description}</p>
-                    <p className="text-[10px] text-zinc-600">Válido até {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}</p>
                   </div>
                 ))}
               </div>
@@ -664,6 +805,57 @@ export const ClientDashboard: React.FC = () => {
                 <p>Nenhum cupom disponível no momento.</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+{/* Modal de Histórico de Solicitações */}
+      {isHistoryModalOpen && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden shadow-2xl animate-in zoom-in duration-200">
+            <div className="flex justify-between items-center p-4 border-b border-zinc-800">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <History size={20} className="text-[#D4AF37]" />
+                Histórico de Solicitações
+              </h3>
+              <button onClick={() => setIsHistoryModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {loanHistory.length > 0 ? (
+                <div className="space-y-3">
+                  {loanHistory.map((loan) => (
+                    <div key={loan.id} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="font-bold text-white">R$ {loan.amount?.toLocaleString('pt-BR')}</p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          loan.status === 'APPROVED' ? 'bg-green-900/50 text-green-400' :
+                          loan.status === 'REJECTED' ? 'bg-red-900/50 text-red-400' :
+                          loan.status === 'PENDING' ? 'bg-yellow-900/50 text-yellow-400' :
+                          'bg-blue-900/50 text-blue-400'
+                        }`}>
+                          {loan.status === 'APPROVED' ? 'Aprovado' :
+                           loan.status === 'REJECTED' ? 'Rejeitado' :
+                           loan.status === 'PENDING' ? 'Pendente' :
+                           loan.status === 'WAITING_DOCS' ? 'Aguardando Docs' :
+                           loan.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-zinc-500">
+                        <Clock size={12} />
+                        {new Date(loan.date || loan.createdAt).toLocaleDateString('pt-BR')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-zinc-500">
+                  <History size={48} className="mx-auto mb-4 opacity-50" />
+                  <p>Nenhuma solicitação encontrada</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -723,5 +915,33 @@ const ActionButton = ({ icon: Icon, label, onClick, disabled }: any) => (
       <Icon size={20} />
     </div>
     <span className="text-[10px] font-bold text-white">{label}</span>
+  </button>
+);
+
+// Botões Principais - Mais compactos e profissionais
+const MainActionButton = ({ icon: Icon, label, onClick, disabled }: any) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className="flex flex-col items-center justify-center gap-2 p-3.5 rounded-xl bg-gradient-to-br from-zinc-900 to-zinc-800 border border-zinc-700 hover:border-[#FF0000] hover:shadow-md hover:shadow-[#FF0000]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+  >
+    <div className="w-11 h-11 rounded-xl bg-[#FF0000] flex items-center justify-center text-white shadow-md">
+      <Icon size={22} strokeWidth={2.5} />
+    </div>
+    <span className="text-[10px] font-bold text-white text-center leading-tight">{label}</span>
+  </button>
+);
+
+// Botões Secundários - Mais compactos
+const SecondaryActionButton = ({ icon: Icon, label, onClick, disabled }: any) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-600 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+  >
+    <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400">
+      <Icon size={18} strokeWidth={2} />
+    </div>
+    <span className="text-[9px] font-semibold text-zinc-300 text-center leading-tight">{label}</span>
   </button>
 );
