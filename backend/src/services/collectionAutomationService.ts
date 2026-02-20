@@ -6,7 +6,7 @@ import { templateService } from './templateService';
  * Dispara automaticamente lembretes e cobranças via Email, WhatsApp e Notificações
  */
 
-interface CollectionStats {
+export interface CollectionStats {
   dueIn7Days: number;
   dueIn3Days: number;
   dueToday: number;

@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { collectionAutomationService } from '../services/collectionAutomationService';
+import { collectionAutomationService, CollectionStats } from '../services/collectionAutomationService';
 
 /**
  * Cron Job para Réguas de Cobrança Automatizadas
