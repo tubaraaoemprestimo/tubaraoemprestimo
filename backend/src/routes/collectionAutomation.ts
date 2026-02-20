@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { authenticate } from '../middleware/auth';
 import { runCollectionManually } from '../cron/collectionCron';
 import { prisma } from '../services/prisma';
 
@@ -9,7 +9,7 @@ const router = Router();
  * GET /api/collection-automation/stats
  * Retorna estatísticas das parcelas para réguas de cobrança
  */
-router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/stats', authenticate, async (req, res) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -95,7 +95,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
  * POST /api/collection-automation/run
  * Executa manualmente as réguas de cobrança
  */
-router.post('/run', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/run', authenticate, async (req, res) => {
   try {
     console.log('[CollectionAutomation] Execução manual solicitada pelo admin');
 
@@ -123,7 +123,7 @@ router.post('/run', authenticateToken, requireAdmin, async (req, res) => {
  * GET /api/collection-automation/templates
  * Lista todos os templates de cobrança
  */
-router.get('/templates', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/templates', authenticate, async (req, res) => {
   try {
     const templates = await prisma.messageTemplate.findMany({
       where: {
@@ -145,7 +145,7 @@ router.get('/templates', authenticateToken, requireAdmin, async (req, res) => {
  * GET /api/collection-automation/history
  * Retorna histórico de envios de cobrança
  */
-router.get('/history', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/history', authenticate, async (req, res) => {
   try {
     const { limit = 50, offset = 0 } = req.query;
 

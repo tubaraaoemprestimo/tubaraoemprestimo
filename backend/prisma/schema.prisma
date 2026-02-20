@@ -631,15 +631,23 @@ model QualificationLead {
   name              String
   email             String
   phone             String
-  hasExperience     Boolean  @map("has_experience")
-  experienceLevel   String?  @map("experience_level")
-  hasCapital        Boolean  @map("has_capital")
+  city              String?
+  state             String?
+  mainInterest      String?  @map("main_interest")
+  creditExperience  String?  @map("credit_experience")
+  hasCapital        Boolean  @default(false) @map("has_capital")
   capitalAmount     String?  @map("capital_amount")
-  wantsToLearn      Boolean  @map("wants_to_learn")
+  intention         String?
+  investmentCapacity String? @map("investment_capacity")
+  interests         String[] @default([])
+  weeklyTime        String?  @map("weekly_time")
+  hasExperience     Boolean  @default(false) @map("has_experience")
+  experienceLevel   String?  @map("experience_level")
+  wantsToLearn      Boolean  @default(false) @map("wants_to_learn")
   learningInterest  String?  @map("learning_interest")
-  hasTime           Boolean  @map("has_time")
+  hasTime           Boolean  @default(false) @map("has_time")
   timeAvailability  String?  @map("time_availability")
-  wantsPartnership  Boolean  @map("wants_partnership")
+  wantsPartnership  Boolean  @default(false) @map("wants_partnership")
   partnershipType   String?  @map("partnership_type")
   tags              String[] @default([])
   status            String   @default("NEW")
