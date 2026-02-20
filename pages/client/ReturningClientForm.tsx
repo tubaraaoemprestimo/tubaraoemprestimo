@@ -8,6 +8,7 @@ import {
 import { Logo } from '../../components/Logo';
 import { useToast } from '../../components/Toast';
 import { supabaseService } from '../../services/supabaseService';
+import { api } from '../../services/apiClient';
 import { SystemSettings } from '../../types';
 
 // Componente Input
@@ -90,12 +91,21 @@ export const ReturningClientForm: React.FC = () => {
     const [formData, setFormData] = useState({
         name: '',
         cpf: '',
+        rg: '',
+        birthDate: '',
         phone: '',
         email: '',
+        address: '',
+        neighborhood: '',
+        city: '',
+        state: '',
+        zipCode: '',
         instagram: '',
-        birthDate: '',
-        amount: '',
-        preferredDueDay: '10'
+        loanAmount: '',
+        interestRate: '',
+        dueDate: '',
+        chargeType: 'MENSAL',
+        notes: ''
     });
 
     useEffect(() => {
@@ -144,35 +154,54 @@ export const ReturningClientForm: React.FC = () => {
             addToast('Informe um e-mail válido.', 'warning');
             return;
         }
-        if (!formData.amount || Number(formData.amount) < 100) {
-            addToast('Informe o valor desejado.', 'warning');
+        if (!formData.loanAmount || Number(formData.loanAmount) < 100) {
+            addToast('Informe o valor do empréstimo.', 'warning');
+            return;
+        }
+        if (!formData.interestRate) {
+            addToast('Informe a taxa de juros.', 'warning');
+            return;
+        }
+        if (!formData.dueDate) {
+            addToast('Informe a data de vencimento.', 'warning');
             return;
         }
 
         setLoading(true);
 
         try {
-            // Submeter como cliente antigo pendente
-            const result = await supabaseService.submitReturningClientRequest({
+            // Enviar para API de clientes recorrentes
+            const response = await api.post('/api/returning-clients', {
+                // Etapa 1: Atualização Cadastral
                 name: formData.name,
-                cpf: formData.cpf.replace(/\D/g, ''),
-                phone: formData.phone.replace(/\D/g, ''),
-                email: formData.email,
-                instagram: formData.instagram,
+                cpf: formData.cpf,
+                rg: formData.rg,
                 birthDate: formData.birthDate,
-                amount: Number(formData.amount),
-                preferredDueDay: Number(formData.preferredDueDay)
+                phone: formData.phone,
+                email: formData.email,
+                address: formData.address,
+                neighborhood: formData.neighborhood,
+                city: formData.city,
+                state: formData.state,
+                zipCode: formData.zipCode,
+
+                // Etapa 2: Dados do Contrato Atual
+                loanAmount: Number(formData.loanAmount),
+                interestRate: Number(formData.interestRate),
+                dueDate: formData.dueDate,
+                chargeType: formData.chargeType,
+                notes: formData.notes
             });
 
-            if (result) {
+            if (response.data.success) {
                 setSuccess(true);
                 addToast('Solicitação enviada com sucesso!', 'success');
             } else {
                 throw new Error('Falha ao enviar');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            addToast('Erro ao enviar. Tente novamente.', 'error');
+            addToast(error.response?.data?.error || 'Erro ao enviar. Tente novamente.', 'error');
         } finally {
             setLoading(false);
         }
@@ -190,15 +219,23 @@ export const ReturningClientForm: React.FC = () => {
                         Solicitação Enviada!
                     </h1>
                     <p className="text-zinc-400 mb-8">
-                        Recebemos sua solicitação de renovação. Nossa equipe irá analisar e entrar em contato em breve.
+                        Recebemos sua solicitação de migração de contrato. Nossa equipe irá validar os dados e entrar em contato em breve.
                     </p>
                     <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 mb-8">
-                        <div className="flex items-center gap-3 text-left">
+                        <div className="flex items-center gap-3 text-left mb-4">
                             <Clock size={24} className="text-[#D4AF37]" />
                             <div>
-                                <div className="font-bold text-white">Tempo estimado</div>
-                                <div className="text-sm text-zinc-400">Até 2 horas úteis</div>
+                                <div className="font-bold text-white">Status: Pendente Validação</div>
+                                <div className="text-sm text-zinc-400">Aguardando análise manual</div>
                             </div>
+                        </div>
+                        <div className="text-sm text-zinc-500 bg-black/30 rounded-lg p-4">
+                            <p className="mb-2">📋 Próximos passos:</p>
+                            <ul className="list-disc list-inside space-y-1">
+                                <li>Nossa equipe irá validar seus dados cadastrais</li>
+                                <li>Verificaremos as informações do contrato atual</li>
+                                <li>Você receberá uma notificação quando o contrato for ativado</li>
+                            </ul>
                         </div>
                     </div>
                     <button
@@ -257,116 +294,204 @@ export const ReturningClientForm: React.FC = () => {
 
                 {/* Form Card */}
                 <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 space-y-5">
-                    <Input
-                        label="Nome Completo"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        placeholder="Seu nome completo"
-                        icon={<User size={18} />}
-                        required
-                    />
-
-                    <Input
-                        label="CPF"
-                        name="cpf"
-                        value={formData.cpf}
-                        onChange={handleChange}
-                        placeholder="000.000.000-00"
-                        icon={<Shield size={18} />}
-                        mask={masks.cpf}
-                        required
-                    />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Input
-                            label="Telefone/WhatsApp"
-                            name="phone"
-                            value={formData.phone}
-                            onChange={handleChange}
-                            placeholder="(00) 00000-0000"
-                            icon={<Phone size={18} />}
-                            mask={masks.phone}
-                            required
-                        />
-                        <Input
-                            label="E-mail"
-                            name="email"
-                            type="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            placeholder="seu@email.com"
-                            icon={<Mail size={18} />}
-                            required
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Input
-                            label="Instagram"
-                            name="instagram"
-                            value={formData.instagram}
-                            onChange={handleChange}
-                            placeholder="@seuusuario"
-                            icon={<Instagram size={18} />}
-                        />
-                        <Input
-                            label="Data de Nascimento"
-                            name="birthDate"
-                            value={formData.birthDate}
-                            onChange={handleChange}
-                            placeholder="DD/MM/AAAA"
-                            icon={<Calendar size={18} />}
-                            mask={masks.date}
-                        />
-                    </div>
-
-                    <div className="pt-4 border-t border-zinc-800">
+                    {/* Etapa 1: Atualização Cadastral */}
+                    <div className="mb-6">
                         <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-                            <DollarSign size={18} className="text-[#D4AF37]" />
-                            Dados do Empréstimo
+                            <User size={18} className="text-emerald-400" />
+                            Etapa 1: Atualização Cadastral
                         </h3>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-4">
+                            <Input
+                                label="Nome Completo"
+                                name="name"
+                                value={formData.name}
+                                onChange={handleChange}
+                                placeholder="Seu nome completo"
+                                icon={<User size={18} />}
+                                required
+                            />
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Input
+                                    label="CPF"
+                                    name="cpf"
+                                    value={formData.cpf}
+                                    onChange={handleChange}
+                                    placeholder="000.000.000-00"
+                                    icon={<Shield size={18} />}
+                                    mask={masks.cpf}
+                                    required
+                                />
+                                <Input
+                                    label="RG"
+                                    name="rg"
+                                    value={formData.rg}
+                                    onChange={handleChange}
+                                    placeholder="00.000.000-0"
+                                    icon={<Shield size={18} />}
+                                />
+                            </div>
+
+                            <Input
+                                label="Data de Nascimento"
+                                name="birthDate"
+                                value={formData.birthDate}
+                                onChange={handleChange}
+                                placeholder="DD/MM/AAAA"
+                                icon={<Calendar size={18} />}
+                                mask={masks.date}
+                            />
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Input
+                                    label="Telefone/WhatsApp"
+                                    name="phone"
+                                    value={formData.phone}
+                                    onChange={handleChange}
+                                    placeholder="(00) 00000-0000"
+                                    icon={<Phone size={18} />}
+                                    mask={masks.phone}
+                                    required
+                                />
+                                <Input
+                                    label="E-mail"
+                                    name="email"
+                                    type="email"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    placeholder="seu@email.com"
+                                    icon={<Mail size={18} />}
+                                    required
+                                />
+                            </div>
+
+                            <Input
+                                label="Endereço"
+                                name="address"
+                                value={formData.address}
+                                onChange={handleChange}
+                                placeholder="Rua, número, complemento"
+                            />
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Input
+                                    label="Bairro"
+                                    name="neighborhood"
+                                    value={formData.neighborhood}
+                                    onChange={handleChange}
+                                    placeholder="Seu bairro"
+                                />
+                                <Input
+                                    label="Cidade"
+                                    name="city"
+                                    value={formData.city}
+                                    onChange={handleChange}
+                                    placeholder="Sua cidade"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Input
+                                    label="Estado"
+                                    name="state"
+                                    value={formData.state}
+                                    onChange={handleChange}
+                                    placeholder="UF"
+                                />
+                                <Input
+                                    label="CEP"
+                                    name="zipCode"
+                                    value={formData.zipCode}
+                                    onChange={handleChange}
+                                    placeholder="00000-000"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Etapa 2: Dados do Contrato Atual */}
+                    <div className="pt-6 border-t border-zinc-800">
+                        <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                            <DollarSign size={18} className="text-[#D4AF37]" />
+                            Etapa 2: Dados do Contrato Atual
+                        </h3>
+
+                        <div className="space-y-4">
                             <div className="space-y-2">
                                 <label className="text-sm text-zinc-400 font-medium">
-                                    Valor Pretendido <span className="text-red-500">*</span>
+                                    Valor do Empréstimo <span className="text-red-500">*</span>
                                 </label>
                                 <div className="relative">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">R$</span>
                                     <input
                                         type="number"
-                                        name="amount"
-                                        value={formData.amount}
+                                        name="loanAmount"
+                                        value={formData.loanAmount}
                                         onChange={handleChange}
                                         placeholder="0,00"
                                         className="w-full bg-black border border-zinc-700 rounded-xl pl-12 pr-4 py-4 text-white text-xl font-bold focus:border-emerald-500 outline-none"
                                     />
                                 </div>
-                                {settings && (
-                                    <p className="text-xs text-zinc-500">
-                                        Mín: R$ {settings.minLoanAmount?.toLocaleString('pt-BR')} |
-                                        Máx: R$ {settings.maxLoanAmount?.toLocaleString('pt-BR')}
-                                    </p>
-                                )}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm text-zinc-400 font-medium">
+                                        Taxa de Juros (%) <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        name="interestRate"
+                                        value={formData.interestRate}
+                                        onChange={handleChange}
+                                        placeholder="10.00"
+                                        className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-4 text-white focus:border-emerald-500 outline-none"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm text-zinc-400 font-medium">
+                                        Data de Vencimento <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="date"
+                                        name="dueDate"
+                                        value={formData.dueDate}
+                                        onChange={handleChange}
+                                        className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-4 text-white focus:border-emerald-500 outline-none"
+                                    />
+                                </div>
                             </div>
 
                             <div className="space-y-2">
                                 <label className="text-sm text-zinc-400 font-medium">
-                                    Dia de Vencimento Preferencial
+                                    Tipo de Cobrança <span className="text-red-500">*</span>
                                 </label>
                                 <select
-                                    name="preferredDueDay"
-                                    value={formData.preferredDueDay}
+                                    name="chargeType"
+                                    value={formData.chargeType}
                                     onChange={handleChange}
                                     className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-4 text-white focus:border-emerald-500 outline-none"
                                 >
-                                    <option value="5">Dia 5</option>
-                                    <option value="10">Dia 10</option>
-                                    <option value="15">Dia 15</option>
-                                    <option value="20">Dia 20</option>
-                                    <option value="25">Dia 25</option>
+                                    <option value="MENSAL">Mensal</option>
+                                    <option value="DIARIA">Diária</option>
                                 </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm text-zinc-400 font-medium">
+                                    Observações (opcional)
+                                </label>
+                                <textarea
+                                    name="notes"
+                                    value={formData.notes}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                                    placeholder="Informações adicionais sobre o contrato..."
+                                    className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-4 text-white focus:border-emerald-500 outline-none resize-none"
+                                    rows={3}
+                                />
                             </div>
                         </div>
                     </div>
