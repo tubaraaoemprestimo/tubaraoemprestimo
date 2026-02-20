@@ -65,7 +65,7 @@ import {
   LayoutDashboard, FileText, Settings as SettingsIcon, LogOut, Users, Bot, Menu, X,
   UserCog, Home as HomeIcon, PieChart, User as UserIcon, Megaphone, BarChart3,
   Calendar, Ban, FileCheck, DollarSign, MessageSquare, Star, ChevronDown, ChevronRight,
-  MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload, Search, Handshake
+  MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload, Search, Handshake, TrendingUp
 } from 'lucide-react';
 import { Logo } from './components/Logo';
 import { apiService } from './services/apiService';
