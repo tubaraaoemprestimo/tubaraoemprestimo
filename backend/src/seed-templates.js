@@ -108,6 +108,273 @@ _Tubarão Empréstimos_`,
     variables: ['nome', 'dias_atraso', 'valor', 'valor_com_juros', 'pix_key', 'telefone_suporte'],
     isActive: true
   },
+  {
+    name: 'Atraso 3 dias',
+    category: 'COBRANCA',
+    triggerEvent: 'INSTALLMENT_OVERDUE_3_DAYS',
+    channel: 'whatsapp',
+    subject: null,
+    content: `⚠️ {nome}, sua parcela está 3 dias em atraso!
+
+Valor: *R$ {valor}*
+Venceu em: {data_vencimento}
+Atraso: *3 dias*
+
+💰 Regularize agora via PIX:
+{pix_key}
+
+Evite juros maiores e negativação! 🦈
+
+_Tubarão Empréstimos_`,
+    variables: ['nome', 'valor', 'data_vencimento', 'pix_key'],
+    isActive: true
+  },
+  {
+    name: 'Atraso 15 dias - CRÍTICO',
+    category: 'COBRANCA',
+    triggerEvent: 'INSTALLMENT_OVERDUE_15_DAYS',
+    channel: 'whatsapp',
+    subject: null,
+    content: `🚨 CRÍTICO - {nome}
+
+Sua parcela está *15 dias* em atraso!
+
+Valor original: R$ {valor}
+Valor com juros: *R$ {valor_com_juros}*
+
+⚠️ ATENÇÃO:
+• Negativação será realizada em 48h
+• Bloqueio permanente de crédito
+• Cobrança judicial iniciada
+
+💳 REGULARIZE URGENTE:
+PIX: {pix_key}
+
+Suporte: {telefone_suporte}
+
+_Tubarão Empréstimos_`,
+    variables: ['nome', 'valor', 'valor_com_juros', 'pix_key', 'telefone_suporte'],
+    isActive: true
+  },
+  {
+    name: 'Atraso 30 dias - ÚLTIMA NOTIFICAÇÃO',
+    category: 'COBRANCA',
+    triggerEvent: 'INSTALLMENT_OVERDUE_30_DAYS',
+    channel: 'whatsapp',
+    subject: null,
+    content: `🚨 ÚLTIMA NOTIFICAÇÃO - {nome}
+
+Sua parcela está *30 dias* em atraso!
+
+Valor original: R$ {valor}
+Valor com juros e multa: *R$ {valor_com_juros}*
+
+⚠️ AÇÕES TOMADAS:
+✓ Negativação no SPC/Serasa
+✓ Bloqueio de crédito
+✓ Processo judicial iniciado
+
+Esta é a ÚLTIMA oportunidade de regularização antes da execução judicial.
+
+💳 PIX: {pix_key}
+📞 Suporte: {telefone_suporte}
+
+_Tubarão Empréstimos - Departamento Jurídico_`,
+    variables: ['nome', 'valor', 'valor_com_juros', 'pix_key', 'telefone_suporte'],
+    isActive: true
+  },
+
+  // ============ COBRANÇA - TEMPLATES DE EMAIL ============
+  {
+    name: 'Email - Lembrete 7 dias antes',
+    category: 'COBRANCA',
+    triggerEvent: 'INSTALLMENT_DUE_7_DAYS',
+    channel: 'email',
+    subject: '📅 Lembrete: Parcela vence em 7 dias',
+    content: `Olá {nome}!
+
+Lembramos que sua parcela de R$ {valor} vence em 7 dias ({data_vencimento}).
+
+💳 Pague via PIX:
+Chave: {pix_key}
+
+Evite juros e mantenha seu crédito em dia!
+
+Atenciosamente,
+Equipe Tubarão Empréstimos`,
+    variables: ['nome', 'valor', 'data_vencimento', 'pix_key'],
+    isActive: true
+  },
+  {
+    name: 'Email - Lembrete 3 dias antes',
+    category: 'COBRANCA',
+    triggerEvent: 'INSTALLMENT_DUE_3_DAYS',
+    channel: 'email',
+    subject: '⚠️ Atenção: Parcela vence em 3 dias',
+    content: `{nome}, atenção!
+
+Sua parcela de R$ {valor} vence em 3 dias ({data_vencimento}).
+
+💰 Pague agora via PIX:
+Chave: {pix_key}
+
+Não deixe para a última hora!
+
+Atenciosamente,
+Equipe Tubarão Empréstimos`,
+    variables: ['nome', 'valor', 'data_vencimento', 'pix_key'],
+    isActive: true
+  },
+  {
+    name: 'Email - Vencimento hoje',
+    category: 'COBRANCA',
+    triggerEvent: 'INSTALLMENT_DUE_TODAY',
+    channel: 'email',
+    subject: '🚨 HOJE é o vencimento da sua parcela',
+    content: `{nome}, HOJE é o vencimento!
+
+Parcela: R$ {valor}
+Vencimento: HOJE ({data_vencimento})
+
+💳 PIX para pagamento:
+{pix_key}
+
+Pague agora e evite juros!
+
+Atenciosamente,
+Equipe Tubarão Empréstimos`,
+    variables: ['nome', 'valor', 'data_vencimento', 'pix_key'],
+    isActive: true
+  },
+  {
+    name: 'Email - Atraso 1 dia',
+    category: 'COBRANCA',
+    triggerEvent: 'INSTALLMENT_OVERDUE_1_DAY',
+    channel: 'email',
+    subject: '⚠️ Parcela em atraso - 1 dia',
+    content: `{nome}, sua parcela está em atraso!
+
+Valor: R$ {valor}
+Venceu em: {data_vencimento}
+Atraso: 1 dia
+
+💰 Regularize agora via PIX:
+{pix_key}
+
+Evite juros maiores e negativação!
+
+Atenciosamente,
+Equipe Tubarão Empréstimos`,
+    variables: ['nome', 'valor', 'data_vencimento', 'pix_key'],
+    isActive: true
+  },
+  {
+    name: 'Email - Atraso 3 dias',
+    category: 'COBRANCA',
+    triggerEvent: 'INSTALLMENT_OVERDUE_3_DAYS',
+    channel: 'email',
+    subject: '⚠️ Parcela em atraso - 3 dias',
+    content: `{nome}, sua parcela está 3 dias em atraso!
+
+Valor: R$ {valor}
+Venceu em: {data_vencimento}
+Atraso: 3 dias
+
+💰 Regularize agora via PIX:
+{pix_key}
+
+Evite juros maiores e negativação!
+
+Atenciosamente,
+Equipe Tubarão Empréstimos`,
+    variables: ['nome', 'valor', 'data_vencimento', 'pix_key'],
+    isActive: true
+  },
+  {
+    name: 'Email - Atraso 7+ dias URGENTE',
+    category: 'COBRANCA',
+    triggerEvent: 'INSTALLMENT_OVERDUE_7_DAYS',
+    channel: 'email',
+    subject: '🚨 URGENTE: Parcela em atraso - {dias_atraso} dias',
+    content: `URGENTE - {nome}
+
+Sua parcela está {dias_atraso} dias em atraso!
+
+Valor original: R$ {valor}
+Valor com juros: R$ {valor_com_juros}
+
+⚠️ Regularize HOJE para evitar:
+• Negativação no SPC/Serasa
+• Bloqueio de novos empréstimos
+• Ação judicial
+
+💳 PIX: {pix_key}
+
+Entre em contato: {telefone_suporte}
+
+Atenciosamente,
+Equipe Tubarão Empréstimos`,
+    variables: ['nome', 'dias_atraso', 'valor', 'valor_com_juros', 'pix_key', 'telefone_suporte'],
+    isActive: true
+  },
+  {
+    name: 'Email - Atraso 15 dias CRÍTICO',
+    category: 'COBRANCA',
+    triggerEvent: 'INSTALLMENT_OVERDUE_15_DAYS',
+    channel: 'email',
+    subject: '🚨 CRÍTICO: Parcela 15 dias em atraso',
+    content: `CRÍTICO - {nome}
+
+Sua parcela está 15 dias em atraso!
+
+Valor original: R$ {valor}
+Valor com juros: R$ {valor_com_juros}
+
+⚠️ ATENÇÃO:
+• Negativação será realizada em 48h
+• Bloqueio permanente de crédito
+• Cobrança judicial iniciada
+
+💳 REGULARIZE URGENTE:
+PIX: {pix_key}
+
+Suporte: {telefone_suporte}
+
+Atenciosamente,
+Departamento de Cobrança
+Tubarão Empréstimos`,
+    variables: ['nome', 'valor', 'valor_com_juros', 'pix_key', 'telefone_suporte'],
+    isActive: true
+  },
+  {
+    name: 'Email - Atraso 30 dias ÚLTIMA NOTIFICAÇÃO',
+    category: 'COBRANCA',
+    triggerEvent: 'INSTALLMENT_OVERDUE_30_DAYS',
+    channel: 'email',
+    subject: '🚨 ÚLTIMA NOTIFICAÇÃO: Parcela 30 dias em atraso',
+    content: `ÚLTIMA NOTIFICAÇÃO - {nome}
+
+Sua parcela está 30 dias em atraso!
+
+Valor original: R$ {valor}
+Valor com juros e multa: R$ {valor_com_juros}
+
+⚠️ AÇÕES TOMADAS:
+✓ Negativação no SPC/Serasa
+✓ Bloqueio de crédito
+✓ Processo judicial iniciado
+
+Esta é a ÚLTIMA oportunidade de regularização antes da execução judicial.
+
+💳 PIX: {pix_key}
+📞 Suporte: {telefone_suporte}
+
+Atenciosamente,
+Departamento Jurídico
+Tubarão Empréstimos`,
+    variables: ['nome', 'valor', 'valor_com_juros', 'pix_key', 'telefone_suporte'],
+    isActive: true
+  },
 
   // ============ MARKETING (5 templates) ============
   {

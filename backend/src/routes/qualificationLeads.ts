@@ -8,59 +8,37 @@ const prisma = new PrismaClient();
 router.post('/', async (req, res) => {
   try {
     const {
-      name,
-      email,
-      phone,
-      hasExperience,
-      experienceLevel,
+      // Filtro inicial
+      mainInterest,
+
+      // Etapa 2 - Perfil
+      creditExperience,
       hasCapital,
-      capitalAmount,
-      wantsToLearn,
-      learningInterest,
-      hasTime,
-      timeAvailability,
-      wantsPartnership,
-      partnershipType
+      intention,
+
+      // Etapa 3 - Capacidade de investimento
+      investmentCapacity,
+
+      // Etapa 4 - Interesse em soluções
+      interests,
+
+      // Etapa 5 - Compromisso
+      weeklyTime,
+
+      // Dados básicos
+      name,
+      whatsapp,
+      email,
+      city,
+      state,
+
+      // Tags (geradas no frontend)
+      tags
     } = req.body;
 
     // Validação básica
-    if (!name || !email || !phone) {
-      return res.status(400).json({ error: 'Nome, email e telefone são obrigatórios' });
-    }
-
-    // Gerar tags automáticas baseadas nas respostas
-    const tags: string[] = [];
-
-    if (hasExperience) {
-      tags.push('TAG_EXPERIENCIA');
-      if (experienceLevel === 'avancado') tags.push('TAG_AVANCADO');
-    } else {
-      tags.push('TAG_INICIANTE');
-    }
-
-    if (hasCapital) {
-      tags.push('TAG_CAPITAL');
-      if (capitalAmount === 'acima_100k') tags.push('TAG_INVESTIDOR_ALTO');
-      else if (capitalAmount === '50k_100k') tags.push('TAG_INVESTIDOR_MEDIO');
-    }
-
-    if (wantsToLearn) {
-      tags.push('TAG_APRENDIZADO');
-      if (learningInterest === 'curso') tags.push('TAG_CURSO');
-      if (learningInterest === 'mentoria') tags.push('TAG_MENTORIA_ONLINE');
-      if (learningInterest === 'presencial') tags.push('TAG_MENTORIA_PRESENCIAL');
-    }
-
-    if (hasTime) {
-      tags.push('TAG_DISPONIBILIDADE');
-      if (timeAvailability === 'integral') tags.push('TAG_TEMPO_INTEGRAL');
-    }
-
-    if (wantsPartnership) {
-      tags.push('TAG_PARCERIA');
-      if (partnershipType === 'investidor') tags.push('TAG_INVESTIDOR');
-      if (partnershipType === 'operacional') tags.push('TAG_OPERACIONAL');
-      if (partnershipType === 'correspondente') tags.push('TAG_CORRESPONDENTE');
+    if (!name || !email || !whatsapp || !city || !state) {
+      return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos' });
     }
 
     // Criar lead
@@ -68,21 +46,23 @@ router.post('/', async (req, res) => {
       data: {
         name,
         email,
-        phone,
-        hasExperience,
-        experienceLevel,
+        phone: whatsapp,
+        city,
+        state,
+        mainInterest,
+        creditExperience,
         hasCapital,
-        capitalAmount,
-        wantsToLearn,
-        learningInterest,
-        hasTime,
-        timeAvailability,
-        wantsPartnership,
-        partnershipType,
-        tags,
-        status: 'NEW'
+        intention,
+        investmentCapacity,
+        interests: interests || [],
+        weeklyTime,
+        tags: tags || [],
+        status: 'NEW',
+        notes: ''
       }
     });
+
+    console.log(`[QualificationLeads] ✅ Novo lead criado: ${name} - Tags: ${tags?.join(', ')}`);
 
     res.json({ success: true, lead });
   } catch (error: any) {

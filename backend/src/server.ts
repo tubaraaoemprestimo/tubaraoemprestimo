@@ -36,7 +36,10 @@ import { partnersRouter } from './routes/partners';
 import { maintenanceRouter } from './routes/maintenance';
 import { loanRequestUpdatesRouter } from './routes/loanRequestUpdates';
 import scheduledStatusRouter from './routes/scheduledStatus';
+import collectionAutomationRouter from './routes/collectionAutomation';
+import { returningClientsRouter } from './routes/returningClients';
 import { initCronJobs } from './cron/installmentReminders';
+import { startCollectionCron } from './cron/collectionCron';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -105,6 +108,8 @@ app.use('/api/partners', partnersRouter);
 app.use('/api/maintenance', maintenanceRouter);
 app.use('/api/qualification-leads', qualificationLeadsRouter);
 app.use('/api/scheduled-status', scheduledStatusRouter);
+app.use('/api/collection-automation', collectionAutomationRouter);
+app.use('/api/returning-clients', returningClientsRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -133,6 +138,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 // ============= START =============
 
 initCronJobs();
+startCollectionCron();
 
 app.listen(PORT, () => {
     console.log(`ðŸ¦ˆ TubarÃ£o Backend rodando na porta ${PORT}`);

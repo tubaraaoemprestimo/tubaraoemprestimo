@@ -286,6 +286,10 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 autoRenew: data.autoRenew !== undefined ? data.autoRenew : true,
                 withdrawalNoticeMonths: data.withdrawalNoticeMonths || null,
                 accountHolderName: data.accountHolderName || null,
+                // Flags de classificação de contrato
+                isService: data.profileType === 'LIMPA_NOME',
+                isInvestment: data.profileType === 'INVESTIDOR',
+                isLoan: ['CLT', 'AUTONOMO', 'MOTO', 'GARANTIA'].includes(data.profileType || ''),
                 status: 'PENDING'
             }
         });
@@ -416,7 +420,11 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
                     installmentsCount: request.installments,
                     remainingAmount: request.amount,
                     status: 'APPROVED',
-                    startDate: new Date()
+                    startDate: new Date(),
+                    // Flags de classificação de contrato
+                    isService: request.profileType === 'LIMPA_NOME',
+                    isInvestment: request.profileType === 'INVESTIDOR',
+                    isLoan: ['CLT', 'AUTONOMO', 'MOTO', 'GARANTIA'].includes(request.profileType || '')
                 }
             });
 

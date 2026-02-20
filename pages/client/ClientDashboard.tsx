@@ -605,7 +605,7 @@ if (user) {
               <ul className="space-y-2 text-xs text-zinc-300">
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
-                  <span>Apenas 5 parcelas para quitar seu empréstimo</span>
+                  <span>Condições especiais para quitar seu empréstimo</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
@@ -678,7 +678,7 @@ if (user) {
                 <div className="bg-gradient-to-r from-emerald-900/30 to-emerald-900/10 border border-emerald-600/50 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Calculator size={16} className="text-emerald-400" />
-                    <span className="text-xs font-bold uppercase text-emerald-400">Oferta de Parcelamento</span>
+                    <span className="text-xs font-bold uppercase text-emerald-400">Oferta Especial</span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div className="bg-black/30 p-3 rounded-xl">
@@ -689,13 +689,9 @@ if (user) {
                       <p className="text-xs text-zinc-500">Taxa</p>
                       <p className="text-lg font-bold text-white">{installmentOffer.interestRate}% a.m.</p>
                     </div>
-                    <div className="bg-black/30 p-3 rounded-xl">
-                      <p className="text-xs text-zinc-500">Total</p>
-                      <p className="text-lg font-bold text-white">R$ {installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                    </div>
-                    <div className="bg-black/30 p-3 rounded-xl">
-                      <p className="text-xs text-zinc-500">Parcela</p>
-                      <p className="text-lg font-bold text-emerald-400">{installmentOffer.installments}x R$ {installmentOffer.installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <div className="bg-black/30 p-3 rounded-xl col-span-2">
+                      <p className="text-xs text-zinc-500">Total a Pagar</p>
+                      <p className="text-lg font-bold text-emerald-400">R$ {installmentOffer.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                     </div>
                   </div>
                   <p className="text-xs text-zinc-500 text-center mb-3">
@@ -704,7 +700,7 @@ if (user) {
                   <Button
                     onClick={() => {
                       setIsOffersModalOpen(false);
-                      navigate(`/wizard?amount=${installmentOffer.amount}&installments=${installmentOffer.installments}&rate=${installmentOffer.interestRate}`);
+                      navigate(`/wizard?amount=${installmentOffer.amount}&rate=${installmentOffer.interestRate}`);
                     }}
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-none"
                   >
@@ -832,7 +828,6 @@ if (user) {
                       <div className="flex justify-between items-start mb-2">
                         <div>
                           <p className="font-bold text-white">R$ {loan.amount?.toLocaleString('pt-BR')}</p>
-                          <p className="text-xs text-zinc-500">{loan.installments}x parcelas</p>
                         </div>
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                           loan.status === 'APPROVED' ? 'bg-green-900/50 text-green-400' :

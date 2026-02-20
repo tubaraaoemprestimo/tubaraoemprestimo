@@ -48,6 +48,7 @@ import Register from './pages/auth/Register';
 import ResetPassword from './pages/auth/ResetPassword';
 import { SalesPage } from './pages/public/SalesPage';
 import { QualificationPage } from './pages/public/QualificationPage';
+import { QualificationSuccess } from './pages/public/QualificationSuccess';
 
 // Components
 import { Chatbot } from './components/Chatbot';
@@ -489,6 +490,7 @@ function App() {
             <Route path="/" element={<Login />} />
             <Route path="/site" element={<SalesPage />} />
             <Route path="/qualificacao" element={<QualificationPage />} />
+            <Route path="/qualificacao/sucesso" element={<QualificationSuccess />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />

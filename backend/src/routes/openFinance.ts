@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate } from '../middleware/auth';
+import { externalScoreService } from '../services/externalScoreService';
 
 export const openFinanceRouter = Router();
 
@@ -17,7 +18,7 @@ const getScoreClassification = (score: number): string => {
 openFinanceRouter.post('/score/:customerId', authenticate, async (req: Request, res: Response) => {
     try {
         const { customerId } = req.params;
-        const { source } = req.body; // 'INTERNAL', 'SERASA', 'SPC'
+        const { source, useExternalAPI } = req.body; // 'INTERNAL', 'SERASA', 'SPC', useExternalAPI: true/false
 
         const customer = await prisma.customer.findUnique({ where: { id: customerId } });
         if (!customer) {
@@ -25,64 +26,119 @@ openFinanceRouter.post('/score/:customerId', authenticate, async (req: Request, 
             return;
         }
 
-        // Calculate score based on customer data
-        const c = customer as any;
-        const hasLoans = await prisma.loan.count({ where: { customerId } });
-        const overdueLoans = await prisma.loan.count({ where: { customerId, status: 'OVERDUE' } });
-        const paidLoans = await prisma.loan.count({ where: { customerId, status: 'PAID' } });
+        let score = 0;
+        let classification = 'E';
+        let factors: any = {};
+        let restrictions: any = null;
+        let cpfData: any = null;
 
-        // Payment history factor (35%)
-        const paymentHistory = hasLoans > 0
-            ? Math.min(100, ((paidLoans / hasLoans) * 80) + (overdueLoans === 0 ? 20 : 0))
-            : 50; // New customer = neutral
+        // Se useExternalAPI = true, consulta APIs externas
+        if (useExternalAPI && customer.cpf) {
+            console.log('[OpenFinance] Consultando APIs externas...');
 
-        // Debt ratio factor (30%)
-        const totalDebt = await prisma.installment.aggregate({
-            where: { loan: { customerId }, status: { in: ['PENDING', 'OVERDUE'] } },
-            _sum: { amount: true }
-        });
-        const debtAmount = totalDebt._sum.amount || 0;
-        const debtRatio = Math.max(0, 100 - (debtAmount / 10000) * 100);
+            // Buscar dados do cliente para cálculo
+            const hasLoans = await prisma.loan.count({ where: { customerId } });
+            const overdueLoans = await prisma.loan.count({ where: { customerId, status: 'OVERDUE' } });
+            const paidLoans = await prisma.loan.count({ where: { customerId, status: 'PAID' } });
 
-        // Credit age factor (15%)
-        const accountAge = (Date.now() - new Date(c.createdAt).getTime()) / (365 * 24 * 60 * 60 * 1000);
-        const creditAge = Math.min(100, accountAge * 20);
+            const totalDebt = await prisma.installment.aggregate({
+                where: { loan: { customerId }, status: { in: ['PENDING', 'OVERDUE'] } },
+                _sum: { amount: true }
+            });
+            const debtAmount = totalDebt._sum.amount || 0;
 
-        // Recent inquiries factor (20%)
-        const recentScores = await prisma.creditScore.count({
-            where: { customerId, consultedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }
-        });
-        const recentInquiries = Math.max(0, 100 - recentScores * 10);
+            const accountAge = (Date.now() - new Date((customer as any).createdAt).getTime()) / (365 * 24 * 60 * 60 * 1000);
 
-        // Weighted average
-        let score = Math.round(
-            (paymentHistory * 0.35 + debtRatio * 0.30 + creditAge * 0.15 + recentInquiries * 0.20) * 10
-        );
+            const recentScores = await prisma.creditScore.count({
+                where: { customerId, consultedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }
+            });
 
-        // Add variation for external sources
-        if (source === 'SERASA' || source === 'SPC') {
-            const variation = (Math.random() - 0.5) * 80;
-            score = Math.round(score + variation);
+            // Consulta externa completa
+            const analysis = await externalScoreService.fullCreditAnalysis(customer.cpf, {
+                hasLoans,
+                paidLoans,
+                overdueLoans,
+                totalDebt: debtAmount,
+                accountAge,
+                recentScores
+            });
+
+            cpfData = analysis.cpfData;
+            score = analysis.scoreData.score;
+            classification = analysis.scoreData.classification;
+            factors = analysis.scoreData.factors;
+            restrictions = analysis.scoreData.restrictions;
+
+            console.log(`[OpenFinance] ✅ Score externo: ${score} (${classification})`);
+
+        } else {
+            // Cálculo interno (código original)
+            const c = customer as any;
+            const hasLoans = await prisma.loan.count({ where: { customerId } });
+            const overdueLoans = await prisma.loan.count({ where: { customerId, status: 'OVERDUE' } });
+            const paidLoans = await prisma.loan.count({ where: { customerId, status: 'PAID' } });
+
+            // Payment history factor (35%)
+            const paymentHistory = hasLoans > 0
+                ? Math.min(100, ((paidLoans / hasLoans) * 80) + (overdueLoans === 0 ? 20 : 0))
+                : 50; // New customer = neutral
+
+            // Debt ratio factor (30%)
+            const totalDebt = await prisma.installment.aggregate({
+                where: { loan: { customerId }, status: { in: ['PENDING', 'OVERDUE'] } },
+                _sum: { amount: true }
+            });
+            const debtAmount = totalDebt._sum.amount || 0;
+            const debtRatio = Math.max(0, 100 - (debtAmount / 10000) * 100);
+
+            // Credit age factor (15%)
+            const accountAge = (Date.now() - new Date(c.createdAt).getTime()) / (365 * 24 * 60 * 60 * 1000);
+            const creditAge = Math.min(100, accountAge * 20);
+
+            // Recent inquiries factor (20%)
+            const recentScores = await prisma.creditScore.count({
+                where: { customerId, consultedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }
+            });
+            const recentInquiries = Math.max(0, 100 - recentScores * 10);
+
+            // Weighted average
+            score = Math.round(
+                (paymentHistory * 0.35 + debtRatio * 0.30 + creditAge * 0.15 + recentInquiries * 0.20) * 10
+            );
+
+            // Add variation for external sources
+            if (source === 'SERASA' || source === 'SPC') {
+                const variation = (Math.random() - 0.5) * 80;
+                score = Math.round(score + variation);
+            }
+
+            score = Math.min(1000, Math.max(0, score));
+            classification = getScoreClassification(score);
+
+            factors = {
+                paymentHistory: Math.round(paymentHistory),
+                debtRatio: Math.round(debtRatio),
+                creditAge: Math.round(creditAge),
+                recentInquiries: Math.round(recentInquiries)
+            };
+
+            // Check restrictions
+            const hasRestriction = overdueLoans > 0 || debtAmount > 5000;
+            restrictions = hasRestriction ? {
+                hasRestriction: true,
+                type: overdueLoans > 0 ? 'Inadimplência' : 'Dívida em Aberto',
+                value: debtAmount,
+                origin: source === 'SERASA' ? 'Serasa Experian' : source === 'SPC' ? 'SPC Brasil' : 'Sistema Interno'
+            } : null;
         }
-
-        score = Math.min(1000, Math.max(0, score));
-
-        // Check restrictions
-        const hasRestriction = overdueLoans > 0 || debtAmount > 5000;
-        const restrictions = hasRestriction ? {
-            hasRestriction: true,
-            type: overdueLoans > 0 ? 'Inadimplência' : 'Dívida em Aberto',
-            value: debtAmount,
-            origin: source === 'SERASA' ? 'Serasa Experian' : source === 'SPC' ? 'SPC Brasil' : 'Sistema Interno'
-        } : null;
 
         const creditScore = await prisma.creditScore.create({
             data: {
                 customerId,
                 score,
-                classification: getScoreClassification(score),
-                source: source || 'INTERNAL',
-                factors: { paymentHistory: Math.round(paymentHistory), debtRatio: Math.round(debtRatio), creditAge: Math.round(creditAge), recentInquiries: Math.round(recentInquiries) },
+                classification,
+                source: source || (useExternalAPI ? 'SERASA' : 'INTERNAL'),
+                factors,
                 restrictions: restrictions || undefined
             }
         });
@@ -95,7 +151,8 @@ openFinanceRouter.post('/score/:customerId', authenticate, async (req: Request, 
             source: creditScore.source,
             consultedAt: creditScore.consultedAt,
             factors: creditScore.factors,
-            restrictions: creditScore.restrictions
+            restrictions: creditScore.restrictions,
+            cpfData: cpfData || undefined
         });
     } catch (error) {
         console.error('[OpenFinance] score error:', error);
@@ -342,5 +399,127 @@ openFinanceRouter.put('/consent/:id/revoke', authenticate, async (req: Request, 
     } catch (error) {
         console.error('[OpenFinance] revoke consent error:', error);
         res.status(500).json({ error: 'Erro ao revogar consentimento' });
+    }
+});
+
+// POST /api/open-finance/consult-cpf — Consultar CPF via API externa (ReceitaWS)
+openFinanceRouter.post('/consult-cpf', authenticate, async (req: Request, res: Response) => {
+    try {
+        const { cpf } = req.body;
+
+        if (!cpf) {
+            res.status(400).json({ error: 'CPF não informado' });
+            return;
+        }
+
+        console.log(`[OpenFinance] Consultando CPF ${cpf} via API externa...`);
+
+        // Validar CPF
+        const isValid = await externalScoreService.validateCPFBrasilAPI(cpf);
+
+        if (!isValid) {
+            res.status(400).json({ error: 'CPF inválido' });
+            return;
+        }
+
+        // Consultar dados do CPF
+        const cpfData = await externalScoreService.consultCPF(cpf);
+
+        if (!cpfData) {
+            res.status(404).json({ error: 'CPF não encontrado na base da Receita Federal' });
+            return;
+        }
+
+        res.json({
+            success: true,
+            cpf: cpfData.cpf,
+            nome: cpfData.nome,
+            situacao: cpfData.situacao,
+            dataNascimento: cpfData.dataNascimento,
+            nomeMae: cpfData.nomeMae,
+            isValid: true
+        });
+
+    } catch (error) {
+        console.error('[OpenFinance] consult CPF error:', error);
+        res.status(500).json({ error: 'Erro ao consultar CPF' });
+    }
+});
+
+// POST /api/open-finance/external-analysis/:customerId — Análise completa via APIs externas
+openFinanceRouter.post('/external-analysis/:customerId', authenticate, async (req: Request, res: Response) => {
+    try {
+        const { customerId } = req.params;
+
+        const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+        if (!customer) {
+            res.status(404).json({ error: 'Cliente não encontrado' });
+            return;
+        }
+
+        if (!customer.cpf) {
+            res.status(400).json({ error: 'Cliente não possui CPF cadastrado' });
+            return;
+        }
+
+        console.log(`[OpenFinance] Análise externa completa para ${customer.name}...`);
+
+        // Buscar dados do cliente
+        const hasLoans = await prisma.loan.count({ where: { customerId } });
+        const overdueLoans = await prisma.loan.count({ where: { customerId, status: 'OVERDUE' } });
+        const paidLoans = await prisma.loan.count({ where: { customerId, status: 'PAID' } });
+
+        const totalDebt = await prisma.installment.aggregate({
+            where: { loan: { customerId }, status: { in: ['PENDING', 'OVERDUE'] } },
+            _sum: { amount: true }
+        });
+        const debtAmount = totalDebt._sum.amount || 0;
+
+        const accountAge = (Date.now() - new Date((customer as any).createdAt).getTime()) / (365 * 24 * 60 * 60 * 1000);
+
+        const recentScores = await prisma.creditScore.count({
+            where: { customerId, consultedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }
+        });
+
+        // Análise completa via APIs externas
+        const analysis = await externalScoreService.fullCreditAnalysis(customer.cpf, {
+            hasLoans,
+            paidLoans,
+            overdueLoans,
+            totalDebt: debtAmount,
+            accountAge,
+            recentScores
+        });
+
+        // Salvar score no banco
+        const creditScore = await prisma.creditScore.create({
+            data: {
+                customerId,
+                score: analysis.scoreData.score,
+                classification: analysis.scoreData.classification,
+                source: 'SERASA',
+                factors: analysis.scoreData.factors,
+                restrictions: analysis.scoreData.restrictions || undefined
+            }
+        });
+
+        res.json({
+            success: true,
+            cpfData: analysis.cpfData,
+            scoreData: {
+                id: creditScore.id,
+                score: creditScore.score,
+                classification: creditScore.classification,
+                source: creditScore.source,
+                consultedAt: creditScore.consultedAt,
+                factors: creditScore.factors,
+                restrictions: creditScore.restrictions
+            },
+            isValid: analysis.isValid
+        });
+
+    } catch (error) {
+        console.error('[OpenFinance] external analysis error:', error);
+        res.status(500).json({ error: 'Erro ao realizar análise externa' });
     }
 });

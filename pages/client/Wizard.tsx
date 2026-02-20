@@ -88,17 +88,15 @@ const profileOptions = [
 
 // Steps dinâmicos baseados no perfil
 const getStepsForProfile = (profile: ProfileType) => {
-  // INVESTIDOR tem fluxo próprio: Info > Dados > Investimento > Banco > Visualizar Termos > Aceitar e Assinar > Confirmar
+  // INVESTIDOR tem fluxo simplificado: Info > Dados > Investimento > Segurança > Confirmar
   if (profile === 'INVESTIDOR') {
     return [
       { id: 1, title: 'Serviço', icon: Users },
       { id: 2, title: 'Saiba Mais', icon: Shield },
       { id: 3, title: 'Dados', icon: User },
       { id: 4, title: 'Investimento', icon: DollarSign },
-      { id: 5, title: 'Banco', icon: Landmark },
-      { id: 6, title: 'Termos', icon: FileText },
-      { id: 7, title: 'Assinar', icon: FileSignature },
-      { id: 8, title: 'Confirmar', icon: CheckCircle2 },
+      { id: 5, title: 'Segurança', icon: Shield },
+      { id: 6, title: 'Confirmar', icon: CheckCircle2 },
     ];
   }
   // LIMPA_NOME é um SERVIÇO simples - não precisa de documentos
@@ -1707,117 +1705,54 @@ export const Wizard: React.FC = () => {
             </div>
           )}
 
-          {/* INVESTIDOR STEP 5: Dados Bancários */}
+          {/* INVESTIDOR STEP 5: Segurança e Transparência */}
           {currentStep === 5 && profileType === 'INVESTIDOR' && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center">
-                <Landmark size={48} className="mx-auto text-cyan-400 mb-3" />
-                <h2 className="text-xl font-bold">Dados Bancários para Recebimento</h2>
-                <p className="text-zinc-400 text-sm mt-1">Onde receberá seus rendimentos</p>
+                <Shield size={48} className="mx-auto text-cyan-400 mb-3" />
+                <h2 className="text-xl font-bold">🔒 Segurança e Transparência</h2>
               </div>
 
-              <Input label="Banco" name="investorBankName" value={investorData.bankName}
-                onChange={(e: any) => setInvestorData({ ...investorData, bankName: e.target.value })} placeholder="Ex: Nubank" required />
-
-              <div className="grid grid-cols-4 gap-2">
-                {[{ v: 'cpf', l: 'CPF' }, { v: 'phone', l: 'Celular' }, { v: 'email', l: 'Email' }, { v: 'random', l: 'Aleatória' }].map(o => (
-                  <button key={o.v} type="button" onClick={() => setInvestorData({ ...investorData, pixKeyType: o.v })}
-                    className={`p-2 rounded-lg border text-sm ${investorData.pixKeyType === o.v ? 'border-cyan-500 text-cyan-400' : 'border-zinc-700 text-zinc-400'}`}>{o.l}</button>
-                ))}
+              <div className="bg-cyan-900/20 border border-cyan-600/30 rounded-xl p-6 space-y-4">
+                <p className="text-zinc-300 leading-relaxed">
+                  Para emissão do contrato oficial, nossos especialistas entram em contato via WhatsApp
+                  para validar os dados e enviar o contrato digital com assinatura pelo GOV.BR.
+                </p>
+                <p className="text-zinc-300 leading-relaxed">
+                  Seus dados são tratados conforme a LGPD e só são solicitados após confirmação do investimento.
+                </p>
               </div>
 
-              <Input label="Chave PIX" name="investorPixKey" value={investorData.pixKey}
-                onChange={(e: any) => setInvestorData({ ...investorData, pixKey: e.target.value })} placeholder="Sua chave" required />
-
-              <Input label="Nome do Titular da Conta" name="investorAccountHolder" value={investorData.accountHolderName}
-                onChange={(e: any) => setInvestorData({ ...investorData, accountHolderName: e.target.value })} placeholder="Seu nome completo" required />
+              <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-600/30 rounded-xl p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <CheckCircle2 size={24} className="text-green-400 shrink-0" />
+                  <h3 className="font-bold text-white">Processo Seguro</h3>
+                </div>
+                <ul className="space-y-2 text-sm text-zinc-300">
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-400 mt-0.5">✓</span>
+                    <span>Validação de dados via WhatsApp</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-400 mt-0.5">✓</span>
+                    <span>Contrato digital com assinatura GOV.BR</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-400 mt-0.5">✓</span>
+                    <span>Conformidade total com LGPD</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-400 mt-0.5">✓</span>
+                    <span>Dados solicitados apenas após confirmação</span>
+                  </li>
+                </ul>
+              </div>
             </div>
           )}
 
-          {/* INVESTIDOR STEP 6: Visualizar e Aceitar Termos */}
+
+          {/* INVESTIDOR STEP 6: Confirmação Final */}
           {currentStep === 6 && profileType === 'INVESTIDOR' && (
-            <div className="space-y-6 animate-in slide-in-from-right">
-              <div className="text-center">
-                <FileText size={48} className="mx-auto text-cyan-400 mb-3" />
-                <h2 className="text-xl font-bold">CONTRATO DE ALOCAÇÃO DE CAPITAL</h2>
-                <p className="text-zinc-400 text-sm mt-1">Leia atentamente antes de prosseguir.</p>
-              </div>
-
-              <div className="bg-cyan-900/20 border border-cyan-600/30 rounded-xl p-4">
-                <p className="text-sm text-zinc-300">
-                  {(SERVICE_TERMS as any).INVESTIDOR?.contractIntro}
-                </p>
-              </div>
-
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                <h3 className="font-bold text-cyan-400 mb-3">Dados do Investidor (Cadastro)</h3>
-                <ul className="space-y-2">
-                  {(SERVICE_TERMS as any).INVESTIDOR?.registrationFields?.map((field: string, idx: number) => (
-                    <li key={idx} className="text-sm text-zinc-300 flex items-start gap-2">
-                      <CheckCircle2 size={14} className="text-cyan-500 mt-0.5 shrink-0" />
-                      {field}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Condições */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 max-h-[350px] overflow-y-auto">
-                <h3 className="font-bold text-cyan-400 mb-4 text-center">CONDIÇÕES DO INVESTIMENTO</h3>
-                <ul className="space-y-2">
-                  {(SERVICE_TERMS as any).INVESTIDOR?.conditions?.map((cond: string, idx: number) => (
-                    <li key={idx} className="text-sm text-zinc-300 flex items-start gap-2">
-                      <CheckCircle2 size={14} className="text-cyan-500 mt-0.5 shrink-0" />
-                      {cond}
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="mt-6 pt-4 border-t border-zinc-700">
-                  <h4 className="font-bold text-white mb-2">Resumo do seu Investimento:</h4>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between"><span className="text-zinc-400">Valor:</span><span className="font-bold">R$ {investorData.investmentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                    <div className="flex justify-between"><span className="text-zinc-400">Faixa:</span><span className="font-bold text-cyan-400">{investorData.investmentTier === 'PREMIUM' ? 'Premium (R$50k+)' : 'Standard (R$10k-49k)'}</span></div>
-                    <div className="flex justify-between"><span className="text-zinc-400">Modalidade:</span><span className="font-bold">{investorData.payoutMode === 'MONTHLY' ? 'Mensal' : 'Anual Acumulado'}</span></div>
-                    <div className="flex justify-between"><span className="text-zinc-400">Taxa:</span><span className="font-bold text-[#D4AF37]">{investorData.monthlyRate}% ao mês</span></div>
-                    <div className="flex justify-between"><span className="text-zinc-400">Prazo:</span><span className="font-bold">12 meses</span></div>
-                    <div className="flex justify-between"><span className="text-zinc-400">Aviso de Resgate:</span><span className="font-bold">3 meses antes</span></div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3">
-                <p className="text-xs text-yellow-400">
-                  <strong>IMPORTANTE:</strong> Na próxima etapa, você deverá assinar digitalmente o contrato.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* INVESTIDOR STEP 7: Assinatura Digital */}
-          {currentStep === 7 && profileType === 'INVESTIDOR' && (
-            <div className="space-y-6 animate-in slide-in-from-right">
-              <div className="text-center">
-                <FileSignature size={48} className="mx-auto text-cyan-400 mb-3" />
-                <h2 className="text-xl font-bold">Assinatura Digital do Contrato</h2>
-                <p className="text-zinc-400 text-sm mt-1">Assine no campo abaixo para confirmar sua adesão.</p>
-              </div>
-
-              {/* Assinatura */}
-              <div className="space-y-2">
-                <h3 className="font-bold text-cyan-400">Confirmar e Assinar</h3>
-                <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
-                  <p className="text-xs text-red-400">
-                    <strong>OBRIGATÓRIO:</strong> Assine no campo abaixo para confirmar sua adesão ao programa de investimento.
-                  </p>
-                </div>
-                <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
-              </div>
-            </div>
-          )}
-
-          {/* INVESTIDOR STEP 8: Confirmação Final */}
-          {currentStep === 8 && profileType === 'INVESTIDOR' && (
             <div className="space-y-6 animate-in slide-in-from-right">
               <div className="text-center">
                 <CheckCircle2 size={48} className="mx-auto text-green-500 mb-3" />
@@ -1828,14 +1763,13 @@ export const Wizard: React.FC = () => {
                 <div className="flex justify-between"><span className="text-zinc-400">Serviço:</span><span className="font-bold text-cyan-400">Investidor Tubarão</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Nome:</span><span className="font-bold">{investorData.fullName}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">CPF/CNPJ:</span><span className="font-bold">{investorData.cpfCnpj}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Email:</span><span className="font-bold">{investorData.email}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Telefone:</span><span className="font-bold">{investorData.phone}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Valor:</span><span className="font-bold text-[#D4AF37]">R$ {investorData.investmentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Faixa:</span><span className="font-bold">{investorData.investmentTier === 'PREMIUM' ? 'Premium' : 'Standard'}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Modalidade:</span><span className="font-bold">{investorData.payoutMode === 'MONTHLY' ? 'Mensal' : 'Anual Acumulado'}</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Taxa:</span><span className="font-bold text-cyan-400">{investorData.monthlyRate}% ao mês</span></div>
                 <div className="flex justify-between"><span className="text-zinc-400">Prazo:</span><span className="font-bold">12 meses</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Banco:</span><span className="font-bold">{investorData.bankName}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">PIX:</span><span className="font-bold">{investorData.pixKey}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Termos:</span><span className="font-bold text-green-400">Aceito e Assinado</span></div>
               </div>
 
               <div className="bg-cyan-900/20 border border-cyan-600/30 rounded-xl p-4">
@@ -1843,6 +1777,17 @@ export const Wizard: React.FC = () => {
                   Ao confirmar, sua solicitação será enviada para análise pela equipe Tubarão. Você receberá um retorno em até 48 horas.
                 </p>
               </div>
+
+              {/* Botão WhatsApp */}
+              <a
+                href={`https://wa.me/5511999999999?text=${encodeURIComponent(`Olá! Gostaria de falar sobre meu investimento de R$ ${investorData.investmentAmount.toLocaleString('pt-BR')}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-3 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-all"
+              >
+                <Phone size={20} />
+                🟢 Falar no WhatsApp
+              </a>
             </div>
           )}
 
@@ -1897,6 +1842,9 @@ export const Wizard: React.FC = () => {
                 {/* Cálculos em Tempo Real */}
                 {(() => {
                   const amount = customAmount ? parseFloat(customAmount) : selectedAmount;
+                  if (!amount || isNaN(amount) || !settings || !settings.interestRate) {
+                    return null;
+                  }
                   const installmentsCount = 12; // Padrão 12 meses
                   const monthlyRate = settings.interestRate / 100;
                   const totalWithInterest = amount * Math.pow(1 + monthlyRate, installmentsCount);
@@ -3073,7 +3021,7 @@ export const Wizard: React.FC = () => {
           ) : (
             <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading}
               disabled={
-                profileType === 'INVESTIDOR' ? !formData.signature :
+                profileType === 'INVESTIDOR' ? false :
                 profileType === 'LIMPA_NOME' ? !formData.signature :
                 (!formData.signature || !formData.declarationAccepted)
               }>

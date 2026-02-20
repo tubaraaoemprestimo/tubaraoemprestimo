@@ -318,6 +318,10 @@ model LoanRequest {
   autoRenew               Boolean   @default(true) @map("auto_renew")
   withdrawalNoticeMonths  Int?      @map("withdrawal_notice_months")
   accountHolderName       String?   @map("account_holder_name")
+  // Flags de classificação de contrato
+  isService               Boolean   @default(false) @map("is_service")      // LIMPA_NOME
+  isInvestment            Boolean   @default(false) @map("is_investment")   // INVESTIDOR
+  isLoan                  Boolean   @default(true) @map("is_loan")          // EMPRÉSTIMO (CLT, AUTONOMO, MOTO, GARANTIA)
 
   customer                Customer? @relation(fields: [customerId], references: [id], name: "LoanRequestCustomer")
   user                    User?     @relation(fields: [userId], references: [id], name: "LoanRequestUser")
@@ -340,6 +344,10 @@ model Loan {
   createdAt               DateTime      @default(now()) @map("created_at")
   nivelOuroUtilizado      Boolean       @default(false) @map("nivel_ouro_utilizado")
   dataAtivacaoNivelOuro   DateTime?     @map("data_ativacao_nivel_ouro")
+  // Flags de classificação de contrato
+  isService               Boolean       @default(false) @map("is_service")      // LIMPA_NOME
+  isInvestment            Boolean       @default(false) @map("is_investment")   // INVESTIDOR
+  isLoan                  Boolean       @default(true) @map("is_loan")          // EMPRÉSTIMO
   installments            Installment[]
   customer                Customer      @relation(fields: [customerId], references: [id])
   loanRequest             LoanRequest   @relation(fields: [requestId], references: [id])
