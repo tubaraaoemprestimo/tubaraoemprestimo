@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import {
     User, Phone, Mail, Calendar, DollarSign, Instagram,
     ArrowLeft, Send, Loader2, CheckCircle, Clock, UserCheck,
-    Shield, Sparkles
+    Shield, Sparkles, Upload, Camera
 } from 'lucide-react';
 import { Logo } from '../../components/Logo';
 import { useToast } from '../../components/Toast';
 import { apiService } from '../../services/apiService';
 import { api } from '../../services/apiClient';
 import { SystemSettings } from '../../types';
+import { PaymentReceiptUpload } from '../../components/PaymentReceiptUpload';
 
 // Componente Input
 const Input: React.FC<{
@@ -105,7 +106,9 @@ export const ReturningClientForm: React.FC = () => {
         interestRate: '',
         dueDate: '',
         chargeType: 'MENSAL',
-        notes: ''
+        notes: '',
+        proofOfResidenceUrl: '',
+        selfieUrl: ''
     });
 
     useEffect(() => {
@@ -154,6 +157,14 @@ export const ReturningClientForm: React.FC = () => {
             addToast('Informe um e-mail válido.', 'warning');
             return;
         }
+        if (!formData.proofOfResidenceUrl) {
+            addToast('Envie o comprovante de residência.', 'warning');
+            return;
+        }
+        if (!formData.selfieUrl) {
+            addToast('Envie uma selfie para validação.', 'warning');
+            return;
+        }
         if (!formData.loanAmount || Number(formData.loanAmount) < 100) {
             addToast('Informe o valor do empréstimo.', 'warning');
             return;
@@ -184,6 +195,8 @@ export const ReturningClientForm: React.FC = () => {
                 city: formData.city,
                 state: formData.state,
                 zipCode: formData.zipCode,
+                proofOfResidenceUrl: formData.proofOfResidenceUrl,
+                selfieUrl: formData.selfieUrl,
 
                 // Etapa 2: Dados do Contrato Atual
                 loanAmount: Number(formData.loanAmount),
@@ -406,6 +419,44 @@ export const ReturningClientForm: React.FC = () => {
                                     onChange={handleChange}
                                     placeholder="00000-000"
                                 />
+                            </div>
+
+                            {/* Upload de Comprovante de Residência */}
+                            <div className="space-y-2">
+                                <label className="text-sm text-zinc-400 font-medium flex items-center gap-1">
+                                    Comprovante de Residência
+                                    <span className="text-red-500">*</span>
+                                </label>
+                                <PaymentReceiptUpload
+                                    onUpload={(url) => setFormData(prev => ({ ...prev, proofOfResidenceUrl: url }))}
+                                    receiptUrl={formData.proofOfResidenceUrl}
+                                    onRemove={() => setFormData(prev => ({ ...prev, proofOfResidenceUrl: '' }))}
+                                />
+                                {formData.proofOfResidenceUrl && (
+                                    <div className="flex items-center gap-2 text-sm text-emerald-400">
+                                        <CheckCircle size={16} />
+                                        Comprovante enviado
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Upload de Selfie */}
+                            <div className="space-y-2">
+                                <label className="text-sm text-zinc-400 font-medium flex items-center gap-1">
+                                    Selfie para Validação
+                                    <span className="text-red-500">*</span>
+                                </label>
+                                <PaymentReceiptUpload
+                                    onUpload={(url) => setFormData(prev => ({ ...prev, selfieUrl: url }))}
+                                    receiptUrl={formData.selfieUrl}
+                                    onRemove={() => setFormData(prev => ({ ...prev, selfieUrl: '' }))}
+                                />
+                                {formData.selfieUrl && (
+                                    <div className="flex items-center gap-2 text-sm text-emerald-400">
+                                        <CheckCircle size={16} />
+                                        Selfie enviada
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
