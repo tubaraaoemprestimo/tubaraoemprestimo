@@ -37,7 +37,18 @@ export const ClientDashboard: React.FC = () => {
     totalAmount: number;
     createdAt: string;
   } | null>(null);
-  const [coupons, setCoupons] = useState<{ code: string; discount: number; description: string; expiresAt: string }[]>([]);
+  const [coupons, setCoupons] = useState<{
+    id: string;
+    code: string;
+    discount: number;
+    description: string;
+    expiresAt: string;
+    imageUrl?: string;
+    partnerName?: string;
+    partnerLogo?: string;
+    usageLimit?: number;
+    usageCount?: number;
+  }[]>([]);
   const [realNotifications, setRealNotifications] = useState<{ id: string; title: string; message: string; type: string; created_at: string; read: boolean }[]>([]);
 
   // ... modals ...
@@ -729,20 +740,66 @@ if (user) {
               <div className="space-y-3">
                 {coupons.map((coupon, idx) => (
                   <div
-                    key={idx}
-                    className="bg-gradient-to-r from-purple-900/30 to-purple-900/10 border border-purple-600/50 rounded-xl p-4"
+                    key={coupon.id || idx}
+                    className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded">{coupon.code}</span>
-                        <span className="text-purple-400 font-bold">{coupon.discount}% OFF</span>
+                    {/* Imagem do Cupom */}
+                    {coupon.imageUrl && (
+                      <div className="w-full h-40 bg-zinc-900">
+                        <img
+                          src={coupon.imageUrl}
+                          alt={coupon.partnerName || 'Cupom'}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
-                      <Button size="sm" variant="secondary" className="bg-purple-900/50 border-purple-700 text-purple-300">
-                        Usar
-                      </Button>
+                    )}
+
+                    <div className="p-4">
+                      {/* Logo do Parceiro */}
+                      {coupon.partnerLogo && (
+                        <div className="mb-3">
+                          <img
+                            src={coupon.partnerLogo}
+                            alt={coupon.partnerName || 'Parceiro'}
+                            className="h-8 object-contain"
+                          />
+                        </div>
+                      )}
+
+                      {/* Nome do Parceiro */}
+                      {coupon.partnerName && (
+                        <h4 className="font-bold text-white mb-2">{coupon.partnerName}</h4>
+                      )}
+
+                      {/* Código e Desconto */}
+                      <div className="bg-gradient-to-r from-[#D4AF37]/20 to-[#FDB931]/10 border border-[#D4AF37]/30 rounded-lg p-3 mb-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-mono font-bold text-[#D4AF37] text-lg">{coupon.code}</span>
+                          <span className="text-white font-bold text-xl">{coupon.discount}% OFF</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="w-full bg-[#D4AF37] text-black hover:bg-[#FDB931]"
+                          onClick={() => {
+                            navigator.clipboard.writeText(coupon.code);
+                            addToast('Código copiado!', 'success');
+                          }}
+                        >
+                          Copiar Código
+                        </Button>
+                      </div>
+
+                      {/* Descrição */}
+                      <p className="text-sm text-zinc-300 mb-2">{coupon.description}</p>
+
+                      {/* Informações adicionais */}
+                      <div className="flex items-center justify-between text-xs text-zinc-500">
+                        <span>Válido até {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}</span>
+                        {coupon.usageLimit && coupon.usageCount !== undefined && (
+                          <span>{coupon.usageCount}/{coupon.usageLimit} usos</span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs text-zinc-400">{coupon.description}</p>
-                    <p className="text-[10px] text-zinc-600">Válido até {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}</p>
                   </div>
                 ))}
               </div>
