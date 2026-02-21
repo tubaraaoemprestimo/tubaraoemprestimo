@@ -1829,125 +1829,140 @@ export const Wizard: React.FC = () => {
                 <p className="text-zinc-400 text-sm mt-2">Simule agora e receba em instantes.</p>
               </div>
 
-              {/* Slider de Valor */}
+              {/* Slider de Valor — Simulador Interativo */}
               <div className="space-y-4">
-                <div className="bg-gradient-to-br from-[#D4AF37]/10 to-zinc-900 border border-[#D4AF37]/30 rounded-2xl p-6">
-                  <div className="text-center mb-4">
-                    <p className="text-sm text-zinc-400 mb-2">Valor solicitado</p>
-                    <p className={`font-bold text-[#D4AF37] transition-all duration-150 ${isDraggingSlider ? 'text-5xl scale-110' : 'text-4xl scale-100'}`}>
-                      R$ {(customAmount ? parseFloat(customAmount) : selectedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                    {isDraggingSlider && (
-                      <p className="text-xs text-[#D4AF37]/70 mt-1 animate-pulse">Arraste para simular ↔</p>
-                    )}
-                  </div>
-
-                  {/* Slider */}
-                  <div className="space-y-3">
-                    <input
-                      type="range"
-                      min={settings.minLoanAmount}
-                      max={settings.maxLoanAmount}
-                      step={100}
-                      value={customAmount ? parseFloat(customAmount) : selectedAmount}
-                      onMouseDown={() => setIsDraggingSlider(true)}
-                      onMouseUp={() => setIsDraggingSlider(false)}
-                      onTouchStart={() => setIsDraggingSlider(true)}
-                      onTouchEnd={() => setIsDraggingSlider(false)}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        setCustomAmount(val.toString());
-                        setSelectedAmount(val);
-                      }}
-                      className="w-full h-3 bg-zinc-800 rounded-lg appearance-none cursor-pointer slider-thumb"
-                      style={{
-                        background: `linear-gradient(to right, #D4AF37 0%, #D4AF37 ${((customAmount ? parseFloat(customAmount) : selectedAmount) - settings.minLoanAmount) / (settings.maxLoanAmount - settings.minLoanAmount) * 100}%, #27272a ${((customAmount ? parseFloat(customAmount) : selectedAmount) - settings.minLoanAmount) / (settings.maxLoanAmount - settings.minLoanAmount) * 100}%, #27272a 100%)`
-                      }}
-                    />
-                    <div className="flex justify-between text-xs text-zinc-500">
-                      <span>R$ {settings.minLoanAmount.toLocaleString('pt-BR')}</span>
-                      <span>R$ {settings.maxLoanAmount.toLocaleString('pt-BR')}</span>
-                    </div>
-                  </div>
-
-                  {/* Cards de simulação imediata — aparecem DENTRO do card, logo após o slider */}
-                  {(() => {
-                    const amount = customAmount ? parseFloat(customAmount) : selectedAmount;
-                    if (!amount || isNaN(amount) || !settings || !settings.interestRate) return null;
-                    const installmentsCount = 12;
-                    const monthlyRate = settings.interestRate / 100;
-                    const totalWithInterest = amount * Math.pow(1 + monthlyRate, installmentsCount);
-                    const monthlyPayment = totalWithInterest / installmentsCount;
-                    const totalInterest = totalWithInterest - amount;
-                    return (
-                      <div className={`grid grid-cols-3 gap-2 mt-5 transition-all duration-200 ${isDraggingSlider ? 'scale-105' : 'scale-100'}`}>
-                        <div className={`rounded-xl p-3 text-center border transition-all duration-200 ${isDraggingSlider ? 'border-green-500 bg-green-500/20' : 'border-zinc-700 bg-black/50'}`}>
-                          <p className="text-[10px] text-zinc-400 mb-1">Parcela</p>
-                          <p className="text-sm font-bold text-green-400 leading-tight">
-                            R$ {monthlyPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </p>
-                          <p className="text-[10px] text-zinc-500 mt-0.5">{installmentsCount}x</p>
-                        </div>
-                        <div className={`rounded-xl p-3 text-center border transition-all duration-200 ${isDraggingSlider ? 'border-orange-500 bg-orange-500/20' : 'border-zinc-700 bg-black/50'}`}>
-                          <p className="text-[10px] text-zinc-400 mb-1">Juros</p>
-                          <p className="text-sm font-bold text-orange-400 leading-tight">
-                            R$ {totalInterest.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </p>
-                          <p className="text-[10px] text-zinc-500 mt-0.5">{settings.interestRate}% a.m.</p>
-                        </div>
-                        <div className={`rounded-xl p-3 text-center border transition-all duration-200 ${isDraggingSlider ? 'border-cyan-500 bg-cyan-500/20' : 'border-zinc-700 bg-black/50'}`}>
-                          <p className="text-[10px] text-zinc-400 mb-1">Total</p>
-                          <p className="text-sm font-bold text-cyan-300 leading-tight">
-                            R$ {totalWithInterest.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </p>
-                          <p className="text-[10px] text-zinc-500 mt-0.5">a pagar</p>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* Detalhamento completo da simulação */}
                 {(() => {
                   const amount = customAmount ? parseFloat(customAmount) : selectedAmount;
-                  if (!amount || isNaN(amount) || !settings || !settings.interestRate) {
-                    return null;
-                  }
-                  const installmentsCount = 12; // Padrão 12 meses
-                  const monthlyRate = settings.interestRate / 100;
-                  const totalWithInterest = amount * Math.pow(1 + monthlyRate, installmentsCount);
-                  const monthlyPayment = totalWithInterest / installmentsCount;
-                  const totalInterest = totalWithInterest - amount;
+                  const validAmount = (!amount || isNaN(amount)) ? 0 : amount;
+                  const installmentsCount = 12;
+                  const monthlyRate = (settings?.interestRate || 0) / 100;
+                  const annualRate = (Math.pow(1 + monthlyRate, 12) - 1) * 100;
+                  const totalWithInterest = validAmount * Math.pow(1 + monthlyRate, installmentsCount);
+                  const monthlyPayment = installmentsCount > 0 ? totalWithInterest / installmentsCount : 0;
+                  const totalInterest = totalWithInterest - validAmount;
+                  const progress = settings ? ((validAmount - settings.minLoanAmount) / (settings.maxLoanAmount - settings.minLoanAmount)) * 100 : 0;
+                  const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
                   return (
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
-                      <h3 className="font-bold text-cyan-400 text-center mb-4">Simulação do Empréstimo</h3>
+                    <div className={`rounded-3xl border-2 overflow-hidden transition-all duration-300 ${isDraggingSlider ? 'border-[#D4AF37] shadow-[0_0_30px_rgba(212,175,55,0.25)]' : 'border-[#D4AF37]/30'}`} style={{ background: 'linear-gradient(160deg, #0f0f0f 0%, #1a1800 100%)' }}>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-black/50 rounded-xl p-4 text-center">
-                          <p className="text-xs text-zinc-400 mb-1">Parcela Mensal</p>
-                          <p className="text-2xl font-bold text-green-400">
-                            R$ {monthlyPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </p>
-                          <p className="text-xs text-zinc-500 mt-1">{installmentsCount}x</p>
-                        </div>
-
-                        <div className="bg-black/50 rounded-xl p-4 text-center">
-                          <p className="text-xs text-zinc-400 mb-1">Total de Juros</p>
-                          <p className="text-2xl font-bold text-orange-400">
-                            R$ {totalInterest.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </p>
-                          <p className="text-xs text-zinc-500 mt-1">{settings.interestRate}% a.m.</p>
-                        </div>
-                      </div>
-
-                      <div className="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-600/30 rounded-xl p-4 text-center">
-                        <p className="text-xs text-zinc-400 mb-1">Valor Total a Pagar</p>
-                        <p className="text-3xl font-bold text-cyan-300">
-                          R$ {totalWithInterest.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {/* Cabeçalho — Valor escolhido */}
+                      <div className="px-6 pt-6 pb-4 text-center relative">
+                        <p className="text-xs uppercase tracking-widest text-zinc-500 mb-1">Você quer solicitar</p>
+                        <p className={`font-black text-[#D4AF37] transition-all duration-150 leading-none ${isDraggingSlider ? 'text-6xl' : 'text-5xl'}`}>
+                          R$ {fmt(validAmount)}
                         </p>
-                        <p className="text-xs text-zinc-500 mt-1">Quitação em {installmentsCount} meses</p>
+                        {isDraggingSlider && (
+                          <span className="inline-block mt-2 text-[11px] text-[#D4AF37]/60 animate-pulse">← deslize para ajustar →</span>
+                        )}
                       </div>
+
+                      {/* Slider */}
+                      <div className="px-6 pb-3">
+                        <input
+                          type="range"
+                          min={settings?.minLoanAmount ?? 500}
+                          max={settings?.maxLoanAmount ?? 10000}
+                          step={100}
+                          value={validAmount || (settings?.minLoanAmount ?? 500)}
+                          onMouseDown={() => setIsDraggingSlider(true)}
+                          onMouseUp={() => setIsDraggingSlider(false)}
+                          onTouchStart={() => setIsDraggingSlider(true)}
+                          onTouchEnd={() => setIsDraggingSlider(false)}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            setCustomAmount(val.toString());
+                            setSelectedAmount(val);
+                          }}
+                          className="w-full h-4 rounded-full appearance-none cursor-pointer slider-thumb"
+                          style={{
+                            background: `linear-gradient(to right, #D4AF37 0%, #f0d060 ${progress}%, #2a2a2a ${progress}%, #1a1a1a 100%)`,
+                            boxShadow: isDraggingSlider ? '0 0 12px rgba(212,175,55,0.5)' : 'none'
+                          }}
+                        />
+                        <div className="flex justify-between text-xs text-zinc-600 mt-1.5 px-0.5">
+                          <span>R$ {(settings?.minLoanAmount ?? 500).toLocaleString('pt-BR')}</span>
+                          <span>R$ {(settings?.maxLoanAmount ?? 10000).toLocaleString('pt-BR')}</span>
+                        </div>
+                      </div>
+
+                      {/* Linha divisória */}
+                      <div className="mx-6 border-t border-zinc-800/80 mb-4" />
+
+                      {/* Grid de dados financeiros — atualizam em tempo real */}
+                      <div className="px-4 pb-4 grid grid-cols-2 gap-3">
+
+                        {/* Taxa mensal */}
+                        <div className={`rounded-2xl p-4 flex flex-col gap-1 transition-all duration-200 ${isDraggingSlider ? 'bg-yellow-500/10 border border-yellow-500/40' : 'bg-zinc-900/80 border border-zinc-800'}`}>
+                          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Taxa mensal</span>
+                          <span className={`text-xl font-black transition-colors ${isDraggingSlider ? 'text-yellow-400' : 'text-yellow-300'}`}>
+                            {(settings?.interestRate ?? 0).toFixed(1)}%
+                          </span>
+                          <span className="text-[10px] text-zinc-600">ao mês</span>
+                        </div>
+
+                        {/* Taxa anual */}
+                        <div className={`rounded-2xl p-4 flex flex-col gap-1 transition-all duration-200 ${isDraggingSlider ? 'bg-yellow-500/10 border border-yellow-500/40' : 'bg-zinc-900/80 border border-zinc-800'}`}>
+                          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Taxa anual</span>
+                          <span className={`text-xl font-black transition-colors ${isDraggingSlider ? 'text-yellow-400' : 'text-yellow-300'}`}>
+                            {annualRate.toFixed(1)}%
+                          </span>
+                          <span className="text-[10px] text-zinc-600">ao ano</span>
+                        </div>
+
+                        {/* Parcela mensal */}
+                        <div className={`rounded-2xl p-4 flex flex-col gap-1 transition-all duration-200 ${isDraggingSlider ? 'bg-green-500/15 border border-green-500/50' : 'bg-zinc-900/80 border border-zinc-800'}`}>
+                          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Parcela mensal</span>
+                          <span className={`text-xl font-black transition-colors ${isDraggingSlider ? 'text-green-300' : 'text-green-400'}`}>
+                            R$ {fmt(monthlyPayment)}
+                          </span>
+                          <span className="text-[10px] text-zinc-600">{installmentsCount}x mensais</span>
+                        </div>
+
+                        {/* Total de juros */}
+                        <div className={`rounded-2xl p-4 flex flex-col gap-1 transition-all duration-200 ${isDraggingSlider ? 'bg-orange-500/15 border border-orange-500/50' : 'bg-zinc-900/80 border border-zinc-800'}`}>
+                          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Total de juros</span>
+                          <span className={`text-xl font-black transition-colors ${isDraggingSlider ? 'text-orange-300' : 'text-orange-400'}`}>
+                            R$ {fmt(totalInterest)}
+                          </span>
+                          <span className="text-[10px] text-zinc-600">no período total</span>
+                        </div>
+
+                      </div>
+
+                      {/* Destaque — Valor total a pagar */}
+                      <div className={`mx-4 mb-4 rounded-2xl p-4 text-center transition-all duration-200 ${isDraggingSlider ? 'bg-cyan-500/20 border-2 border-cyan-400/60 shadow-[0_0_20px_rgba(6,182,212,0.2)]' : 'bg-cyan-900/20 border border-cyan-800/40'}`}>
+                        <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Valor total a pagar</p>
+                        <p className={`font-black leading-none transition-all duration-150 ${isDraggingSlider ? 'text-4xl text-cyan-300' : 'text-3xl text-cyan-400'}`}>
+                          R$ {fmt(totalWithInterest)}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1.5">
+                          Empréstimo de <span className="text-white font-semibold">R$ {fmt(validAmount)}</span> + juros de <span className="text-orange-400 font-semibold">R$ {fmt(totalInterest)}</span>
+                        </p>
+                      </div>
+
+                      {/* Barra de progresso de juros */}
+                      <div className="px-4 pb-5">
+                        <div className="flex justify-between text-[10px] text-zinc-500 mb-1.5">
+                          <span>Capital: {validAmount > 0 ? ((validAmount / totalWithInterest) * 100).toFixed(0) : 0}%</span>
+                          <span>Juros: {validAmount > 0 ? ((totalInterest / totalWithInterest) * 100).toFixed(0) : 0}%</span>
+                        </div>
+                        <div className="h-2 rounded-full overflow-hidden bg-zinc-800 flex">
+                          <div
+                            className="h-full bg-[#D4AF37] transition-all duration-300"
+                            style={{ width: validAmount > 0 ? `${(validAmount / totalWithInterest) * 100}%` : '0%' }}
+                          />
+                          <div
+                            className="h-full bg-orange-500 transition-all duration-300"
+                            style={{ width: validAmount > 0 ? `${(totalInterest / totalWithInterest) * 100}%` : '0%' }}
+                          />
+                        </div>
+                        <div className="flex gap-4 mt-1.5 text-[10px]">
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#D4AF37] inline-block" /> Capital</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500 inline-block" /> Juros</span>
+                        </div>
+                      </div>
+
                     </div>
                   );
                 })()}
