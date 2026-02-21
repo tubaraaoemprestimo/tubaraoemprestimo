@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Check, ChevronLeft, User, MapPin,
+  Check, ChevronLeft, ChevronDown, User, MapPin,
   AlertCircle, FileText, ScanFace, X, Plus, Loader2,
   Phone, Users, Video, DollarSign, Shield, Clock, Landmark, CheckCircle2, FileCheck, Percent,
   Car, Smartphone, Tv, Home, Package, Camera as CameraIcon,
@@ -189,6 +189,24 @@ export const Wizard: React.FC = () => {
   const [selectedAmount, setSelectedAmount] = useState<number>(1000);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [needsGuarantee, setNeedsGuarantee] = useState(false);
+  const [isDraggingSlider, setIsDraggingSlider] = useState(false);
+
+  // Refs para auto-scroll
+  const returningClientSectionRef = useRef<HTMLDivElement>(null);
+  const referralSectionRef = useRef<HTMLDivElement>(null);
+
+  // Handler interativo: seleciona perfil e rola a página para mostrar próxima ação
+  const handleProfileSelect = (profileId: ProfileType) => {
+    setProfileType(profileId);
+    setTimeout(() => {
+      // Para perfis com seção "já sou cliente", scroll até lá
+      if (profileId !== 'MOTO' && profileId !== 'LIMPA_NOME' && profileId !== 'INVESTIDOR') {
+        returningClientSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        referralSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 150);
+  };
 
   // Garantia Universal (usado para Garantia Veículo tb)
   const [guarantee, setGuarantee] = useState({
@@ -1356,7 +1374,7 @@ export const Wizard: React.FC = () => {
                   return (
                     <button
                       key={option.id}
-                      onClick={() => setProfileType(option.id as ProfileType)}
+                      onClick={() => handleProfileSelect(option.id as ProfileType)}
                       className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all ${isSelected
                         ? 'border-[#D4AF37] bg-[#D4AF37]/10 scale-[1.02]'
                         : 'border-zinc-800 bg-black hover:border-zinc-600'
@@ -1372,9 +1390,16 @@ export const Wizard: React.FC = () => {
                 })}
               </div>
 
+              {/* Seta animada guiando o usuário para baixo após selecionar serviço */}
+              {profileType && (
+                <div className="flex justify-center animate-bounce mt-1 mb-0">
+                  <ChevronDown size={28} className="text-[#D4AF37] opacity-70" />
+                </div>
+              )}
+
               {/* Campo de Código de Indicação */}
               {profileType && (
-                <div className="mt-6 p-5 bg-gradient-to-r from-emerald-900/30 to-zinc-900/50 rounded-2xl border border-emerald-700/50 animate-in fade-in slide-in-from-bottom-2">
+                <div ref={referralSectionRef} className="mt-6 p-5 bg-gradient-to-r from-emerald-900/30 to-zinc-900/50 rounded-2xl border border-emerald-700/50 animate-in fade-in slide-in-from-bottom-2">
                   <h3 className="font-bold text-emerald-400 mb-3 flex items-center gap-2">
                     <Gift size={18} />
                     Código de Indicação (Opcional)
@@ -1396,7 +1421,7 @@ export const Wizard: React.FC = () => {
 
               {/* Pergunta sobre cliente recorrente - apenas CLT, AUTONOMO e GARANTIA */}
               {profileType && profileType !== 'MOTO' && profileType !== 'LIMPA_NOME' && profileType !== 'INVESTIDOR' && (
-                <div className="mt-6 p-5 bg-zinc-800/50 rounded-2xl border border-zinc-700 animate-in fade-in slide-in-from-bottom-2">
+                <div ref={returningClientSectionRef} className="mt-6 p-5 bg-zinc-800/50 rounded-2xl border border-zinc-700 animate-in fade-in slide-in-from-bottom-2">
                   <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                     <Users size={18} className="text-[#D4AF37]" />
                     Você já fez empréstimo conosco antes?
@@ -1807,11 +1832,14 @@ export const Wizard: React.FC = () => {
               {/* Slider de Valor */}
               <div className="space-y-4">
                 <div className="bg-gradient-to-br from-[#D4AF37]/10 to-zinc-900 border border-[#D4AF37]/30 rounded-2xl p-6">
-                  <div className="text-center mb-6">
+                  <div className="text-center mb-4">
                     <p className="text-sm text-zinc-400 mb-2">Valor solicitado</p>
-                    <p className="text-4xl font-bold text-[#D4AF37]">
+                    <p className={`font-bold text-[#D4AF37] transition-all duration-150 ${isDraggingSlider ? 'text-5xl scale-110' : 'text-4xl scale-100'}`}>
                       R$ {(customAmount ? parseFloat(customAmount) : selectedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
+                    {isDraggingSlider && (
+                      <p className="text-xs text-[#D4AF37]/70 mt-1 animate-pulse">Arraste para simular ↔</p>
+                    )}
                   </div>
 
                   {/* Slider */}
@@ -1822,6 +1850,10 @@ export const Wizard: React.FC = () => {
                       max={settings.maxLoanAmount}
                       step={100}
                       value={customAmount ? parseFloat(customAmount) : selectedAmount}
+                      onMouseDown={() => setIsDraggingSlider(true)}
+                      onMouseUp={() => setIsDraggingSlider(false)}
+                      onTouchStart={() => setIsDraggingSlider(true)}
+                      onTouchEnd={() => setIsDraggingSlider(false)}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
                         setCustomAmount(val.toString());
@@ -1837,9 +1869,45 @@ export const Wizard: React.FC = () => {
                       <span>R$ {settings.maxLoanAmount.toLocaleString('pt-BR')}</span>
                     </div>
                   </div>
+
+                  {/* Cards de simulação imediata — aparecem DENTRO do card, logo após o slider */}
+                  {(() => {
+                    const amount = customAmount ? parseFloat(customAmount) : selectedAmount;
+                    if (!amount || isNaN(amount) || !settings || !settings.interestRate) return null;
+                    const installmentsCount = 12;
+                    const monthlyRate = settings.interestRate / 100;
+                    const totalWithInterest = amount * Math.pow(1 + monthlyRate, installmentsCount);
+                    const monthlyPayment = totalWithInterest / installmentsCount;
+                    const totalInterest = totalWithInterest - amount;
+                    return (
+                      <div className={`grid grid-cols-3 gap-2 mt-5 transition-all duration-200 ${isDraggingSlider ? 'scale-105' : 'scale-100'}`}>
+                        <div className={`rounded-xl p-3 text-center border transition-all duration-200 ${isDraggingSlider ? 'border-green-500 bg-green-500/20' : 'border-zinc-700 bg-black/50'}`}>
+                          <p className="text-[10px] text-zinc-400 mb-1">Parcela</p>
+                          <p className="text-sm font-bold text-green-400 leading-tight">
+                            R$ {monthlyPayment.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-[10px] text-zinc-500 mt-0.5">{installmentsCount}x</p>
+                        </div>
+                        <div className={`rounded-xl p-3 text-center border transition-all duration-200 ${isDraggingSlider ? 'border-orange-500 bg-orange-500/20' : 'border-zinc-700 bg-black/50'}`}>
+                          <p className="text-[10px] text-zinc-400 mb-1">Juros</p>
+                          <p className="text-sm font-bold text-orange-400 leading-tight">
+                            R$ {totalInterest.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-[10px] text-zinc-500 mt-0.5">{settings.interestRate}% a.m.</p>
+                        </div>
+                        <div className={`rounded-xl p-3 text-center border transition-all duration-200 ${isDraggingSlider ? 'border-cyan-500 bg-cyan-500/20' : 'border-zinc-700 bg-black/50'}`}>
+                          <p className="text-[10px] text-zinc-400 mb-1">Total</p>
+                          <p className="text-sm font-bold text-cyan-300 leading-tight">
+                            R$ {totalWithInterest.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-[10px] text-zinc-500 mt-0.5">a pagar</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
-                {/* Cálculos em Tempo Real */}
+                {/* Detalhamento completo da simulação */}
                 {(() => {
                   const amount = customAmount ? parseFloat(customAmount) : selectedAmount;
                   if (!amount || isNaN(amount) || !settings || !settings.interestRate) {
