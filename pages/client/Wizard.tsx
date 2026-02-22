@@ -1906,31 +1906,31 @@ export const Wizard: React.FC = () => {
                           <span className="text-[10px] text-zinc-600">ao mês</span>
                         </div>
 
-                        {/* Taxa anual */}
-                        <div className={`rounded-2xl p-4 flex flex-col gap-1 transition-all duration-200 ${isDraggingSlider ? 'bg-yellow-500/10 border border-yellow-500/40' : 'bg-zinc-900/80 border border-zinc-800'}`}>
-                          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Taxa anual</span>
-                          <span className={`text-xl font-black transition-colors ${isDraggingSlider ? 'text-yellow-400' : 'text-yellow-300'}`}>
-                            {annualRate.toFixed(1)}%
-                          </span>
-                          <span className="text-[10px] text-zinc-600">ao ano</span>
-                        </div>
-
-                        {/* Juros do Mês */}
+                        {/* Juros do Mês — valor em R$ */}
                         <div className={`rounded-2xl p-4 flex flex-col gap-1 transition-all duration-200 ${isDraggingSlider ? 'bg-green-500/15 border border-green-500/50' : 'bg-zinc-900/80 border border-zinc-800'}`}>
-                          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Juros do Mês</span>
+                          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Juros mensais</span>
                           <span className={`text-xl font-black transition-colors ${isDraggingSlider ? 'text-green-300' : 'text-green-400'}`}>
                             R$ {fmt(jurosMensais)}
                           </span>
                           <span className="text-[10px] text-zinc-600">por mês</span>
                         </div>
 
-                        {/* Total de juros */}
+                        {/* Custo em 3 meses */}
                         <div className={`rounded-2xl p-4 flex flex-col gap-1 transition-all duration-200 ${isDraggingSlider ? 'bg-orange-500/15 border border-orange-500/50' : 'bg-zinc-900/80 border border-zinc-800'}`}>
-                          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Total de juros</span>
+                          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Juros em 3 meses</span>
                           <span className={`text-xl font-black transition-colors ${isDraggingSlider ? 'text-orange-300' : 'text-orange-400'}`}>
-                            R$ {fmt(totalInterest)}
+                            R$ {fmt(jurosMensais * 3)}
                           </span>
-                          <span className="text-[10px] text-zinc-600">encargo mensal</span>
+                          <span className="text-[10px] text-zinc-600">se renovar 3x</span>
+                        </div>
+
+                        {/* Custo diário equivalente */}
+                        <div className={`rounded-2xl p-4 flex flex-col gap-1 transition-all duration-200 ${isDraggingSlider ? 'bg-purple-500/15 border border-purple-500/50' : 'bg-zinc-900/80 border border-zinc-800'}`}>
+                          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Custo por dia</span>
+                          <span className={`text-xl font-black transition-colors ${isDraggingSlider ? 'text-purple-300' : 'text-purple-400'}`}>
+                            R$ {fmt(jurosMensais / 30)}
+                          </span>
+                          <span className="text-[10px] text-zinc-600">equivalente diário</span>
                         </div>
 
                       </div>
