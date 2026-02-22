@@ -10,7 +10,7 @@ export const HelpCenter: React.FC = () => {
   const faqs = [
     { q: "Como aumentar meu limite?", a: "O aumento de limite é analisado automaticamente a cada 3 meses. Mantenha seus pagamentos em dia para aumentar suas chances." },
     { q: "Quais são as taxas de juros?", a: "As taxas variam de acordo com seu perfil e o pacote escolhido, começando em 3.2% a.m. Você pode ver a taxa exata na simulação." },
-    { q: "Como antecipar parcelas?", a: "Vá em 'Meus Contratos', selecione a parcela desejada e realize o pagamento. O desconto de juros é calculado automaticamente." },
+    { q: "Como realizar pagamento antecipado?", a: "Vá em 'Meus Contratos', selecione o pagamento desejado e realize o pagamento. O desconto de juros é calculado automaticamente." },
     { q: "O Pix não funcionou, e agora?", a: "O código Pix expira em 30 minutos. Gere um novo código na aba de contratos. Se o dinheiro saiu da sua conta, envie o comprovante no chat." },
   ];
 

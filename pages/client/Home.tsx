@@ -108,7 +108,7 @@ export const Home: React.FC = () => {
                 </div>
 
                 <div className="mt-8 pt-8 border-t border-zinc-800">
-                  <div className="text-zinc-400 text-sm mb-1">Parcela Estimada</div>
+                  <div className="text-zinc-400 text-sm mb-1">Juros do Mês</div>
                   <div className="text-4xl font-bold text-white mb-6">
                     R$ {calculateMonthly().toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>

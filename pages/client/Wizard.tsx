@@ -1834,12 +1834,12 @@ export const Wizard: React.FC = () => {
                 {(() => {
                   const amount = customAmount ? parseFloat(customAmount) : selectedAmount;
                   const validAmount = (!amount || isNaN(amount)) ? 0 : amount;
-                  const installmentsCount = 12;
                   const monthlyRate = (settings?.interestRate || 0) / 100;
                   const annualRate = (Math.pow(1 + monthlyRate, 12) - 1) * 100;
-                  const totalWithInterest = validAmount * Math.pow(1 + monthlyRate, installmentsCount);
-                  const monthlyPayment = installmentsCount > 0 ? totalWithInterest / installmentsCount : 0;
-                  const totalInterest = totalWithInterest - validAmount;
+                  // Lógica agiota: juros simples mensais sobre o principal
+                  const jurosMensais = validAmount * monthlyRate;
+                  const totalWithInterest = validAmount + jurosMensais;
+                  const totalInterest = jurosMensais;
                   const progress = settings ? ((validAmount - settings.minLoanAmount) / (settings.maxLoanAmount - settings.minLoanAmount)) * 100 : 0;
                   const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -1910,13 +1910,13 @@ export const Wizard: React.FC = () => {
                           <span className="text-[10px] text-zinc-600">ao ano</span>
                         </div>
 
-                        {/* Parcela mensal */}
+                        {/* Juros do Mês */}
                         <div className={`rounded-2xl p-4 flex flex-col gap-1 transition-all duration-200 ${isDraggingSlider ? 'bg-green-500/15 border border-green-500/50' : 'bg-zinc-900/80 border border-zinc-800'}`}>
-                          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Parcela mensal</span>
+                          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Juros do Mês</span>
                           <span className={`text-xl font-black transition-colors ${isDraggingSlider ? 'text-green-300' : 'text-green-400'}`}>
-                            R$ {fmt(monthlyPayment)}
+                            R$ {fmt(jurosMensais)}
                           </span>
-                          <span className="text-[10px] text-zinc-600">{installmentsCount}x mensais</span>
+                          <span className="text-[10px] text-zinc-600">por mês</span>
                         </div>
 
                         {/* Total de juros */}
@@ -1925,19 +1925,19 @@ export const Wizard: React.FC = () => {
                           <span className={`text-xl font-black transition-colors ${isDraggingSlider ? 'text-orange-300' : 'text-orange-400'}`}>
                             R$ {fmt(totalInterest)}
                           </span>
-                          <span className="text-[10px] text-zinc-600">no período total</span>
+                          <span className="text-[10px] text-zinc-600">encargo mensal</span>
                         </div>
 
                       </div>
 
-                      {/* Destaque — Valor total a pagar */}
+                      {/* Destaque — 1º Vencimento */}
                       <div className={`mx-4 mb-4 rounded-2xl p-4 text-center transition-all duration-200 ${isDraggingSlider ? 'bg-cyan-500/20 border-2 border-cyan-400/60 shadow-[0_0_20px_rgba(6,182,212,0.2)]' : 'bg-cyan-900/20 border border-cyan-800/40'}`}>
-                        <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Valor total a pagar</p>
+                        <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">1º Vencimento</p>
                         <p className={`font-black leading-none transition-all duration-150 ${isDraggingSlider ? 'text-4xl text-cyan-300' : 'text-3xl text-cyan-400'}`}>
                           R$ {fmt(totalWithInterest)}
                         </p>
                         <p className="text-xs text-zinc-500 mt-1.5">
-                          Empréstimo de <span className="text-white font-semibold">R$ {fmt(validAmount)}</span> + juros de <span className="text-orange-400 font-semibold">R$ {fmt(totalInterest)}</span>
+                          Capital de <span className="text-white font-semibold">R$ {fmt(validAmount)}</span> + juros de <span className="text-orange-400 font-semibold">R$ {fmt(totalInterest)}</span>
                         </p>
                       </div>
 
@@ -2244,7 +2244,7 @@ export const Wizard: React.FC = () => {
                     <h3 className="font-bold text-yellow-400 mb-3">💰 CONDIÇÕES FINANCEIRAS</h3>
                     <ul className="text-sm text-zinc-300 space-y-2">
                       <li>• <strong className="text-yellow-400">Entrada obrigatória:</strong> R$ 2.000,00 (não reembolsável)</li>
-                      <li>• <strong>Parcelamento:</strong> 36 parcelas mensais de R$ 611,00</li>
+                      <li>• <strong>Financiamento:</strong> 36 prestações mensais de R$ 611,00</li>
                       <li>• <strong>Seguro obrigatório:</strong> R$ 150,00/mês</li>
                       <li>• <strong className="text-green-400">Valor mensal total:</strong> R$ 761,00</li>
                     </ul>
@@ -2273,7 +2273,7 @@ export const Wizard: React.FC = () => {
                   <div className="bg-blue-900/20 border border-blue-600/30 rounded-xl p-4">
                     <h3 className="font-bold text-blue-400 mb-3">📋 TRANSFERÊNCIA</h3>
                     <ul className="text-sm text-zinc-300 space-y-2">
-                      <li>• A moto só será transferida para o nome do cliente <strong className="text-blue-400">após a quitação da 36ª parcela</strong></li>
+                      <li>• A moto só será transferida para o nome do cliente <strong className="text-blue-400">após a quitação da 36ª prestação</strong></li>
                       <li>• Até lá, a moto permanece registrada em nome da empresa</li>
                     </ul>
                   </div>
@@ -2283,7 +2283,7 @@ export const Wizard: React.FC = () => {
                     <div>
                       <span className="text-white font-bold">☑️ Declaro que li e compreendi</span>
                       <p className="text-xs text-zinc-400 mt-1">
-                        Todas as condições do financiamento próprio de motocicleta, incluindo a entrada obrigatória de <strong>R$ 2.000,00</strong>, o parcelamento em <strong>36x de R$ 611,00</strong> + seguro de <strong>R$ 150,00</strong> (total mensal: <strong>R$ 761,00</strong>), a cláusula de <strong className="text-red-400">busca e apreensão imediata</strong> em caso de atraso superior ao contrato com <strong className="text-red-400">perda total dos valores pagos</strong>, e que a transferência do veículo somente ocorrerá após a quitação da 36ª parcela.
+                        Todas as condições do financiamento próprio de motocicleta, incluindo a entrada obrigatória de <strong>R$ 2.000,00</strong>, o financiamento em <strong>36x de R$ 611,00</strong> + seguro de <strong>R$ 150,00</strong> (total mensal: <strong>R$ 761,00</strong>), a cláusula de <strong className="text-red-400">busca e apreensão imediata</strong> em caso de atraso superior ao contrato com <strong className="text-red-400">perda total dos valores pagos</strong>, e que a transferência do veículo somente ocorrerá após a quitação da 36ª prestação.
                       </p>
                     </div>
                   </label>
@@ -2605,7 +2605,7 @@ export const Wizard: React.FC = () => {
                 <ul className="text-sm text-zinc-300 space-y-2">
                   <li>• A moto será entregue ZERADA, 0km</li>
                   <li>• Cor será definida conforme disponibilidade no estoque</li>
-                  <li>• Transferência somente após quitação da 36ª parcela</li>
+                  <li>• Transferência somente após quitação da 36ª prestação</li>
                 </ul>
               </div>
             </div>
@@ -3031,7 +3031,7 @@ export const Wizard: React.FC = () => {
                       <div className="flex justify-between"><span className="text-zinc-400">Produto:</span><span className="font-bold text-blue-400">Honda Pop 110i 2026</span></div>
                       <div className="flex justify-between"><span className="text-zinc-400">Cor:</span><span className="font-bold capitalize">{formData.motoColor}</span></div>
                       <div className="flex justify-between"><span className="text-zinc-400">Entrada:</span><span className="font-bold">R$ 2.000,00</span></div>
-                      <div className="flex justify-between"><span className="text-zinc-400">Parcelas:</span><span className="font-bold">36x R$ 611,00</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-400">Prestações:</span><span className="font-bold">36x R$ 611,00</span></div>
                       <div className="flex justify-between"><span className="text-zinc-400">Seguro:</span><span className="font-bold">R$ 150,00/mês</span></div>
                       <div className="flex justify-between"><span className="text-zinc-400">Mensal Total:</span><span className="font-bold text-[#D4AF37]">R$ 761,00</span></div>
                       <div className="flex justify-between"><span className="text-zinc-400">Nome:</span><span className="font-bold">{formData.name}</span></div>
@@ -3039,7 +3039,7 @@ export const Wizard: React.FC = () => {
 
                     <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4 space-y-2">
                       <h3 className="font-bold text-red-400 text-xs uppercase">TERMO DE FINANCIAMENTO (OBRIGATÓRIO)</h3>
-                      <p className="text-xs text-zinc-400">Ao assinar, declaro que li e concordo com todas as condições do financiamento próprio, incluindo busca e apreensão em caso de inadimplência e transferência somente após a 36ª parcela.</p>
+                      <p className="text-xs text-zinc-400">Ao assinar, declaro que li e concordo com todas as condições do financiamento próprio, incluindo busca e apreensão em caso de inadimplência e transferência somente após a 36ª prestação.</p>
                     </div>
 
                     <div className="space-y-2">

@@ -232,7 +232,7 @@ export const ReferralsPage: React.FC = () => {
 
             <div className="p-3 bg-red-900/20 border border-red-700/30 rounded-xl">
               <p className="text-xs text-red-300">
-                <strong>⚠️ Atenção:</strong> A recompensa só é validada após o pagamento da <strong>1ª parcela</strong> do indicado. Indicações reprovadas ou inadimplentes não geram pontos.
+                <strong>⚠️ Atenção:</strong> A recompensa só é validada após o pagamento do <strong>1º pagamento</strong> do indicado. Indicações reprovadas ou inadimplentes não geram pontos.
               </p>
             </div>
           </div>

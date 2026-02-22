@@ -87,7 +87,7 @@ export const Contracts: React.FC = () => {
       setReceiptData({
          amount: inst.amount,
          date: inst.paidAt || new Date().toISOString(),
-         description: `Pagamento Parcela`,
+         description: `Pagamento de Juros`,
          id: inst.id
       });
    };
@@ -176,7 +176,7 @@ export const Contracts: React.FC = () => {
                                  <p className="text-xl font-bold text-[#D4AF37]">R$ {selectedLoan.remainingAmount.toLocaleString()}</p>
                               </div>
                               <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-900">
-                                 <p className="text-zinc-500 text-xs mb-1">Parcelas</p>
+                                 <p className="text-zinc-500 text-xs mb-1">Cobranças</p>
                                  <p className="text-xl font-bold text-white">{selectedLoan.installmentsCount}</p>
                               </div>
                            </div>
@@ -203,7 +203,7 @@ export const Contracts: React.FC = () => {
                            </div>
                         </div>
 
-                        <h3 className="font-bold text-lg mb-4 pl-2 text-white">Parcelas</h3>
+                        <h3 className="font-bold text-lg mb-4 pl-2 text-white">Cobranças</h3>
                         <div className="space-y-3">
                            {selectedLoan.installments.map((inst, idx) => (
                               <div key={inst.id} className={`bg-zinc-900 border rounded-2xl p-5 flex items-center justify-between group hover:border-[#D4AF37]/30 transition-colors ${inst.status === 'LATE' ? 'border-red-800/50' : 'border-zinc-800'}`}>

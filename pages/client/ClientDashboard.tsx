@@ -107,7 +107,7 @@ const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const campaigns = await apiService.getActiveCampaigns() as any[];
     const preApproved = await apiService.getPreApproval();
 
-    // Buscar oferta de parcelamento e cupons
+    // Buscar oferta de crédito e cupons
     const offer = await apiService.getClientInstallmentOffer();
     const clientCoupons = await apiService.getClientCoupons();
 
@@ -258,7 +258,7 @@ if (user) {
   const notifications = [
     // Ofertas pendentes
     ...(preApprovedAmount ? [{ id: 'pre-approved', title: '🎉 Crédito Pré-Aprovado', msg: `Você tem R$ ${preApprovedAmount.toLocaleString('pt-BR')} disponíveis!`, type: 'success', time: 'Agora' }] : []),
-    ...(installmentOffer ? [{ id: 'installment-offer', title: '💰 Oferta de Parcelamento', msg: `R$ ${installmentOffer.amount.toLocaleString('pt-BR')} em ${installmentOffer.installments}x`, type: 'success', time: 'Agora' }] : []),
+    ...(installmentOffer ? [{ id: 'installment-offer', title: '💰 Oferta de Crédito', msg: `R$ ${installmentOffer.amount.toLocaleString('pt-BR')} disponível`, type: 'success', time: 'Agora' }] : []),
     // Documentos pendentes
     ...(pendingRequest?.status === LoanStatus.WAITING_DOCS ? [{ id: 'waiting-docs', title: '⚠️ Ação Necessária', msg: 'Envie o documento solicitado.', type: 'warning', time: 'Agora' }] : []),
     // Notificações reais do banco
@@ -397,10 +397,10 @@ if (user) {
             )}
           </div>
 
-          {/* Próxima parcela */}
+          {/* Próximo vencimento */}
           <div className="mx-4 mb-4 bg-black/50 rounded-xl p-3.5 flex items-center justify-between">
             <div>
-              <p className="text-[9px] text-zinc-500 uppercase tracking-widest mb-1">Próxima Parcela</p>
+              <p className="text-[9px] text-zinc-500 uppercase tracking-widest mb-1">Próximo Vencimento</p>
               <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-[#FF0000]" />
                 <span className="text-white font-bold text-sm">
@@ -421,13 +421,13 @@ if (user) {
             </div>
           </div>
 
-          {/* Botão Pagar Parcela */}
+          {/* Botão Pagar Agora */}
           <button
             onClick={() => navigate('/client/contracts')}
             disabled={loading || userData.balance === 0}
             className="w-full bg-[#FF0000] hover:bg-red-700 active:bg-red-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm tracking-widest uppercase py-4 flex items-center justify-center gap-2 transition-all"
           >
-            PAGAR PARCELA <ChevronRight size={18} />
+            PAGAR AGORA <ChevronRight size={18} />
           </button>
         </div>
 
@@ -673,7 +673,7 @@ if (user) {
                 </div>
               )}
 
-              {/* Oferta de Parcelamento */}
+              {/* Oferta de Crédito */}
               {installmentOffer && (
                 <div className="bg-gradient-to-r from-emerald-900/30 to-emerald-900/10 border border-emerald-600/50 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">

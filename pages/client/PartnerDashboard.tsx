@@ -226,8 +226,8 @@ export const PartnerDashboard: React.FC = () => {
                     </div>
                     <div className="mt-3 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
                         <p className="text-xs text-zinc-400">
-                            <strong className="text-white">Liberação:</strong> 40% na 1ª parcela paga • 30% na 2ª • 30% na 3ª.
-                            Se o contrato for cancelado antes da 3ª parcela, o restante é cancelado.
+                            <strong className="text-white">Liberação:</strong> 40% no 1º pagamento realizado • 30% no 2º • 30% no 3º.
+                            Se o contrato for cancelado antes do 3º pagamento, o restante é cancelado.
                         </p>
                     </div>
                 </div>
