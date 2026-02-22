@@ -1834,7 +1834,7 @@ export const Wizard: React.FC = () => {
                 {(() => {
                   const amount = customAmount ? parseFloat(customAmount) : selectedAmount;
                   const validAmount = (!amount || isNaN(amount)) ? 0 : amount;
-                  const monthlyRate = (settings?.interestRateMonthly || 0) / 100;
+                  const monthlyRate = (Number(settings?.interestRateMonthly) || 0) / 100;
                   const annualRate = (Math.pow(1 + monthlyRate, 12) - 1) * 100;
                   // Lógica agiota: juros simples mensais sobre o principal
                   const jurosMensais = validAmount * monthlyRate;
@@ -1842,9 +1842,9 @@ export const Wizard: React.FC = () => {
                   const totalInterest = jurosMensais;
                   const progress = settings ? ((validAmount - settings.minLoanAmount) / (settings.maxLoanAmount - settings.minLoanAmount)) * 100 : 0;
                   const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                  // Encargos por atraso vindos do settings
-                  const multaFixaPct = settings?.lateFeeFixed ?? 0;      // % do valor
-                  const jurosDiarioFixo = settings?.lateFeeDaily ?? 0;   // R$ por dia
+                  // Encargos por atraso vindos do settings — forçar conversão para Number (banco retorna strings decimais)
+                  const multaFixaPct = Number(settings?.lateFeeFixed ?? 0);      // % do valor
+                  const jurosDiarioFixo = Number(settings?.lateFeeDaily ?? 0);   // R$ por dia
                   const multaReais = validAmount > 0 ? (multaFixaPct / 100) * validAmount : 0;
                   const custoPor7Dias = multaReais + (jurosDiarioFixo * 7);
 
@@ -1901,7 +1901,7 @@ export const Wizard: React.FC = () => {
                         <div className={`rounded-2xl p-4 flex flex-col gap-1 transition-all duration-200 ${isDraggingSlider ? 'bg-yellow-500/10 border border-yellow-500/40' : 'bg-zinc-900/80 border border-zinc-800'}`}>
                           <span className="text-[10px] uppercase tracking-wider text-zinc-500">Taxa mensal</span>
                           <span className={`text-xl font-black transition-colors ${isDraggingSlider ? 'text-yellow-400' : 'text-yellow-300'}`}>
-                            {(settings?.interestRateMonthly ?? 0).toFixed(1)}%
+                            {(Number(settings?.interestRateMonthly) ?? 0).toFixed(1)}%
                           </span>
                           <span className="text-[10px] text-zinc-600">ao mês</span>
                         </div>
@@ -2005,7 +2005,7 @@ export const Wizard: React.FC = () => {
 
                           </div>
                           <p className="text-[9px] text-zinc-600 mt-2.5 leading-relaxed">
-                            Juros mensais: {settings?.interestRateMonthly ?? 0}% · Multa: {multaFixaPct.toFixed(0)}% · Diário: R$ {fmt(jurosDiarioFixo)}
+                            Juros mensais: {Number(settings?.interestRateMonthly ?? 0).toFixed(0)}% · Multa: {multaFixaPct.toFixed(0)}% · Diário: R$ {fmt(jurosDiarioFixo)}
                           </p>
                         </div>
                       )}
