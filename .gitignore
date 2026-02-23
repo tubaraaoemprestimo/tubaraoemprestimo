@@ -43,3 +43,6 @@ dist-ssr
 backend.tar.gz
 ssh-key-*
 nul
+
+# Vídeos grandes (hospedar externamente)
+public/videos/*.mp4
