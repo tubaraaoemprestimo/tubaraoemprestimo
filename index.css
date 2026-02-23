@@ -6,6 +6,7 @@
   --color-primary: #FF0000;
   --color-secondary: #D4AF37;
   --color-background: #000000;
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
 }
 
@@ -30,6 +31,16 @@ body {
 /* Safe area padding for notched devices */
 .pb-safe {
   padding-bottom: max(1rem, var(--safe-area-inset-bottom));
+}
+
+/* Top safe area — para iOS PWA com notch / Dynamic Island */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Header PWA-safe: adiciona o espaço do notch ao padding interno do header */
+.header-safe {
+  padding-top: max(1rem, calc(env(safe-area-inset-top, 0px) + 1rem));
 }
 
 /* Custom scrollbar */

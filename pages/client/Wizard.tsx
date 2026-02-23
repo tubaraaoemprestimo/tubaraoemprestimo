@@ -1327,7 +1327,10 @@ export const Wizard: React.FC = () => {
   return (
     <div className="min-h-screen bg-black text-white font-sans pb-32">
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-black/80 backdrop-blur-md border-b border-zinc-900 p-4 flex items-center justify-between">
+      <div
+        className="sticky top-0 z-30 bg-black/80 backdrop-blur-md border-b border-zinc-900 px-4 pb-4 flex items-center justify-between"
+        style={{ paddingTop: 'max(1rem, calc(env(safe-area-inset-top, 0px) + 0.5rem))' }}
+      >
         <div className="flex items-center gap-2" onClick={() => navigate('/')}>
           <ChevronLeft className="text-zinc-400" />
           <span className="font-bold">{profileType === 'INVESTIDOR' ? 'Área do Investidor' : profileType === 'LIMPA_NOME' ? 'Limpa Nome' : 'Solicitar Empréstimo'}</span>
