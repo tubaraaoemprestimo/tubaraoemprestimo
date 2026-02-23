@@ -371,7 +371,19 @@ if (user) {
           </div>
         )}
 
-        {pendingRequest && <div className="px-4 mb-3"><LoanTimeline status={pendingRequest.status} date={pendingRequest.date} amount={pendingRequest.amount} installments={pendingRequest.installments} /></div>}
+        {/* Só mostrar timeline se houver solicitação em andamento (PENDING ou WAITING_DOCS) */}
+        {pendingRequest &&
+         (pendingRequest.status === LoanStatus.PENDING || pendingRequest.status === LoanStatus.WAITING_DOCS) &&
+         pendingRequest.amount > 0 && (
+          <div className="px-4 mb-3">
+            <LoanTimeline
+              status={pendingRequest.status}
+              date={pendingRequest.date}
+              amount={pendingRequest.amount}
+              installments={pendingRequest.installments}
+            />
+          </div>
+        )}
 
         {contractPdfUrl && (
           <div className="mx-4 mb-3 bg-zinc-900 border border-green-500/30 rounded-xl p-3 flex items-center gap-3">
