@@ -52,6 +52,13 @@ import { SalesPage } from './pages/public/SalesPage';
 import { QualificationPage } from './pages/public/QualificationPage';
 import { QualificationSuccess } from './pages/public/QualificationSuccess';
 
+// Pages - Funil de Vendas
+import PreLancamento from './pages/funil/PreLancamento';
+import PosCompra from './pages/funil/PosCompra';
+import MentoriaOnline from './pages/funil/MentoriaOnline';
+import MentoriaPresencial from './pages/funil/MentoriaPresencial';
+import ObrigadoFinal from './pages/funil/ObrigadoFinal';
+
 // Components
 import { Chatbot } from './components/Chatbot';
 import { BottomNav } from './components/BottomNav';
@@ -500,6 +507,13 @@ function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/wizard" element={<BiometricAccessGate><PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/demo" element={<DemoSimulator />} />
+
+            {/* Funil de Vendas - Método Tubarão */}
+            <Route path="/funil/pre-lancamento" element={<PreLancamento />} />
+            <Route path="/funil/pos-compra" element={<PosCompra />} />
+            <Route path="/funil/mentoria-online" element={<MentoriaOnline />} />
+            <Route path="/funil/mentoria-presencial" element={<MentoriaPresencial />} />
+            <Route path="/funil/obrigado-final" element={<ObrigadoFinal />} />
 
             {/* Client Welcome & Onboarding */}
             <Route path="/client/welcome" element={<BiometricAccessGate><PermissionGate><ClientWelcome /></PermissionGate></BiometricAccessGate>} />
