@@ -118,20 +118,54 @@ export const dataEnrichmentService = {
 
             // Dados da InfoSeek API
             const apiData = result.data;
+            const dadosCPF = (apiData as any).dadosCPF || {};
+            const emails = (apiData as any).emails || {};
+            const telefones = (apiData as any).telefones || {};
+            const enderecos = (apiData as any).enderecos || {};
 
             // Normalizar resposta da InfoSeek para o formato EnrichedCpfData
             return {
                 success: true,
                 data: {
-                    cpf: apiData.document || cleanCpf,
-                    name: apiData.name,
-                    birthDate: apiData.birthDate,
-                    status: apiData.situation || 'Regular',
-                    // InfoSeek retorna dados básicos, outros campos ficam vazios
-                    emails: [],
-                    phones: [],
-                    addresses: [],
-                    occupations: [],
+                    cpf: dadosCPF.CPF || cleanCpf,
+                    name: dadosCPF.NOME,
+                    gender: dadosCPF.SEXO === 'M' ? 'Masculino' : dadosCPF.SEXO === 'F' ? 'Feminino' : undefined,
+                    birthDate: dadosCPF.NASCIMENTO?.split(' ')[0], // Remove hora
+                    motherName: dadosCPF.NOME_MAE,
+                    fatherName: dadosCPF.NOME_PAI,
+                    status: 'Regular',
+                    income: dadosCPF.RENDA,
+                    rg: dadosCPF.RG ? {
+                        numero: dadosCPF.RG,
+                        orgaoExpedidor: dadosCPF.ORGAO_EMISSOR,
+                        uf: dadosCPF.UF_EMISSAO,
+                        dataExpedicao: ''
+                    } : undefined,
+                    voterRegistration: dadosCPF.TITULO_ELEITOR ? {
+                        titulo: dadosCPF.TITULO_ELEITOR,
+                        zona: '',
+                        secao: '',
+                        municipio: '',
+                        uf: ''
+                    } : undefined,
+                    // Arrays vazios se não houver dados
+                    emails: emails.msg ? [] : Object.values(emails),
+                    phones: telefones.msg ? [] : Object.values(telefones).map((t: any) => ({
+                        numero: t.numero || t,
+                        tipo: t.tipo,
+                        operadora: t.operadora,
+                        whatsapp: t.whatsapp
+                    })),
+                    addresses: enderecos.msg ? [] : [enderecos].map((e: any) => ({
+                        logradouro: e.logradouro || '',
+                        numero: e.numero || '',
+                        bairro: e.bairro || '',
+                        cidade: e.cidade || '',
+                        uf: e.uf || '',
+                        cep: e.cep || '',
+                        complemento: e.complemento
+                    })),
+                    occupations: dadosCPF.CBO ? [dadosCPF.CBO] : [],
                     jobs: [],
                     companies: [],
                     relatives: [],
