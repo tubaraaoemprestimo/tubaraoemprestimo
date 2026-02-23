@@ -121,15 +121,20 @@ const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     let activeLoan: string | null = null;
 
     if (loans.length > 0) {
-      const activeLoans = loans.filter(l => l.status === 'APPROVED');
-      totalDebt = activeLoans.reduce((acc, curr) => acc + curr.remainingAmount, 0);
+      // Incluir empréstimos APPROVED e PAID (quitados recentemente)
+      const activeLoans = loans.filter(l => l.status === 'APPROVED' || l.status === 'PAID');
 
-      // Pegar o primeiro empréstimo ativo para verificar elegibilidade Nível Ouro
-      if (activeLoans.length > 0) {
-        activeLoan = activeLoans[0].id;
+      // Calcular saldo devedor total (remainingAmount já vem atualizado do backend)
+      totalDebt = activeLoans.reduce((acc, curr) => acc + (curr.remainingAmount || 0), 0);
+
+      // Pegar o primeiro empréstimo ativo (não quitado) para verificar elegibilidade Nível Ouro
+      const notPaidLoans = activeLoans.filter(l => l.status === 'APPROVED');
+      if (notPaidLoans.length > 0) {
+        activeLoan = notPaidLoans[0].id;
       }
 
-      const allInstallments = activeLoans.flatMap(l => l.installments).filter(i => i.status === 'OPEN' || i.status === 'LATE');
+      // Buscar próxima parcela em aberto (apenas de empréstimos não quitados)
+      const allInstallments = notPaidLoans.flatMap(l => l.installments).filter(i => i.status === 'OPEN' || i.status === 'LATE');
       allInstallments.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
       if (allInstallments.length > 0) {
