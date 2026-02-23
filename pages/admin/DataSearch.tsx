@@ -12,18 +12,9 @@ export const DataSearch: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [cpfResult, setCpfResult] = useState<EnrichedCpfData | null>(null);
     const [cnpjResult, setCnpjResult] = useState<EnrichedCnpjData | null>(null);
-    const [showConfig, setShowConfig] = useState(false);
-    const [rapidApiKey, setRapidApiKey] = useState(dataEnrichmentService.getRapidApiKey());
 
     const handleSearch = async () => {
         if (!query) return;
-
-        // Para CPF, verificar chave RapidAPI
-        if (activeTab === 'cpf' && !dataEnrichmentService.hasRapidApiKey()) {
-            addToast('Configure a chave da RapidAPI nas configurações primeiro.', 'error');
-            setShowConfig(true);
-            return;
-        }
 
         setLoading(true);
         setCpfResult(null);
@@ -86,92 +77,16 @@ export const DataSearch: React.FC = () => {
         return phoneStr;
     };
 
-    const saveRapidApiKey = () => {
-        if (rapidApiKey) {
-            dataEnrichmentService.setRapidApiKey(rapidApiKey);
-            addToast('Chave da RapidAPI salva com sucesso!', 'success');
-            setShowConfig(false);
-        }
-    };
-
     return (
         <div className="p-8 bg-black min-h-screen text-white">
-            <div className="mb-8 flex items-start justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-[#D4AF37] flex items-center gap-3">
-                        <Database size={32} /> Central de Investigação e Dados
-                    </h1>
-                    <p className="text-zinc-500 mt-2">
-                        Consulte bases completas: CPF (RapidAPI) e CNPJ (BrasilAPI - gratuito).
-                    </p>
-                </div>
-                <button
-                    onClick={() => setShowConfig(!showConfig)}
-                    className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
-                    title="Configurações de API"
-                >
-                    <Settings size={24} />
-                </button>
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold text-[#D4AF37] flex items-center gap-3">
+                    <Database size={32} /> Central de Investigação e Dados
+                </h1>
+                <p className="text-zinc-500 mt-2">
+                    Consulte bases completas: CPF (InfoSeek - Receita Federal) e CNPJ (BrasilAPI - gratuito).
+                </p>
             </div>
-
-            {/* Painel de Configuração */}
-            {showConfig && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-6 animate-in fade-in slide-in-from-top-2">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <Settings size={20} /> Configuração de APIs
-                    </h3>
-                    <div className="grid grid-cols-1 gap-4">
-                        <div className="p-4 bg-zinc-800/50 rounded-xl border border-zinc-700">
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                                    <User size={20} className="text-orange-400" />
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-white">RapidAPI CPF DataPro</h4>
-                                    <p className="text-xs text-zinc-500">Dados COMPLETOS: telefones, endereços, parentes, score, renda</p>
-                                </div>
-                            </div>
-                            <div className="flex gap-2">
-                                <input
-                                    type="password"
-                                    value={rapidApiKey}
-                                    onChange={(e) => setRapidApiKey(e.target.value)}
-                                    placeholder="Sua X-RapidAPI-Key"
-                                    className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white placeholder:text-zinc-600 focus:border-orange-500 outline-none"
-                                />
-                                <Button
-                                    onClick={saveRapidApiKey}
-                                    className="bg-orange-600 hover:bg-orange-500 text-white"
-                                >
-                                    Salvar
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => {
-                                        dataEnrichmentService.clearRapidApiKey();
-                                        setRapidApiKey('');
-                                        addToast('Token removido.', 'success');
-                                    }}
-                                    className="bg-red-900/30 text-red-400 border-red-700/50"
-                                >
-                                    Limpar
-                                </Button>
-                            </div>
-                        </div>
-                        <div className="p-4 bg-emerald-900/20 rounded-xl border border-emerald-700/50">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                                    <Building2 size={20} className="text-emerald-400" />
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-white">BrasilAPI CNPJ</h4>
-                                    <p className="text-xs text-emerald-400">✓ 100% Gratuita - Sem necessidade de token</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Search Box */}
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-8 shadow-xl">
