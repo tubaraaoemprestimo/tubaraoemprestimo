@@ -1,9 +1,10 @@
 
 // Serviço de Enriquecimento de Dados
 // CNPJ: BrasilAPI (100% gratuita)
-// CPF: RapidAPI CPF DataPro
+// CPF: InfoSeek API (Produção)
 
 import { api } from './apiClient';
+import { infoseekService } from './infoseekService';
 
 export interface EnrichedCpfData {
     cpf?: string;
@@ -98,163 +99,53 @@ export interface EnrichedCnpjData {
 }
 
 export const dataEnrichmentService = {
-    // Configuração de Token RapidAPI
-    getRapidApiKey: () => localStorage.getItem('RAPIDAPI_KEY') || '',
-    setRapidApiKey: (key: string) => localStorage.setItem('RAPIDAPI_KEY', key),
-    hasRapidApiKey: () => !!localStorage.getItem('RAPIDAPI_KEY'),
-    clearRapidApiKey: () => localStorage.removeItem('RAPIDAPI_KEY'),
-
-    // Consultar dados por CPF via RapidAPI CPF DataPro
+    // Consultar dados por CPF via InfoSeek API (Produção)
     searchByCpf: async (cpf: string): Promise<{ success: boolean; data?: EnrichedCpfData; error?: string }> => {
-        const rapidApiKey = dataEnrichmentService.getRapidApiKey();
-
-        if (!rapidApiKey) {
-            return { success: false, error: 'Chave da RapidAPI não configurada. Configure nas configurações.' };
-        }
-
         try {
             const cleanCpf = cpf.replace(/\D/g, '');
-            console.log('[DataEnrichment] Consultando CPF via RapidAPI:', cleanCpf);
+            console.log('[DataEnrichment] Consultando CPF via InfoSeek:', cleanCpf);
 
-            // Chamar API backend (proxy para RapidAPI)
-            const { data: result, error: apiError } = await api.post<any>('/cpf/lookup', {
-                cpf: cleanCpf,
-                rapidapi_key: rapidApiKey
-            });
+            // Chamar InfoSeek API diretamente
+            const result = await infoseekService.validateCpf(cleanCpf);
 
-            console.log('[DataEnrichment] Resposta CPF:', result);
+            console.log('[DataEnrichment] Resposta InfoSeek CPF:', result);
 
             // Verificar erro
-            if (apiError || !result) {
-                const errorMsg = apiError?.message || apiError?.error || 'Erro na consulta';
+            if (!result.success || !result.data) {
+                const errorMsg = result.error || 'Erro na consulta de CPF';
                 return { success: false, error: errorMsg };
             }
 
-            // Dados da API
-            const data = result.data || result;
-            const basicos = data.DadosBasicos || {};
-            const economicos = data.DadosEconomicos || {};
-            const profissao = data.profissao || {};
-            const empregos = data.empregos || [];
-            const empresas = data.empresas || [];
-            const rg = data.registroGeral || {};
-            const tituloEleitor = data.tituloEleitor || {};
-            const enderecos = data.enderecos || [];
-            const telefones = data.telefones || [];
-            const emails = data.emails || [];
-            const parentes = data.parentes || [];
-            const vizinhos = data.vizinhos || [];
-            const perfilConsumo = data.perfilConsumo || {};
-            const flags = data.flags || {};
+            // Dados da InfoSeek API
+            const apiData = result.data;
 
-            // Normalizar resposta
+            // Normalizar resposta da InfoSeek para o formato EnrichedCpfData
             return {
                 success: true,
                 data: {
-                    cpf: basicos.cpf || cleanCpf,
-                    name: basicos.nome,
-                    gender: basicos.sexo,
-                    birthDate: basicos.dataNascimento,
-                    age: basicos.idade,
-                    zodiac: basicos.signo,
-                    motherName: basicos.nomeMae,
-                    fatherName: basicos.nomePai,
-                    status: basicos.situacaoReceita || 'Regular',
-                    isDead: basicos.falecido === true || basicos.obito === 'SIM',
-                    cns: basicos.cns,
-
-                    // Telefones
-                    phones: telefones.map((t: any) => ({
-                        numero: t.numero || t.telefone || t,
-                        tipo: t.tipo,
-                        operadora: t.operadora,
-                        whatsapp: t.whatsapp || t.temWhatsApp
-                    })),
-
-                    // E-mails
-                    emails: emails.map((e: any) => typeof e === 'string' ? e : e.email),
-
-                    // Endereços
-                    addresses: enderecos.map((e: any) => ({
-                        logradouro: e.logradouro || e.endereco,
-                        numero: e.numero || 'S/N',
-                        bairro: e.bairro,
-                        cidade: e.cidade || e.municipio,
-                        uf: e.uf || e.estado,
-                        cep: e.cep,
-                        complemento: e.complemento
-                    })),
-
-                    // RG
-                    rg: rg.numero ? {
-                        numero: rg.numero,
-                        orgaoExpedidor: rg.orgaoExpedidor,
-                        uf: rg.uf,
-                        dataExpedicao: rg.dataExpedicao
-                    } : undefined,
-
-                    // Título de Eleitor
-                    voterRegistration: tituloEleitor.numero ? {
-                        titulo: tituloEleitor.numero,
-                        zona: tituloEleitor.zona,
-                        secao: tituloEleitor.secao,
-                        municipio: tituloEleitor.municipio,
-                        uf: tituloEleitor.uf
-                    } : undefined,
-
-                    // Dados econômicos
-                    income: economicos.rendaPresumida || economicos.renda,
-                    score: economicos.score || economicos.scoreCredito,
-                    purchasingPower: economicos.poderAquisitivo,
-                    purchasingPowerRange: economicos.faixaRenda,
-
-                    // Profissão
-                    occupations: profissao.cbo ? [profissao.descricao || profissao.cbo] : [],
-
-                    // Empregos
-                    jobs: empregos.map((e: any) => ({
-                        empresa: e.empresa || e.razaoSocial,
-                        cargo: e.cargo || e.funcao,
-                        dataAdmissao: e.dataAdmissao || e.admissao,
-                        dataDemissao: e.dataDemissao || e.demissao
-                    })),
-
-                    // Empresas
-                    companies: empresas.map((e: any) => ({
-                        cnpj: e.cnpj,
-                        razaoSocial: e.razaoSocial || e.empresa,
-                        participacao: e.participacao || e.qualificacao
-                    })),
-
-                    // Parentes
-                    relatives: parentes.map((p: any) => ({
-                        cpf: p.cpf,
-                        name: p.nome,
-                        relationship: p.vinculo || p.parentesco,
-                        birthDate: p.dataNascimento,
-                        age: p.idade
-                    })),
-
-                    // Vizinhos
-                    neighbors: vizinhos.map((v: any) => ({
-                        cpf: v.cpf,
-                        name: v.nome
-                    })),
-
-                    // Perfil de Consumo
-                    consumptionProfile: perfilConsumo,
-
-                    // Flags
-                    isPEP: flags.__pessoa_exposta_politicamente__ === true,
-
-                    // Dados brutos
-                    rawData: data
+                    cpf: apiData.document || cleanCpf,
+                    name: apiData.name,
+                    birthDate: apiData.birthDate,
+                    status: apiData.situation || 'Regular',
+                    // InfoSeek retorna dados básicos, outros campos ficam vazios
+                    emails: [],
+                    phones: [],
+                    addresses: [],
+                    occupations: [],
+                    jobs: [],
+                    companies: [],
+                    relatives: [],
+                    neighbors: [],
+                    rawData: result
                 }
             };
 
-        } catch (error) {
-            console.error('[DataEnrichment] Erro CPF:', error);
-            return { success: false, error: 'Falha de conexão com o serviço.' };
+        } catch (error: any) {
+            console.error('[DataEnrichment] Erro ao consultar CPF:', error);
+            return {
+                success: false,
+                error: error.message || 'Erro ao consultar CPF'
+            };
         }
     },
 
