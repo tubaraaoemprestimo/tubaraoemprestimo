@@ -52,24 +52,31 @@ export interface InfoSeekCnpjResponse {
 }
 
 export const infoseekService = {
-    // API Key de Produção
-    API_KEY: 'sk_prod_2de8b4cfd0dd8d3c6f575750759b9160bf13dc4806bc85d8a697421dd0e2d4ec',
-    BASE_URL: 'https://api.infoseekdata.com.br/api',
+    // URL do proxy backend (evita CORS)
+    getProxyUrl: () => {
+        const host = typeof window !== 'undefined' ? window.location.hostname : '';
+        if (host === 'tubaraoemprestimo.com.br' || host === 'www.tubaraoemprestimo.com.br') {
+            return 'https://app-api.tubaraoemprestimo.com.br/api/infoseek';
+        }
+        return 'http://localhost:3001/api/infoseek';
+    },
 
-    // Validar CPF
+    // Validar CPF via proxy
     validateCpf: async (cpf: string): Promise<InfoSeekCpfResponse> => {
         try {
             const cleanCpf = cpf.replace(/\D/g, '');
 
-            console.log('[InfoSeek] Validando CPF:', cleanCpf);
+            console.log('[InfoSeek] Validando CPF via proxy:', cleanCpf);
 
-            const response = await fetch(`${infoseekService.BASE_URL}/validate/cpf`, {
+            const response = await fetch(infoseekService.getProxyUrl(), {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${infoseekService.API_KEY}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ value: cleanCpf })
+                body: JSON.stringify({
+                    type: 'cpf',
+                    value: cleanCpf
+                })
             });
 
             if (!response.ok) {
@@ -78,7 +85,7 @@ export const infoseekService = {
 
                 return {
                     success: false,
-                    error: errorData.message || `Erro ${response.status}: ${response.statusText}`
+                    error: errorData.error || `Erro ${response.status}: ${response.statusText}`
                 };
             }
 
@@ -96,20 +103,22 @@ export const infoseekService = {
         }
     },
 
-    // Validar CNPJ
+    // Validar CNPJ via proxy
     validateCnpj: async (cnpj: string): Promise<InfoSeekCnpjResponse> => {
         try {
             const cleanCnpj = cnpj.replace(/\D/g, '');
 
-            console.log('[InfoSeek] Validando CNPJ:', cleanCnpj);
+            console.log('[InfoSeek] Validando CNPJ via proxy:', cleanCnpj);
 
-            const response = await fetch(`${infoseekService.BASE_URL}/validate/cnpj`, {
+            const response = await fetch(infoseekService.getProxyUrl(), {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${infoseekService.API_KEY}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ value: cleanCnpj })
+                body: JSON.stringify({
+                    type: 'cnpj',
+                    value: cleanCnpj
+                })
             });
 
             if (!response.ok) {
@@ -118,7 +127,7 @@ export const infoseekService = {
 
                 return {
                     success: false,
-                    error: errorData.message || `Erro ${response.status}: ${response.statusText}`
+                    error: errorData.error || `Erro ${response.status}: ${response.statusText}`
                 };
             }
 
