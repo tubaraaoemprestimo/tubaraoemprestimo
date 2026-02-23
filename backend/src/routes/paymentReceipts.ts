@@ -116,7 +116,7 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
         });
 
         // Marca parcela como paga
-        await prisma.installment.update({
+        const installment = await prisma.installment.update({
             where: { id: receipt.installmentId },
             data: {
                 status: 'PAID',
@@ -124,6 +124,46 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
                 proofUrl: receipt.receiptUrl
             }
         });
+
+        // Atualizar remainingAmount do loan
+        const loan = await prisma.loan.findUnique({
+            where: { id: installment.loanId },
+            include: { installments: true }
+        });
+
+        if (loan) {
+            // Calcular total do empréstimo (soma de todas as parcelas)
+            const totalLoan = loan.installments.reduce((sum, i) => sum + Number(i.amount), 0);
+
+            // Calcular total pago (soma de todas as parcelas pagas)
+            const totalPaid = loan.installments
+                .filter(i => i.status === 'PAID')
+                .reduce((sum, i) => sum + Number(i.amount), 0);
+
+            // Calcular saldo devedor restante
+            const newRemaining = totalLoan - totalPaid;
+
+            await prisma.loan.update({
+                where: { id: loan.id },
+                data: {
+                    remainingAmount: Math.max(0, newRemaining),
+                    status: newRemaining <= 0 ? 'PAID' : loan.status
+                }
+            });
+
+            // Criar transação de entrada
+            await prisma.transaction.create({
+                data: {
+                    type: 'IN',
+                    description: `Pagamento confirmado - ${loan.id.substring(0, 8)}`,
+                    amount: Number(receipt.amount),
+                    category: 'PAYMENT',
+                    date: new Date()
+                }
+            }).catch(() => {});
+
+            console.log(`[PaymentReceipts] Loan ${loan.id} updated: remainingAmount = R$ ${newRemaining.toFixed(2)} (was R$ ${loan.remainingAmount.toFixed(2)}), totalPaid = R$ ${totalPaid.toFixed(2)}`);
+        }
 
         // Busca dados do cliente
         const customer = await prisma.customer.findUnique({ where: { id: receipt.customerId } });
