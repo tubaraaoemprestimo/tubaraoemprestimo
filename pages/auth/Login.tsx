@@ -8,6 +8,7 @@ import { InstallPwaButton } from '../../components/InstallPwaButton';
 import { biometricService } from '../../services/biometricService';
 import { antifraudService } from '../../services/antifraudService';
 import { locationTrackingService } from '../../services/locationTrackingService';
+import { secureStorageService } from '../../services/secureStorageService';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -95,14 +96,23 @@ export const Login: React.FC = () => {
           }
         }
 
-        // 🔐 Biometria: salvar credenciais e tentar cadastrar se disponível
+        // 🔐 Biometria: salvar credenciais de forma segura e tentar cadastrar se disponível
         if (biometricAvailable && result.user.role !== 'ADMIN') {
           try {
-            // Armazenar credenciais para login biométrico futuro
-            localStorage.setItem(`bio_auth_${result.user.id}`, JSON.stringify({
-              email: creds.identifier,
-              token: btoa(creds.password),
-            }));
+            // Armazenar credenciais criptografadas para login biométrico futuro
+            if (secureStorageService.isSupported()) {
+              await secureStorageService.setSecure(
+                `bio_auth_${result.user.id}`,
+                JSON.stringify({ email: creds.identifier, password: creds.password }),
+                result.user.id
+              );
+            } else {
+              // Fallback para base64 se Web Crypto não disponível (navegadores antigos)
+              localStorage.setItem(`bio_auth_${result.user.id}`, JSON.stringify({
+                email: creds.identifier,
+                token: btoa(creds.password),
+              }));
+            }
 
             // Se não tem credencial biométrica, cadastrar agora (silenciosamente)
             const hasExisting = await biometricService.hasCredential(result.user.id);
@@ -200,23 +210,47 @@ export const Login: React.FC = () => {
       }
 
       // Biometria OK! Agora fazer login real com as credenciais armazenadas
-      const storedAuth = localStorage.getItem(`bio_auth_${result.userId}`);
-      if (!storedAuth) {
-        await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
-          flow: 'LOGIN_BIOMETRIC_BUTTON',
-          reason: 'missing_local_password_cache',
-        });
-        setIsScanning(false);
-        setBiometricNeedsPassword(true);
-        setBiometricEmail(result.userEmail || '');
-        setError('Faça login com senha para cadastrar sua biometria automaticamente.');
-        return;
+      let email: string;
+      let password: string;
+
+      // Tentar recuperar credenciais criptografadas
+      if (secureStorageService.isSupported()) {
+        const secureData = await secureStorageService.getSecure(`bio_auth_${result.userId}`, result.userId);
+        if (!secureData) {
+          await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
+            flow: 'LOGIN_BIOMETRIC_BUTTON',
+            reason: 'missing_secure_credentials',
+          });
+          setIsScanning(false);
+          setBiometricNeedsPassword(true);
+          setBiometricEmail(result.userEmail || '');
+          setError('Faça login com senha para cadastrar sua biometria automaticamente.');
+          return;
+        }
+        const parsed = JSON.parse(secureData);
+        email = parsed.email;
+        password = parsed.password;
+      } else {
+        // Fallback para base64 (navegadores antigos)
+        const storedAuth = localStorage.getItem(`bio_auth_${result.userId}`);
+        if (!storedAuth) {
+          await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
+            flow: 'LOGIN_BIOMETRIC_BUTTON',
+            reason: 'missing_local_password_cache',
+          });
+          setIsScanning(false);
+          setBiometricNeedsPassword(true);
+          setBiometricEmail(result.userEmail || '');
+          setError('Faça login com senha para cadastrar sua biometria automaticamente.');
+          return;
+        }
+        const parsed = JSON.parse(storedAuth);
+        email = parsed.email;
+        password = atob(parsed.token);
       }
 
-      const { email, token } = JSON.parse(storedAuth);
-
-      // Login via API com senha armazenada
-      const loginResult = await apiService.auth.signIn({ identifier: email, password: atob(token) }) as any;
+      // Login via API com credenciais recuperadas
+      const loginResult = await apiService.auth.signIn({ identifier: email, password }) as any;
 
       if (loginResult.user) {
         await antifraudService.logRiskEvent('LOGIN_SUCCESS', loginResult.user.id, {

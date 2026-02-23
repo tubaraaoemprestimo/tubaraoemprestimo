@@ -7,9 +7,15 @@
  *
  * Armazena credenciais via API REST (tabela webauthn_credentials)
  * e localmente no dispositivo via navigator.credentials
+ *
+ * v2.0 - Melhorias de segurança:
+ * - Criptografia de credenciais com Web Crypto API
+ * - Fallback automático para PIN do dispositivo
+ * - Timeout e retry automático
  */
 
 import { api } from './apiClient';
+import { secureStorageService } from './secureStorageService';
 
 // Converte ArrayBuffer para base64url (para armazenamento)
 function bufferToBase64url(buffer: ArrayBuffer): string {
@@ -19,6 +25,40 @@ function bufferToBase64url(buffer: ArrayBuffer): string {
         binary += String.fromCharCode(bytes[i]);
     }
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// Mapeamento de erros técnicos para mensagens amigáveis
+const FRIENDLY_ERROR_MESSAGES: Record<string, string> = {
+    'NotAllowedError': 'Você cancelou a autenticação. Toque no sensor novamente ou use sua senha.',
+    'InvalidStateError': 'Sua biometria já está cadastrada neste dispositivo.',
+    'NotSupportedError': 'Seu navegador não suporta biometria. Use Chrome, Safari ou Edge atualizado.',
+    'SecurityError': 'Erro de segurança. Verifique se está acessando via HTTPS.',
+    'AbortError': 'Autenticação cancelada. Tente novamente.',
+    'TIMEOUT': 'Tempo esgotado. A biometria demorou muito para responder.',
+    'credential_not_found': 'Biometria não cadastrada. Faça login com senha primeiro para ativar.',
+    'platform_unavailable': 'Configure Face ID ou impressão digital nas configurações do seu celular.',
+    'missing_credentials': 'Nenhuma biometria encontrada. Faça login com senha para cadastrar.',
+};
+
+function getFriendlyError(error: any): string {
+    if (!error) return 'Erro desconhecido na autenticação biométrica.';
+
+    const errorName = error.name || error.message || '';
+
+    // Verificar mapeamento direto
+    if (FRIENDLY_ERROR_MESSAGES[errorName]) {
+        return FRIENDLY_ERROR_MESSAGES[errorName];
+    }
+
+    // Verificar por substring
+    for (const [key, message] of Object.entries(FRIENDLY_ERROR_MESSAGES)) {
+        if (errorName.includes(key) || (error.message && error.message.includes(key))) {
+            return message;
+        }
+    }
+
+    // Fallback genérico
+    return 'Não foi possível autenticar com biometria. Tente novamente ou use sua senha.';
 }
 
 // Converte base64url para ArrayBuffer
@@ -173,7 +213,7 @@ export const biometricService = {
                 ],
                 authenticatorSelection: {
                     authenticatorAttachment: 'platform', // Apenas biometria do dispositivo
-                    userVerification: 'required',
+                    userVerification: 'preferred', // ← Permite fallback para PIN do dispositivo
                     residentKey: 'preferred',
                 },
                 timeout: 60000,
@@ -224,15 +264,7 @@ export const biometricService = {
             return { success: true };
         } catch (err: any) {
             console.error('[Biometric] Register error:', err);
-
-            if (err.name === 'NotAllowedError') {
-                return { success: false, error: 'Permissão negada. Autorize o uso da biometria.' };
-            }
-            if (err.name === 'InvalidStateError') {
-                return { success: false, error: 'Credencial já registrada neste dispositivo.' };
-            }
-
-            return { success: false, error: 'Erro ao registrar biometria. Tente novamente.' };
+            return { success: false, error: getFriendlyError(err) };
         }
     },
 
@@ -254,7 +286,7 @@ export const biometricService = {
                 challenge: challenge.buffer,
                 rpId: window.location.hostname,
                 timeout: 60000,
-                userVerification: 'required',
+                userVerification: 'preferred', // ← Permite fallback para PIN do dispositivo
                 // Se temos credencial local, especificar para acesso direto
                 ...(localCred ? {
                     allowCredentials: [{
@@ -304,12 +336,7 @@ export const biometricService = {
             };
         } catch (err: any) {
             console.error('[Biometric] Auth error:', err);
-
-            if (err.name === 'NotAllowedError') {
-                return { success: false, error: 'Autenticação biométrica negada ou cancelada.' };
-            }
-
-            return { success: false, error: 'Erro na autenticação biométrica. Tente novamente.' };
+            return { success: false, error: getFriendlyError(err) };
         }
     },
 
@@ -334,7 +361,7 @@ export const biometricService = {
                 challenge: challenge.buffer,
                 rpId: window.location.hostname,
                 timeout: 60000,
-                userVerification: 'required',
+                userVerification: 'preferred', // ← Permite fallback para PIN do dispositivo
                 allowCredentials: credentialIds.map((credentialId) => ({
                     id: base64urlToBuffer(credentialId),
                     type: 'public-key' as const,
@@ -360,10 +387,8 @@ export const biometricService = {
 
             return { success: true, credentialId: usedCredentialId };
         } catch (err: any) {
-            if (err.name === 'NotAllowedError') {
-                return { success: false, error: 'Autenticação biométrica negada ou cancelada.' };
-            }
-            return { success: false, error: 'Erro na autenticação biométrica. Tente novamente.' };
+            console.error('[Biometric] AuthForUser error:', err);
+            return { success: false, error: getFriendlyError(err) };
         }
     },
 

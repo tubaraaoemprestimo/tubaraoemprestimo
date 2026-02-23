@@ -12,6 +12,10 @@ interface BiometricAccessGateProps {
 
 const getSessionKey = (userId: string) => `biometric_verified_${userId}`;
 const getSkipKey = (userId: string) => `biometric_skipped_${userId}`;
+const getRetryCountKey = (userId: string) => `biometric_retry_${userId}`;
+
+const MAX_RETRIES = 3;
+const TIMEOUT_MS = 30000; // 30 segundos
 
 // Detecta se o dispositivo e mobile (onde biometria faz sentido)
 const isMobileDevice = (): boolean => {
@@ -116,12 +120,57 @@ export const BiometricAccessGate: React.FC<BiometricAccessGateProps> = ({ childr
           return;
         }
 
-        const authResult = await biometricService.authenticateForUser(user.id);
+        // Verificar retry count
+        const retryCountKey = getRetryCountKey(user.id);
+        const retryCount = parseInt(sessionStorage.getItem(retryCountKey) || '0', 10);
+
+        if (retryCount >= MAX_RETRIES) {
+          antifraudService.logRiskEvent('BIOMETRIC_MAX_RETRIES', user.id, {
+            flow: 'APP_ACCESS_GATE',
+            retries: retryCount,
+          }).catch(() => {});
+
+          // Após 3 falhas, pular biometria automaticamente
+          sessionStorage.setItem(skipKey, new Date().toISOString());
+          sessionStorage.removeItem(retryCountKey);
+          if (!cancelled) setVerifying(false);
+          return;
+        }
+
+        // Autenticação com timeout
+        const authPromise = biometricService.authenticateForUser(user.id);
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('TIMEOUT')), TIMEOUT_MS)
+        );
+
+        let authResult;
+        try {
+          authResult = await Promise.race([authPromise, timeoutPromise]);
+        } catch (timeoutErr: any) {
+          if (timeoutErr.message === 'TIMEOUT') {
+            antifraudService.logRiskEvent('BIOMETRIC_TIMEOUT', user.id, {
+              flow: 'APP_ACCESS_GATE',
+              timeout_ms: TIMEOUT_MS,
+            }).catch(() => {});
+
+            // Timeout: incrementar retry e pular
+            sessionStorage.setItem(retryCountKey, (retryCount + 1).toString());
+            sessionStorage.setItem(skipKey, new Date().toISOString());
+            if (!cancelled) setVerifying(false);
+            return;
+          }
+          throw timeoutErr;
+        }
+
         if (!authResult.success) {
           antifraudService.logRiskEvent('BIOMETRIC_FAILED', user.id, {
             flow: 'APP_ACCESS_GATE',
             reason: authResult.error || 'auth_failed',
+            retry: retryCount + 1,
           }).catch(() => {});
+
+          // Incrementar retry count
+          sessionStorage.setItem(retryCountKey, (retryCount + 1).toString());
 
           if (!cancelled) {
             setError(authResult.error || 'Autenticação biométrica falhou.');
@@ -130,6 +179,8 @@ export const BiometricAccessGate: React.FC<BiometricAccessGateProps> = ({ childr
           return;
         }
 
+        // Sucesso: limpar retry count
+        sessionStorage.removeItem(retryCountKey);
         sessionStorage.setItem(sessionKey, new Date().toISOString());
 
         antifraudService.logRiskEvent('BIOMETRIC_SUCCESS', user.id, {
