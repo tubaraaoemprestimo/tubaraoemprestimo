@@ -9,8 +9,8 @@ const CHECKOUT_LIMPA_NOME_URL = 'https://link.infinitepay.io/tubaraoemprestimo/V
 const CHECKOUT_FINANCIAMENTO_MOTO_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-3gkPAIq4JF-297,00';
 const CHECKOUT_COMBO_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-ope8lFBEf-450,00';
 
-// IDs dos vídeos do YouTube (substitua pelos IDs reais)
-const YOUTUBE_UPSELL_ID = 'dQw4w9WgXcQ'; // TODO: substituir pelo ID real do vídeo de upsell
+// Vídeo hospedado no Cloudflare R2
+const VIDEO_UPSELL_URL = 'https://pub-284d6194bd7533bf8c3a6f4b4eba035b.r2.dev/videos/02-upsell-modulos.mp4';
 
 export default function PosCompra() {
   const router = useRouter();
@@ -49,17 +49,21 @@ export default function PosCompra() {
             <strong className="text-[#D4AF37]">oferta especial exclusiva</strong> para você...
           </p>
 
-          {/* Vídeo de Upsell - YouTube Embed */}
+          {/* Vídeo de Upsell - Cloudflare R2 */}
           {showVideo && (
             <div className="relative w-full max-w-4xl mx-auto mb-8 rounded-2xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]/20 animate-in fade-in zoom-in-95 duration-700 delay-300">
               <div className="relative aspect-video bg-zinc-900">
-                <iframe
-                  src={`https://www.youtube.com/embed/${YOUTUBE_UPSELL_ID}?rel=0&modestbranding=1&autoplay=1`}
-                  title="Método Tubarão - Oferta Especial"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
+                <video
+                  controls
+                  autoPlay
+                  poster="/images/upsell-thumbnail.jpg"
                   className="absolute inset-0 w-full h-full"
-                />
+                  preload="metadata"
+                  playsInline
+                >
+                  <source src={VIDEO_UPSELL_URL} type="video/mp4" />
+                  Seu navegador não suporta vídeo HTML5.
+                </video>
               </div>
             </div>
           )}

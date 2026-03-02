@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation';
 // Link de checkout InfinitePay - Mentoria Método Tubarão Online
 const CHECKOUT_MENTORIA_ONLINE_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-7NUsdS72g5-3997,00';
 
-// ID do vídeo do YouTube (substitua pelo ID real do pitch de mentoria online)
-const YOUTUBE_MENTORIA_ONLINE_ID = 'dQw4w9WgXcQ'; // TODO: substituir pelo ID real
+// Vídeo hospedado no Cloudflare R2
+const VIDEO_MENTORIA_ONLINE_URL = 'https://pub-284d6194bd7533bf8c3a6f4b4eba035b.r2.dev/videos/03-pitch-mentorias.mp4';
 
 export default function MentoriaOnline() {
   const router = useRouter();
@@ -49,13 +49,17 @@ export default function MentoriaOnline() {
           {/* Vídeo de Pitch - YouTube Embed */}
           <div className="relative w-full max-w-4xl mx-auto mb-8 rounded-2xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]/20 animate-in fade-in zoom-in-95 duration-700 delay-300">
             <div className="relative aspect-video bg-zinc-900">
-              <iframe
-                src={`https://www.youtube.com/embed/${YOUTUBE_MENTORIA_ONLINE_ID}?rel=0&modestbranding=1&autoplay=1`}
-                title="Mentoria Método Tubarão Online"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
+              <video
+                controls
+                autoPlay
+                poster="/images/mentoria-thumbnail.jpg"
                 className="absolute inset-0 w-full h-full"
-              />
+                preload="metadata"
+                playsInline
+              >
+                <source src={VIDEO_MENTORIA_ONLINE_URL} type="video/mp4" />
+                Seu navegador não suporta vídeo HTML5.
+              </video>
             </div>
           </div>
 

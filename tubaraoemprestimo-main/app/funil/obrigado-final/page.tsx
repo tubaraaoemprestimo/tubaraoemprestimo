@@ -3,8 +3,8 @@
 import { useEffect } from 'react';
 import { CheckCircle2, Sparkles, MessageCircle, Calendar, Award } from 'lucide-react';
 
-// ID do vídeo final do YouTube (substitua pelo ID real)
-const YOUTUBE_OBRIGADO_ID = 'dQw4w9WgXcQ'; // TODO: substituir pelo ID real
+// Vídeo hospedado no Cloudflare R2
+const VIDEO_OBRIGADO_URL = 'https://pub-284d6194bd7533bf8c3a6f4b4eba035b.r2.dev/videos/05-obrigado-final.mp4';
 
 export default function ObrigadoFinal() {
   useEffect(() => {
@@ -43,13 +43,17 @@ export default function ObrigadoFinal() {
           {/* Vídeo Final - YouTube Embed */}
           <div className="relative w-full max-w-4xl mx-auto mb-12 rounded-2xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]/30 animate-in fade-in zoom-in-95 duration-700 delay-300">
             <div className="relative aspect-video bg-zinc-900">
-              <iframe
-                src={`https://www.youtube.com/embed/${YOUTUBE_OBRIGADO_ID}?rel=0&modestbranding=1&autoplay=1`}
-                title="Método Tubarão - Obrigado"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
+              <video
+                controls
+                autoPlay
+                poster="/images/obrigado-thumbnail.jpg"
                 className="absolute inset-0 w-full h-full"
-              />
+                preload="metadata"
+                playsInline
+              >
+                <source src={VIDEO_OBRIGADO_URL} type="video/mp4" />
+                Seu navegador não suporta vídeo HTML5.
+              </video>
             </div>
           </div>
 

@@ -7,8 +7,8 @@ import { useRouter } from 'next/navigation';
 // Link de checkout InfinitePay - Mentoria Presencial
 const CHECKOUT_MENTORIA_PRESENCIAL_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-7NUrPuK8AH-5997,00';
 
-// ID do vídeo do YouTube (substitua pelo ID real do vídeo de mentoria presencial)
-const YOUTUBE_PRESENCIAL_ID = 'dQw4w9WgXcQ'; // TODO: substituir pelo ID real
+// Vídeo hospedado no Cloudflare R2
+const VIDEO_PRESENCIAL_URL = 'https://pub-284d6194bd7533bf8c3a6f4b4eba035b.r2.dev/videos/04-mentoria-presencial.mp4';
 
 export default function MentoriaPresencial() {
   const router = useRouter();
@@ -118,13 +118,16 @@ export default function MentoriaPresencial() {
           {/* Vídeo - YouTube Embed */}
           <div className="relative w-full max-w-4xl mx-auto mb-12 rounded-2xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]/30 animate-in fade-in zoom-in-95 duration-700 delay-300">
             <div className="relative aspect-video bg-zinc-900">
-              <iframe
-                src={`https://www.youtube.com/embed/${YOUTUBE_PRESENCIAL_ID}?rel=0&modestbranding=1`}
-                title="Mentoria Presencial Método Tubarão"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
+              <video
+                controls
+                poster="/images/mentoria-presencial-thumbnail.jpg"
                 className="absolute inset-0 w-full h-full"
-              />
+                preload="metadata"
+                playsInline
+              >
+                <source src={VIDEO_PRESENCIAL_URL} type="video/mp4" />
+                Seu navegador não suporta vídeo HTML5.
+              </video>
             </div>
           </div>
 
