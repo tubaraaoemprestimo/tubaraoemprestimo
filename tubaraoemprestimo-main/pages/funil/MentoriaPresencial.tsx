@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 const CHECKOUT_MENTORIA_PRESENCIAL_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-7NUrPuK8AH-5997,00';
 
 // Vídeo hospedado no Cloudflare R2
-const VIDEO_PRESENCIAL_URL = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/04-mentoria-presencial.mp4';
+const VIDEO_PRESENCIAL_URL = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/video-etapa1.mp4';
 
 export default function MentoriaPresencial() {
   const navigate = useNavigate();
@@ -119,8 +119,9 @@ export default function MentoriaPresencial() {
               <video
                 controls
                 poster="/images/mentoria-presencial-thumbnail.jpg"
-                className="w-full h-full"
+                className="absolute inset-0 w-full h-full"
                 preload="metadata"
+                playsInline
               >
                 <source src={VIDEO_PRESENCIAL_URL} type="video/mp4" />
                 Seu navegador não suporta vídeo HTML5.
