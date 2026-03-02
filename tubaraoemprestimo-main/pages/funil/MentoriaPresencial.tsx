@@ -1,8 +1,6 @@
-'use client';
-
 import { useState } from 'react';
 import { Crown, CheckCircle2, Users, TrendingUp, MapPin, Calendar, Award, X, Loader2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 
 // Link de checkout InfinitePay - Mentoria Presencial
 const CHECKOUT_MENTORIA_PRESENCIAL_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-7NUrPuK8AH-5997,00';
@@ -11,7 +9,7 @@ const CHECKOUT_MENTORIA_PRESENCIAL_URL = 'https://link.infinitepay.io/tubaraoemp
 const VIDEO_PRESENCIAL_URL = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/04-mentoria-presencial.mp4';
 
 export default function MentoriaPresencial() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -80,7 +78,7 @@ export default function MentoriaPresencial() {
       }
 
       // Redirecionar para página de obrigado final
-      router.push('/funil/obrigado-final');
+      navigate('/funil/obrigado-final');
     } catch (err: any) {
       setError(err.message || 'Erro ao enviar aplicação. Tente novamente.');
       setLoading(false);
@@ -115,15 +113,14 @@ export default function MentoriaPresencial() {
             construa um negócio de <strong className="text-[#D4AF37]">6 dígitos por mês</strong> do zero.
           </p>
 
-          {/* Vídeo - YouTube Embed */}
+          {/* Vídeo (se houver) */}
           <div className="relative w-full max-w-4xl mx-auto mb-12 rounded-2xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]/30 animate-in fade-in zoom-in-95 duration-700 delay-300">
             <div className="relative aspect-video bg-zinc-900">
               <video
                 controls
                 poster="/images/mentoria-presencial-thumbnail.jpg"
-                className="absolute inset-0 w-full h-full"
+                className="w-full h-full"
                 preload="metadata"
-                playsInline
               >
                 <source src={VIDEO_PRESENCIAL_URL} type="video/mp4" />
                 Seu navegador não suporta vídeo HTML5.
@@ -238,7 +235,7 @@ export default function MentoriaPresencial() {
         </div>
       </section>
 
-      {/* Modal de Formulário de Aplicação */}
+      {/* Modal de Formulário */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="relative w-full max-w-2xl bg-zinc-900 border border-[#D4AF37]/30 rounded-3xl p-8 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300">

@@ -1,20 +1,20 @@
-'use client';
-
+import { useState } from 'react';
 import { Users, CheckCircle2, Video, MessageCircle, Calendar, TrendingUp, Sparkles } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 
-// Link de checkout InfinitePay - Mentoria Método Tubarão Online
+// Link de checkout InfinitePay
 const CHECKOUT_MENTORIA_ONLINE_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-7NUsdS72g5-3997,00';
 
 // Vídeo hospedado no Cloudflare R2
 const VIDEO_MENTORIA_ONLINE_URL = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/03-pitch-mentorias.mp4';
 
 export default function MentoriaOnline() {
-  const router = useRouter();
+  const navigate = useNavigate();
+  const [showVideo, setShowVideo] = useState(true);
 
   const handleRecusar = () => {
     // Redirecionar para Etapa 4 (Mentoria Presencial)
-    router.push('/funil/mentoria-presencial');
+    navigate('/funil/mentoria-presencial');
   };
 
   return (
@@ -46,22 +46,23 @@ export default function MentoriaOnline() {
             reais de alunos que já estão <strong className="text-white">faturando alto</strong>.
           </p>
 
-          {/* Vídeo de Pitch - YouTube Embed */}
-          <div className="relative w-full max-w-4xl mx-auto mb-8 rounded-2xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]/20 animate-in fade-in zoom-in-95 duration-700 delay-300">
-            <div className="relative aspect-video bg-zinc-900">
-              <video
-                controls
-                autoPlay
-                poster="/images/mentoria-thumbnail.jpg"
-                className="absolute inset-0 w-full h-full"
-                preload="metadata"
-                playsInline
-              >
-                <source src={VIDEO_MENTORIA_ONLINE_URL} type="video/mp4" />
-                Seu navegador não suporta vídeo HTML5.
-              </video>
+          {/* Vídeo de Pitch */}
+          {showVideo && (
+            <div className="relative w-full max-w-4xl mx-auto mb-8 rounded-2xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]/20 animate-in fade-in zoom-in-95 duration-700 delay-300">
+              <div className="relative aspect-video bg-zinc-900">
+                <video
+                  controls
+                  autoPlay
+                  poster="/images/mentoria-thumbnail.jpg"
+                  className="w-full h-full"
+                  preload="metadata"
+                >
+                  <source src={VIDEO_MENTORIA_ONLINE_URL} type="video/mp4" />
+                  Seu navegador não suporta vídeo HTML5.
+                </video>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* CTA Principal */}
           <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-400">
@@ -79,8 +80,6 @@ export default function MentoriaOnline() {
               {/* Botão de Compra */}
               <a
                 href={CHECKOUT_MENTORIA_ONLINE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-xl font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(212,175,55,0.4)] hover:shadow-[0_0_60px_rgba(212,175,55,0.6)] mb-4"
               >
                 <span>GARANTIR MINHA VAGA NA MENTORIA</span>
@@ -224,8 +223,6 @@ export default function MentoriaOnline() {
 
           <a
             href={CHECKOUT_MENTORIA_ONLINE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-xl font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(212,175,55,0.4)] mb-4"
           >
             <span>GARANTIR VAGA POR R$ 3.997</span>

@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect } from 'react';
 import { CheckCircle2, Sparkles, MessageCircle, Calendar, Award } from 'lucide-react';
 
@@ -8,6 +6,7 @@ const VIDEO_OBRIGADO_URL = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/
 
 export default function ObrigadoFinal() {
   useEffect(() => {
+    // Scroll to top on mount
     window.scrollTo(0, 0);
   }, []);
 
@@ -40,16 +39,15 @@ export default function ObrigadoFinal() {
             <strong className="text-[#D4AF37]">48 horas</strong>.
           </p>
 
-          {/* Vídeo Final - YouTube Embed */}
+          {/* Vídeo Final */}
           <div className="relative w-full max-w-4xl mx-auto mb-12 rounded-2xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]/30 animate-in fade-in zoom-in-95 duration-700 delay-300">
             <div className="relative aspect-video bg-zinc-900">
               <video
                 controls
                 autoPlay
                 poster="/images/obrigado-thumbnail.jpg"
-                className="absolute inset-0 w-full h-full"
+                className="w-full h-full"
                 preload="metadata"
-                playsInline
               >
                 <source src={VIDEO_OBRIGADO_URL} type="video/mp4" />
                 Seu navegador não suporta vídeo HTML5.
@@ -171,10 +169,7 @@ export default function ObrigadoFinal() {
       <footer className="py-8 px-4 border-t border-zinc-900 text-center text-zinc-600 text-sm">
         <p>© 2026 Método Tubarão. Todos os direitos reservados.</p>
         <p className="mt-2 text-zinc-500">
-          Dúvidas? Entre em contato:{' '}
-          <a href="mailto:contato@metodtubarao.com" className="text-[#D4AF37] hover:underline">
-            contato@metodtubarao.com
-          </a>
+          Dúvidas? Entre em contato: <a href="mailto:contato@metodtubarao.com" className="text-[#D4AF37] hover:underline">contato@metodtubarao.com</a>
         </p>
       </footer>
     </div>

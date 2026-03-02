@@ -1,14 +1,12 @@
-'use client';
-
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Clock, TrendingUp, Users, Award, Zap, Play } from 'lucide-react';
+import { Play, CheckCircle2, Clock, TrendingUp, Users, Award, Zap } from 'lucide-react';
 
 // Configuração do contador - 5 dias a partir de agora
 const COUNTDOWN_DAYS = 5;
 const PRECO_FUNDADOR = 497;
 const PRECO_OFICIAL = 697;
 
-// Link de checkout InfinitePay - Método Tubarão Preço Promocional
+// Link do checkout InfinitePay
 const CHECKOUT_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-MsCyVA2ER-497,00';
 
 // Vídeo hospedado no Cloudflare R2
@@ -24,8 +22,13 @@ export default function PreLancamento() {
   });
 
   useEffect(() => {
+    // Calcular data final do contador (5 dias a partir de agora)
+    // Em produção, você pode armazenar isso no banco de dados
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + COUNTDOWN_DAYS);
+
+    // Ou usar data fixa (exemplo):
+    // const endDate = new Date('2026-02-28T23:59:59');
 
     const calculateTimeLeft = () => {
       const now = new Date().getTime();
@@ -84,15 +87,14 @@ export default function PreLancamento() {
             empréstimos — mesmo começando do zero.
           </p>
 
-          {/* Vídeo de Vendas - Cloudflare R2 */}
+          {/* Vídeo de Vendas */}
           <div className="relative w-full max-w-4xl mx-auto mb-8 rounded-2xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]/20 animate-in fade-in zoom-in-95 duration-700 delay-300">
             <div className="relative aspect-video bg-zinc-900">
               <video
                 controls
                 poster="/images/video-thumbnail.jpg"
-                className="absolute inset-0 w-full h-full"
+                className="w-full h-full"
                 preload="metadata"
-                playsInline
               >
                 <source src={VIDEO_URL} type="video/mp4" />
                 Seu navegador não suporta vídeo HTML5.
@@ -172,8 +174,6 @@ export default function PreLancamento() {
               {!timeLeft.expired ? (
                 <a
                   href={CHECKOUT_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-xl font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(212,175,55,0.4)] hover:shadow-[0_0_60px_rgba(212,175,55,0.6)]"
                 >
                   <span>GARANTIR MINHA VAGA AGORA</span>
@@ -274,8 +274,6 @@ export default function PreLancamento() {
           {!timeLeft.expired ? (
             <a
               href={CHECKOUT_URL}
-              target="_blank"
-              rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-xl font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(212,175,55,0.4)]"
             >
               <span>GARANTIR ACESSO POR R$ {precoAtual}</span>

@@ -1,8 +1,6 @@
-'use client';
-
 import { useState } from 'react';
 import { CheckCircle2, Sparkles, TrendingUp, ArrowRight } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 
 // Links de checkout InfinitePay
 const CHECKOUT_LIMPA_NOME_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-7NUnL8kth5-297,00';
@@ -13,11 +11,12 @@ const CHECKOUT_COMBO_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLU
 const VIDEO_UPSELL_URL = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/02-upsell-modulos.mp4';
 
 export default function PosCompra() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [showVideo] = useState(true);
 
   const handleRecusar = () => {
-    router.push('/funil/mentoria-online');
+    // Redirecionar para Etapa 3
+    navigate('/funil/mentoria-online');
   };
 
   return (
@@ -49,7 +48,7 @@ export default function PosCompra() {
             <strong className="text-[#D4AF37]">oferta especial exclusiva</strong> para você...
           </p>
 
-          {/* Vídeo de Upsell - Cloudflare R2 */}
+          {/* Vídeo de Upsell */}
           {showVideo && (
             <div className="relative w-full max-w-4xl mx-auto mb-8 rounded-2xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]/20 animate-in fade-in zoom-in-95 duration-700 delay-300">
               <div className="relative aspect-video bg-zinc-900">
@@ -57,9 +56,8 @@ export default function PosCompra() {
                   controls
                   autoPlay
                   poster="/images/upsell-thumbnail.jpg"
-                  className="absolute inset-0 w-full h-full"
+                  className="w-full h-full"
                   preload="metadata"
-                  playsInline
                 >
                   <source src={VIDEO_UPSELL_URL} type="video/mp4" />
                   Seu navegador não suporta vídeo HTML5.
@@ -196,8 +194,6 @@ export default function PosCompra() {
                 {/* Botão */}
                 <a
                   href={CHECKOUT_LIMPA_NOME_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="block w-full py-4 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-center font-black rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg"
                 >
                   ADICIONAR POR R$ 297
@@ -263,8 +259,6 @@ export default function PosCompra() {
                 {/* Botão */}
                 <a
                   href={CHECKOUT_FINANCIAMENTO_MOTO_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="block w-full py-4 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-center font-black rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg"
                 >
                   ADICIONAR POR R$ 297
