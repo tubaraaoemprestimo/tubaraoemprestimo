@@ -1,0 +1,8 @@
+{
+  "name": "Tubarão Empréstimos",
+  "description": "Plataforma premium de gestão e solicitação de empréstimos com validação KYC e inteligência artificial.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}

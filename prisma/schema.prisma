@@ -1,0 +1,465 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:tubarao123@localhost:5432/tubarao_db"
+}
+
+model ai_chat_history {
+  id         String   @id
+  phone      String
+  role       String
+  content    String
+  metadata   Json?
+  created_at DateTime @default(now())
+}
+
+model ai_chatbot_config {
+  id                  String   @id
+  enabled             Boolean  @default(false)
+  provider            String   @default("gemini")
+  api_key             String   @default("")
+  system_prompt       String   @default("")
+  auto_reply_enabled  Boolean  @default(true)
+  working_hours_start String   @default("08:00")
+  working_hours_end   String   @default("18:00")
+  transfer_keywords   String[] @default(["atendente", "humano", "pessoa"])
+  updated_at          DateTime
+}
+
+model audit_logs {
+  id         String   @id
+  user_id    String
+  user_name  String
+  action     String
+  entity     String
+  entity_id  String?
+  details    String?
+  ip_address String?
+  timestamp  DateTime @default(now())
+}
+
+model blacklist {
+  id       String   @id
+  cpf      String   @unique
+  name     String
+  reason   String
+  added_by String
+  active   Boolean  @default(true)
+  added_at DateTime @default(now())
+}
+
+model brand_settings {
+  id               String   @id
+  system_name      String
+  logo_url         String?
+  primary_color    String   @default("#FF0000")
+  secondary_color  String   @default("#D4AF37")
+  background_color String   @default("#000000")
+  company_name     String   @default("")
+  cnpj             String   @default("")
+  address          String   @default("")
+  phone            String   @default("")
+  updated_at       DateTime
+}
+
+model campaigns {
+  id          String   @id
+  title       String
+  description String
+  image_url   String?
+  link        String?
+  start_date  DateTime
+  end_date    DateTime
+  frequency   String   @default("ONCE")
+  active      Boolean  @default(true)
+  priority    Int      @default(0)
+  created_at  DateTime @default(now())
+}
+
+model collection_rules {
+  id               String   @id
+  days_offset      Int
+  type             String
+  message_template String
+  active           Boolean  @default(true)
+  created_at       DateTime @default(now())
+}
+
+model contract_signatures {
+  id              String   @id
+  loan_request_id String
+  signature_url   String
+  ip_address      String?
+  user_agent      String?
+  signed_at       DateTime @default(now())
+}
+
+model coupons {
+  id             String     @id
+  code           String     @unique
+  discount       Float
+  description    String
+  customer_id    String?
+  customer_email String?
+  expires_at     DateTime
+  active         Boolean    @default(true)
+  used_at        DateTime?
+  created_at     DateTime   @default(now())
+  customers      customers? @relation(fields: [customer_id], references: [id])
+}
+
+model customers {
+  id                    String          @id
+  user_id               String?
+  name                  String
+  cpf                   String          @unique
+  email                 String
+  phone                 String
+  status                String          @default("ACTIVE")
+  internal_score        Int             @default(0)
+  total_debt            Float           @default(0)
+  active_loans_count    Int             @default(0)
+  address               String?
+  neighborhood          String?
+  city                  String?
+  state                 String?
+  zip_code              String?
+  latitude              Float?
+  longitude             Float?
+  monthly_income        Float?
+  pre_approved_amount   Float?
+  pre_approved_at       DateTime?
+  instagram             String?
+  source                String?         @default("MANUAL")
+  profile_pic           String?
+  birth_date            String?
+  monthly_interest_rate Float?
+  late_fixed_fee        Float?
+  late_interest_daily   Float?
+  late_interest_monthly Float?
+  installment_offer     Json?
+  joined_at             DateTime        @default(now())
+  coupons               coupons[]
+  users                 users?          @relation(fields: [user_id], references: [id])
+  loan_requests         loan_requests[]
+  loans                 loans[]
+  notifications         notifications[]
+}
+
+model goals_settings {
+  id                         String   @id
+  monthly_loan_goal          Float    @default(0)
+  monthly_client_goal        Int      @default(0)
+  monthly_approval_rate_goal Float    @default(0)
+  projections                Json?
+  expected_growth_rate       Float    @default(0)
+  goal_period                String   @default("")
+  updated_at                 DateTime
+}
+
+model installments {
+  id         String    @id
+  loan_id    String
+  due_date   DateTime
+  amount     Float
+  status     String    @default("OPEN")
+  pix_code   String?
+  proof_url  String?
+  paid_at    DateTime?
+  created_at DateTime  @default(now())
+  loans      loans     @relation(fields: [loan_id], references: [id])
+}
+
+model loan_packages {
+  id               String   @id
+  name             String
+  min_value        Float
+  max_value        Float
+  min_installments Int
+  max_installments Int
+  interest_rate    Float
+  created_at       DateTime @default(now())
+}
+
+model loan_requests {
+  id                        String     @id
+  customer_id               String?
+  user_id                   String?
+  client_name               String
+  cpf                       String
+  email                     String
+  phone                     String
+  amount                    Float      @default(0)
+  installments              Int        @default(1)
+  status                    String     @default("PENDING")
+  profile_type              String?
+  father_phone              String?
+  mother_phone              String?
+  spouse_phone              String?
+  address                   String?
+  neighborhood              String?
+  city                      String?
+  state                     String?
+  zip_code                  String?
+  birth_date                String?
+  preferred_due_day         Int?
+  instagram                 String?
+  monthly_income            Float?
+  selfie_url                String?
+  id_card_url               String?
+  id_card_back_url          String?
+  proof_of_address_url      String?
+  proof_income_url          String?
+  vehicle_url               String?
+  video_selfie_url          String?
+  video_house_url           String?
+  video_vehicle_url         String?
+  signature_url             String?
+  work_card_url             String?
+  supplemental_description  String?
+  supplemental_doc_url      String?
+  supplemental_requested_at DateTime?
+  supplemental_uploaded_at  DateTime?
+  latitude                  Float?
+  longitude                 Float?
+  accuracy                  Float?
+  contract_accepted         Boolean    @default(false)
+  bank_name                 String?
+  bank_agency               String?
+  bank_account              String?
+  bank_account_type         String?
+  pix_key                   String?
+  pix_key_type              String?
+  created_at                DateTime   @default(now())
+  updated_at                DateTime
+  contract_pdf_url          String?
+  customers                 customers? @relation(fields: [customer_id], references: [id])
+  users                     users?     @relation(fields: [user_id], references: [id])
+  loans                     loans?
+}
+
+model loans {
+  id                 String         @id
+  customer_id        String
+  request_id         String         @unique
+  amount             Float
+  installments_count Int
+  remaining_amount   Float
+  status             String         @default("APPROVED")
+  start_date         DateTime
+  created_at         DateTime       @default(now())
+  installments       installments[]
+  customers          customers      @relation(fields: [customer_id], references: [id])
+  loan_requests      loan_requests  @relation(fields: [request_id], references: [id])
+}
+
+model message_templates {
+  id         String   @id
+  name       String
+  category   String
+  content    String
+  variables  String[]
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+}
+
+model notification_logs {
+  id            String   @id
+  type          String
+  recipient     String
+  subject       String?
+  content       String?
+  status        String   @default("SENT")
+  error_message String?
+  metadata      Json?
+  created_at    DateTime @default(now())
+}
+
+model notifications {
+  id             String     @id
+  customer_email String?
+  title          String
+  message        String
+  type           String     @default("INFO")
+  created_at     DateTime   @default(now())
+  customer_id    String?
+  is_read        Boolean    @default(false)
+  customers      customers? @relation(fields: [customer_id], references: [id])
+}
+
+model otp_codes {
+  id         String   @id
+  email      String
+  code       String
+  type       String   @default("EMAIL_VERIFY")
+  used       Boolean  @default(false)
+  expires_at DateTime
+  created_at DateTime @default(now())
+}
+
+model push_subscriptions {
+  id         String   @id
+  user_id    String
+  endpoint   String
+  p256dh     String
+  auth       String
+  user_agent String?
+  created_at DateTime @default(now())
+  users      users    @relation(fields: [user_id], references: [id])
+}
+
+model risk_events {
+  id         String   @id
+  user_id    String?
+  event_type String
+  risk_level String?
+  details    Json?
+  ip_address String?
+  user_agent String?
+  latitude   Float?
+  longitude  Float?
+  created_at DateTime @default(now())
+  users      users?   @relation(fields: [user_id], references: [id])
+}
+
+model scheduled_status {
+  id            String    @id
+  image_url     String
+  caption       String?
+  status        String    @default("PENDING")
+  error_message String?
+  scheduled_at  DateTime  @default(now())
+  posted_at     DateTime?
+  created_at    DateTime  @default(now())
+}
+
+model security_alerts {
+  id          String   @id
+  user_id     String
+  user_name   String
+  user_email  String
+  alert_type  String
+  severity    String
+  title       String
+  description String
+  device_info Json?
+  ip_address  String?
+  location    Json?
+  is_read     Boolean  @default(false)
+  created_at  DateTime @default(now())
+}
+
+model security_blocks {
+  id                 String    @id
+  user_id            String
+  block_type         String
+  block_reason       String
+  device_fingerprint String?
+  ip_address         String?
+  device_info        Json?
+  is_resolved        Boolean   @default(false)
+  resolved_at        DateTime?
+  resolved_by        String?
+  resolution_notes   String?
+  expires_at         DateTime?
+  created_at         DateTime  @default(now())
+  users              users     @relation(fields: [user_id], references: [id])
+}
+
+model system_settings {
+  id         String   @id
+  key        String   @unique
+  value      String
+  updated_at DateTime
+}
+
+model temporary_links {
+  id         String   @id
+  token      String   @unique
+  type       String
+  user_id    String?
+  email      String?
+  metadata   Json?
+  used       Boolean  @default(false)
+  expires_at DateTime
+  created_at DateTime @default(now())
+}
+
+model transactions {
+  id          String   @id
+  type        String
+  description String
+  amount      Float
+  category    String
+  date        DateTime
+  created_at  DateTime @default(now())
+}
+
+model trusted_devices {
+  id                 String   @id
+  user_id            String
+  device_fingerprint String
+  device_name        String
+  device_model       String?
+  platform           String?
+  browser            String?
+  screen_resolution  String?
+  last_ip            String?
+  last_location_lat  Float?
+  last_location_lng  Float?
+  is_verified        Boolean  @default(false)
+  is_primary         Boolean  @default(false)
+  trust_score        Int      @default(0)
+  login_count        Int      @default(0)
+  first_seen_at      DateTime @default(now())
+  last_seen_at       DateTime @default(now())
+  users              users    @relation(fields: [user_id], references: [id])
+}
+
+model users {
+  id                   String                 @id
+  auth_id              String?                @unique
+  name                 String
+  email                String                 @unique
+  password             String
+  role                 String                 @default("CLIENT")
+  phone                String?
+  address              String?
+  city                 String?
+  neighborhood         String?
+  avatar_url           String?
+  created_at           DateTime               @default(now())
+  customers            customers[]
+  loan_requests        loan_requests[]
+  push_subscriptions   push_subscriptions[]
+  risk_events          risk_events[]
+  security_blocks      security_blocks[]
+  trusted_devices      trusted_devices[]
+  webauthn_credentials webauthn_credentials[]
+}
+
+model webauthn_credentials {
+  id                 String    @id
+  user_id            String
+  user_email         String
+  credential_id      String    @unique
+  public_key         String?
+  attestation_object String?
+  device_name        String?
+  sign_count         Int       @default(0)
+  last_used_at       DateTime?
+  created_at         DateTime  @default(now())
+  users              users     @relation(fields: [user_id], references: [id])
+}
+
+model whatsapp_config {
+  id            String   @id
+  api_url       String
+  api_key       String
+  instance_name String
+  is_connected  Boolean  @default(false)
+  updated_at    DateTime
+}
