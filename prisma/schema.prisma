@@ -463,3 +463,48 @@ model whatsapp_config {
   is_connected  Boolean  @default(false)
   updated_at    DateTime
 }
+
+model funnel_leads {
+  id           String          @id @default(cuid())
+  session_id   String          @unique
+  current_step Int             @default(1)
+  utm_source   String?
+  utm_medium   String?
+  utm_campaign String?
+  utm_content  String?
+  utm_term     String?
+  ip_address   String?
+  user_agent   String?
+  created_at   DateTime        @default(now())
+  updated_at   DateTime        @updatedAt
+  events       funnel_events[]
+  purchases    funnel_purchases[]
+}
+
+model funnel_events {
+  id         String       @id @default(cuid())
+  lead_id    String
+  session_id String
+  step       Int
+  event_type String
+  metadata   Json?
+  created_at DateTime     @default(now())
+  lead       funnel_leads @relation(fields: [lead_id], references: [id])
+
+  @@index([session_id])
+  @@index([step, event_type])
+}
+
+model funnel_purchases {
+  id              String       @id @default(cuid())
+  lead_id         String
+  session_id      String
+  step            Int
+  product_name    String
+  amount          Float
+  gateway_ref     String?
+  created_at      DateTime     @default(now())
+  lead            funnel_leads @relation(fields: [lead_id], references: [id])
+
+  @@index([session_id])
+}
