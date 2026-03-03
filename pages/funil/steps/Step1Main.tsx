@@ -16,9 +16,9 @@ const BENEFITS = [
   { icon: <Star        size={22} />, title: 'Suporte Exclusivo',   desc: 'Grupo VIP, materiais e mentoria para tirar todas as dúvidas.' },
 ];
 
-interface Step1Props { sessionId: string }
+interface Step1Props { sessionId: string; onDecline: () => void }
 
-export function Step1Main({ sessionId }: Step1Props) {
+export function Step1Main({ sessionId, onDecline }: Step1Props) {
   useEffect(() => {
     track({ sessionId, step: 1, eventType: 'STEP_VIEW' });
   }, [sessionId]);
@@ -26,6 +26,11 @@ export function Step1Main({ sessionId }: Step1Props) {
   const handleBuy = () => {
     trackPurchase({ sessionId, step: 1, productName: 'Método Tubarão', amount: 497 });
     window.open(`${CHECKOUT_URL}?sid=${sessionId}`, '_blank');
+  };
+
+  const handleDecline = () => {
+    track({ sessionId, step: 1, eventType: 'CLICK_NO' });
+    onDecline();
   };
 
   return (
@@ -87,6 +92,12 @@ export function Step1Main({ sessionId }: Step1Props) {
         <p className="text-zinc-500 text-xs text-center">
           🔒 Compra 100% segura · Acesso imediato · Garantia de 7 dias
         </p>
+        <button
+          onClick={handleDecline}
+          className="text-zinc-600 text-sm underline underline-offset-4 hover:text-zinc-400 transition-colors mt-2"
+        >
+          Não, obrigado. Continuar sem comprar.
+        </button>
       </div>
 
     </section>

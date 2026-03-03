@@ -75,12 +75,12 @@ export default function FunnelManager() {
   // ── State machine ────────────────────────────────────────────────────────
   const renderStep = () => {
     switch (currentStep) {
-      case 1: return <Step1Main sessionId={sessionId} />;
+      case 1: return <Step1Main sessionId={sessionId} onDecline={() => advanceStep(2)} />;
       case 2: return <Step2Upsell1 sessionId={sessionId} onDecline={() => advanceStep(3)} />;
       case 3: return <Step3Upsell2 sessionId={sessionId} onDecline={() => advanceStep(4)} />;
       case 4: return <Step4Presencial sessionId={sessionId} onDecline={() => advanceStep(5)} />;
       case 5: return <Step5Confirmacao sessionId={sessionId} />;
-      default: return <Step1Main sessionId={sessionId} />;
+      default: return <Step1Main sessionId={sessionId} onDecline={() => advanceStep(2)} />;
     }
   };
 
