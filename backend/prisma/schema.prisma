@@ -820,3 +820,55 @@ model PartnerInvite {
   @@index([invitedEmail])
   @@index([inviteCode])
 }
+
+// ─── FUNIL DE VENDAS ──────────────────────────────────────────────────────────
+
+model FunnelLead {
+  id          String           @id @default(uuid())
+  sessionId   String           @unique @map("session_id")
+  currentStep Int              @default(1) @map("current_step")
+  utmSource   String?          @map("utm_source")
+  utmMedium   String?          @map("utm_medium")
+  utmCampaign String?          @map("utm_campaign")
+  utmContent  String?          @map("utm_content")
+  utmTerm     String?          @map("utm_term")
+  ipAddress   String?          @map("ip_address")
+  userAgent   String?          @map("user_agent")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  events      FunnelEvent[]
+  purchases   FunnelPurchase[]
+
+  @@map("funnel_leads")
+  @@index([sessionId])
+}
+
+model FunnelEvent {
+  id         String     @id @default(uuid())
+  leadId     String     @map("lead_id")
+  sessionId  String     @map("session_id")
+  step       Int
+  eventType  String     @map("event_type")
+  metadata   Json?
+  createdAt  DateTime   @default(now()) @map("created_at")
+  lead       FunnelLead @relation(fields: [leadId], references: [id])
+
+  @@map("funnel_events")
+  @@index([sessionId])
+  @@index([step, eventType])
+}
+
+model FunnelPurchase {
+  id          String     @id @default(uuid())
+  leadId      String     @map("lead_id")
+  sessionId   String     @map("session_id")
+  step        Int
+  productName String     @map("product_name")
+  amount      Float
+  gatewayRef  String?    @map("gateway_ref")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  lead        FunnelLead @relation(fields: [leadId], references: [id])
+
+  @@map("funnel_purchases")
+  @@index([sessionId])
+}
