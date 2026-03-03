@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { ShieldCheck, TrendingUp, Users, Banknote, Clock, Star } from 'lucide-react';
-import { FunnelVideo } from './FunnelVideo';
-import { track, trackPurchase } from './funnelTracker';
+import { FunnelVideo } from '../FunnelVideo';
+import { track, trackPurchase } from '../funnelTracker';
 
 // ── URLs reais ────────────────────────────────────────────────────────────────
 const VIDEO_URL    = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/01-pre-lancamento.mp4';
