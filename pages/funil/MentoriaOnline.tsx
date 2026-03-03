@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { Users, CheckCircle2, Video, MessageCircle, Calendar, TrendingUp, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-// Link de checkout Asaas (substitua pelo link real)
-const ASAAS_MENTORIA_ONLINE_URL = 'https://www.asaas.com/c/mentoria-online-link';
+// Link de checkout InfinitePay
+const CHECKOUT_MENTORIA_ONLINE_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-7NUsdS72g5-3997,00';
+
+// Vídeo hospedado no Cloudflare R2
+const VIDEO_MENTORIA_ONLINE_URL = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/03-pitch-mentorias.mp4';
 
 export default function MentoriaOnline() {
   const navigate = useNavigate();
@@ -53,8 +56,9 @@ export default function MentoriaOnline() {
                   poster="/images/mentoria-thumbnail.jpg"
                   className="w-full h-full"
                   preload="metadata"
+                  playsInline
                 >
-                  <source src="/videos/03-pitch-mentorias.mp4" type="video/mp4" />
+                  <source src={VIDEO_MENTORIA_ONLINE_URL} type="video/mp4" />
                   Seu navegador não suporta vídeo HTML5.
                 </video>
               </div>
@@ -67,7 +71,7 @@ export default function MentoriaOnline() {
               {/* Preço */}
               <div className="mb-6">
                 <div className="text-5xl md:text-6xl font-black text-[#D4AF37] mb-2">
-                  R$ 997
+                  R$ 3.997
                 </div>
                 <p className="text-zinc-400 text-sm">
                   Acesso por 3 meses • Encontros semanais ao vivo
@@ -76,7 +80,9 @@ export default function MentoriaOnline() {
 
               {/* Botão de Compra */}
               <a
-                href={ASAAS_MENTORIA_ONLINE_URL}
+                href={CHECKOUT_MENTORIA_ONLINE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-xl font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(212,175,55,0.4)] hover:shadow-[0_0_60px_rgba(212,175,55,0.6)] mb-4"
               >
                 <span>GARANTIR MINHA VAGA NA MENTORIA</span>
@@ -84,7 +90,7 @@ export default function MentoriaOnline() {
               </a>
 
               <p className="text-xs text-zinc-600 mb-6">
-                🔒 Pagamento 100% seguro via Asaas
+                🔒 Pagamento 100% seguro via InfinitePay
               </p>
 
               {/* Botão de Recusa */}
@@ -219,10 +225,12 @@ export default function MentoriaOnline() {
           </p>
 
           <a
-            href={ASAAS_MENTORIA_ONLINE_URL}
+            href={CHECKOUT_MENTORIA_ONLINE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-xl font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(212,175,55,0.4)] mb-4"
           >
-            <span>GARANTIR VAGA POR R$ 997</span>
+            <span>GARANTIR VAGA POR R$ 3.997</span>
             <TrendingUp size={24} />
           </a>
 

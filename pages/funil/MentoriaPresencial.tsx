@@ -2,6 +2,12 @@ import { useState } from 'react';
 import { Crown, CheckCircle2, Users, TrendingUp, MapPin, Calendar, Award, X, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+// Link de checkout InfinitePay - Mentoria Presencial
+const CHECKOUT_MENTORIA_PRESENCIAL_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-7NUrPuK8AH-5997,00';
+
+// Vídeo hospedado no Cloudflare R2
+const VIDEO_PRESENCIAL_URL = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/video-etapa1.mp4';
+
 export default function MentoriaPresencial() {
   const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
@@ -107,16 +113,17 @@ export default function MentoriaPresencial() {
             construa um negócio de <strong className="text-[#D4AF37]">6 dígitos por mês</strong> do zero.
           </p>
 
-          {/* Vídeo (se houver) */}
+          {/* Vídeo */}
           <div className="relative w-full max-w-4xl mx-auto mb-12 rounded-2xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]/30 animate-in fade-in zoom-in-95 duration-700 delay-300">
             <div className="relative aspect-video bg-zinc-900">
               <video
                 controls
                 poster="/images/mentoria-presencial-thumbnail.jpg"
-                className="w-full h-full"
+                className="absolute inset-0 w-full h-full"
                 preload="metadata"
+                playsInline
               >
-                <source src="/videos/04-mentoria-presencial.mp4" type="video/mp4" />
+                <source src={VIDEO_PRESENCIAL_URL} type="video/mp4" />
                 Seu navegador não suporta vídeo HTML5.
               </video>
             </div>
@@ -132,16 +139,33 @@ export default function MentoriaPresencial() {
             </p>
           </div>
 
-          {/* CTA - Botão de Aplicação */}
-          <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500">
+          {/* CTAs */}
+          <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500 space-y-4">
+            {/* Compra Direta */}
+            <div>
+              <a
+                href={CHECKOUT_MENTORIA_PRESENCIAL_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-xl font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(212,175,55,0.4)] hover:shadow-[0_0_60px_rgba(212,175,55,0.6)]"
+              >
+                <span>GARANTIR MINHA VAGA — R$ 5.997</span>
+                <TrendingUp size={24} />
+              </a>
+              <p className="text-xs text-zinc-600 mt-2">🔒 Pagamento seguro via InfinitePay</p>
+            </div>
+
+            {/* Ou aplicar */}
+            <div className="text-zinc-500 text-sm">ou</div>
+
             <button
               onClick={() => setShowForm(true)}
-              className="inline-flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-xl font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(212,175,55,0.4)] hover:shadow-[0_0_60px_rgba(212,175,55,0.6)]"
+              className="inline-flex items-center justify-center gap-3 px-8 py-4 border-2 border-[#D4AF37]/50 text-[#D4AF37] text-lg font-bold rounded-2xl hover:bg-[#D4AF37]/10 transition-all"
             >
-              <span>APLICAR PARA MENTORIA PRESENCIAL</span>
-              <Crown size={24} />
+              <span>APLICAR PARA PROCESSO SELETIVO</span>
+              <Crown size={20} />
             </button>
-            <p className="text-xs text-zinc-600 mt-3">
+            <p className="text-xs text-zinc-600">
               ⚠️ Vagas limitadas • Processo seletivo
             </p>
           </div>

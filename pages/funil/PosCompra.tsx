@@ -1,17 +1,26 @@
 import { useState } from 'react';
-import { CheckCircle2, Sparkles, TrendingUp, ArrowRight } from 'lucide-react';
+import { CheckCircle2, Sparkles, TrendingUp, ArrowRight, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-// Links de checkout Asaas (substitua pelos links reais)
-const ASAAS_LIMPA_NOME_URL = 'https://www.asaas.com/c/limpa-nome-link';
-const ASAAS_FINANCIAMENTO_MOTO_URL = 'https://www.asaas.com/c/financiamento-moto-link';
+// Links de checkout InfinitePay
+const CHECKOUT_LIMPA_NOME_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-7NUnL8kth5-297,00';
+const CHECKOUT_FINANCIAMENTO_MOTO_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-3gkPAIq4JF-297,00';
+const CHECKOUT_COMBO_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-ope8lFBEf-450,00';
+
+// Vídeos hospedados no Cloudflare R2
+const VIDEO_UPSELL_URL = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/02-upsell-modulos.mp4';
+const VIDEO_RECUSA_URL = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/04-recusa.mp4';
 
 export default function PosCompra() {
   const navigate = useNavigate();
-  const [showVideo, setShowVideo] = useState(true);
+  const [showRecusaModal, setShowRecusaModal] = useState(false);
 
-  const handleRecusar = () => {
-    // Redirecionar para Etapa 3
+  const handleRecusarClick = () => {
+    setShowRecusaModal(true);
+  };
+
+  const handleFecharModal = () => {
+    setShowRecusaModal(false);
     navigate('/funil/mentoria-online');
   };
 
@@ -45,22 +54,21 @@ export default function PosCompra() {
           </p>
 
           {/* Vídeo de Upsell */}
-          {showVideo && (
-            <div className="relative w-full max-w-4xl mx-auto mb-8 rounded-2xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]/20 animate-in fade-in zoom-in-95 duration-700 delay-300">
-              <div className="relative aspect-video bg-zinc-900">
-                <video
-                  controls
-                  autoPlay
-                  poster="/images/upsell-thumbnail.jpg"
-                  className="w-full h-full"
-                  preload="metadata"
-                >
-                  <source src="/videos/02-upsell-modulos.mp4" type="video/mp4" />
-                  Seu navegador não suporta vídeo HTML5.
-                </video>
-              </div>
+          <div className="relative w-full max-w-4xl mx-auto mb-8 rounded-2xl overflow-hidden shadow-2xl border-2 border-[#D4AF37]/20 animate-in fade-in zoom-in-95 duration-700 delay-300">
+            <div className="relative aspect-video bg-zinc-900">
+              <video
+                controls
+                autoPlay
+                poster="/images/upsell-thumbnail.jpg"
+                className="absolute inset-0 w-full h-full"
+                preload="metadata"
+                playsInline
+              >
+                <source src={VIDEO_UPSELL_URL} type="video/mp4" />
+                Seu navegador não suporta vídeo HTML5.
+              </video>
             </div>
-          )}
+          </div>
 
           {/* Oferta Especial Header */}
           <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-400">
@@ -84,36 +92,72 @@ export default function PosCompra() {
       {/* Produtos - Order Bump */}
       <section className="py-20 px-4 bg-zinc-950">
         <div className="max-w-6xl mx-auto">
+
+          {/* Combo em destaque no topo */}
+          <div className="mb-8">
+            <div className="bg-gradient-to-br from-zinc-800 to-zinc-900 border-2 border-[#D4AF37] rounded-3xl p-8 relative overflow-hidden group hover:border-[#D4AF37]/80 transition-all">
+              <div className="absolute top-4 right-4 px-3 py-1 bg-[#D4AF37] text-black text-sm font-black rounded-full">
+                ⭐ MELHOR OFERTA
+              </div>
+
+              <div className="relative z-10 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-[#D4AF37]/20 border border-[#D4AF37]/50 flex items-center justify-center mx-auto mb-4 text-3xl">
+                  🦈
+                </div>
+                <h3 className="text-2xl md:text-3xl font-black mb-3">
+                  Combo <span className="text-[#D4AF37]">Financiamento Próprio + Limpa Nome</span>
+                </h3>
+                <p className="text-zinc-400 mb-6 leading-relaxed max-w-2xl mx-auto">
+                  Leve os dois módulos mais lucrativos por um preço especial e domine dois mercados
+                  ao mesmo tempo: empréstimos próprios e regularização de CPF.
+                </p>
+
+                <div className="mb-6">
+                  <div className="flex items-center justify-center gap-3 mb-2">
+                    <span className="text-xl text-zinc-500 line-through">R$ 594</span>
+                    <span className="px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-full">
+                      -24% OFF
+                    </span>
+                  </div>
+                  <div className="text-5xl font-black text-[#D4AF37]">R$ 450</div>
+                  <p className="text-zinc-500 text-sm mt-1">Oferta válida apenas nesta página</p>
+                </div>
+
+                <a
+                  href={CHECKOUT_COMBO_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-3 px-10 py-5 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-xl font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(212,175,55,0.5)]"
+                >
+                  <span>PEGAR O COMBO POR R$ 450</span>
+                  <TrendingUp size={24} />
+                </a>
+                <p className="text-xs text-zinc-600 mt-3">🔒 Pagamento seguro via InfinitePay</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Módulos individuais */}
           <div className="grid md:grid-cols-2 gap-8">
             {/* Módulo 1: Limpa Nome */}
             <div className="bg-gradient-to-br from-zinc-900 to-black border-2 border-[#D4AF37]/30 rounded-3xl p-8 relative overflow-hidden group hover:border-[#D4AF37]/60 transition-all">
-              {/* Badge de Desconto */}
               <div className="absolute top-4 right-4 px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-full rotate-12">
                 -40%
               </div>
-
-              {/* Glow Effect */}
               <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
               <div className="relative z-10">
-                {/* Ícone */}
                 <div className="w-16 h-16 rounded-2xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center justify-center mb-6 text-[#D4AF37] text-3xl">
                   ✨
                 </div>
-
-                {/* Título */}
                 <h3 className="text-2xl md:text-3xl font-black mb-3">
                   Módulo <span className="text-[#D4AF37]">Limpa Nome</span>
                 </h3>
-
-                {/* Descrição */}
                 <p className="text-zinc-400 mb-6 leading-relaxed">
                   Aprenda a oferecer serviços de regularização de CPF e aumentar seu ticket médio
                   em até <strong className="text-white">300%</strong>. Inclui scripts, contratos e
                   parcerias estratégicas.
                 </p>
-
-                {/* Benefícios */}
                 <ul className="space-y-3 mb-8">
                   {[
                     'Scripts de venda prontos',
@@ -127,8 +171,6 @@ export default function PosCompra() {
                     </li>
                   ))}
                 </ul>
-
-                {/* Preço */}
                 <div className="mb-6">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-xl text-zinc-500 line-through">R$ 497</span>
@@ -139,10 +181,10 @@ export default function PosCompra() {
                   <div className="text-4xl font-black text-[#D4AF37]">R$ 297</div>
                   <p className="text-zinc-500 text-sm">Oferta válida apenas nesta página</p>
                 </div>
-
-                {/* Botão */}
                 <a
-                  href={ASAAS_LIMPA_NOME_URL}
+                  href={CHECKOUT_LIMPA_NOME_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="block w-full py-4 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-center font-black rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg"
                 >
                   ADICIONAR POR R$ 297
@@ -152,33 +194,23 @@ export default function PosCompra() {
 
             {/* Módulo 2: Financiamento de Moto */}
             <div className="bg-gradient-to-br from-zinc-900 to-black border-2 border-[#D4AF37]/30 rounded-3xl p-8 relative overflow-hidden group hover:border-[#D4AF37]/60 transition-all">
-              {/* Badge de Desconto */}
               <div className="absolute top-4 right-4 px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-full rotate-12">
-                -50%
+                -70%
               </div>
-
-              {/* Glow Effect */}
               <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
               <div className="relative z-10">
-                {/* Ícone */}
                 <div className="w-16 h-16 rounded-2xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center justify-center mb-6 text-[#D4AF37] text-3xl">
                   🏍️
                 </div>
-
-                {/* Título */}
                 <h3 className="text-2xl md:text-3xl font-black mb-3">
                   Módulo <span className="text-[#D4AF37]">Financiamento de Moto</span>
                 </h3>
-
-                {/* Descrição */}
                 <p className="text-zinc-400 mb-6 leading-relaxed">
                   Domine o nicho de financiamento de motos e gere contratos de{' '}
                   <strong className="text-white">R$ 5.000 a R$ 15.000</strong> com margens
                   altíssimas. Sistema completo de gestão incluso.
                 </p>
-
-                {/* Benefícios */}
                 <ul className="space-y-3 mb-8">
                   {[
                     'Planilha de cálculo automática',
@@ -192,25 +224,23 @@ export default function PosCompra() {
                     </li>
                   ))}
                 </ul>
-
-                {/* Preço */}
                 <div className="mb-6">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-xl text-zinc-500 line-through">R$ 997</span>
                     <span className="px-2 py-1 bg-red-500 text-white text-xs font-bold rounded">
-                      50% OFF
+                      70% OFF
                     </span>
                   </div>
-                  <div className="text-4xl font-black text-[#D4AF37]">R$ 497</div>
+                  <div className="text-4xl font-black text-[#D4AF37]">R$ 297</div>
                   <p className="text-zinc-500 text-sm">Oferta válida apenas nesta página</p>
                 </div>
-
-                {/* Botão */}
                 <a
-                  href={ASAAS_FINANCIAMENTO_MOTO_URL}
+                  href={CHECKOUT_FINANCIAMENTO_MOTO_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="block w-full py-4 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-center font-black rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg"
                 >
-                  ADICIONAR POR R$ 497
+                  ADICIONAR POR R$ 297
                 </a>
               </div>
             </div>
@@ -219,7 +249,7 @@ export default function PosCompra() {
           {/* Botão de Recusa */}
           <div className="text-center mt-12">
             <button
-              onClick={handleRecusar}
+              onClick={handleRecusarClick}
               className="inline-flex items-center gap-2 text-zinc-500 hover:text-zinc-400 transition-colors text-sm underline"
             >
               Não, obrigado. Quero continuar apenas com o Método Tubarão
@@ -249,6 +279,44 @@ export default function PosCompra() {
       <footer className="py-8 px-4 border-t border-zinc-900 text-center text-zinc-600 text-sm">
         <p>© 2026 Método Tubarão. Todos os direitos reservados.</p>
       </footer>
+
+      {/* Modal de Recusa com Vídeo */}
+      {showRecusaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="relative w-full max-w-2xl bg-zinc-900 border border-[#D4AF37]/30 rounded-3xl p-6 animate-in zoom-in-95 duration-300">
+            <button
+              onClick={handleFecharModal}
+              className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white transition-colors z-10"
+            >
+              <X size={24} />
+            </button>
+
+            <h2 className="text-2xl font-black text-center mb-4">
+              Espera! Antes de sair... 👀
+            </h2>
+
+            <div className="relative aspect-video bg-zinc-950 rounded-xl overflow-hidden mb-6">
+              <video
+                controls
+                autoPlay
+                className="absolute inset-0 w-full h-full"
+                preload="metadata"
+                playsInline
+              >
+                <source src={VIDEO_RECUSA_URL} type="video/mp4" />
+                Seu navegador não suporta vídeo HTML5.
+              </video>
+            </div>
+
+            <button
+              onClick={handleFecharModal}
+              className="w-full py-3 text-zinc-500 hover:text-zinc-400 transition-colors text-sm underline"
+            >
+              Não, obrigado. Continuar sem os módulos
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

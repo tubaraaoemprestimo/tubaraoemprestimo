@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
 import { CheckCircle2, Sparkles, MessageCircle, Calendar, Award } from 'lucide-react';
 
+// Vídeo hospedado no Cloudflare R2
+const VIDEO_OBRIGADO_URL = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/05-obrigado-final.mp4';
+
 export default function ObrigadoFinal() {
   useEffect(() => {
     // Scroll to top on mount
@@ -45,8 +48,9 @@ export default function ObrigadoFinal() {
                 poster="/images/obrigado-thumbnail.jpg"
                 className="w-full h-full"
                 preload="metadata"
+                playsInline
               >
-                <source src="/videos/05-obrigado-final.mp4" type="video/mp4" />
+                <source src={VIDEO_OBRIGADO_URL} type="video/mp4" />
                 Seu navegador não suporta vídeo HTML5.
               </video>
             </div>

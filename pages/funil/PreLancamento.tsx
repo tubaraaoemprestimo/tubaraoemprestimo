@@ -6,8 +6,11 @@ const COUNTDOWN_DAYS = 5;
 const PRECO_FUNDADOR = 497;
 const PRECO_OFICIAL = 697;
 
-// Link do checkout Asaas (substitua pelo link real)
-const ASAAS_CHECKOUT_URL = 'https://www.asaas.com/c/seu-link-aqui';
+// Link de checkout InfinitePay
+const INFINITEPAY_CHECKOUT_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-MsCyVA2ER-497,00';
+
+// Vídeo hospedado no Cloudflare R2
+const VIDEO_PRE_LANCAMENTO_URL = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/01-pre-lancamento.mp4';
 
 export default function PreLancamento() {
   const [timeLeft, setTimeLeft] = useState({
@@ -20,12 +23,8 @@ export default function PreLancamento() {
 
   useEffect(() => {
     // Calcular data final do contador (5 dias a partir de agora)
-    // Em produção, você pode armazenar isso no banco de dados
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + COUNTDOWN_DAYS);
-
-    // Ou usar data fixa (exemplo):
-    // const endDate = new Date('2026-02-28T23:59:59');
 
     const calculateTimeLeft = () => {
       const now = new Date().getTime();
@@ -90,10 +89,11 @@ export default function PreLancamento() {
               <video
                 controls
                 poster="/images/video-thumbnail.jpg"
-                className="w-full h-full"
+                className="absolute inset-0 w-full h-full"
                 preload="metadata"
+                playsInline
               >
-                <source src="/videos/01-pre-lancamento.mp4" type="video/mp4" />
+                <source src={VIDEO_PRE_LANCAMENTO_URL} type="video/mp4" />
                 Seu navegador não suporta vídeo HTML5.
               </video>
             </div>
@@ -170,7 +170,9 @@ export default function PreLancamento() {
               {/* Botão de Compra */}
               {!timeLeft.expired ? (
                 <a
-                  href={ASAAS_CHECKOUT_URL}
+                  href={INFINITEPAY_CHECKOUT_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-xl font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(212,175,55,0.4)] hover:shadow-[0_0_60px_rgba(212,175,55,0.6)]"
                 >
                   <span>GARANTIR MINHA VAGA AGORA</span>
@@ -186,7 +188,7 @@ export default function PreLancamento() {
               )}
 
               <p className="text-xs text-zinc-600 mt-3">
-                🔒 Pagamento 100% seguro via Asaas
+                🔒 Pagamento 100% seguro via InfinitePay
               </p>
             </div>
           </div>
@@ -270,7 +272,9 @@ export default function PreLancamento() {
 
           {!timeLeft.expired ? (
             <a
-              href={ASAAS_CHECKOUT_URL}
+              href={INFINITEPAY_CHECKOUT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-[#D4AF37] to-[#B8860B] text-black text-xl font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(212,175,55,0.4)]"
             >
               <span>GARANTIR ACESSO POR R$ {precoAtual}</span>
