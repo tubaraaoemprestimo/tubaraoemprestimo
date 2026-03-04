@@ -144,9 +144,14 @@ export function Step5Confirmacao({ sessionId }: Step5Props) {
           <div className="bg-black/50 rounded-2xl p-6 text-center">
             <Phone size={40} className="text-[#D4AF37] mx-auto mb-4" />
             <h3 className="font-bold text-lg mb-2">WhatsApp</h3>
-            <p className="text-zinc-400 text-sm">
-              Nossa equipe entrará em contato em breve
-            </p>
+            <a
+              href="https://wa.me/5511987577050"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#D4AF37] hover:underline font-bold"
+            >
+              +55 11 98757-7050
+            </a>
           </div>
         </div>
       </div>

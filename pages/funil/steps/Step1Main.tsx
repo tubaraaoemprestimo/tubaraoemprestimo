@@ -6,6 +6,7 @@ import { track, trackPurchase } from '../funnelTracker';
 // ── URLs reais ────────────────────────────────────────────────────────────────
 const VIDEO_URL    = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/01-pre-lancamento.mp4';
 const CHECKOUT_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-MsCyVA2ER-497,00';
+const WHATSAPP_NUMBER = '+55 11 98757-7050';
 
 // Data de término do pré-lançamento (5 dias a partir de agora)
 const COUNTDOWN_END = new Date('2026-03-09T23:59:59').getTime();

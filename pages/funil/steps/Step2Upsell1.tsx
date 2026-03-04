@@ -43,12 +43,12 @@ const OFFERS = [
       'Lucro de R$ 1.000 a R$ 4.000 por operação',
     ],
     priceOriginal: 'R$ 997',
-    price: 'R$ 497',
-    discount: '50% OFF',
-    url: 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-3gkPAIq4JF-497,00',
+    price: 'R$ 297',
+    discount: '70% OFF',
+    url: 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-3gkPAIq4JF-297,00',
     highlight: true,
     productName: 'Módulo Financiamento de Moto',
-    amount: 497,
+    amount: 297,
   },
 ];
 

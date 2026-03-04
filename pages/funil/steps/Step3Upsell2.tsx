@@ -4,7 +4,7 @@ import { FunnelVideo } from '../FunnelVideo';
 import { track, trackPurchase } from '../funnelTracker';
 
 const VIDEO_URL = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/03-pitch-mentorias.mp4';
-const CHECKOUT_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-7NUsdS72g5-997,00';
+const CHECKOUT_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-7NUsdS72g5-3997,00';
 
 const INCLUSO = [
   { icon: <Video size={22} />, text: '12 semanas de mentoria ao vivo (1x por semana)' },
@@ -29,7 +29,7 @@ export function Step3Upsell2({ sessionId, onDecline }: Step3Props) {
   }, [sessionId]);
 
   const handleBuy = () => {
-    trackPurchase({ sessionId, step: 3, productName: 'Mentoria Online', amount: 997 });
+    trackPurchase({ sessionId, step: 3, productName: 'Mentoria Online', amount: 3997 });
     window.open(`${CHECKOUT_URL}?sid=${sessionId}`, '_blank');
   };
 
@@ -141,8 +141,8 @@ export function Step3Upsell2({ sessionId, onDecline }: Step3Props) {
         <p className="text-zinc-400 mb-6">Acompanhamento semanal + Grupo VIP + Materiais exclusivos</p>
         <div className="mb-8">
           <p className="text-zinc-500 text-sm mb-2">Investimento único:</p>
-          <p className="text-6xl font-black text-[#D4AF37] mb-2">R$ 997</p>
-          <p className="text-green-400 font-bold text-sm">Ou 12x de R$ 97 no cartão</p>
+          <p className="text-6xl font-black text-[#D4AF37] mb-2">R$ 3.997</p>
+          <p className="text-green-400 font-bold text-sm">Pagamento à vista</p>
         </div>
         <button
           onClick={handleBuy}
@@ -151,7 +151,7 @@ export function Step3Upsell2({ sessionId, onDecline }: Step3Props) {
         >
           🚀 QUERO A MENTORIA ONLINE
         </button>
-        <p className="text-zinc-500 text-sm">🔒 Pagamento seguro · Parcelamento disponível</p>
+        <p className="text-zinc-500 text-sm">🔒 Pagamento seguro</p>
       </div>
 
       {/* Botão de Recusa */}

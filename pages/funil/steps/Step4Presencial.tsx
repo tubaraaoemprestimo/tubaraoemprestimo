@@ -164,7 +164,7 @@ export function Step4Presencial({ sessionId, onDecline }: Step4Props) {
         <div className="mb-8">
           <p className="text-zinc-500 text-sm mb-2">Investimento único:</p>
           <p className="text-6xl font-black text-[#D4AF37] mb-2">R$ 5.997</p>
-          <p className="text-green-400 font-bold text-sm">Ou 12x de R$ 583 no cartão</p>
+          <p className="text-green-400 font-bold text-sm">Pagamento à vista</p>
         </div>
         <button
           onClick={handleBuy}
@@ -173,7 +173,7 @@ export function Step4Presencial({ sessionId, onDecline }: Step4Props) {
         >
           🔥 GARANTIR MINHA VAGA AGORA
         </button>
-        <p className="text-zinc-500 text-sm">🔒 Pagamento seguro · Parcelamento disponível</p>
+        <p className="text-zinc-500 text-sm">🔒 Pagamento seguro</p>
       </div>
 
       {/* Botão de Recusa */}
