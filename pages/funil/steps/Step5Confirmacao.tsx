@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { CheckCircle2, MessageCircle, Calendar, Award } from 'lucide-react';
+import { CheckCircle2, MessageCircle, Calendar, Award, Sparkles, Mail, Phone } from 'lucide-react';
 import { FunnelVideo } from '../FunnelVideo';
 import { track } from '../funnelTracker';
 
@@ -10,88 +10,186 @@ interface Step5Props { sessionId: string }
 export function Step5Confirmacao({ sessionId }: Step5Props) {
   useEffect(() => {
     track({ sessionId, step: 5, eventType: 'STEP_VIEW' });
-    // Lead completou o fluxo — limpa o sessionId para próxima visita começar do zero
+    // Limpa o sessionId após conclusão do funil
     localStorage.removeItem('funnel_session_id');
   }, [sessionId]);
 
   return (
-    <section className="flex flex-col items-center gap-10 py-12 px-4 animate-in fade-in zoom-in-95 duration-700">
+    <section className="flex flex-col items-center gap-12 py-16 px-4 animate-in fade-in zoom-in-95 duration-700">
 
-      <div className="inline-flex items-center gap-2 px-5 py-2 bg-green-500/10 border border-green-500/30 rounded-full">
-        <CheckCircle2 size={20} className="text-green-400" />
-        <span className="text-sm font-bold text-green-400 uppercase tracking-wider">
-          Você está na nossa base!
-        </span>
-      </div>
-
-      <div className="text-center max-w-3xl">
-        <h1 className="text-5xl md:text-7xl font-black mb-6">
-          🎉 <span className="text-[#D4AF37]">Parabéns!</span>
+      {/* Mensagem de Sucesso */}
+      <div className="w-full max-w-4xl bg-gradient-to-br from-green-900/20 to-black border-2 border-green-500/40 rounded-3xl p-12 text-center">
+        <Sparkles size={64} className="text-green-400 mx-auto mb-6 animate-pulse" />
+        <h1 className="text-5xl md:text-6xl font-black mb-6">
+          🎉 Parabéns! Você Está Dentro!
         </h1>
-        <p className="text-xl md:text-2xl text-zinc-300 leading-relaxed">
-          Você já está na nossa base de dados. Nossa equipe entrará em contato para confirmar
-          sua inscrição e liberar seu acesso.
+        <p className="text-2xl text-zinc-300 leading-relaxed max-w-2xl mx-auto mb-6">
+          Sua inscrição foi registrada com sucesso em nossa base de dados.
         </p>
+        <div className="inline-block bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-2xl px-8 py-4">
+          <p className="text-lg text-[#D4AF37] font-bold">
+            ✅ Nossa equipe entrará em contato em breve para confirmar sua inscrição e liberar seu acesso!
+          </p>
+        </div>
       </div>
 
-      <div className="w-full max-w-4xl">
+      {/* Vídeo de Boas-Vindas */}
+      <div className="w-full max-w-5xl">
+        <h2 className="text-3xl font-black text-center mb-6">
+          🎥 Mensagem Especial de Boas-Vindas
+        </h2>
         <FunnelVideo
           src={VIDEO_URL}
           autoPlay={true}
-          onPlay={()     => track({ sessionId, step: 5, eventType: 'VIDEO_PLAY' })}
+          onPlay={() => track({ sessionId, step: 5, eventType: 'VIDEO_PLAY' })}
           onComplete={() => track({ sessionId, step: 5, eventType: 'VIDEO_COMPLETE' })}
         />
       </div>
 
       {/* Próximos Passos */}
-      <div className="w-full max-w-3xl bg-zinc-900 border border-[#D4AF37]/30 rounded-3xl p-8">
-        <h2 className="text-2xl font-black mb-6 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center justify-center text-[#D4AF37]">
-            ✦
-          </span>
-          Próximos Passos
+      <div className="w-full max-w-5xl">
+        <h2 className="text-4xl font-black text-center mb-12">
+          📋 Próximos Passos
         </h2>
-        <div className="space-y-5">
-          {[
-            { num: '1', title: 'Análise do Perfil',  desc: 'Nossa equipe irá analisar suas informações e verificar o alinhamento com o programa.' },
-            { num: '2', title: 'Contato Direto',     desc: 'Você receberá uma mensagem no WhatsApp em até 48 horas para confirmar sua inscrição.' },
-            { num: '3', title: 'Acesso Liberado',    desc: 'Após a confirmação, seu acesso será liberado e você receberá todas as instruções.' },
-          ].map((p) => (
-            <div key={p.num} className="flex gap-4">
-              <div className="shrink-0 w-8 h-8 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/50 flex items-center justify-center text-[#D4AF37] font-black text-sm">
-                {p.num}
-              </div>
-              <div>
-                <h3 className="font-bold mb-0.5">{p.title}</h3>
-                <p className="text-zinc-400 text-sm leading-relaxed">{p.desc}</p>
-              </div>
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="bg-gradient-to-br from-zinc-900 to-black border-2 border-[#D4AF37] rounded-2xl p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-[#D4AF37] text-black font-black text-3xl flex items-center justify-center mx-auto mb-6">
+              1
             </div>
-          ))}
+            <Mail size={40} className="text-[#D4AF37] mx-auto mb-4" />
+            <h3 className="text-xl font-black mb-4">Verifique Seu Email</h3>
+            <p className="text-zinc-400 leading-relaxed">
+              Enviamos um email de confirmação com todos os detalhes. Verifique sua caixa de entrada e spam.
+            </p>
+          </div>
+
+          <div className="bg-gradient-to-br from-zinc-900 to-black border-2 border-[#D4AF37] rounded-2xl p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-[#D4AF37] text-black font-black text-3xl flex items-center justify-center mx-auto mb-6">
+              2
+            </div>
+            <MessageCircle size={40} className="text-[#D4AF37] mx-auto mb-4" />
+            <h3 className="text-xl font-black mb-4">Aguarde Nosso Contato</h3>
+            <p className="text-zinc-400 leading-relaxed">
+              Nossa equipe entrará em contato via WhatsApp ou telefone nas próximas 24-48 horas.
+            </p>
+          </div>
+
+          <div className="bg-gradient-to-br from-zinc-900 to-black border-2 border-[#D4AF37] rounded-2xl p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-[#D4AF37] text-black font-black text-3xl flex items-center justify-center mx-auto mb-6">
+              3
+            </div>
+            <Award size={40} className="text-[#D4AF37] mx-auto mb-4" />
+            <h3 className="text-xl font-black mb-4">Acesso Liberado</h3>
+            <p className="text-zinc-400 leading-relaxed">
+              Após a confirmação, você receberá acesso imediato à área de membros e todos os materiais.
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4 w-full max-w-4xl">
-        {[
-          { icon: <MessageCircle size={24} />, title: 'Fique Atento ao WhatsApp', desc: 'Nosso contato chegará em até 48 horas.' },
-          { icon: <Calendar      size={24} />, title: 'Reserve as Datas',          desc: '3 dias presenciais em São Paulo (se aplicável).' },
-          { icon: <Award         size={24} />, title: 'Defina Seus Objetivos',     desc: 'Pense nas metas que deseja alcançar.' },
-        ].map((card, i) => (
-          <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-center hover:border-[#D4AF37]/30 transition-all">
-            <div className="w-12 h-12 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center justify-center text-[#D4AF37] mx-auto mb-3">
-              {card.icon}
+      {/* Preparação */}
+      <div className="w-full max-w-4xl bg-zinc-900 border border-zinc-800 rounded-3xl p-8">
+        <h2 className="text-3xl font-black text-center mb-8">
+          🚀 Enquanto Isso, Prepare-se!
+        </h2>
+        <div className="space-y-6">
+          <div className="flex items-start gap-4 bg-black/50 rounded-xl p-6">
+            <CheckCircle2 size={24} className="text-green-400 flex-shrink-0 mt-1" />
+            <div>
+              <h3 className="font-bold text-lg mb-2">Defina Seu Objetivo</h3>
+              <p className="text-zinc-400 leading-relaxed">
+                Quanto você quer faturar por mês? R$ 10k? R$ 30k? R$ 100k? Tenha uma meta clara em mente.
+              </p>
             </div>
-            <h3 className="font-bold text-sm mb-1">{card.title}</h3>
-            <p className="text-zinc-400 text-xs leading-relaxed">{card.desc}</p>
           </div>
-        ))}
+
+          <div className="flex items-start gap-4 bg-black/50 rounded-xl p-6">
+            <CheckCircle2 size={24} className="text-green-400 flex-shrink-0 mt-1" />
+            <div>
+              <h3 className="font-bold text-lg mb-2">Separe Seu Capital Inicial</h3>
+              <p className="text-zinc-400 leading-relaxed">
+                Você pode começar com R$ 500 a R$ 1.000. Quanto mais capital, mais rápido você escala.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-4 bg-black/50 rounded-xl p-6">
+            <CheckCircle2 size={24} className="text-green-400 flex-shrink-0 mt-1" />
+            <div>
+              <h3 className="font-bold text-lg mb-2">Mentalidade de Empreendedor</h3>
+              <p className="text-zinc-400 leading-relaxed">
+                Prepare-se para sair da zona de conforto. Você está prestes a construir um negócio real e lucrativo!
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <p className="text-zinc-600 text-xs text-center">
-        Dúvidas?{' '}
-        <a href="mailto:contato@metodtubarao.com" className="text-[#D4AF37] hover:underline">
-          contato@metodtubarao.com
-        </a>
-      </p>
+      {/* Informações de Contato */}
+      <div className="w-full max-w-4xl bg-gradient-to-br from-[#D4AF37]/10 to-black border-2 border-[#D4AF37] rounded-3xl p-8">
+        <h2 className="text-3xl font-black text-center mb-8">
+          📞 Precisa de Ajuda?
+        </h2>
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="bg-black/50 rounded-2xl p-6 text-center">
+            <Mail size={40} className="text-[#D4AF37] mx-auto mb-4" />
+            <h3 className="font-bold text-lg mb-2">Email</h3>
+            <a
+              href="mailto:contato@tubaraoemprestimo.com.br"
+              className="text-[#D4AF37] hover:underline font-bold"
+            >
+              contato@tubaraoemprestimo.com.br
+            </a>
+          </div>
+          <div className="bg-black/50 rounded-2xl p-6 text-center">
+            <Phone size={40} className="text-[#D4AF37] mx-auto mb-4" />
+            <h3 className="font-bold text-lg mb-2">WhatsApp</h3>
+            <p className="text-zinc-400 text-sm">
+              Nossa equipe entrará em contato em breve
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Depoimento Final */}
+      <div className="w-full max-w-3xl bg-zinc-900 border border-zinc-800 rounded-3xl p-8 text-center">
+        <div className="mb-6">
+          <div className="flex justify-center gap-1 mb-4">
+            {[...Array(5)].map((_, i) => (
+              <Award key={i} size={24} className="text-[#D4AF37]" fill="#D4AF37" />
+            ))}
+          </div>
+          <p className="text-xl text-zinc-300 italic leading-relaxed mb-4">
+            "Tomar a decisão de entrar no Método Tubarão foi o melhor investimento que já fiz.
+            Em 6 meses saí de R$ 3.000 para R$ 45.000 por mês. Minha vida mudou completamente!"
+          </p>
+          <p className="text-[#D4AF37] font-bold">— Carlos Silva, São Paulo/SP</p>
+        </div>
+      </div>
+
+      {/* Mensagem Final */}
+      <div className="w-full max-w-4xl text-center">
+        <h2 className="text-3xl font-black mb-6">
+          🦈 Bem-vindo à Família Tubarão!
+        </h2>
+        <p className="text-xl text-zinc-300 leading-relaxed mb-8">
+          Você acabou de dar o primeiro passo para construir um negócio lucrativo e transformar sua vida financeira.
+          Estamos ansiosos para ver seus resultados!
+        </p>
+        <div className="inline-block bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-2xl px-8 py-4">
+          <p className="text-lg text-[#D4AF37] font-bold">
+            💪 Prepare-se para a jornada da sua vida!
+          </p>
+        </div>
+      </div>
+
+      {/* Botão Voltar ao Início */}
+      <a
+        href="/#/"
+        className="inline-block px-8 py-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl transition-all"
+      >
+        ← Voltar ao Início
+      </a>
 
     </section>
   );
