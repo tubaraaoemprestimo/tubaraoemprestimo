@@ -1,9 +1,9 @@
-﻿/**
- * AcessoCurso â€” Ãrea do Aluno Premium (Micro-LMS)
+/**
+ * AcessoCurso — Área do Aluno Premium (Micro-LMS)
  * Rota: /acesso
  *
  * UI: Dark-mode estilo Netflix/streaming premium.
- * LÃ³gica: cursoService real (API) + fallback para mock data visual durante dev.
+ * Lógica: cursoService real (API) + fallback para mock data visual durante dev.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { cursoService, PlayerData, Lesson, Module } from '../../services/cursoService';
 
-// â”€â”€â”€ Formatters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Formatters ───────────────────────────────────────────────────────────────
 
 function formatDuration(seconds?: number): string {
   if (!seconds) return '';
@@ -24,42 +24,42 @@ function formatDuration(seconds?: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// â”€â”€â”€ MOCK DATA (renderiza visualmente enquanto a API nÃ£o retorna) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── MOCK DATA (renderiza visualmente enquanto a API não retorna) ──────────────
 
 const MOCK_DATA: PlayerData = {
   course: {
     id: 'mock-course',
-    title: 'MÃ©todo TubarÃ£o',
-    description: 'O sistema completo para construir um negÃ³cio de emprÃ©stimos.',
+    title: 'Método Tubarão',
+    description: 'O sistema completo para construir um negócio de empréstimos.',
     modules: [
       {
-        id: 'mod-1', courseId: 'mock-course', title: 'MÃ³dulo 1 â€” Fundamentos do NegÃ³cio', description: '', order: 0,
+        id: 'mod-1', courseId: 'mock-course', title: 'Módulo 1 — Fundamentos do Negócio', description: '', order: 0,
         lessons: [
-          { id: 'l-1', moduleId: 'mod-1', title: 'ApresentaÃ§Ã£o do MÃ©todo TubarÃ£o', description: 'VisÃ£o geral de tudo o que vocÃª vai aprender e o potencial de mercado.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 0, duration: 540, progress: [] },
-          { id: 'l-2', moduleId: 'mod-1', title: 'A Mentalidade do TubarÃ£o', description: 'Como pensar como um operador de crÃ©dito de sucesso.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 1, duration: 720, progress: [] },
-          { id: 'l-3', moduleId: 'mod-1', title: 'LegislaÃ§Ã£o e Compliance BÃ¡sico', description: 'O que vocÃª pode e nÃ£o pode fazer. Proteja seu negÃ³cio desde o inÃ­cio.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 2, duration: 900, progress: [] },
+          { id: 'l-1', moduleId: 'mod-1', title: 'Apresentação do Método Tubarão', description: 'Visão geral de tudo o que você vai aprender e o potencial de mercado.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 0, duration: 540, progress: [] },
+          { id: 'l-2', moduleId: 'mod-1', title: 'A Mentalidade do Tubarão', description: 'Como pensar como um operador de crédito de sucesso.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 1, duration: 720, progress: [] },
+          { id: 'l-3', moduleId: 'mod-1', title: 'Legislação e Compliance Básico', description: 'O que você pode e não pode fazer. Proteja seu negócio desde o início.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 2, duration: 900, progress: [] },
         ],
       },
       {
-        id: 'mod-2', courseId: 'mock-course', title: 'MÃ³dulo 2 â€” CaptaÃ§Ã£o de Clientes', description: '', order: 1,
+        id: 'mod-2', courseId: 'mock-course', title: 'Módulo 2 — Captação de Clientes', description: '', order: 1,
         lessons: [
-          { id: 'l-4', moduleId: 'mod-2', title: 'Onde EstÃ£o Seus Clientes Ideais', description: 'IdentificaÃ§Ã£o e segmentaÃ§Ã£o do pÃºblico de maior valor.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 0, duration: 810, progress: [] },
-          { id: 'l-5', moduleId: 'mod-2', title: 'Scripts de Abordagem que Convertem', description: 'Frases e tÃ©cnicas testadas para fechar mais negÃ³cios.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 1, duration: 1080, progress: [] },
-          { id: 'l-6', moduleId: 'mod-2', title: 'TrÃ¡fego Pago para CrÃ©dito (Meta e Google)', description: 'Campanhas de anÃºncios otimizadas para o seu nicho.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 2, duration: 1320, progress: [] },
+          { id: 'l-4', moduleId: 'mod-2', title: 'Onde Estão Seus Clientes Ideais', description: 'Identificação e segmentação do público de maior valor.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 0, duration: 810, progress: [] },
+          { id: 'l-5', moduleId: 'mod-2', title: 'Scripts de Abordagem que Convertem', description: 'Frases e técnicas testadas para fechar mais negócios.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 1, duration: 1080, progress: [] },
+          { id: 'l-6', moduleId: 'mod-2', title: 'Tráfego Pago para Crédito (Meta e Google)', description: 'Campanhas de anúncios otimizadas para o seu nicho.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 2, duration: 1320, progress: [] },
         ],
       },
       {
-        id: 'mod-3', courseId: 'mock-course', title: 'MÃ³dulo 3 â€” AnÃ¡lise e ConcessÃ£o', description: '', order: 2,
+        id: 'mod-3', courseId: 'mock-course', title: 'Módulo 3 — Análise e Concessão', description: '', order: 2,
         lessons: [
-          { id: 'l-7', moduleId: 'mod-3', title: 'Analisando o Perfil de CrÃ©dito', description: 'Como avaliar risco e definir limites seguros.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 0, duration: 960, progress: [] },
-          { id: 'l-8', moduleId: 'mod-3', title: 'Contratos que Protegem VocÃª', description: 'ClÃ¡usulas essenciais e modelos prontos para download.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 1, duration: 1140, materialUrl: '#', progress: [] },
-          { id: 'l-9', moduleId: 'mod-3', title: 'Sistema de CobranÃ§a Eficaz', description: 'RÃ©gua de cobranÃ§a e como recuperar inadimplentes.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 2, duration: 870, progress: [] },
+          { id: 'l-7', moduleId: 'mod-3', title: 'Analisando o Perfil de Crédito', description: 'Como avaliar risco e definir limites seguros.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 0, duration: 960, progress: [] },
+          { id: 'l-8', moduleId: 'mod-3', title: 'Contratos que Protegem Você', description: 'Cláusulas essenciais e modelos prontos para download.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 1, duration: 1140, materialUrl: '#', progress: [] },
+          { id: 'l-9', moduleId: 'mod-3', title: 'Sistema de Cobrança Eficaz', description: 'Régua de cobrança e como recuperar inadimplentes.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 2, duration: 870, progress: [] },
         ],
       },
       {
-        id: 'mod-4', courseId: 'mock-course', title: 'MÃ³dulo 4 â€” Escala e AutomaÃ§Ã£o', description: '', order: 3,
+        id: 'mod-4', courseId: 'mock-course', title: 'Módulo 4 — Escala e Automação', description: '', order: 3,
         lessons: [
-          { id: 'l-10', moduleId: 'mod-4', title: 'Automatizando o Atendimento com IA', description: 'Chatbots e fluxos que trabalham por vocÃª 24h.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 0, duration: 1020, progress: [] },
+          { id: 'l-10', moduleId: 'mod-4', title: 'Automatizando o Atendimento com IA', description: 'Chatbots e fluxos que trabalham por você 24h.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 0, duration: 1020, progress: [] },
           { id: 'l-11', moduleId: 'mod-4', title: 'Construindo uma Equipe Comercial', description: 'Como recrutar, treinar e remunerar seus agentes.', videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', order: 1, duration: 1200, progress: [] },
         ],
       },
@@ -68,14 +68,14 @@ const MOCK_DATA: PlayerData = {
   stats: { totalLessons: 11, completedLessons: 0, progressPercent: 0 },
 };
 
-// â”€â”€â”€ Tela de Sem Acesso â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tela de Sem Acesso ───────────────────────────────────────────────────────
 
 function NoAccess({ onBack }: { onBack: () => void }) {
   return (
     <div className="min-h-screen bg-zinc-900 flex flex-col items-center justify-center p-6 text-center">
       {/* Glow background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/3 left-1/2 -tranzinc-x-1/2 -tranzinc-y-1/2 w-96 h-96 bg-yellow-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-yellow-500/5 rounded-full blur-3xl" />
       </div>
 
       <div className="relative z-10 max-w-md mx-auto">
@@ -84,23 +84,23 @@ function NoAccess({ onBack }: { onBack: () => void }) {
         </div>
         <h1 className="text-3xl font-black text-white mb-3">Acesso Restrito</h1>
         <p className="text-zinc-400 leading-relaxed mb-8">
-          VocÃª ainda nÃ£o tem acesso ao <span className="text-yellow-500 font-bold">MÃ©todo TubarÃ£o</span>. Adquira o curso para desbloquear todo o conteÃºdo premium.
+          Você ainda não tem acesso ao <span className="text-yellow-500 font-bold">Método Tubarão</span>. Adquira o curso para desbloquear todo o conteúdo premium.
         </p>
         <button
           onClick={() => window.location.href = '/#/funil'}
           className="w-full px-8 py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-lg rounded-2xl transition-all active:scale-95 shadow-lg shadow-yellow-500/25 mb-4"
         >
-          ðŸ¦ˆ Quero o MÃ©todo TubarÃ£o
+          🦈 Quero o Método Tubarão
         </button>
         <button onClick={onBack} className="text-zinc-500 text-sm hover:text-zinc-300 transition-colors">
-          â† Voltar ao Dashboard
+          ← Voltar ao Dashboard
         </button>
       </div>
     </div>
   );
 }
 
-// â”€â”€â”€ Loading Premium â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Loading Premium ──────────────────────────────────────────────────────────
 
 function LoadingScreen() {
   return (
@@ -110,23 +110,23 @@ function LoadingScreen() {
         <div className="absolute inset-0 w-16 h-16 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
       </div>
       <div className="text-center">
-        <p className="text-white font-bold">Carregando seu conteÃºdo</p>
-        <p className="text-zinc-500 text-sm mt-1">Preparando o MÃ©todo TubarÃ£oâ€¦</p>
+        <p className="text-white font-bold">Carregando seu conteúdo</p>
+        <p className="text-zinc-500 text-sm mt-1">Preparando o Método Tubarão…</p>
       </div>
     </div>
   );
 }
 
-// â”€â”€â”€ Barra de Progresso Global â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Barra de Progresso Global ────────────────────────────────────────────────
 
 function GlobalProgressBar({ pct, completed, total }: { pct: number; completed: number; total: number }) {
   const getMotivationalText = () => {
     if (pct === 0) return 'Comece sua jornada agora!';
-    if (pct < 25) return 'Ã“timo comeÃ§o! Continue assim!';
-    if (pct < 50) return 'VocÃª estÃ¡ no caminho certo!';
-    if (pct < 75) return 'Mais da metade! IncrÃ­vel!';
-    if (pct < 100) return 'Quase lÃ¡! VocÃª consegue!';
-    return 'ðŸ† ParabÃ©ns! Curso concluÃ­do!';
+    if (pct < 25) return 'Ótimo começo! Continue assim!';
+    if (pct < 50) return 'Você está no caminho certo!';
+    if (pct < 75) return 'Mais da metade! Incrível!';
+    if (pct < 100) return 'Quase lá! Você consegue!';
+    return '🏆 Parabéns! Curso concluído!';
   };
 
   return (
@@ -135,7 +135,7 @@ function GlobalProgressBar({ pct, completed, total }: { pct: number; completed: 
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Flame size={14} className="text-yellow-500" />
-            <span className="text-xs font-bold text-yellow-500">Progresso do TubarÃ£o</span>
+            <span className="text-xs font-bold text-yellow-500">Progresso do Tubarão</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-zinc-400">{completed}/{total} aulas</span>
@@ -160,7 +160,7 @@ function GlobalProgressBar({ pct, completed, total }: { pct: number; completed: 
   );
 }
 
-// â”€â”€â”€ Item de Aula na Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Item de Aula na Sidebar ──────────────────────────────────────────────────
 
 function LessonItem({
   lesson, isActive, isCompleted, index, onClick,
@@ -217,7 +217,7 @@ function LessonItem({
   );
 }
 
-// â”€â”€â”€ MÃ³dulo Accordion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Módulo Accordion ─────────────────────────────────────────────────────────
 
 function ModuleAccordion({
   module, completedIds, activeLesson, moduleIndex, onSelectLesson,
@@ -287,7 +287,7 @@ function ModuleAccordion({
   );
 }
 
-// â”€â”€â”€ Sidebar (Desktop) / Drawer (Mobile) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Sidebar (Desktop) / Drawer (Mobile) ─────────────────────────────────────
 
 function Sidebar({
   playerData, completedIds, activeLesson, onSelectLesson, stats,
@@ -316,7 +316,7 @@ function Sidebar({
         w-80 bg-zinc-900 border-r border-zinc-800 flex flex-col
         fixed inset-y-0 right-0 z-40 xl:static xl:inset-auto xl:z-auto
         transition-transform duration-300 ease-in-out
-        ${mobileOpen ? 'tranzinc-x-0' : 'tranzinc-x-full xl:tranzinc-x-0'}
+        ${mobileOpen ? 'translate-x-0' : 'translate-x-full xl:translate-x-0'}
       `}>
         {/* Header */}
         <div className="p-4 border-b border-zinc-800 shrink-0">
@@ -325,7 +325,7 @@ function Sidebar({
               <div className="w-7 h-7 rounded-lg bg-yellow-500/20 flex items-center justify-center">
                 <BookOpen size={14} className="text-yellow-500" />
               </div>
-              <span className="text-sm font-bold text-white">ConteÃºdo do Curso</span>
+              <span className="text-sm font-bold text-white">Conteúdo do Curso</span>
             </div>
             <button
               onClick={onClose}
@@ -343,7 +343,7 @@ function Sidebar({
             </div>
             <div className="flex items-end gap-2">
               <span className="text-2xl font-black text-white">{stats.progressPercent}%</span>
-              <span className="text-xs text-zinc-500 mb-1">concluÃ­do</span>
+              <span className="text-xs text-zinc-500 mb-1">concluído</span>
             </div>
             <div className="mt-2 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
               <div
@@ -352,7 +352,7 @@ function Sidebar({
               />
             </div>
             <p className="text-[10px] text-zinc-600 mt-1.5">
-              {stats.completedLessons} de {stats.totalLessons} aulas concluÃ­das
+              {stats.completedLessons} de {stats.totalLessons} aulas concluídas
             </p>
           </div>
         </div>
@@ -376,7 +376,7 @@ function Sidebar({
           <div className="flex items-center gap-2 bg-zinc-800/50 rounded-xl p-3">
             <GraduationCap size={16} className="text-yellow-500 shrink-0" />
             <p className="text-[10px] text-zinc-400 leading-relaxed">
-              Complete todas as aulas para receber seu <span className="text-yellow-500 font-bold">Certificado TubarÃ£o</span>
+              Complete todas as aulas para receber seu <span className="text-yellow-500 font-bold">Certificado Tubarão</span>
             </p>
           </div>
         </div>
@@ -385,7 +385,7 @@ function Sidebar({
   );
 }
 
-// â”€â”€â”€ Player Principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Player Principal ─────────────────────────────────────────────────────────
 
 function VideoPlayer({
   lesson,
@@ -423,7 +423,7 @@ function VideoPlayer({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {/* â”€â”€ Video Player â”€â”€ */}
+      {/* Video Player */}
       <div className="relative w-full bg-black shadow-[0_0_30px_rgba(234,179,8,0.12)]">
         {lesson.videoUrl ? (
           <>
@@ -440,7 +440,7 @@ function VideoPlayer({
                 onEnded={() => setVideoEnded(true)}
               >
                 <source src={lesson.videoUrl} type="video/mp4" />
-                Seu navegador nÃ£o suporta vÃ­deo HTML5.
+                Seu navegador não suporta vídeo HTML5.
               </video>
 
               {/* Video ended overlay */}
@@ -448,14 +448,14 @@ function VideoPlayer({
                 <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
                   <CheckCircle2 size={48} className="text-yellow-500" />
                   <p className="text-white font-bold text-lg text-center px-4">
-                    Aula finalizada! Marque como concluÃ­da.
+                    Aula finalizada! Marque como concluída.
                   </p>
                   <button
                     onClick={handleMark}
                     disabled={marking}
                     className="px-6 py-3 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-xl transition-all active:scale-95 disabled:opacity-60"
                   >
-                    {marking ? 'Salvandoâ€¦' : 'âœ… Marcar como ConcluÃ­da'}
+                    {marking ? 'Salvando…' : '✅ Marcar como Concluída'}
                   </button>
                 </div>
               )}
@@ -465,7 +465,7 @@ function VideoPlayer({
             {isCompleted && (
               <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-yellow-500 text-black text-xs font-black px-3 py-1.5 rounded-full shadow-lg">
                 <CheckCircle2 size={12} />
-                ConcluÃ­da
+                Concluída
               </div>
             )}
           </>
@@ -474,12 +474,12 @@ function VideoPlayer({
             <div className="w-20 h-20 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center">
               <Lock size={32} />
             </div>
-            <p className="text-sm font-medium">VÃ­deo em breve</p>
+            <p className="text-sm font-medium">Vídeo em breve</p>
           </div>
         )}
       </div>
 
-      {/* â”€â”€ Lesson Details â”€â”€ */}
+      {/* Lesson Details */}
       <div className="p-4 md:p-6 max-w-4xl mx-auto">
 
         {/* Title area */}
@@ -493,7 +493,7 @@ function VideoPlayer({
           {lesson.duration && (
             <div className="flex items-center gap-1.5 mt-2">
               <Clock size={12} className="text-zinc-600" />
-              <span className="text-xs text-zinc-600">{formatDuration(lesson.duration)} de duraÃ§Ã£o</span>
+              <span className="text-xs text-zinc-600">{formatDuration(lesson.duration)} de duração</span>
             </div>
           )}
         </div>
@@ -510,8 +510,8 @@ function VideoPlayer({
                 : 'bg-yellow-500 hover:bg-yellow-400 text-black shadow-yellow-500/30'
               }`}
           >
-            <CheckCircle2 size={20} className={isCompleted ? 'text-yellow-500' : 'text-black'} />
-            {marking ? 'Salvandoâ€¦' : isCompleted ? 'Aula ConcluÃ­da âœ“' : 'Marcar como ConcluÃ­da'}
+            <img src="/logo.png" className="w-5 h-5 mr-2 object-contain" alt="" />
+            {marking ? 'Salvando…' : isCompleted ? 'Aula Concluída ✓' : 'Marcar como Concluída'}
           </button>
 
           {/* Secondary: Download material */}
@@ -523,7 +523,7 @@ function VideoPlayer({
               className="flex items-center justify-center gap-2 px-5 py-4 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 font-bold text-sm rounded-2xl transition-all active:scale-[0.98]"
             >
               <Download size={16} />
-              ðŸ“„ Baixar Material
+              📄 Baixar Material
             </a>
           )}
 
@@ -534,7 +534,7 @@ function VideoPlayer({
               className="flex items-center justify-center gap-2 px-5 py-4 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 font-bold text-sm rounded-2xl transition-all active:scale-[0.98]"
             >
               <SkipForward size={16} />
-              PrÃ³xima Aula
+              Próxima Aula
             </button>
           )}
         </div>
@@ -543,8 +543,8 @@ function VideoPlayer({
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
             <Zap size={18} className="text-yellow-500 mx-auto mb-1" />
-            <p className="text-[10px] text-zinc-500 font-medium">MÃ©todo</p>
-            <p className="text-xs font-bold text-white">TubarÃ£o</p>
+            <p className="text-[10px] text-zinc-500 font-medium">Método</p>
+            <p className="text-xs font-bold text-white">Tubarão</p>
           </div>
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
             <Target size={18} className="text-yellow-500 mx-auto mb-1" />
@@ -553,7 +553,7 @@ function VideoPlayer({
           </div>
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
             <Award size={18} className="text-yellow-500 mx-auto mb-1" />
-            <p className="text-[10px] text-zinc-500 font-medium">NÃ­vel</p>
+            <p className="text-[10px] text-zinc-500 font-medium">Nível</p>
             <p className="text-xs font-bold text-white">Premium</p>
           </div>
         </div>
@@ -562,7 +562,7 @@ function VideoPlayer({
   );
 }
 
-// â”€â”€â”€ Componente Principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Componente Principal ─────────────────────────────────────────────────────
 
 export const AcessoCurso: React.FC = () => {
   const navigate = useNavigate();
@@ -581,7 +581,7 @@ export const AcessoCurso: React.FC = () => {
         setPlayerData(data);
         setStats(data.stats);
 
-        // Monta set de aulas concluÃ­das
+        // Monta set de aulas concluídas
         const ids = new Set<string>();
         data.course.modules.forEach(m =>
           m.lessons.forEach(l => {
@@ -590,7 +590,7 @@ export const AcessoCurso: React.FC = () => {
         );
         setCompletedIds(ids);
 
-        // Seleciona primeira aula nÃ£o concluÃ­da (ou a primeira de todas)
+        // Seleciona primeira aula não concluída (ou a primeira de todas)
         const allLessons = data.course.modules.flatMap(m => m.lessons);
         const firstPending = allLessons.find(l => !ids.has(l.id)) ?? allLessons[0];
         if (firstPending) setActiveLesson(firstPending);
@@ -598,7 +598,7 @@ export const AcessoCurso: React.FC = () => {
         setHasAccess(true);
       } catch (err: any) {
         if (err?.response?.status === 403) {
-          // Sem acesso â€” usa mock data para demo visual (remove em prod)
+          // Sem acesso — usa mock data para demo visual (remove em prod)
           setPlayerData(MOCK_DATA);
           setStats(MOCK_DATA.stats);
           const allLessons = MOCK_DATA.course.modules.flatMap(m => m.lessons);
@@ -645,10 +645,8 @@ export const AcessoCurso: React.FC = () => {
   const currentLessonIndex = allLessons.findIndex(l => l.id === activeLesson?.id);
   const hasNext = currentLessonIndex < allLessons.length - 1;
 
-  // â”€â”€ Loading â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (loading) return <LoadingScreen />;
 
-  // â”€â”€ Sem Acesso â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (!hasAccess) {
     return <NoAccess onBack={() => navigate('/client/dashboard')} />;
   }
@@ -656,7 +654,7 @@ export const AcessoCurso: React.FC = () => {
   return (
     <div className="min-h-screen bg-zinc-900 flex flex-col">
 
-      {/* â”€â”€ Topbar â”€â”€ */}
+      {/* Topbar */}
       <header className="sticky top-0 z-30 bg-zinc-950/95 backdrop-blur border-b border-zinc-800 shrink-0">
         {/* Nav row */}
         <div className="px-4 h-14 flex items-center gap-3">
@@ -668,9 +666,9 @@ export const AcessoCurso: React.FC = () => {
           </button>
 
           <div className="flex-1 min-w-0 flex items-center gap-2">
-            <span className="text-base">ðŸ¦ˆ</span>
+            <span className="text-base">🦈</span>
             <div className="min-w-0">
-              <p className="text-sm font-black text-white truncate">MÃ©todo TubarÃ£o</p>
+              <p className="text-sm font-black text-white truncate">Método Tubarão</p>
               {activeLesson && (
                 <p className="text-[10px] text-zinc-500 truncate">{activeLesson.title}</p>
               )}
@@ -703,7 +701,7 @@ export const AcessoCurso: React.FC = () => {
         />
       </header>
 
-      {/* â”€â”€ Body: Player + Sidebar â”€â”€ */}
+      {/* Body: Player + Sidebar */}
       <div className="flex flex-1 overflow-hidden">
 
         {/* Player area */}
@@ -719,7 +717,7 @@ export const AcessoCurso: React.FC = () => {
           ) : (
             <div className="flex flex-col items-center justify-center h-64 gap-4 text-zinc-700">
               <BookOpen size={48} />
-              <p className="text-sm">Selecione uma aula para comeÃ§ar</p>
+              <p className="text-sm">Selecione uma aula para começar</p>
             </div>
           )}
         </main>
@@ -740,4 +738,3 @@ export const AcessoCurso: React.FC = () => {
     </div>
   );
 };
-
