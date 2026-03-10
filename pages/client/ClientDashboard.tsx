@@ -133,8 +133,8 @@ const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     let activeLoan: string | null = null;
 
     if (loans.length > 0) {
-      // Incluir empréstimos APPROVED e PAID (quitados recentemente)
-      const activeLoans = loans.filter(l => l.status === 'APPROVED' || l.status === 'PAID');
+      // Calcular saldo devedor apenas de empréstimos ativos (APPROVED)
+      const activeLoans = loans.filter(l => l.status === 'APPROVED');
 
       // Calcular saldo devedor total (remainingAmount já vem atualizado do backend)
       totalDebt = activeLoans.reduce((acc, curr) => acc + (curr.remainingAmount || 0), 0);

@@ -165,9 +165,15 @@ export const Contracts: React.FC = () => {
                                  <p className="text-zinc-500 text-xs uppercase tracking-widest mb-1">Valor Total</p>
                                  <h2 className="text-3xl font-bold text-white">R$ {selectedLoan.amount.toLocaleString()}</h2>
                               </div>
-                              <div className="px-3 py-1 bg-green-900/30 border border-green-800 text-green-400 rounded-full text-xs font-bold">
-                                 ATIVO
-                              </div>
+                              {selectedLoan.status === 'PAID' ? (
+                                 <div className="px-3 py-1 bg-zinc-800 border border-zinc-600 text-zinc-300 rounded-full text-xs font-bold">
+                                    QUITADO ✓
+                                 </div>
+                              ) : (
+                                 <div className="px-3 py-1 bg-green-900/30 border border-green-800 text-green-400 rounded-full text-xs font-bold">
+                                    ATIVO
+                                 </div>
+                              )}
                            </div>
 
                            <div className="grid grid-cols-2 gap-4 mb-6">
@@ -181,26 +187,34 @@ export const Contracts: React.FC = () => {
                               </div>
                            </div>
 
-                           {/* ===== BOTÕES DE PAGAMENTO: JUROS / QUITAÇÃO ===== */}
-                           <div className="grid grid-cols-2 gap-3">
-                              <button
-                                 onClick={() => setIsPaymentChoiceOpen(true)}
-                                 className="flex items-center justify-center gap-2 p-3.5 bg-gradient-to-r from-amber-900/40 to-amber-800/20 border border-amber-600/50 rounded-2xl text-amber-400 font-bold text-sm hover:border-amber-400 hover:from-amber-900/60 transition-all active:scale-95"
-                              >
-                                 <Banknote size={18} />
-                                 <span>Pagar Juros</span>
-                              </button>
-                              <button
-                                 onClick={() => {
-                                    setIsPaymentChoiceOpen(false);
-                                    handleGeneratePayment('full');
-                                 }}
-                                 className="flex items-center justify-center gap-2 p-3.5 bg-gradient-to-r from-green-900/40 to-green-800/20 border border-green-600/50 rounded-2xl text-green-400 font-bold text-sm hover:border-green-400 hover:from-green-900/60 transition-all active:scale-95"
-                              >
-                                 <CreditCard size={18} />
-                                 <span>Quitar Tudo</span>
-                              </button>
-                           </div>
+                           {/* ===== BOTÕES DE PAGAMENTO: só para contratos ATIVOS ===== */}
+                           {selectedLoan.status !== 'PAID' && (
+                              <div className="grid grid-cols-2 gap-3">
+                                 <button
+                                    onClick={() => setIsPaymentChoiceOpen(true)}
+                                    className="flex items-center justify-center gap-2 p-3.5 bg-gradient-to-r from-amber-900/40 to-amber-800/20 border border-amber-600/50 rounded-2xl text-amber-400 font-bold text-sm hover:border-amber-400 hover:from-amber-900/60 transition-all active:scale-95"
+                                 >
+                                    <Banknote size={18} />
+                                    <span>Pagar Juros</span>
+                                 </button>
+                                 <button
+                                    onClick={() => {
+                                       setIsPaymentChoiceOpen(false);
+                                       handleGeneratePayment('full');
+                                    }}
+                                    className="flex items-center justify-center gap-2 p-3.5 bg-gradient-to-r from-green-900/40 to-green-800/20 border border-green-600/50 rounded-2xl text-green-400 font-bold text-sm hover:border-green-400 hover:from-green-900/60 transition-all active:scale-95"
+                                 >
+                                    <CreditCard size={18} />
+                                    <span>Quitar Tudo</span>
+                                 </button>
+                              </div>
+                           )}
+                           {selectedLoan.status === 'PAID' && (
+                              <div className="flex items-center justify-center gap-2 p-3.5 bg-zinc-950 border border-zinc-700 rounded-2xl text-zinc-400 text-sm">
+                                 <CheckCircle2 size={16} className="text-green-500" />
+                                 <span>Empréstimo quitado — nenhuma cobrança pendente</span>
+                              </div>
+                           )}
                         </div>
 
                         <h3 className="font-bold text-lg mb-4 pl-2 text-white">Cobranças</h3>
@@ -300,7 +314,9 @@ export const Contracts: React.FC = () => {
                   <div className="bg-black/50 border border-zinc-800 rounded-2xl p-4 mb-6">
                      <div className="flex justify-between items-center mb-2">
                         <span className="text-zinc-500 text-xs uppercase">Contrato #{selectedLoan.id.slice(-4)}</span>
-                        <span className="text-green-400 text-xs font-bold">ATIVO</span>
+                        <span className={`text-xs font-bold ${selectedLoan.status === 'PAID' ? 'text-zinc-400' : 'text-green-400'}`}>
+                           {selectedLoan.status === 'PAID' ? 'QUITADO' : 'ATIVO'}
+                        </span>
                      </div>
                      <div className="grid grid-cols-2 gap-4 mt-3">
                         <div>
