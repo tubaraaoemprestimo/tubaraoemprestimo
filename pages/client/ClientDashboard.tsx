@@ -107,14 +107,11 @@ const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     // Buscar dados atualizados do usuário da API
     try {
       const { data: freshUser } = await api.get('/auth/me');
-      if (freshUser) {
-        console.log('[ClientDashboard] hasCourseAccess:', freshUser.hasCourseAccess);
-        setHasCourseAccess(!!freshUser.hasCourseAccess);
-      }
+      const courseAccess = !!(freshUser as any)?.user?.hasCourseAccess;
+      console.log('[ClientDashboard] hasCourseAccess:', courseAccess);
+      setHasCourseAccess(courseAccess);
     } catch (err) {
       console.error('[ClientDashboard] Erro ao buscar dados do usuário:', err);
-      // Fallback para localStorage
-      setHasCourseAccess(!!(user as any)?.hasCourseAccess);
     }
 
     const loans = await apiService.getClientLoans() as any[];
