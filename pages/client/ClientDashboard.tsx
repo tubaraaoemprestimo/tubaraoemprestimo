@@ -103,6 +103,20 @@ const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const loadDashboardData = async () => {
     setLoading(true);
     const user = apiService.auth.getUser();
+
+    // Buscar dados atualizados do usuário da API
+    try {
+      const { data: freshUser } = await api.get('/auth/me');
+      if (freshUser) {
+        console.log('[ClientDashboard] hasCourseAccess:', freshUser.hasCourseAccess);
+        setHasCourseAccess(!!freshUser.hasCourseAccess);
+      }
+    } catch (err) {
+      console.error('[ClientDashboard] Erro ao buscar dados do usuário:', err);
+      // Fallback para localStorage
+      setHasCourseAccess(!!(user as any)?.hasCourseAccess);
+    }
+
     const loans = await apiService.getClientLoans() as any[];
     const pendingReq = await apiService.getClientPendingRequest();
     const campaigns = await apiService.getActiveCampaigns() as any[];
@@ -152,7 +166,6 @@ const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
       nextInstallmentValue: nextInstVal
     });
 
-    setHasCourseAccess(!!(user as any)?.hasCourseAccess);
     setActiveLoanId(activeLoan);
 
     // Verificar elegibilidade para Nível Ouro
