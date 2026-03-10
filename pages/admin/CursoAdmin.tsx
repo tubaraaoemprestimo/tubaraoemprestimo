@@ -447,7 +447,7 @@ export const CursoAdmin: React.FC = () => {
   const loadCourse = async () => {
     setLoading(true);
     try {
-      const data = await cursoService.getPlayer();
+      const data = await cursoService.getAdminCourse();
       setModules(data.course.modules);
     } catch (err: any) {
       if (err?.response?.status !== 404) {

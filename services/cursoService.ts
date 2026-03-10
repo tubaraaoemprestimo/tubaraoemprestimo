@@ -161,6 +161,10 @@ export const cursoService = {
 
   // ── Admin — Usuários ───────────────────────────────────────────────────────
 
+  /** Retorna curso completo para admin (sem verificar hasCourseAccess) */
+  getAdminCourse: (): Promise<{ course: Course }> =>
+    api.get(`${BASE}/admin/course`).then(r => r.data),
+
   getAdminUsers: (): Promise<AdminUser[]> =>
     api.get(`${BASE}/admin/users`).then(r => r.data),
 

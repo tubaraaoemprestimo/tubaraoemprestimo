@@ -283,6 +283,38 @@ router.delete(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ADMIN — Buscar curso completo (sem verificar hasCourseAccess)
+// GET /api/curso/admin/course
+// ─────────────────────────────────────────────────────────────────────────────
+router.get(
+  '/admin/course',
+  authenticate,
+  requireAdmin,
+  async (_req: Request, res: Response) => {
+    // Busca curso com módulos e aulas (sem verificar acesso do usuário)
+    const course = await prisma.course.findFirst({
+      where: { isPublished: true },
+      include: {
+        modules: {
+          orderBy: { order: 'asc' },
+          include: {
+            lessons: {
+              orderBy: { order: 'asc' },
+            },
+          },
+        },
+      },
+    });
+
+    if (!course) {
+      return res.status(404).json({ error: 'Nenhum curso encontrado.' });
+    }
+
+    return res.json({ course });
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN — Listar usuários com/sem acesso ao curso
 // GET /api/curso/admin/users
 // ─────────────────────────────────────────────────────────────────────────────
