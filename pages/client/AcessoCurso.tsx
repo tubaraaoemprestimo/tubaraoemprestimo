@@ -8,12 +8,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ChevronDown, ChevronRight, CheckCircle2,
+  ChevronDown, ChevronRight, CheckCircle2, ShieldCheck,
   Lock, BookOpen, Download, ArrowLeft, Menu, X, Trophy,
   Zap, Clock, Play, SkipForward,
-  GraduationCap, Award, Flame, Target
+  GraduationCap, Award, Flame, Target, Medal, Star, Printer
 } from 'lucide-react';
 import { cursoService, PlayerData, Lesson, Module } from '../../services/cursoService';
+import { api } from '../../services/apiClient';
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
@@ -73,11 +74,9 @@ const MOCK_DATA: PlayerData = {
 function NoAccess({ onBack }: { onBack: () => void }) {
   return (
     <div className="min-h-screen bg-zinc-900 flex flex-col items-center justify-center p-6 text-center">
-      {/* Glow background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-yellow-500/5 rounded-full blur-3xl" />
       </div>
-
       <div className="relative z-10 max-w-md mx-auto">
         <div className="w-24 h-24 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center mx-auto mb-6 shadow-2xl">
           <Lock size={40} className="text-zinc-600" />
@@ -180,7 +179,6 @@ function LessonItem({
           : 'hover:bg-zinc-800/60 border-l-[3px] border-transparent'
         }`}
     >
-      {/* Status icon */}
       <div className="shrink-0 w-5 h-5 flex items-center justify-center">
         {isCompleted ? (
           <CheckCircle2 size={18} className="text-yellow-500" />
@@ -194,8 +192,6 @@ function LessonItem({
           </div>
         )}
       </div>
-
-      {/* Lesson info */}
       <div className="flex-1 min-w-0">
         <p className={`text-xs font-semibold leading-snug line-clamp-2
           ${isActive ? 'text-yellow-400' : isCompleted ? 'text-zinc-400' : 'text-zinc-300 group-hover:text-white'}`}>
@@ -208,8 +204,6 @@ function LessonItem({
           </div>
         )}
       </div>
-
-      {/* Active shimmer */}
       {isActive && (
         <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
       )}
@@ -238,15 +232,12 @@ function ModuleAccordion({
     <div className="border-b border-zinc-800/60 last:border-0">
       <button
         onClick={() => setOpen(o => !o)}
-        className={`w-full flex items-center gap-3 px-4 py-4 hover:bg-zinc-800/40 transition-all group`}
+        className="w-full flex items-center gap-3 px-4 py-4 hover:bg-zinc-800/40 transition-all group"
       >
-        {/* Module number */}
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-black transition-colors
           ${allDone ? 'bg-yellow-500 text-black' : isActiveModule ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/40' : 'bg-zinc-800 text-zinc-500'}`}>
           {allDone ? <CheckCircle2 size={14} /> : moduleIndex + 1}
         </div>
-
-        {/* Title + progress */}
         <div className="flex-1 text-left">
           <p className={`text-xs font-bold leading-snug ${isActiveModule ? 'text-white' : 'text-zinc-300 group-hover:text-white'} transition-colors`}>
             {module.title}
@@ -263,12 +254,10 @@ function ModuleAccordion({
             </span>
           </div>
         </div>
-
         {open
           ? <ChevronDown size={14} className="text-zinc-500 shrink-0 transition-transform" />
           : <ChevronRight size={14} className="text-zinc-600 shrink-0 transition-transform" />}
       </button>
-
       {open && (
         <div className="bg-zinc-900/50">
           {module.lessons.map((lesson, idx) => (
@@ -287,11 +276,150 @@ function ModuleAccordion({
   );
 }
 
+// ─── Certificado (Template) ───────────────────────────────────────────────────
+
+function CertificateTemplate({ studentName, courseTitle, completionDate }: {
+  studentName: string;
+  courseTitle: string;
+  completionDate: string;
+}) {
+  return (
+    <div
+      id="certificate-template"
+      className="relative w-full bg-zinc-950 border-[6px] border-double border-yellow-500 rounded-2xl p-10 text-center overflow-hidden"
+      style={{ minHeight: 420 }}
+    >
+      {/* Corner ornaments */}
+      <div className="absolute top-4 left-4 w-10 h-10 border-t-2 border-l-2 border-yellow-500/60 rounded-tl-lg" />
+      <div className="absolute top-4 right-4 w-10 h-10 border-t-2 border-r-2 border-yellow-500/60 rounded-tr-lg" />
+      <div className="absolute bottom-4 left-4 w-10 h-10 border-b-2 border-l-2 border-yellow-500/60 rounded-bl-lg" />
+      <div className="absolute bottom-4 right-4 w-10 h-10 border-b-2 border-r-2 border-yellow-500/60 rounded-br-lg" />
+
+      {/* Background glow */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-yellow-500/5 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative z-10 flex flex-col items-center gap-4">
+        {/* Trophy icon */}
+        <div className="w-16 h-16 rounded-full bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center mb-2">
+          <Trophy size={32} className="text-yellow-500" />
+        </div>
+
+        {/* Title */}
+        <div>
+          <p className="text-yellow-500/70 text-xs font-bold uppercase tracking-[0.3em] mb-1">Tubarão Empréstimos</p>
+          <h1 className="text-3xl md:text-4xl font-black text-yellow-400 tracking-wide uppercase">
+            Certificado de Conclusão
+          </h1>
+        </div>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 w-full max-w-sm">
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent to-yellow-500/50" />
+          <Star size={12} className="text-yellow-500" />
+          <div className="flex-1 h-px bg-gradient-to-l from-transparent to-yellow-500/50" />
+        </div>
+
+        {/* Body */}
+        <div className="space-y-2">
+          <p className="text-zinc-400 text-sm">Certificamos que</p>
+          <p className="text-2xl md:text-3xl font-black text-white">{studentName}</p>
+          <p className="text-zinc-400 text-sm">concluiu com êxito o curso</p>
+          <p className="text-xl font-black text-yellow-400">🦈 {courseTitle}</p>
+          <p className="text-zinc-500 text-xs mt-2">
+            dominando as estratégias completas do sistema de empréstimos de alta performance
+          </p>
+        </div>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 w-full max-w-sm">
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent to-yellow-500/50" />
+          <Medal size={12} className="text-yellow-500" />
+          <div className="flex-1 h-px bg-gradient-to-l from-transparent to-yellow-500/50" />
+        </div>
+
+        {/* Date + seal */}
+        <div className="flex items-center justify-between w-full max-w-md mt-2">
+          <div className="text-center">
+            <p className="text-zinc-600 text-[10px] uppercase tracking-widest">Data de Conclusão</p>
+            <p className="text-zinc-300 text-sm font-bold">{completionDate}</p>
+          </div>
+          <div className="w-16 h-16 rounded-full border-2 border-yellow-500/50 bg-yellow-500/5 flex flex-col items-center justify-center">
+            <Award size={18} className="text-yellow-500 mb-0.5" />
+            <p className="text-[8px] text-yellow-500 font-black uppercase leading-tight text-center">Tubarão<br />Cert.</p>
+          </div>
+          <div className="text-center">
+            <p className="text-zinc-600 text-[10px] uppercase tracking-widest">Certificado por</p>
+            <p className="text-zinc-300 text-sm font-bold">Tubarão Empréstimos</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal de Certificado ─────────────────────────────────────────────────────
+
+function CertificateModal({ studentName, courseTitle, onClose }: {
+  studentName: string;
+  courseTitle: string;
+  onClose: () => void;
+}) {
+  const completionDate = new Date().toLocaleDateString('pt-BR', {
+    day: '2-digit', month: 'long', year: 'numeric'
+  });
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+      <div className="w-full max-w-2xl animate-in zoom-in-95 duration-300">
+        {/* Modal header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Trophy size={20} className="text-yellow-500" />
+            <span className="text-white font-black">Seu Certificado</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-sm font-bold rounded-xl transition-all"
+            >
+              <Printer size={14} />
+              Imprimir / Salvar PDF
+            </button>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Certificate */}
+        <CertificateTemplate
+          studentName={studentName}
+          courseTitle={courseTitle}
+          completionDate={completionDate}
+        />
+
+        <p className="text-center text-zinc-600 text-xs mt-3">
+          Use "Imprimir / Salvar PDF" para baixar seu certificado em PDF
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Sidebar (Desktop) / Drawer (Mobile) ─────────────────────────────────────
 
 function Sidebar({
   playerData, completedIds, activeLesson, onSelectLesson, stats,
-  mobileOpen, onClose,
+  mobileOpen, onClose, onOpenCertificate,
 }: {
   playerData: PlayerData;
   completedIds: Set<string>;
@@ -300,10 +428,12 @@ function Sidebar({
   stats: PlayerData['stats'];
   mobileOpen: boolean;
   onClose: () => void;
+  onOpenCertificate: () => void;
 }) {
+  const isComplete = stats.progressPercent === 100;
+
   return (
     <>
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="xl:hidden fixed inset-0 z-30 bg-black/70 backdrop-blur-sm"
@@ -311,7 +441,6 @@ function Sidebar({
         />
       )}
 
-      {/* Sidebar panel */}
       <aside className={`
         w-80 bg-zinc-900 border-r border-zinc-800 flex flex-col
         fixed inset-y-0 right-0 z-40 xl:static xl:inset-auto xl:z-auto
@@ -371,14 +500,24 @@ function Sidebar({
           ))}
         </div>
 
-        {/* Footer */}
+        {/* Footer — certificado ou prompt */}
         <div className="p-4 border-t border-zinc-800 shrink-0">
-          <div className="flex items-center gap-2 bg-zinc-800/50 rounded-xl p-3">
-            <GraduationCap size={16} className="text-yellow-500 shrink-0" />
-            <p className="text-[10px] text-zinc-400 leading-relaxed">
-              Complete todas as aulas para receber seu <span className="text-yellow-500 font-bold">Certificado Tubarão</span>
-            </p>
-          </div>
+          {isComplete ? (
+            <button
+              onClick={onOpenCertificate}
+              className="w-full flex items-center justify-center gap-2 p-3.5 bg-gradient-to-r from-yellow-600 to-yellow-400 hover:from-yellow-500 hover:to-yellow-300 text-black font-black text-sm rounded-2xl transition-all active:scale-95 shadow-lg shadow-yellow-500/30 animate-pulse"
+            >
+              <Trophy size={18} />
+              🏆 Emitir Certificado Tubarão
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 bg-zinc-800/50 rounded-xl p-3">
+              <GraduationCap size={16} className="text-yellow-500 shrink-0" />
+              <p className="text-[10px] text-zinc-400 leading-relaxed">
+                Complete todas as aulas para receber seu <span className="text-yellow-500 font-bold">Certificado Tubarão</span>
+              </p>
+            </div>
+          )}
         </div>
       </aside>
     </>
@@ -404,7 +543,6 @@ function VideoPlayer({
   const [marking, setMarking] = useState(false);
   const [videoEnded, setVideoEnded] = useState(false);
 
-  // Reinicia ao trocar de aula
   useEffect(() => {
     videoRef.current?.load();
     setVideoEnded(false);
@@ -443,7 +581,6 @@ function VideoPlayer({
                 Seu navegador não suporta vídeo HTML5.
               </video>
 
-              {/* Video ended overlay */}
               {videoEnded && !isCompleted && (
                 <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
                   <CheckCircle2 size={48} className="text-yellow-500" />
@@ -461,7 +598,6 @@ function VideoPlayer({
               )}
             </div>
 
-            {/* Completion badge overlay for completed lessons */}
             {isCompleted && (
               <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-yellow-500 text-black text-xs font-black px-3 py-1.5 rounded-full shadow-lg">
                 <CheckCircle2 size={12} />
@@ -482,7 +618,6 @@ function VideoPlayer({
       {/* Lesson Details */}
       <div className="p-4 md:p-6 max-w-4xl mx-auto">
 
-        {/* Title area */}
         <div className="mb-5">
           <h1 className="text-xl md:text-2xl font-black text-white leading-tight mb-2">
             {lesson.title}
@@ -510,11 +645,10 @@ function VideoPlayer({
                 : 'bg-yellow-500 hover:bg-yellow-400 text-black shadow-yellow-500/30'
               }`}
           >
-            <img src="/logo.png" className="w-5 h-5 mr-2 object-contain" alt="" />
+            <ShieldCheck size={22} className={isCompleted ? 'text-yellow-500' : 'text-black'} />
             {marking ? 'Salvando…' : isCompleted ? 'Aula Concluída ✓' : 'Marcar como Concluída'}
           </button>
 
-          {/* Secondary: Download material */}
           {lesson.materialUrl && (
             <a
               href={lesson.materialUrl}
@@ -527,7 +661,6 @@ function VideoPlayer({
             </a>
           )}
 
-          {/* Next lesson button */}
           {hasNext && isCompleted && onNext && (
             <button
               onClick={onNext}
@@ -573,15 +706,23 @@ export const AcessoCurso: React.FC = () => {
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stats, setStats] = useState({ totalLessons: 0, completedLessons: 0, progressPercent: 0 });
+  const [studentName, setStudentName] = useState('Aluno');
+  const [showCertificate, setShowCertificate] = useState(false);
 
   useEffect(() => {
     (async () => {
+      // Busca nome do usuário
+      try {
+        const { data: me } = await api.get('/auth/me');
+        const name = (me as any)?.user?.name || (me as any)?.name || 'Aluno';
+        setStudentName(name);
+      } catch {}
+
       try {
         const data = await cursoService.getPlayer();
         setPlayerData(data);
         setStats(data.stats);
 
-        // Monta set de aulas concluídas
         const ids = new Set<string>();
         data.course.modules.forEach(m =>
           m.lessons.forEach(l => {
@@ -590,7 +731,6 @@ export const AcessoCurso: React.FC = () => {
         );
         setCompletedIds(ids);
 
-        // Seleciona primeira aula não concluída (ou a primeira de todas)
         const allLessons = data.course.modules.flatMap(m => m.lessons);
         const firstPending = allLessons.find(l => !ids.has(l.id)) ?? allLessons[0];
         if (firstPending) setActiveLesson(firstPending);
@@ -598,7 +738,6 @@ export const AcessoCurso: React.FC = () => {
         setHasAccess(true);
       } catch (err: any) {
         if (err?.response?.status === 403) {
-          // Sem acesso — usa mock data para demo visual (remove em prod)
           setPlayerData(MOCK_DATA);
           setStats(MOCK_DATA.stats);
           const allLessons = MOCK_DATA.course.modules.flatMap(m => m.lessons);
@@ -622,7 +761,6 @@ export const AcessoCurso: React.FC = () => {
       const wasCompleted = next.has(activeLesson.id);
       wasCompleted ? next.delete(activeLesson.id) : next.add(activeLesson.id);
 
-      // Recalcula stats
       const completed = wasCompleted ? stats.completedLessons - 1 : stats.completedLessons + 1;
       const pct = stats.totalLessons > 0 ? Math.round((completed / stats.totalLessons) * 100) : 0;
       setStats(s => ({ ...s, completedLessons: completed, progressPercent: pct }));
@@ -644,6 +782,7 @@ export const AcessoCurso: React.FC = () => {
 
   const currentLessonIndex = allLessons.findIndex(l => l.id === activeLesson?.id);
   const hasNext = currentLessonIndex < allLessons.length - 1;
+  const courseTitle = playerData?.course.title ?? 'Método Tubarão';
 
   if (loading) return <LoadingScreen />;
 
@@ -656,7 +795,6 @@ export const AcessoCurso: React.FC = () => {
 
       {/* Topbar */}
       <header className="sticky top-0 z-30 bg-zinc-950/95 backdrop-blur border-b border-zinc-800 shrink-0">
-        {/* Nav row */}
         <div className="px-4 h-14 flex items-center gap-3">
           <button
             onClick={() => navigate('/client/dashboard')}
@@ -675,7 +813,6 @@ export const AcessoCurso: React.FC = () => {
             </div>
           </div>
 
-          {/* Aula atual / total */}
           <div className="hidden sm:flex items-center gap-1.5 bg-zinc-800 px-3 py-1.5 rounded-xl">
             <Play size={10} className="text-yellow-500 fill-yellow-500" />
             <span className="text-xs font-bold text-white">
@@ -683,7 +820,17 @@ export const AcessoCurso: React.FC = () => {
             </span>
           </div>
 
-          {/* Toggle sidebar (mobile) */}
+          {/* Botão certificado no header (mobile, quando 100%) */}
+          {stats.progressPercent === 100 && (
+            <button
+              onClick={() => setShowCertificate(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-black rounded-xl transition-all animate-pulse"
+            >
+              <Trophy size={14} />
+              <span className="hidden sm:inline">Certificado</span>
+            </button>
+          )}
+
           <button
             onClick={() => setSidebarOpen(o => !o)}
             className="xl:hidden flex items-center gap-1.5 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-all"
@@ -693,7 +840,6 @@ export const AcessoCurso: React.FC = () => {
           </button>
         </div>
 
-        {/* Progress bar strip */}
         <GlobalProgressBar
           pct={stats.progressPercent}
           completed={stats.completedLessons}
@@ -704,7 +850,6 @@ export const AcessoCurso: React.FC = () => {
       {/* Body: Player + Sidebar */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* Player area */}
         <main className="flex-1 overflow-y-auto bg-zinc-950 xl:bg-zinc-900">
           {activeLesson ? (
             <VideoPlayer
@@ -722,7 +867,6 @@ export const AcessoCurso: React.FC = () => {
           )}
         </main>
 
-        {/* Sidebar (desktop: static | mobile: drawer) */}
         {playerData && (
           <Sidebar
             playerData={playerData}
@@ -732,9 +876,19 @@ export const AcessoCurso: React.FC = () => {
             stats={stats}
             mobileOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
+            onOpenCertificate={() => setShowCertificate(true)}
           />
         )}
       </div>
+
+      {/* Modal Certificado */}
+      {showCertificate && (
+        <CertificateModal
+          studentName={studentName}
+          courseTitle={courseTitle}
+          onClose={() => setShowCertificate(false)}
+        />
+      )}
     </div>
   );
 };
