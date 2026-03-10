@@ -20,7 +20,7 @@
  *   PATCH  /api/curso/admin/users/:userId/access → Liga/desliga acesso de um usuário
  */
 
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, RequestHandler } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -158,7 +158,7 @@ router.put(
   authenticate,
   requireAdmin,
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { title, description, order } = req.body as {
       title?: string;
       description?: string;
@@ -187,7 +187,7 @@ router.delete(
   authenticate,
   requireAdmin,
   async (req: Request, res: Response) => {
-    await prisma.module.delete({ where: { id: req.params.id } });
+    await prisma.module.delete({ where: { id: String(req.params.id) } });
     return res.json({ ok: true });
   }
 );
@@ -242,7 +242,7 @@ router.put(
   authenticate,
   requireAdmin,
   async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { title, description, videoUrl, materialUrl, order, duration } = req.body as {
       title?:       string;
       description?: string;
@@ -277,7 +277,7 @@ router.delete(
   authenticate,
   requireAdmin,
   async (req: Request, res: Response) => {
-    await prisma.lesson.delete({ where: { id: req.params.id } });
+    await prisma.lesson.delete({ where: { id: String(req.params.id) } });
     return res.json({ ok: true });
   }
 );
@@ -316,7 +316,7 @@ router.patch(
   authenticate,
   requireAdmin,
   async (req: Request, res: Response) => {
-    const { userId } = req.params;
+    const userId = String(req.params.userId);
     const { hasCourseAccess } = req.body as { hasCourseAccess: boolean };
 
     if (typeof hasCourseAccess !== 'boolean') {
@@ -342,7 +342,7 @@ router.get(
   '/player',
   authenticate,
   async (req: Request, res: Response) => {
-    const userId = (req as any).user?.id as string;
+    const userId = req.user!.id;
 
     // Verifica acesso
     const user = await prisma.user.findUnique({
@@ -405,7 +405,7 @@ router.post(
   authenticate,
   async (req: Request, res: Response) => {
     const userId   = (req as any).user?.id as string;
-    const lessonId = req.params.lessonId;
+    const lessonId = String(req.params.lessonId);
     const { isCompleted = true } = req.body as { isCompleted?: boolean };
 
     // Verifica acesso
@@ -445,7 +445,7 @@ router.get(
   '/progress',
   authenticate,
   async (req: Request, res: Response) => {
-    const userId = (req as any).user?.id as string;
+    const userId = req.user!.id;
 
     const progress = await prisma.userProgress.findMany({
       where: { userId },
