@@ -367,8 +367,10 @@ function UsersTab() {
       const updated = await cursoService.setUserAccess(user.id, !user.hasCourseAccess);
       setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, hasCourseAccess: updated.hasCourseAccess } : u));
       addToast(`Acesso ${updated.hasCourseAccess ? 'liberado' : 'removido'} para ${updated.name}`, 'success');
-    } catch {
-      addToast('Erro ao alterar acesso.', 'error');
+    } catch (err: any) {
+      console.error('[CursoAdmin] Erro ao alterar acesso:', err);
+      console.error('[CursoAdmin] Response:', err?.response?.data);
+      addToast(`Erro ao alterar acesso: ${err?.response?.data?.error || err.message}`, 'error');
     } finally {
       setToggling(null);
     }
