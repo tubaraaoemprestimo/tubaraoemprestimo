@@ -503,7 +503,8 @@ authRouter.get('/me', authenticate, async (req: Request, res: Response) => {
             select: {
                 id: true, name: true, email: true, role: true,
                 phone: true, avatarUrl: true, address: true,
-                city: true, neighborhood: true, createdAt: true
+                city: true, neighborhood: true, createdAt: true,
+                hasCourseAccess: true
             }
         });
 
