@@ -583,6 +583,7 @@ model User {
   createdAt           DateTime             @default(now()) @map("created_at")
   isPartner           Boolean              @default(false) @map("is_partner")
   partnerScore        Float?               @map("partner_score")
+  hasCourseAccess     Boolean              @default(false) @map("has_course_access")
   customers           Customer[]           @relation("CustomerUser")
   loanRequests        LoanRequest[]        @relation("LoanRequestUser")
   partnerCustomers    Customer[]           @relation("CustomerPartner")
@@ -595,8 +596,76 @@ model User {
   securityBlocks      SecurityBlock[]
   trustedDevices      TrustedDevice[]
   webauthnCredentials WebAuthnCredential[]
+  userProgress        UserProgress[]
 
   @@map("users")
+}
+
+// ─── MICRO-LMS ────────────────────────────────────────────────────────────────
+
+model Course {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  coverUrl    String?  @map("cover_url")
+  isPublished Boolean  @default(false) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  modules     Module[]
+
+  @@map("courses")
+}
+
+model Module {
+  id          String   @id @default(uuid())
+  courseId    String   @map("course_id")
+  title       String
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+
+  @@map("modules")
+  @@index([courseId])
+  @@index([order])
+}
+
+model Lesson {
+  id          String         @id @default(uuid())
+  moduleId    String         @map("module_id")
+  title       String
+  description String?
+  videoUrl    String?        @map("video_url")
+  materialUrl String?        @map("material_url")
+  order       Int            @default(0)
+  duration    Int?           // duração em segundos (extraída no frontend após upload)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  module      Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress    UserProgress[]
+
+  @@map("lessons")
+  @@index([moduleId])
+  @@index([order])
+}
+
+model UserProgress {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  lessonId    String   @map("lesson_id")
+  isCompleted Boolean  @default(false) @map("is_completed")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@map("user_progress")
+  @@index([userId])
+  @@index([lessonId])
 }
 
 model WebAuthnCredential {

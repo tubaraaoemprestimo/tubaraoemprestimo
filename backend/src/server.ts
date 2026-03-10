@@ -39,6 +39,7 @@ import scheduledStatusRouter from './routes/scheduledStatus';
 import collectionAutomationRouter from './routes/collectionAutomation';
 import { returningClientsRouter } from './routes/returningClients';
 import { funilRouter } from './routes/funil';
+import { cursoRouter } from './routes/curso';
 import { initCronJobs } from './cron/installmentReminders';
 import { startCollectionCron } from './cron/collectionCron';
 
@@ -112,6 +113,7 @@ app.use('/api/scheduled-status', scheduledStatusRouter);
 app.use('/api/collection-automation', collectionAutomationRouter);
 app.use('/api/returning-clients', returningClientsRouter);
 app.use('/api/funil', funilRouter);
+app.use('/api/curso', cursoRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
