@@ -55,6 +55,10 @@ import { QualificationSuccess } from './pages/public/QualificationSuccess';
 // Funil de Vendas — One Page Funnel (SPA, sem reload entre steps)
 import FunnelManager from './pages/funil/FunnelManager';
 
+// Micro-LMS
+import { AcessoCurso } from './pages/client/AcessoCurso';
+import { CursoAdmin } from './pages/admin/CursoAdmin';
+
 // Components
 import { Chatbot } from './components/Chatbot';
 import { BottomNav } from './components/BottomNav';
@@ -68,7 +72,7 @@ import {
   LayoutDashboard, FileText, Settings as SettingsIcon, LogOut, Users, Bot, Menu, X,
   UserCog, Home as HomeIcon, PieChart, User as UserIcon, Megaphone, BarChart3,
   Calendar, Ban, FileCheck, DollarSign, MessageSquare, Star, ChevronDown, ChevronRight,
-  MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload, Search, Handshake, TrendingUp
+  MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload, Search, Handshake, TrendingUp, BookOpen
 } from 'lucide-react';
 import { Logo } from './components/Logo';
 import { apiService } from './services/apiService';
@@ -285,6 +289,10 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             { to: '/admin/ai-hub?tab=test', label: 'Testar', icon: <Bot size={14} /> },
           ]}
         />
+        {/* Curso */}
+        <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Curso</p>
+        <Link to="/admin/curso" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/curso')}`}><BookOpen size={18} /> Método Tubarão</Link>
+
         <Link to="/admin/settings" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/settings')}`}><SettingsIcon size={18} /> Configurações</Link>
       </nav>
       <div className="p-4 border-t border-zinc-800 shrink-0">
@@ -521,6 +529,7 @@ function App() {
             <Route path="/client/documents" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><MyDocuments /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/referrals" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><ReferralsPage /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/partner" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><PartnerDashboard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/acesso" element={<BiometricAccessGate><PermissionGate><AcessoCurso /></PermissionGate></BiometricAccessGate>} />
 
             {/* Admin Protected - Core */}
             <Route path="/admin" element={<AdminLayout><Dashboard /></AdminLayout>} />
@@ -535,6 +544,7 @@ function App() {
             <Route path="/admin/qualification-leads" element={<AdminLayout><QualificationLeadsAdmin /></AdminLayout>} />
             <Route path="/admin/scheduled-status" element={<AdminLayout><ScheduledStatus /></AdminLayout>} />
             <Route path="/admin/settings" element={<AdminLayout><Settings /></AdminLayout>} />
+            <Route path="/admin/curso" element={<AdminLayout><CursoAdmin /></AdminLayout>} />
 
             {/* Admin Protected - Hubs Unificados */}
             <Route path="/admin/finance-hub" element={<AdminLayout><FinanceHub /></AdminLayout>} />

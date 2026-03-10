@@ -75,6 +75,7 @@ const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     nextDue: '--/--',
     nextInstallmentValue: 0
   });
+  const [hasCourseAccess, setHasCourseAccess] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -151,6 +152,7 @@ const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
       nextInstallmentValue: nextInstVal
     });
 
+    setHasCourseAccess(!!(user as any)?.hasCourseAccess);
     setActiveLoanId(activeLoan);
 
     // Verificar elegibilidade para Nível Ouro
@@ -546,6 +548,23 @@ if (user) {
               <span className="text-[10px] font-semibold text-zinc-300">Histórico</span>
             </button>
           </div>
+        </div>
+
+        {/* Banner Método Tubarão */}
+        <div className="mx-4 mb-2">
+          <button
+            onClick={() => navigate(hasCourseAccess ? '/acesso' : '/funil')}
+            className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-[#1a1500] to-[#2a2000] border border-[#D4AF37]/40 hover:border-[#D4AF37] hover:brightness-110 active:scale-[0.98] transition-all"
+          >
+            <span className="text-2xl shrink-0">🦈</span>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-black text-[#D4AF37] leading-tight">Método Tubarão</p>
+              <p className="text-[10px] text-zinc-400 mt-0.5">
+                {hasCourseAccess ? 'Continuar aprendendo →' : 'Adquira o curso e transforme sua vida →'}
+              </p>
+            </div>
+            <ChevronRight size={16} className="text-[#D4AF37] shrink-0" />
+          </button>
         </div>
 
         {/* Mensagem Fixa do Nível Ouro */}
