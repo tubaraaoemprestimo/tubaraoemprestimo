@@ -171,7 +171,7 @@ const PROVIDER_CONFIG: Record<string, { url: string; model: string }> = {
     openai: { url: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
     openrouter: { url: 'https://openrouter.ai/api/v1', model: 'meta-llama/llama-3.1-70b-instruct' },
     nvidia: { url: 'https://integrate.api.nvidia.com/v1', model: 'meta/llama-3.1-70b-instruct' },
-    perplexity: { url: 'https://api.perplexity.ai', model: 'llama-3.1-sonar-small-128k-online' },
+    perplexity: { url: 'https://api.perplexity.ai', model: 'sonar' },
     grok: { url: 'https://api.x.ai/v1', model: 'grok-2-latest' },
 };
 
