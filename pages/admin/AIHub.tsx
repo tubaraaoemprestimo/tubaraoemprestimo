@@ -185,11 +185,16 @@ export const AIHub: React.FC = () => {
         setTestResponse('');
 
         try {
-            // Usa config local (com chave real) em vez de re-buscar do backend (mascarada)
-            const response = await aiChatbotService.generateResponse(testMessage, [], config as any);
-            setTestResponse(response || 'Sem resposta');
-        } catch (error) {
-            setTestResponse('Erro ao testar: ' + (error as Error).message);
+            // Usa endpoint do backend em vez de chamar API diretamente
+            const response = await api.post('/chatbot/message', {
+                phone: '5500000000000', // Número de teste
+                message: testMessage,
+                customerContext: 'Teste via Central IA'
+            });
+            setTestResponse(response.data.response || 'Sem resposta');
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.error || error.message || 'Erro desconhecido';
+            setTestResponse('Erro ao testar: ' + errorMsg);
         }
         setIsTesting(false);
     };
