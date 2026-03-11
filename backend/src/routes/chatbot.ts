@@ -633,8 +633,21 @@ chatbotRouter.post('/message', authenticate, async (req: Request, res: Response)
             return;
         }
 
-        if (!config.apiKey) {
-            res.status(500).json({ error: 'API Key do chatbot não configurada' });
+        // Resolve API key baseada no provider
+        const provider = config.provider || 'gemini';
+        const apiKey = provider === 'gemini' ? (config.geminiApiKey || config.apiKey) :
+                      provider === 'groq' ? config.groqApiKey :
+                      provider === 'openai' ? config.openaiApiKey :
+                      provider === 'anthropic' ? config.anthropicApiKey :
+                      provider === 'perplexity' ? config.perplexityApiKey :
+                      provider === 'openrouter' ? config.openrouterApiKey :
+                      provider === 'nvidia' ? config.nvidiaApiKey :
+                      provider === 'grok' ? config.grokApiKey :
+                      provider === 'zai' ? config.zaiApiKey :
+                      config.apiKey;
+
+        if (!apiKey) {
+            res.status(500).json({ error: `API Key do provider ${provider} não configurada` });
             return;
         }
 
