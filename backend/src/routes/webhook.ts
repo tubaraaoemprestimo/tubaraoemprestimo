@@ -97,8 +97,41 @@ const PROVIDER_CONFIG: Record<string, { url: string; model: string }> = {
     nvidia: { url: 'https://integrate.api.nvidia.com/v1', model: 'meta/llama-3.1-70b-instruct' },
     perplexity: { url: 'https://api.perplexity.ai', model: 'llama-3.1-sonar-small-128k-online' },
     grok: { url: 'https://api.x.ai/v1', model: 'grok-2-latest' },
-    anthropic: { url: 'https://api.anthropic.com/v1', model: 'claude-3-haiku-20240307' },
 };
+
+/**
+ * Chama a API da Anthropic (formato nativo — NÃO é compatível com OpenAI)
+ */
+async function callAnthropicAPI(
+    apiKey: string,
+    systemPrompt: string,
+    history: { role: string; content: string }[],
+    userMessage: string
+): Promise<string> {
+    const messages: any[] = [];
+    for (const msg of history.slice(-20)) {
+        messages.push({ role: msg.role === 'assistant' ? 'assistant' : 'user', content: msg.content });
+    }
+    messages.push({ role: 'user', content: userMessage });
+
+    const response = await axios.post('https://api.anthropic.com/v1/messages', {
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 1024,
+        system: systemPrompt || undefined,
+        messages
+    }, {
+        headers: {
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json'
+        },
+        timeout: 30000
+    });
+
+    const content = response.data?.content?.[0]?.text;
+    if (!content) throw new Error('Resposta vazia do Anthropic');
+    return content;
+}
 
 /**
  * Resolve a API key correta para o provider selecionado
@@ -408,6 +441,8 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
         try {
             if (provider === 'gemini') {
                 aiResponse = await callGeminiAPI(resolvedApiKey, systemPrompt, conversationHistory, content);
+            } else if (provider === 'anthropic') {
+                aiResponse = await callAnthropicAPI(resolvedApiKey, systemPrompt, conversationHistory, content);
             } else if (PROVIDER_CONFIG[provider]) {
                 const cfg = PROVIDER_CONFIG[provider];
                 aiResponse = await callOpenAICompatibleAPI(resolvedApiKey, cfg.url, cfg.model, systemPrompt, conversationHistory, content);
