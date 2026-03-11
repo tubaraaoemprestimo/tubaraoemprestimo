@@ -646,12 +646,13 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
             return callGeminiAPI(key, systemPrompt, conversationHistory, fullMessage);
         };
 
-        // Ordem de fallback: provider principal → Perplexity → Groq → Anthropic
+        // Ordem de fallback: provider principal → Perplexity → Groq → Gemini → Anthropic
         const fallbackChain: { name: string; key: string }[] = [
             { name: provider, key: resolvedApiKey },
         ];
         if (provider !== 'perplexity' && chatConfig.perplexityApiKey) fallbackChain.push({ name: 'perplexity', key: chatConfig.perplexityApiKey });
         if (provider !== 'groq' && chatConfig.groqApiKey) fallbackChain.push({ name: 'groq', key: chatConfig.groqApiKey });
+        if (provider !== 'gemini' && chatConfig.geminiApiKey) fallbackChain.push({ name: 'gemini', key: chatConfig.geminiApiKey });
         if (provider !== 'anthropic' && chatConfig.anthropicApiKey) fallbackChain.push({ name: 'anthropic', key: chatConfig.anthropicApiKey });
 
         let usedProvider = provider;
