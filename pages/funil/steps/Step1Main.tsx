@@ -3,10 +3,11 @@ import { ShieldCheck, TrendingUp, Users, Banknote, Clock, Star, CheckCircle2, Za
 import { FunnelVideo } from '../FunnelVideo';
 import { track, trackPurchase } from '../funnelTracker';
 
-// ── URLs reais ────────────────────────────────────────────────────────────────
+// ── URLs e configurações ──────────────────────────────────────────────────────
 const VIDEO_URL    = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/01-pre-lancamento.mp4';
-const CHECKOUT_URL = 'https://link.infinitepay.io/tubaraoemprestimo/VC1DLUEtSQ-MsCyVA2ER-497,00';
 const WHATSAPP_NUMBER = '+55 11 98757-7050';
+const STRIPE_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || 'price_1234567890'; // Configurar no .env
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // Data de término do pré-lançamento (5 dias a partir de agora)
 const COUNTDOWN_END = new Date('2026-03-09T23:59:59').getTime();
@@ -42,6 +43,10 @@ interface Step1Props { sessionId: string; onDecline: () => void }
 
 export function Step1Main({ sessionId, onDecline }: Step1Props) {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [isLoading, setIsLoading] = useState(false);
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [showEmailForm, setShowEmailForm] = useState(false);
 
   useEffect(() => {
     track({ sessionId, step: 1, eventType: 'STEP_VIEW' });
@@ -71,9 +76,40 @@ export function Step1Main({ sessionId, onDecline }: Step1Props) {
     return () => clearInterval(interval);
   }, []);
 
-  const handleBuy = () => {
+  const handleBuy = async () => {
+    // Se ainda não temos email, mostra o formulário
+    if (!customerEmail) {
+      setShowEmailForm(true);
+      return;
+    }
+
+    setIsLoading(true);
     trackPurchase({ sessionId, step: 1, productName: 'Método Tubarão', amount: 497 });
-    window.open(`${CHECKOUT_URL}?sid=${sessionId}`, '_blank');
+
+    try {
+      const response = await fetch(`${API_URL}/api/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          priceId: STRIPE_PRICE_ID,
+          customerEmail,
+          customerName: customerName || 'Cliente',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao criar sessão de pagamento');
+      }
+
+      const { url } = await response.json();
+
+      // Redireciona para o Stripe Checkout
+      window.location.href = url;
+    } catch (error) {
+      console.error('Erro ao processar checkout:', error);
+      alert('Erro ao processar pagamento. Tente novamente ou entre em contato pelo WhatsApp.');
+      setIsLoading(false);
+    }
   };
 
   const handleDecline = () => {
@@ -148,16 +184,53 @@ export function Step1Main({ sessionId, onDecline }: Step1Props) {
 
       {/* CTA Principal */}
       <div className="flex flex-col items-center gap-4 w-full max-w-xl">
-        <button
-          onClick={handleBuy}
-          className="w-full py-6 px-8 bg-gradient-to-r from-[#D4AF37] via-[#FFD700] to-[#D4AF37] text-black font-black text-2xl rounded-2xl
-                     hover:brightness-110 active:scale-[0.98] transition-all shadow-2xl shadow-[#D4AF37]/40 animate-pulse"
-        >
-          🚀 QUERO O MÉTODO TUBARÃO POR R$ 497
-        </button>
-        <p className="text-zinc-500 text-sm text-center">
-          🔒 Pagamento 100% seguro · Acesso imediato · Garantia incondicional de 7 dias
-        </p>
+        {showEmailForm ? (
+          <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
+            <h3 className="text-xl font-bold text-center mb-4">📧 Últimos Dados para Finalizar</h3>
+            <input
+              type="text"
+              placeholder="Seu nome completo"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:border-[#D4AF37] focus:outline-none"
+            />
+            <input
+              type="email"
+              placeholder="Seu melhor e-mail"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:border-[#D4AF37] focus:outline-none"
+            />
+            <button
+              onClick={handleBuy}
+              disabled={isLoading || !customerEmail}
+              className="w-full py-4 px-8 bg-gradient-to-r from-[#D4AF37] via-[#FFD700] to-[#D4AF37] text-black font-black text-xl rounded-xl
+                         hover:brightness-110 active:scale-[0.98] transition-all shadow-2xl shadow-[#D4AF37]/40 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? '⏳ Processando...' : '🚀 FINALIZAR COMPRA'}
+            </button>
+            <button
+              onClick={() => setShowEmailForm(false)}
+              className="w-full text-zinc-500 text-sm underline"
+            >
+              Voltar
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              onClick={handleBuy}
+              disabled={isLoading}
+              className="w-full py-6 px-8 bg-gradient-to-r from-[#D4AF37] via-[#FFD700] to-[#D4AF37] text-black font-black text-2xl rounded-2xl
+                         hover:brightness-110 active:scale-[0.98] transition-all shadow-2xl shadow-[#D4AF37]/40 animate-pulse disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? '⏳ Processando...' : '🚀 QUERO O MÉTODO TUBARÃO POR R$ 497'}
+            </button>
+            <p className="text-zinc-500 text-sm text-center">
+              🔒 Pagamento 100% seguro · Acesso imediato · Garantia incondicional de 7 dias
+            </p>
+          </>
+        )}
       </div>
 
       {/* Benefícios */}
@@ -220,22 +293,59 @@ export function Step1Main({ sessionId, onDecline }: Step1Props) {
 
       {/* CTA Final */}
       <div className="flex flex-col items-center gap-4 w-full max-w-xl">
-        <button
-          onClick={handleBuy}
-          className="w-full py-6 px-8 bg-gradient-to-r from-[#D4AF37] via-[#FFD700] to-[#D4AF37] text-black font-black text-2xl rounded-2xl
-                     hover:brightness-110 active:scale-[0.98] transition-all shadow-2xl shadow-[#D4AF37]/40"
-        >
-          🚀 SIM! QUERO TRANSFORMAR MINHA VIDA
-        </button>
-        <p className="text-zinc-500 text-sm text-center">
-          🔒 Pagamento seguro · Acesso imediato · Garantia de 7 dias
-        </p>
-        <button
-          onClick={handleDecline}
-          className="text-zinc-600 text-sm underline underline-offset-4 hover:text-zinc-400 transition-colors mt-4"
-        >
-          Não, obrigado. Continuar sem comprar.
-        </button>
+        {showEmailForm ? (
+          <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
+            <h3 className="text-xl font-bold text-center mb-4">📧 Últimos Dados para Finalizar</h3>
+            <input
+              type="text"
+              placeholder="Seu nome completo"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:border-[#D4AF37] focus:outline-none"
+            />
+            <input
+              type="email"
+              placeholder="Seu melhor e-mail"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:border-[#D4AF37] focus:outline-none"
+            />
+            <button
+              onClick={handleBuy}
+              disabled={isLoading || !customerEmail}
+              className="w-full py-4 px-8 bg-gradient-to-r from-[#D4AF37] via-[#FFD700] to-[#D4AF37] text-black font-black text-xl rounded-xl
+                         hover:brightness-110 active:scale-[0.98] transition-all shadow-2xl shadow-[#D4AF37]/40 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? '⏳ Processando...' : '🚀 FINALIZAR COMPRA'}
+            </button>
+            <button
+              onClick={() => setShowEmailForm(false)}
+              className="w-full text-zinc-500 text-sm underline"
+            >
+              Voltar
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              onClick={handleBuy}
+              disabled={isLoading}
+              className="w-full py-6 px-8 bg-gradient-to-r from-[#D4AF37] via-[#FFD700] to-[#D4AF37] text-black font-black text-2xl rounded-2xl
+                         hover:brightness-110 active:scale-[0.98] transition-all shadow-2xl shadow-[#D4AF37]/40 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? '⏳ Processando...' : '🚀 SIM! QUERO TRANSFORMAR MINHA VIDA'}
+            </button>
+            <p className="text-zinc-500 text-sm text-center">
+              🔒 Pagamento seguro · Acesso imediato · Garantia de 7 dias
+            </p>
+            <button
+              onClick={handleDecline}
+              className="text-zinc-600 text-sm underline underline-offset-4 hover:text-zinc-400 transition-colors mt-4"
+            >
+              Não, obrigado. Continuar sem comprar.
+            </button>
+          </>
+        )}
       </div>
 
       {/* Garantia */}
