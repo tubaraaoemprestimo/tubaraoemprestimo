@@ -272,8 +272,15 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
 
         // 3. Busca config do chatbot IA
         const chatConfig = await prisma.aiChatbotConfig.findFirst();
-        if (!chatConfig || !chatConfig.enabled || !chatConfig.apiKey) {
-            console.log('[Webhook] Chatbot IA desabilitado ou sem API key');
+        if (!chatConfig || !chatConfig.enabled) {
+            console.log('[Webhook] Chatbot IA desabilitado');
+            return;
+        }
+
+        // Verifica se tem API key para o provider selecionado
+        const resolvedApiKey = getProviderApiKey(chatConfig);
+        if (!resolvedApiKey) {
+            console.log(`[Webhook] API key vazia para provider ${chatConfig.provider || 'gemini'}`);
             return;
         }
 
@@ -433,15 +440,8 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
 
         // 9. Chama a IA (com provider correto e key correta)
         let aiResponse: string;
-        const resolvedApiKey = getProviderApiKey(chatConfig);
         const provider = chatConfig.provider || 'gemini';
         console.log(`[Webhook] Chamando IA: provider=${provider}, keyLen=${resolvedApiKey?.length || 0}`);
-
-        if (!resolvedApiKey) {
-            console.error(`[Webhook] API key vazia para provider ${provider}`);
-            await prisma.aiChatHistory.create({ data: { phone, role: 'user', content } });
-            return;
-        }
 
         try {
             if (provider === 'gemini') {
