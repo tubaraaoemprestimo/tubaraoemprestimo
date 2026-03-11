@@ -3,6 +3,9 @@ import { prisma } from '../services/prisma';
 import axios from 'axios';
 import { sendWhatsAppMessage } from '../services/whatsapp';
 import { sendPushToRole } from './push';
+import FormData from 'form-data';
+import fs from 'fs';
+import path from 'path';
 
 export const webhookRouter = Router();
 
@@ -153,6 +156,137 @@ function getProviderApiKey(config: any): string {
 }
 
 /**
+ * Baixa mídia da Evolution API
+ */
+async function downloadMedia(
+    waConfig: { apiUrl: string; apiKey: string; instanceName: string },
+    messageId: string
+): Promise<{ buffer: Buffer; mimetype: string; filename: string } | null> {
+    try {
+        const url = `${waConfig.apiUrl}/message/downloadMedia/${waConfig.instanceName}`;
+        const response = await axios.post(url, {
+            messageId
+        }, {
+            headers: { apikey: waConfig.apiKey },
+            responseType: 'arraybuffer',
+            timeout: 30000
+        });
+
+        const buffer = Buffer.from(response.data);
+        const mimetype = response.headers['content-type'] || 'application/octet-stream';
+        const filename = `media_${Date.now()}`;
+
+        return { buffer, mimetype, filename };
+    } catch (error: any) {
+        console.error('[Media] Erro ao baixar mídia:', error.message);
+        return null;
+    }
+}
+
+/**
+ * Transcreve áudio usando Groq Whisper
+ */
+async function transcribeAudio(audioBuffer: Buffer, filename: string, groqApiKey: string): Promise<string | null> {
+    try {
+        // Salva temporariamente
+        const tempPath = path.join('/tmp', `${filename}.ogg`);
+        fs.writeFileSync(tempPath, audioBuffer);
+
+        // Envia para Groq Whisper
+        const formData = new FormData();
+        formData.append('file', fs.createReadStream(tempPath));
+        formData.append('model', 'whisper-large-v3');
+        formData.append('language', 'pt');
+
+        const response = await axios.post('https://api.groq.com/openai/v1/audio/transcriptions', formData, {
+            headers: {
+                'Authorization': `Bearer ${groqApiKey}`,
+                ...formData.getHeaders()
+            },
+            timeout: 60000
+        });
+
+        // Remove arquivo temporário
+        fs.unlinkSync(tempPath);
+
+        return response.data?.text || null;
+    } catch (error: any) {
+        console.error('[Whisper] Erro ao transcrever áudio:', error.message);
+        return null;
+    }
+}
+
+/**
+ * Processa imagem com Claude Vision
+ */
+async function processImageWithClaude(
+    imageBuffer: Buffer,
+    mimetype: string,
+    anthropicApiKey: string,
+    userQuestion: string
+): Promise<string> {
+    try {
+        const base64Image = imageBuffer.toString('base64');
+        const mediaType = mimetype.includes('png') ? 'image/png' :
+                         mimetype.includes('jpeg') || mimetype.includes('jpg') ? 'image/jpeg' :
+                         mimetype.includes('webp') ? 'image/webp' : 'image/jpeg';
+
+        const response = await axios.post('https://api.anthropic.com/v1/messages', {
+            model: 'claude-sonnet-4-6-20250929',
+            max_tokens: 1024,
+            messages: [{
+                role: 'user',
+                content: [
+                    {
+                        type: 'image',
+                        source: {
+                            type: 'base64',
+                            media_type: mediaType,
+                            data: base64Image
+                        }
+                    },
+                    {
+                        type: 'text',
+                        text: userQuestion || 'Descreva esta imagem em detalhes.'
+                    }
+                ]
+            }]
+        }, {
+            headers: {
+                'x-api-key': anthropicApiKey,
+                'anthropic-version': '2023-06-01',
+                'Content-Type': 'application/json'
+            },
+            timeout: 30000
+        });
+
+        return response.data?.content?.[0]?.text || 'Não foi possível processar a imagem.';
+    } catch (error: any) {
+        console.error('[Claude Vision] Erro:', error.message);
+        return 'Erro ao processar imagem.';
+    }
+}
+
+/**
+ * Extrai texto de documento/PDF
+ */
+async function extractTextFromDocument(buffer: Buffer, mimetype: string): Promise<string | null> {
+    try {
+        if (mimetype.includes('pdf')) {
+            const pdfParse = require('pdf-parse');
+            const data = await pdfParse(buffer);
+            return data.text;
+        } else if (mimetype.includes('text')) {
+            return buffer.toString('utf-8');
+        }
+        return null;
+    } catch (error: any) {
+        console.error('[Document] Erro ao extrair texto:', error.message);
+        return null;
+    }
+}
+
+/**
  * Envia mensagem pelo WhatsApp via Evolution API
  */
 async function sendWhatsAppReply(
@@ -204,16 +338,24 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
 
         // Extrai texto da mensagem
         const msg = messageData.message || messageData;
-        const content = msg?.conversation
+        let content = msg?.conversation
             || msg?.extendedTextMessage?.text
             || msg?.imageMessage?.caption
-            || msg?.videoMessage?.caption;
+            || msg?.videoMessage?.caption
+            || '';
 
-        if (!content) return;
+        // Detecta tipo de mídia
+        const hasAudio = msg?.audioMessage || msg?.pttMessage;
+        const hasImage = msg?.imageMessage;
+        const hasDocument = msg?.documentMessage;
+        const messageId = key.id;
+
+        // Se não tem texto nem mídia, ignora
+        if (!content && !hasAudio && !hasImage && !hasDocument) return;
 
         // Normaliza telefone
         const phone = remoteJid.replace('@s.whatsapp.net', '');
-        console.log(`[Webhook] 📩 Mensagem de ${phone}: ${content.substring(0, 80)}`);
+        console.log(`[Webhook] 📩 Mensagem de ${phone}: ${content.substring(0, 80) || '[MÍDIA]'}`);
 
         // 1. Busca config do WhatsApp
         const waConfig = await prisma.whatsappConfig.findFirst();
@@ -336,6 +478,53 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
             return;
         }
 
+        // 6.5. Processa mídia (áudio, imagem, documento)
+        let mediaContext = '';
+
+        if (hasAudio || hasImage || hasDocument) {
+            console.log(`[Webhook] 📎 Processando mídia: audio=${!!hasAudio}, image=${!!hasImage}, doc=${!!hasDocument}`);
+
+            const media = await downloadMedia(waConfig, messageId);
+            if (media) {
+                // Processa áudio com Whisper
+                if (hasAudio) {
+                    const groqKey = chatConfig.groqApiKey || chatConfig.apiKey;
+                    if (groqKey) {
+                        const transcription = await transcribeAudio(media.buffer, media.filename, groqKey);
+                        if (transcription) {
+                            mediaContext += `\n\n[ÁUDIO TRANSCRITO]: ${transcription}`;
+                            content = content || transcription; // Se não tinha texto, usa a transcrição
+                            console.log(`[Webhook] 🎤 Áudio transcrito: ${transcription.substring(0, 100)}...`);
+                        }
+                    }
+                }
+
+                // Processa imagem com Claude Vision
+                if (hasImage) {
+                    const anthropicKey = chatConfig.anthropicApiKey;
+                    if (anthropicKey) {
+                        const imageAnalysis = await processImageWithClaude(
+                            media.buffer,
+                            media.mimetype,
+                            anthropicKey,
+                            content || 'O que você vê nesta imagem?'
+                        );
+                        mediaContext += `\n\n[IMAGEM ANALISADA]: ${imageAnalysis}`;
+                        console.log(`[Webhook] 🖼️ Imagem processada: ${imageAnalysis.substring(0, 100)}...`);
+                    }
+                }
+
+                // Processa documento/PDF
+                if (hasDocument) {
+                    const docText = await extractTextFromDocument(media.buffer, media.mimetype);
+                    if (docText) {
+                        mediaContext += `\n\n[DOCUMENTO]: ${docText.substring(0, 2000)}`; // Limita a 2000 chars
+                        console.log(`[Webhook] 📄 Documento extraído: ${docText.substring(0, 100)}...`);
+                    }
+                }
+            }
+        }
+
         // 7. Busca histórico recente
         const recentHistory = await prisma.aiChatHistory.findMany({
             where: { phone, role: { in: ['user', 'assistant'] } },
@@ -436,34 +625,37 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
         }
 
         // Monta o prompt final: ADMIN PROMPT PRIMEIRO (prioridade máxima) + contexto depois
-        const systemPrompt = `${adminPrompt}\n\n${contextData}`;
+        const systemPrompt = `${adminPrompt}\n\n${contextData}${mediaContext}`;
 
         // 9. Chama a IA (com provider correto e key correta)
         let aiResponse: string;
         const provider = chatConfig.provider || 'gemini';
         console.log(`[Webhook] Chamando IA: provider=${provider}, keyLen=${resolvedApiKey?.length || 0}`);
 
+        // Monta mensagem completa com contexto de mídia
+        const fullMessage = content + mediaContext;
+
         try {
             if (provider === 'gemini') {
-                aiResponse = await callGeminiAPI(resolvedApiKey, systemPrompt, conversationHistory, content);
+                aiResponse = await callGeminiAPI(resolvedApiKey, systemPrompt, conversationHistory, fullMessage);
             } else if (provider === 'anthropic') {
-                aiResponse = await callAnthropicAPI(resolvedApiKey, systemPrompt, conversationHistory, content);
+                aiResponse = await callAnthropicAPI(resolvedApiKey, systemPrompt, conversationHistory, fullMessage);
             } else if (PROVIDER_CONFIG[provider]) {
                 const cfg = PROVIDER_CONFIG[provider];
-                aiResponse = await callOpenAICompatibleAPI(resolvedApiKey, cfg.url, cfg.model, systemPrompt, conversationHistory, content);
+                aiResponse = await callOpenAICompatibleAPI(resolvedApiKey, cfg.url, cfg.model, systemPrompt, conversationHistory, fullMessage);
             } else {
                 // Fallback: tenta como Gemini
-                aiResponse = await callGeminiAPI(resolvedApiKey, systemPrompt, conversationHistory, content);
+                aiResponse = await callGeminiAPI(resolvedApiKey, systemPrompt, conversationHistory, fullMessage);
             }
         } catch (aiError: any) {
             console.error(`[Webhook] Erro na IA (${provider}):`, aiError?.response?.data || aiError.message);
-            await prisma.aiChatHistory.create({ data: { phone, role: 'user', content } });
+            await prisma.aiChatHistory.create({ data: { phone, role: 'user', content: fullMessage } });
             await prisma.aiChatHistory.create({ data: { phone, role: 'system', content: 'ERROR', metadata: { error: aiError.message, provider } } });
             return;
         }
 
         // 10. Salva histórico
-        await prisma.aiChatHistory.create({ data: { phone, role: 'user', content } });
+        await prisma.aiChatHistory.create({ data: { phone, role: 'user', content: fullMessage } });
         await prisma.aiChatHistory.create({ data: { phone, role: 'assistant', content: aiResponse, metadata: { provider: chatConfig.provider, autoReply: true } } });
 
         // 11. Envia resposta pelo WhatsApp
