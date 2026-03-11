@@ -818,7 +818,8 @@ INFORMAÇÕES SOBRE O SISTEMA DE INDICAÇÃO:
             }
         } catch { /* ignora erro do log */ }
 
-        res.status(500).json({ error: 'Erro ao processar mensagem com IA' });
+        const errorDetail = error.response?.data?.error?.message || error.message || 'Erro desconhecido';
+        res.status(500).json({ error: `Erro IA: ${errorDetail}`, response: null });
     }
 });
 

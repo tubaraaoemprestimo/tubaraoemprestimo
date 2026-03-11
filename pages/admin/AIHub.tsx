@@ -191,10 +191,10 @@ export const AIHub: React.FC = () => {
                 message: testMessage,
                 customerContext: 'Teste via Central IA'
             });
-            setTestResponse(response.data.response || 'Sem resposta');
+            setTestResponse(response?.data?.response || response?.data?.error || 'Sem resposta');
         } catch (error: any) {
-            const errorMsg = error.response?.data?.error || error.message || 'Erro desconhecido';
-            setTestResponse('Erro ao testar: ' + errorMsg);
+            const errorMsg = error?.response?.data?.error || error?.message || 'Erro ao conectar com o servidor';
+            setTestResponse('Erro: ' + errorMsg);
         }
         setIsTesting(false);
     };
