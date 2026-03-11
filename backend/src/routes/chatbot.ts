@@ -753,37 +753,59 @@ INFORMAÇÕES SOBRE O SISTEMA DE INDICAÇÃO:
         // Monta o prompt final: ADMIN PROMPT PRIMEIRO (prioridade máxima) + contexto depois
         const systemPrompt = `${adminPrompt}\n\n${contextData}`;
 
-        // 7. Chama a IA (Gemini, Perplexity, OpenAI, OpenRouter, Nvidia, Z.AI)
+        // 7. Chama a IA com fallback automático: provider principal → Perplexity → Groq → Anthropic
         let aiResponse: string;
 
-        switch (config.provider) {
-            case 'perplexity':
-                aiResponse = await callPerplexityAPI(config.apiKey, systemPrompt, conversationHistory, message);
+        const callProviderByName = async (p: string, key: string): Promise<string> => {
+            switch (p) {
+                case 'perplexity': return callPerplexityAPI(key, systemPrompt, conversationHistory, message);
+                case 'openai': return callOpenAIAPI(key, systemPrompt, conversationHistory, message);
+                case 'openrouter': return callOpenRouterAPI(key, systemPrompt, conversationHistory, message);
+                case 'nvidia': return callNvidiaAPI(key, systemPrompt, conversationHistory, message);
+                case 'zai': return callZaiAPI(key, systemPrompt, conversationHistory, message);
+                case 'anthropic': return callAnthropicAPI(key, systemPrompt, conversationHistory, message);
+                case 'groq': return callGroqAPI(key, systemPrompt, conversationHistory, message);
+                case 'grok': return callGrokAPI(key, systemPrompt, conversationHistory, message);
+                default: return callGeminiAPI(key, systemPrompt, conversationHistory, message);
+            }
+        };
+
+        const getKeyForProvider = (p: string): string => {
+            const keyMap: Record<string, string> = {
+                gemini: config.geminiApiKey || config.apiKey,
+                groq: config.groqApiKey,
+                openai: config.openaiApiKey,
+                openrouter: config.openrouterApiKey,
+                nvidia: config.nvidiaApiKey,
+                perplexity: config.perplexityApiKey,
+                grok: config.grokApiKey,
+                anthropic: config.anthropicApiKey,
+                zai: config.zaiApiKey,
+            };
+            return keyMap[p] || config.apiKey || '';
+        };
+
+        const mainProvider = config.provider || 'gemini';
+        const fallbackChain: string[] = [mainProvider];
+        if (mainProvider !== 'perplexity' && config.perplexityApiKey) fallbackChain.push('perplexity');
+        if (mainProvider !== 'groq' && config.groqApiKey) fallbackChain.push('groq');
+        if (mainProvider !== 'anthropic' && config.anthropicApiKey) fallbackChain.push('anthropic');
+
+        let usedProvider = mainProvider;
+        let lastError: any = null;
+        for (const fb of fallbackChain) {
+            try {
+                aiResponse = await callProviderByName(fb, getKeyForProvider(fb));
+                usedProvider = fb;
+                if (fb !== mainProvider) console.log(`[Chatbot] ⚠️ Fallback: ${mainProvider} falhou, usando ${fb}`);
+                lastError = null;
                 break;
-            case 'openai':
-                aiResponse = await callOpenAIAPI(config.openaiApiKey || config.apiKey, systemPrompt, conversationHistory, message);
-                break;
-            case 'openrouter':
-                aiResponse = await callOpenRouterAPI(config.openrouterApiKey || config.apiKey, systemPrompt, conversationHistory, message);
-                break;
-            case 'nvidia':
-                aiResponse = await callNvidiaAPI(config.nvidiaApiKey || config.apiKey, systemPrompt, conversationHistory, message);
-                break;
-            case 'zai':
-                aiResponse = await callZaiAPI(config.zaiApiKey || config.apiKey, systemPrompt, conversationHistory, message);
-                break;
-            case 'anthropic':
-                aiResponse = await callAnthropicAPI(config.anthropicApiKey || config.apiKey, systemPrompt, conversationHistory, message);
-                break;
-            case 'groq':
-                aiResponse = await callGroqAPI(config.groqApiKey || config.apiKey, systemPrompt, conversationHistory, message);
-                break;
-            case 'grok':
-                aiResponse = await callGrokAPI(config.grokApiKey || config.apiKey, systemPrompt, conversationHistory, message);
-                break;
-            default:
-                aiResponse = await callGeminiAPI(config.geminiApiKey || config.apiKey, systemPrompt, conversationHistory, message);
+            } catch (err: any) {
+                console.error(`[Chatbot] ❌ Provider ${fb} falhou:`, err?.response?.data?.error?.message || err.message);
+                lastError = err;
+            }
         }
+        if (lastError) throw lastError;
 
         // 8. Salva mensagem do usuário e resposta da IA
         await prisma.aiChatHistory.create({
@@ -794,12 +816,12 @@ INFORMAÇÕES SOBRE O SISTEMA DE INDICAÇÃO:
             data: {
                 phone,
                 role: 'assistant',
-                content: aiResponse,
-                metadata: { provider: config.provider, autoReply: true }
+                content: aiResponse!,
+                metadata: { provider: usedProvider, autoReply: true }
             }
         });
 
-        res.json({ response: aiResponse, status: 'OK', provider: config.provider });
+        res.json({ response: aiResponse!, status: 'OK', provider: usedProvider });
     } catch (error: any) {
         console.error('[Chatbot] Erro ao processar mensagem:', error);
 

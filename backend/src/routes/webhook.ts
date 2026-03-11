@@ -627,7 +627,7 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
         // Monta o prompt final: ADMIN PROMPT PRIMEIRO (prioridade máxima) + contexto depois
         const systemPrompt = `${adminPrompt}\n\n${contextData}${mediaContext}`;
 
-        // 9. Chama a IA (com provider correto e key correta)
+        // 9. Chama a IA com fallback automático: Claude → Perplexity → Groq
         let aiResponse: string;
         const provider = chatConfig.provider || 'gemini';
         console.log(`[Webhook] Chamando IA: provider=${provider}, keyLen=${resolvedApiKey?.length || 0}`);
@@ -635,20 +635,43 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
         // Monta mensagem completa com contexto de mídia
         const fullMessage = content + mediaContext;
 
-        try {
-            if (provider === 'gemini') {
-                aiResponse = await callGeminiAPI(resolvedApiKey, systemPrompt, conversationHistory, fullMessage);
-            } else if (provider === 'anthropic') {
-                aiResponse = await callAnthropicAPI(resolvedApiKey, systemPrompt, conversationHistory, fullMessage);
-            } else if (PROVIDER_CONFIG[provider]) {
-                const cfg = PROVIDER_CONFIG[provider];
-                aiResponse = await callOpenAICompatibleAPI(resolvedApiKey, cfg.url, cfg.model, systemPrompt, conversationHistory, fullMessage);
-            } else {
-                // Fallback: tenta como Gemini
-                aiResponse = await callGeminiAPI(resolvedApiKey, systemPrompt, conversationHistory, fullMessage);
+        // Função auxiliar para chamar provider específico
+        const callProvider = async (p: string, key: string): Promise<string> => {
+            if (p === 'gemini') return callGeminiAPI(key, systemPrompt, conversationHistory, fullMessage);
+            if (p === 'anthropic') return callAnthropicAPI(key, systemPrompt, conversationHistory, fullMessage);
+            if (PROVIDER_CONFIG[p]) {
+                const cfg = PROVIDER_CONFIG[p];
+                return callOpenAICompatibleAPI(key, cfg.url, cfg.model, systemPrompt, conversationHistory, fullMessage);
             }
+            return callGeminiAPI(key, systemPrompt, conversationHistory, fullMessage);
+        };
+
+        // Ordem de fallback: provider principal → Perplexity → Groq → Anthropic
+        const fallbackChain: { name: string; key: string }[] = [
+            { name: provider, key: resolvedApiKey },
+        ];
+        if (provider !== 'perplexity' && chatConfig.perplexityApiKey) fallbackChain.push({ name: 'perplexity', key: chatConfig.perplexityApiKey });
+        if (provider !== 'groq' && chatConfig.groqApiKey) fallbackChain.push({ name: 'groq', key: chatConfig.groqApiKey });
+        if (provider !== 'anthropic' && chatConfig.anthropicApiKey) fallbackChain.push({ name: 'anthropic', key: chatConfig.anthropicApiKey });
+
+        let usedProvider = provider;
+        try {
+            let lastError: any = null;
+            for (const fb of fallbackChain) {
+                try {
+                    aiResponse = await callProvider(fb.name, fb.key);
+                    usedProvider = fb.name;
+                    if (fb.name !== provider) console.log(`[Webhook] ⚠️ Fallback: ${provider} falhou, usando ${fb.name}`);
+                    lastError = null;
+                    break;
+                } catch (err: any) {
+                    console.error(`[Webhook] ❌ Provider ${fb.name} falhou:`, err?.response?.data?.error?.message || err.message);
+                    lastError = err;
+                }
+            }
+            if (lastError) throw lastError;
         } catch (aiError: any) {
-            console.error(`[Webhook] Erro na IA (${provider}):`, aiError?.response?.data || aiError.message);
+            console.error(`[Webhook] Erro na IA (todos providers falharam):`, aiError?.response?.data || aiError.message);
             await prisma.aiChatHistory.create({ data: { phone, role: 'user', content: fullMessage } });
             await prisma.aiChatHistory.create({ data: { phone, role: 'system', content: 'ERROR', metadata: { error: aiError.message, provider } } });
             return;
@@ -656,11 +679,11 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
 
         // 10. Salva histórico
         await prisma.aiChatHistory.create({ data: { phone, role: 'user', content: fullMessage } });
-        await prisma.aiChatHistory.create({ data: { phone, role: 'assistant', content: aiResponse, metadata: { provider: chatConfig.provider, autoReply: true } } });
+        await prisma.aiChatHistory.create({ data: { phone, role: 'assistant', content: aiResponse, metadata: { provider: usedProvider, autoReply: true } } });
 
         // 11. Envia resposta pelo WhatsApp
         const sent = await sendWhatsAppReply(waConfig, phone, aiResponse);
-        console.log(`[Webhook] ${sent ? '✅' : '❌'} Resposta IA enviada para ${phone} (${chatConfig.provider})`);
+        console.log(`[Webhook] ${sent ? '✅' : '❌'} Resposta IA enviada para ${phone} (${usedProvider})`);
 
     } catch (error: any) {
         console.error('[Webhook] Erro ao processar mensagem:', error.message);
