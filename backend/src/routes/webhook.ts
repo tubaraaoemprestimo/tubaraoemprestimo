@@ -405,9 +405,15 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
         // Ignora mensagens enviadas por nós
         if (key.fromMe) return;
 
-        // Ignora grupos
+        // Ignora grupos (nunca responder em grupos)
         const remoteJid = key.remoteJid || '';
-        if (remoteJid.includes('@g.us')) return;
+        if (remoteJid.includes('@g.us')) {
+            console.log('[Webhook] 🚫 Mensagem de grupo ignorada:', remoteJid);
+            return;
+        }
+
+        // Ignora mensagens de broadcast/newsletter
+        if (remoteJid.includes('@broadcast') || remoteJid.includes('@newsletter')) return;
 
         // Extrai texto da mensagem
         const msg = messageData.message || messageData;
@@ -416,6 +422,38 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
             || msg?.imageMessage?.caption
             || msg?.videoMessage?.caption
             || '';
+
+        // Detecta e ignora mensagens de outros bots/IAs para evitar loop
+        const botIndicators = [
+            '🤖', '🦈 Olá!', '🦈 Oi!', // Nosso próprio bot
+            'Sou um assistente virtual', 'sou uma inteligência artificial',
+            'I am an AI', 'I\'m an AI assistant',
+            'como assistente virtual', 'sou um chatbot',
+            '¡Hola! Soy', 'Soy un asistente',
+        ];
+        const pushName = data.pushName || '';
+        const botNameIndicators = ['bot', 'Bot', 'BOT', 'assistant', 'Assistant', 'IA ', 'AI ', 'chatbot', 'Chatbot', 'autoresponder'];
+        const isBotByName = botNameIndicators.some(indicator => pushName.includes(indicator));
+        const isBotByContent = content && botIndicators.some(indicator => content.startsWith(indicator));
+
+        // Se a mensagem vem de um bot (pelo nome) E parece resposta automática, ignora
+        if (isBotByName && isBotByContent) {
+            console.log(`[Webhook] 🤖 Mensagem de bot/IA ignorada (${pushName}): ${content.substring(0, 60)}...`);
+            return;
+        }
+
+        // Detecta loop: se recebemos muitas mensagens do mesmo número em poucos segundos, pode ser bot
+        // Verifica se as últimas 3 mensagens deste número nos últimos 30s são todas de "assistant" (indicando loop)
+        const recentBotCheck = await prisma.aiChatHistory.findMany({
+            where: { phone: remoteJid.replace('@s.whatsapp.net', ''), createdAt: { gte: new Date(Date.now() - 30000) } },
+            orderBy: { createdAt: 'desc' },
+            take: 6
+        });
+        const recentPattern = recentBotCheck.map(m => m.role).join(',');
+        if (recentBotCheck.length >= 6 && recentPattern === 'assistant,user,assistant,user,assistant,user') {
+            console.log(`[Webhook] 🔄 Possível loop de bot detectado para ${remoteJid.replace('@s.whatsapp.net', '')} - pausando resposta`);
+            return;
+        }
 
         // Detecta tipo de mídia
         const hasAudio = msg?.audioMessage || msg?.pttMessage;
