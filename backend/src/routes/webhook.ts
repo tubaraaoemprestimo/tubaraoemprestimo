@@ -233,25 +233,33 @@ function getProviderApiKey(config: any): string {
  */
 async function downloadMedia(
     waConfig: { apiUrl: string; apiKey: string; instanceName: string },
-    messageId: string
+    key: any
 ): Promise<{ buffer: Buffer; mimetype: string; filename: string } | null> {
     try {
-        const url = `${waConfig.apiUrl}/message/downloadMedia/${waConfig.instanceName}`;
+        // Evolution API v2 usa base64Media endpoint
+        const url = `${waConfig.apiUrl}/chat/getBase64FromMediaMessage/${waConfig.instanceName}`;
         const response = await axios.post(url, {
-            messageId
+            message: { key }
         }, {
             headers: { apikey: waConfig.apiKey },
-            responseType: 'arraybuffer',
             timeout: 30000
         });
 
-        const buffer = Buffer.from(response.data);
-        const mimetype = response.headers['content-type'] || 'application/octet-stream';
+        const base64Data = response.data?.base64 || response.data?.media?.data;
+        const mimetype = response.data?.mimetype || response.data?.media?.mimetype || 'application/octet-stream';
+
+        if (!base64Data) {
+            console.error('[Media] Resposta sem base64:', JSON.stringify(response.data).substring(0, 200));
+            return null;
+        }
+
+        const buffer = Buffer.from(base64Data, 'base64');
         const filename = `media_${Date.now()}`;
 
+        console.log(`[Media] ✅ Mídia baixada: ${mimetype}, ${buffer.length} bytes`);
         return { buffer, mimetype, filename };
     } catch (error: any) {
-        console.error('[Media] Erro ao baixar mídia:', error.message);
+        console.error('[Media] Erro ao baixar mídia:', error?.response?.data || error.message);
         return null;
     }
 }
@@ -597,7 +605,7 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
         if (hasAudio || hasImage || hasDocument) {
             console.log(`[Webhook] 📎 Processando mídia: audio=${!!hasAudio}, image=${!!hasImage}, doc=${!!hasDocument}`);
 
-            const media = await downloadMedia(waConfig, messageId);
+            const media = await downloadMedia(waConfig, key);
             if (media) {
                 const currentProvider = chatConfig.provider || 'gemini';
 
