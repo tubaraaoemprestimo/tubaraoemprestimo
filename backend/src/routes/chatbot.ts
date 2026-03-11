@@ -787,10 +787,10 @@ INFORMAÇÕES SOBRE O SISTEMA DE INDICAÇÃO:
 
         const mainProvider = config.provider || 'gemini';
         const fallbackChain: string[] = [mainProvider];
+        if (mainProvider !== 'anthropic' && config.anthropicApiKey) fallbackChain.push('anthropic');
         if (mainProvider !== 'perplexity' && config.perplexityApiKey) fallbackChain.push('perplexity');
         if (mainProvider !== 'groq' && config.groqApiKey) fallbackChain.push('groq');
         if (mainProvider !== 'gemini' && (config.geminiApiKey || config.apiKey)) fallbackChain.push('gemini');
-        if (mainProvider !== 'anthropic' && config.anthropicApiKey) fallbackChain.push('anthropic');
 
         let usedProvider = mainProvider;
         let lastError: any = null;

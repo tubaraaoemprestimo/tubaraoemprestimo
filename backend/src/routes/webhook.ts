@@ -30,7 +30,7 @@ function containsTransferKeyword(message: string, keywords: string[]): boolean {
 }
 
 /**
- * Chama a API do Google Gemini
+ * Chama a API do Google Gemini (texto)
  */
 async function callGeminiAPI(
     apiKey: string, systemPrompt: string,
@@ -63,6 +63,79 @@ async function callGeminiAPI(
     const candidate = response.data?.candidates?.[0];
     if (!candidate?.content?.parts?.[0]?.text) throw new Error('Resposta vazia do Gemini');
     return candidate.content.parts[0].text;
+}
+
+/**
+ * Chama a API do Gemini com suporte multimodal nativo (áudio, imagem, PDF)
+ */
+async function callGeminiMultimodalAPI(
+    apiKey: string, systemPrompt: string,
+    history: { role: string; content: string }[], userMessage: string,
+    mediaBuffer?: Buffer, mediaMimetype?: string
+): Promise<{ text: string; transcription?: string }> {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const contents: any[] = [];
+
+    if (systemPrompt) {
+        contents.push({ role: 'user', parts: [{ text: `[Instrução do Sistema]: ${systemPrompt}` }] });
+        contents.push({ role: 'model', parts: [{ text: 'Entendido. Vou seguir essas instruções.' }] });
+    }
+
+    for (const msg of history.slice(-20)) {
+        contents.push({ role: msg.role === 'user' ? 'user' : 'model', parts: [{ text: msg.content }] });
+    }
+
+    // Monta a mensagem do usuário com mídia
+    const userParts: any[] = [];
+
+    if (mediaBuffer && mediaMimetype) {
+        const base64Data = mediaBuffer.toString('base64');
+        // Mapeia mimetypes do WhatsApp para tipos aceitos pelo Gemini
+        let geminiMime = mediaMimetype;
+        if (mediaMimetype.includes('ogg')) geminiMime = 'audio/ogg';
+        if (mediaMimetype.includes('mpeg') && mediaMimetype.includes('audio')) geminiMime = 'audio/mpeg';
+        if (mediaMimetype.includes('m4a')) geminiMime = 'audio/mp4';
+        if (mediaMimetype.includes('webm') && mediaMimetype.includes('audio')) geminiMime = 'audio/webm';
+
+        userParts.push({
+            inline_data: { mime_type: geminiMime, data: base64Data }
+        });
+    }
+
+    // Instrução contextual baseada no tipo de mídia
+    let instruction = userMessage || '';
+    if (mediaBuffer && mediaMimetype) {
+        if (mediaMimetype.includes('audio') || mediaMimetype.includes('ogg')) {
+            instruction = (userMessage ? userMessage + '\n\n' : '') +
+                'O usuário enviou um áudio. Transcreva o que foi dito e responda de acordo. Comece sua resposta respondendo diretamente ao que o usuário disse no áudio.';
+        } else if (mediaMimetype.includes('image')) {
+            instruction = (userMessage ? userMessage + '\n\n' : '') +
+                'O usuário enviou uma imagem. Analise e descreva o que vê, e responda de acordo.';
+        } else if (mediaMimetype.includes('pdf') || mediaMimetype.includes('document')) {
+            instruction = (userMessage ? userMessage + '\n\n' : '') +
+                'O usuário enviou um documento. Leia o conteúdo e responda de acordo.';
+        }
+    }
+
+    if (instruction) userParts.push({ text: instruction });
+    if (userParts.length === 0) userParts.push({ text: 'oi' });
+
+    contents.push({ role: 'user', parts: userParts });
+
+    const response = await axios.post(url, {
+        contents,
+        generationConfig: { temperature: 0.7, topP: 0.95, topK: 40, maxOutputTokens: 1024 },
+        safetySettings: [
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
+        ]
+    }, { headers: { 'Content-Type': 'application/json' }, timeout: 60000 });
+
+    const candidate = response.data?.candidates?.[0];
+    if (!candidate?.content?.parts?.[0]?.text) throw new Error('Resposta vazia do Gemini Multimodal');
+    return { text: candidate.content.parts[0].text };
 }
 
 /**
@@ -480,46 +553,54 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
 
         // 6.5. Processa mídia (áudio, imagem, documento)
         let mediaContext = '';
+        let mediaBuffer: Buffer | undefined;
+        let mediaMimetype: string | undefined;
 
         if (hasAudio || hasImage || hasDocument) {
             console.log(`[Webhook] 📎 Processando mídia: audio=${!!hasAudio}, image=${!!hasImage}, doc=${!!hasDocument}`);
 
             const media = await downloadMedia(waConfig, messageId);
             if (media) {
-                // Processa áudio com Whisper
-                if (hasAudio) {
-                    const groqKey = chatConfig.groqApiKey || chatConfig.apiKey;
-                    if (groqKey) {
-                        const transcription = await transcribeAudio(media.buffer, media.filename, groqKey);
-                        if (transcription) {
-                            mediaContext += `\n\n[ÁUDIO TRANSCRITO]: ${transcription}`;
-                            content = content || transcription; // Se não tinha texto, usa a transcrição
-                            console.log(`[Webhook] 🎤 Áudio transcrito: ${transcription.substring(0, 100)}...`);
+                const currentProvider = chatConfig.provider || 'gemini';
+
+                // Se Gemini é o provider principal, usa processamento multimodal nativo
+                if (currentProvider === 'gemini' && chatConfig.geminiApiKey) {
+                    mediaBuffer = media.buffer;
+                    mediaMimetype = media.mimetype;
+                    const mediaType = hasAudio ? '🎤 Áudio' : hasImage ? '🖼️ Imagem' : '📄 Documento';
+                    console.log(`[Webhook] ${mediaType} será processado nativamente pelo Gemini`);
+                } else {
+                    // Fallback: processa mídia com serviços separados
+                    if (hasAudio) {
+                        const groqKey = chatConfig.groqApiKey || chatConfig.apiKey;
+                        if (groqKey) {
+                            const transcription = await transcribeAudio(media.buffer, media.filename, groqKey);
+                            if (transcription) {
+                                mediaContext += `\n\n[ÁUDIO TRANSCRITO]: ${transcription}`;
+                                content = content || transcription;
+                                console.log(`[Webhook] 🎤 Áudio transcrito (Whisper): ${transcription.substring(0, 100)}...`);
+                            }
                         }
                     }
-                }
 
-                // Processa imagem com Claude Vision
-                if (hasImage) {
-                    const anthropicKey = chatConfig.anthropicApiKey;
-                    if (anthropicKey) {
-                        const imageAnalysis = await processImageWithClaude(
-                            media.buffer,
-                            media.mimetype,
-                            anthropicKey,
-                            content || 'O que você vê nesta imagem?'
-                        );
-                        mediaContext += `\n\n[IMAGEM ANALISADA]: ${imageAnalysis}`;
-                        console.log(`[Webhook] 🖼️ Imagem processada: ${imageAnalysis.substring(0, 100)}...`);
+                    if (hasImage) {
+                        const anthropicKey = chatConfig.anthropicApiKey;
+                        if (anthropicKey) {
+                            const imageAnalysis = await processImageWithClaude(
+                                media.buffer, media.mimetype, anthropicKey,
+                                content || 'O que você vê nesta imagem?'
+                            );
+                            mediaContext += `\n\n[IMAGEM ANALISADA]: ${imageAnalysis}`;
+                            console.log(`[Webhook] 🖼️ Imagem processada (Claude): ${imageAnalysis.substring(0, 100)}...`);
+                        }
                     }
-                }
 
-                // Processa documento/PDF
-                if (hasDocument) {
-                    const docText = await extractTextFromDocument(media.buffer, media.mimetype);
-                    if (docText) {
-                        mediaContext += `\n\n[DOCUMENTO]: ${docText.substring(0, 2000)}`; // Limita a 2000 chars
-                        console.log(`[Webhook] 📄 Documento extraído: ${docText.substring(0, 100)}...`);
+                    if (hasDocument) {
+                        const docText = await extractTextFromDocument(media.buffer, media.mimetype);
+                        if (docText) {
+                            mediaContext += `\n\n[DOCUMENTO]: ${docText.substring(0, 2000)}`;
+                            console.log(`[Webhook] 📄 Documento extraído: ${docText.substring(0, 100)}...`);
+                        }
                     }
                 }
             }
@@ -627,16 +708,21 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
         // Monta o prompt final: ADMIN PROMPT PRIMEIRO (prioridade máxima) + contexto depois
         const systemPrompt = `${adminPrompt}\n\n${contextData}${mediaContext}`;
 
-        // 9. Chama a IA com fallback automático: Claude → Perplexity → Groq
+        // 9. Chama a IA com fallback automático: Gemini → Perplexity → Groq → Claude
         let aiResponse: string;
         const provider = chatConfig.provider || 'gemini';
-        console.log(`[Webhook] Chamando IA: provider=${provider}, keyLen=${resolvedApiKey?.length || 0}`);
+        console.log(`[Webhook] Chamando IA: provider=${provider}, keyLen=${resolvedApiKey?.length || 0}${mediaBuffer ? ', com mídia nativa' : ''}`);
 
         // Monta mensagem completa com contexto de mídia
         const fullMessage = content + mediaContext;
 
         // Função auxiliar para chamar provider específico
         const callProvider = async (p: string, key: string): Promise<string> => {
+            // Se Gemini e tem mídia, usa API multimodal nativa
+            if (p === 'gemini' && mediaBuffer && mediaMimetype) {
+                const result = await callGeminiMultimodalAPI(key, systemPrompt, conversationHistory, content || '', mediaBuffer, mediaMimetype);
+                return result.text;
+            }
             if (p === 'gemini') return callGeminiAPI(key, systemPrompt, conversationHistory, fullMessage);
             if (p === 'anthropic') return callAnthropicAPI(key, systemPrompt, conversationHistory, fullMessage);
             if (PROVIDER_CONFIG[p]) {
@@ -646,14 +732,14 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
             return callGeminiAPI(key, systemPrompt, conversationHistory, fullMessage);
         };
 
-        // Ordem de fallback: provider principal → Perplexity → Groq → Gemini → Anthropic
+        // Ordem de fallback: provider principal → Claude → Perplexity → Groq → Gemini
         const fallbackChain: { name: string; key: string }[] = [
             { name: provider, key: resolvedApiKey },
         ];
+        if (provider !== 'anthropic' && chatConfig.anthropicApiKey) fallbackChain.push({ name: 'anthropic', key: chatConfig.anthropicApiKey });
         if (provider !== 'perplexity' && chatConfig.perplexityApiKey) fallbackChain.push({ name: 'perplexity', key: chatConfig.perplexityApiKey });
         if (provider !== 'groq' && chatConfig.groqApiKey) fallbackChain.push({ name: 'groq', key: chatConfig.groqApiKey });
         if (provider !== 'gemini' && chatConfig.geminiApiKey) fallbackChain.push({ name: 'gemini', key: chatConfig.geminiApiKey });
-        if (provider !== 'anthropic' && chatConfig.anthropicApiKey) fallbackChain.push({ name: 'anthropic', key: chatConfig.anthropicApiKey });
 
         let usedProvider = provider;
         try {
