@@ -712,7 +712,8 @@ chatbotRouter.post('/message', authenticate, async (req: Request, res: Response)
             .map(h => ({ role: h.role, content: h.content }));
 
         // 6. Monta system prompt com contexto do cliente
-        let systemPrompt = config.systemPrompt || 'Você é um assistente virtual da Tubarão Empréstimos, uma empresa de crédito. Seja educado, profissional e objetivo.';
+        // IMPORTANTE: O prompt do admin vem PRIMEIRO para ter prioridade máxima
+        const adminPrompt = config.systemPrompt || 'Você é um assistente virtual da Tubarão Empréstimos, uma empresa de crédito. Seja educado, profissional e objetivo.';
 
         // Adiciona instruções para reconhecer renda informal/PJ
         const incomeRecognitionAppendix = `
@@ -730,11 +731,14 @@ INFORMAÇÕES SOBRE O SISTEMA DE INDICAÇÃO:
 - Valores de comissão: Empréstimo até 3k = R$120, 5k+ = R$150, 10k+ = R$180, Moto = R$250, Limpa Nome = R$50.
 - Bônus mensal: 5+ contratos com <10% inadimplência = R$500 (Silver), 10+ contratos com <5% inadimplência = R$1000 (Gold).`;
 
-        systemPrompt += incomeRecognitionAppendix;
+        let contextData = incomeRecognitionAppendix;
 
         if (customerContext) {
-            systemPrompt += `\n\nContexto do cliente:\n${JSON.stringify(customerContext)}`;
+            contextData += `\n\nContexto do cliente:\n${JSON.stringify(customerContext)}`;
         }
+
+        // Monta o prompt final: ADMIN PROMPT PRIMEIRO (prioridade máxima) + contexto depois
+        const systemPrompt = `${adminPrompt}\n\n${contextData}`;
 
         // 7. Chama a IA (Gemini, Perplexity, OpenAI, OpenRouter, Nvidia, Z.AI)
         let aiResponse: string;
