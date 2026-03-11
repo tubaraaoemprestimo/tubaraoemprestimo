@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Model para registrar vendas/leads do funil
+model Lead {
+  id        String   @id @default(cuid())
+  nome      String
+  email     String?
+  whatsapp  String?
+  produto   String   // Ex: "Método Tubarão - Fundador", "Módulo Limpa Nome", etc.
+  valor     Decimal  @db.Decimal(10, 2)
+  status    String   @default("PENDENTE") // PENDENTE, APROVADO, CANCELADO
+  etapa     Int      // 1, 2, 3, 4 - qual etapa do funil
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+  @@map("leads")
+}
+
+// Model para aplicações da Mentoria Presencial (High Ticket)
+model MentoriaApplication {
+  id                  String   @id @default(cuid())
+  nome                String
+  whatsapp            String
+  cidade              String
+  capitalDisponivel   String   // Pode ser faixa ou valor exato
+  experiencia         String   // Ex: "Iniciante", "Intermediário", "Avançado"
+  objetivo            String   @db.Text
+  status              String   @default("PENDENTE") // PENDENTE, APROVADO, REJEITADO, CONTATADO
+  observacoes         String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("mentoria_applications")
+}
+
+// Model para configurações do funil (opcional - para admin)
+model FunnelConfig {
+  id                    String   @id @default(cuid())
+  countdownEndDate      DateTime // Data final do contador
+  precoFundador         Decimal  @default(497) @db.Decimal(10, 2)
+  precoOficial          Decimal  @default(697) @db.Decimal(10, 2)
+  desabilitarAposExpira Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("funnel_config")
+}

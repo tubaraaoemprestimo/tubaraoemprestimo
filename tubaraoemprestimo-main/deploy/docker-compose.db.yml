@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  db:
+    container_name: tubarao_postgres
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-tubarao123}
+      POSTGRES_DB: tubarao_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  adminer:
+    container_name: tubarao_adminer
+    image: adminer
+    restart: always
+    ports:
+      - "8888:8080"
+    depends_on:
+      - db
+
+volumes:
+  pgdata:

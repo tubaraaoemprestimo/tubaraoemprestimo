@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
 import { prisma } from '../../services/prisma';
 import bcrypt from 'bcryptjs';
+import { sendWelcomeEmail } from '../../services/emailService';
 
 export const stripeWebhookRouter = Router();
 
@@ -110,15 +111,36 @@ stripeWebhookRouter.post('/', async (req: Request, res: Response) => {
                 console.log(`[Stripe Webhook] ✅ Acesso liberado para usuário existente: ${user.id} (${customerEmail})`);
             }
 
-            // TODO: FASE 3 - Enviar e-mail com credenciais via Resend
-            // Será implementado na próxima fase
-            console.log(`[Stripe Webhook] 📧 E-mail será enviado na FASE 3`);
-            console.log(`[Stripe Webhook] Dados para e-mail:`, {
-                email: customerEmail,
-                name: customerName,
-                isNewUser,
-                password: generatedPassword ? '***GERADA***' : 'usar senha existente'
-            });
+            // FASE 3: Enviar e-mail com credenciais via Resend
+            if (isNewUser && generatedPassword) {
+                // Novo usuário - envia senha gerada
+                const emailSent = await sendWelcomeEmail({
+                    email: customerEmail,
+                    name: customerName,
+                    password: generatedPassword,
+                    isNewUser: true
+                });
+
+                if (emailSent) {
+                    console.log(`[Stripe Webhook] ✅ E-mail de boas-vindas enviado para ${customerEmail}`);
+                } else {
+                    console.error(`[Stripe Webhook] ⚠️ Falha ao enviar e-mail para ${customerEmail}`);
+                }
+            } else {
+                // Usuário existente - envia notificação de renovação (sem senha)
+                const emailSent = await sendWelcomeEmail({
+                    email: customerEmail,
+                    name: customerName,
+                    password: '********', // Placeholder - usuário já tem senha
+                    isNewUser: false
+                });
+
+                if (emailSent) {
+                    console.log(`[Stripe Webhook] ✅ E-mail de renovação enviado para ${customerEmail}`);
+                } else {
+                    console.error(`[Stripe Webhook] ⚠️ Falha ao enviar e-mail para ${customerEmail}`);
+                }
+            }
 
             res.json({ received: true, userId: user.id });
         } catch (error: any) {
