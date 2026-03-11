@@ -118,7 +118,7 @@ async function callAnthropicAPI(
     messages.push({ role: 'user', content: userMessage });
 
     const response = await axios.post('https://api.anthropic.com/v1/messages', {
-        model: 'claude-sonnet-4-6-20250514',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 1024,
         system: systemPrompt || undefined,
         messages
@@ -232,7 +232,7 @@ async function processImageWithClaude(
                          mimetype.includes('webp') ? 'image/webp' : 'image/jpeg';
 
         const response = await axios.post('https://api.anthropic.com/v1/messages', {
-            model: 'claude-sonnet-4-6-20250514',
+            model: 'claude-sonnet-4-20250514',
             max_tokens: 1024,
             messages: [{
                 role: 'user',
