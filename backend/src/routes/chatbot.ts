@@ -638,8 +638,8 @@ chatbotRouter.post('/message', authenticate, async (req: Request, res: Response)
             return;
         }
 
-        // 2. Verifica se está em horário de atendimento
-        if (!isWithinWorkingHours(config.workingHoursStart, config.workingHoursEnd)) {
+        // 2. Verifica se está em horário de atendimento (somente se workingHoursOnly estiver ativo)
+        if (config.workingHoursOnly && !isWithinWorkingHours(config.workingHoursStart, config.workingHoursEnd)) {
             // Salva mensagem do usuário no histórico
             await prisma.aiChatHistory.create({
                 data: { phone, role: 'user', content: message }

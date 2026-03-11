@@ -244,8 +244,8 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
             return;
         }
 
-        // 4. Verifica horário de atendimento
-        if (!isWithinWorkingHours(chatConfig.workingHoursStart, chatConfig.workingHoursEnd)) {
+        // 4. Verifica horário de atendimento (somente se workingHoursOnly estiver ativo)
+        if (chatConfig.workingHoursOnly && !isWithinWorkingHours(chatConfig.workingHoursStart, chatConfig.workingHoursEnd)) {
             await prisma.aiChatHistory.create({ data: { phone, role: 'user', content } });
             const offMsg = `Olá! Nosso atendimento funciona das ${chatConfig.workingHoursStart} às ${chatConfig.workingHoursEnd}. Sua mensagem foi registrada e retornaremos assim que possível. 😊`;
             await prisma.aiChatHistory.create({ data: { phone, role: 'assistant', content: offMsg, metadata: { autoReply: true, reason: 'OFF_HOURS' } } });
