@@ -44,7 +44,7 @@ async function callGeminiAPI(
     conversationHistory: { role: string; content: string }[],
     userMessage: string
 ): Promise<string> {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
     const contents: any[] = [];
 
@@ -159,7 +159,7 @@ async function callOpenRouterAPI(
     messages.push({ role: 'user', content: userMessage });
 
     const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-        model: 'google/gemini-2.0-flash-exp:free',
+        model: 'google/gemini-2.5-flash-exp:free',
         messages,
         temperature: 0.7,
         max_tokens: 1024
