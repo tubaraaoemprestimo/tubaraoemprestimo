@@ -40,6 +40,8 @@ import collectionAutomationRouter from './routes/collectionAutomation';
 import { returningClientsRouter } from './routes/returningClients';
 import { funilRouter } from './routes/funil';
 import { cursoRouter } from './routes/curso';
+import { checkoutRouter } from './routes/checkout';
+import { stripeWebhookRouter } from './routes/webhooks/stripe';
 import { initCronJobs } from './cron/installmentReminders';
 import { startCollectionCron } from './cron/collectionCron';
 
@@ -72,7 +74,10 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Body parsing
+// IMPORTANTE: Webhook do Stripe precisa do raw body ANTES do express.json()
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRouter);
+
+// Body parsing (para todas as outras rotas)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -114,6 +119,7 @@ app.use('/api/collection-automation', collectionAutomationRouter);
 app.use('/api/returning-clients', returningClientsRouter);
 app.use('/api/funil', funilRouter);
 app.use('/api/curso', cursoRouter);
+app.use('/api/checkout', checkoutRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
