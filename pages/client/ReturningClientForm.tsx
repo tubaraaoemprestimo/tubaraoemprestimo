@@ -252,7 +252,7 @@ export const ReturningClientForm: React.FC = () => {
                         </div>
                     </div>
                     <button
-                        onClick={() => navigate('/')}
+                        onClick={() => navigate('/client/dashboard')}
                         className="w-full bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold py-4 rounded-xl transition-colors"
                     >
                         Voltar ao início

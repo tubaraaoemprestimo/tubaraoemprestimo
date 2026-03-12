@@ -4,7 +4,7 @@ import {
   Check, ChevronLeft, ChevronDown, User, MapPin,
   AlertCircle, FileText, ScanFace, X, Plus, Loader2,
   Phone, Users, Video, DollarSign, Shield, Clock, Landmark, CheckCircle2, FileCheck, Percent,
-  Car, Smartphone, Tv, Home, Package, Camera as CameraIcon,
+  Car, Smartphone, Tv, Home, Package, Camera as CameraIcon, Trash2,
   Briefcase, Store, Bike, Banknote, Rocket, CreditCard, FileSignature, Scale, Gift
 } from 'lucide-react';
 import { Button } from '../../components/Button';
@@ -208,15 +208,67 @@ export const Wizard: React.FC = () => {
     }, 150);
   };
 
-  // Garantia Universal (usado para Garantia Veículo tb)
-  const [guarantee, setGuarantee] = useState({
+  // Interface para itens de garantia
+  interface CollateralItem {
+    id: string;
+    type: string;
+    description: string;
+    condition: string;
+    estimatedValue: string;
+    hasInvoice: boolean;
+    photos: string[];
+    invoiceUrl: string | null;
+    video: string;
+  }
+
+  // Garantia Universal - Múltiplos Itens
+  const [collateralItems, setCollateralItems] = useState<CollateralItem[]>([{
+    id: crypto.randomUUID(),
     type: '',
     description: '',
     condition: '',
     estimatedValue: '',
-    photos: [] as string[],
-    video: '',
-  });
+    hasInvoice: false,
+    photos: [],
+    invoiceUrl: null,
+    video: ''
+  }]);
+
+  // Funções de gerenciamento de itens de garantia
+  const addCollateralItem = () => {
+    setCollateralItems([...collateralItems, {
+      id: crypto.randomUUID(),
+      type: '',
+      description: '',
+      condition: '',
+      estimatedValue: '',
+      hasInvoice: false,
+      photos: [],
+      invoiceUrl: null,
+      video: ''
+    }]);
+  };
+
+  const removeCollateralItem = (id: string) => {
+    if (collateralItems.length === 1) {
+      addToast('Você precisa ter pelo menos 1 item de garantia.', 'warning');
+      return;
+    }
+    setCollateralItems(collateralItems.filter(item => item.id !== id));
+  };
+
+  const updateCollateralItem = (id: string, field: keyof CollateralItem, value: any) => {
+    setCollateralItems(collateralItems.map(item =>
+      item.id === id ? { ...item, [field]: value } : item
+    ));
+  };
+
+  const getTotalCollateralValue = () => {
+    return collateralItems.reduce((sum, item) => {
+      const value = parseFloat(item.estimatedValue.replace(/\./g, '').replace(',', '.')) || 0;
+      return sum + value;
+    }, 0);
+  };
 
   const [formData, setFormData] = useState({
     name: '', cpf: '', email: '', phone: '', birthDate: '', referralCode: '',
@@ -702,30 +754,39 @@ export const Wizard: React.FC = () => {
 
     // STEP GARANTIA - Dados do Bem (Step 4 para GARANTIA)
     if (profileType === 'GARANTIA' && currentStep === 4) {
-      if (!guarantee.type) {
-        addToast("Selecione o tipo de garantia.", 'warning');
-        return;
+      // Validar cada item
+      for (let i = 0; i < collateralItems.length; i++) {
+        const item = collateralItems[i];
+
+        if (!item.type) {
+          addToast(`Item ${i + 1}: Selecione o tipo de garantia.`, 'warning');
+          return;
+        }
+        if (!item.description.trim()) {
+          addToast(`Item ${i + 1}: Descreva o bem (marca, modelo, ano).`, 'warning');
+          return;
+        }
+        if (!item.estimatedValue.trim()) {
+          addToast(`Item ${i + 1}: Informe o valor estimado.`, 'warning');
+          return;
+        }
+        if (item.photos.length === 0) {
+          addToast(`Item ${i + 1}: Envie fotos do bem.`, 'warning');
+          return;
+        }
+
+        // Se marcou que tem nota fiscal, a nota é obrigatória
+        if (item.hasInvoice && !item.invoiceUrl) {
+          addToast(`Item ${i + 1}: Envie a nota fiscal (você marcou que possui).`, 'warning');
+          return;
+        }
       }
-      if (!guarantee.description.trim()) {
-        addToast("Descreva o bem (marca, modelo, ano).", 'warning');
-        return;
-      }
-      if (!guarantee.estimatedValue.trim()) {
-        addToast("Informe o valor estimado do bem.", 'warning');
-        return;
-      }
-      if (guarantee.photos.length === 0) {
-        addToast("Envie fotos do bem em garantia.", 'warning');
-        return;
-      }
-      // Veículos precisam de CRLV
-      if ((guarantee.type === 'carro' || guarantee.type === 'moto' || guarantee.type === 'jetski' || guarantee.type === 'outro') && formData.vehicleCRLV.length === 0) {
-        addToast("Envie o documento do veículo (CRLV).", 'warning');
-        return;
-      }
-      // Eletrônicos precisam de Nota Fiscal
-      if ((guarantee.type === 'celular' || guarantee.type === 'notebook') && formData.proofPurchase.length === 0) {
-        addToast("Envie a Nota Fiscal do aparelho.", 'warning');
+
+      // Validar valor total mínimo
+      const totalValue = getTotalCollateralValue();
+      const minRequired = getAmount() * 2;
+      if (totalValue < minRequired) {
+        addToast(`Valor total insuficiente. Mínimo: R$ ${minRequired.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'warning');
         return;
       }
     }
@@ -1136,8 +1197,8 @@ export const Wizard: React.FC = () => {
         locationCapturedAt: location ? new Date().toISOString() : null,
       };
 
-      // Atualizar garantia se houver
-      const uploadedGuarantee = needsGuarantee ? { ...guarantee, photos: guaranteePhotos, video: guaranteeVideoUrl } : null;
+      // Enviar múltiplos itens de garantia (GARANTIA profile)
+      const uploadedCollateralItems = profileType === 'GARANTIA' ? collateralItems : null;
 
       // Registrar evento de submissão (antifraude)
       const user = apiService.auth.getUser();
@@ -1351,7 +1412,7 @@ export const Wizard: React.FC = () => {
         className="sticky top-0 z-30 bg-black/80 backdrop-blur-md border-b border-zinc-900 px-4 pb-4 flex items-center justify-between"
         style={{ paddingTop: 'max(1rem, calc(env(safe-area-inset-top, 0px) + 0.5rem))' }}
       >
-        <div className="flex items-center gap-2" onClick={() => navigate('/')}>
+        <div className="flex items-center gap-2" onClick={() => navigate('/client/dashboard')}>
           <ChevronLeft className="text-zinc-400" />
           <span className="font-bold">{profileType === 'INVESTIDOR' ? 'Área do Investidor' : profileType === 'LIMPA_NOME' ? 'Limpa Nome' : 'Solicitar Empréstimo'}</span>
         </div>
@@ -2687,131 +2748,189 @@ export const Wizard: React.FC = () => {
               <div className="text-center">
                 <Car size={48} className="mx-auto text-orange-400 mb-3" />
                 <h2 className="text-xl font-bold">Dados da Garantia</h2>
-                <p className="text-zinc-400 text-sm mt-2">Informe detalhes do bem que ficará em garantia</p>
+                <p className="text-zinc-400 text-sm mt-2">Cadastre todos os bens que ficam em garantia</p>
               </div>
 
               {/* Lembrete importante */}
               <div className="bg-red-900/30 border border-red-500 rounded-xl p-4">
                 <p className="text-red-400 text-sm font-bold text-center">
-                  ⚠️ LEMBRETE: O bem será ENTREGUE FISICAMENTE e ficará em posse da empresa até quitação total
+                  ⚠️ LEMBRETE: Os bens serão ENTREGUES FISICAMENTE e ficarão em posse da empresa até quitação total
                 </p>
               </div>
 
-              {/* Tipo de Garantia */}
-              <div className="space-y-3">
-                <h3 className="font-bold text-[#D4AF37]">Selecione o tipo de garantia:</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { id: 'carro', label: 'Carro', icon: Car, color: 'text-yellow-400' },
-                    { id: 'moto', label: 'Moto', icon: Car, color: 'text-blue-400' },
-                    { id: 'celular', label: 'Celular', icon: Smartphone, color: 'text-green-400' },
-                    { id: 'notebook', label: 'Notebook/Tablet', icon: Tv, color: 'text-purple-400' },
-                    { id: 'jetski', label: 'Jet Ski', icon: Car, color: 'text-cyan-400' },
-                    { id: 'outro', label: 'Outro Veículo', icon: Package, color: 'text-gray-400' },
-                  ].map((tipo) => (
-                    <button
-                      key={tipo.id}
-                      onClick={() => setGuarantee({ ...guarantee, type: tipo.id })}
-                      className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${guarantee.type === tipo.id
-                        ? 'border-[#D4AF37] bg-[#D4AF37]/10 ring-2 ring-[#D4AF37]'
-                        : 'border-zinc-700 hover:border-zinc-500'
-                        }`}
-                    >
-                      <tipo.icon size={28} className={tipo.color} />
-                      <span className="text-sm font-bold">{tipo.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Descrição do Bem */}
-              {guarantee.type && (
-                <div className="space-y-4 border-t border-zinc-800 pt-4">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-[#D4AF37]">
-                      Descreva o bem (marca, modelo, ano):
-                    </label>
-                    <textarea
-                      value={guarantee.description}
-                      onChange={(e) => setGuarantee({ ...guarantee, description: e.target.value })}
-                      placeholder={
-                        guarantee.type === 'carro' ? 'Ex: Honda Civic 2020 Preto' :
-                          guarantee.type === 'moto' ? 'Ex: Honda CG 160 2022' :
-                            guarantee.type === 'celular' ? 'Ex: iPhone 14 Pro 256GB' :
-                              guarantee.type === 'notebook' ? 'Ex: MacBook Air M2 2023' :
-                                'Descreva marca, modelo e ano'
-                      }
-                      className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-[#D4AF37] outline-none min-h-[80px]"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-[#D4AF37]">
-                      Valor Estimado do Bem (R$):
-                    </label>
-                    <input
-                      type="text"
-                      value={guarantee.estimatedValue}
-                      onChange={(e) => setGuarantee({ ...guarantee, estimatedValue: e.target.value })}
-                      placeholder="Ex: 15.000,00"
-                      className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-[#D4AF37] outline-none"
-                    />
-                    <p className="text-xs text-zinc-500">
-                      Lembre-se: o valor deve ser NO MÍNIMO O DOBRO do empréstimo (R$ {(getAmount() * 2).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+              {/* Contador de Valor Total */}
+              <div className="bg-gradient-to-r from-[#D4AF37]/20 to-orange-500/20 border-2 border-[#D4AF37] rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-zinc-400">Valor Total em Garantia</p>
+                    <p className="text-2xl font-bold text-[#D4AF37]">
+                      R$ {getTotalCollateralValue().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
+                  <div className="text-right">
+                    <p className="text-xs text-zinc-400">Mínimo Necessário</p>
+                    <p className="text-lg font-bold text-white">
+                      R$ {(getAmount() * 2).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+                {getTotalCollateralValue() < (getAmount() * 2) && (
+                  <p className="text-xs text-red-400 mt-2 text-center">
+                    ⚠️ Valor insuficiente. Adicione mais itens ou aumente os valores.
+                  </p>
+                )}
+              </div>
 
-                  {/* Condição do bem */}
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-[#D4AF37]">
-                      Condição do Bem:
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {['Ótimo', 'Bom', 'Regular'].map((cond) => (
+              {/* Lista de Itens */}
+              {collateralItems.map((item, index) => (
+                <div key={item.id} className="border-2 border-zinc-800 rounded-xl p-5 space-y-4 relative">
+                  {/* Header do Item */}
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-[#D4AF37] flex items-center gap-2">
+                      <Package size={20} />
+                      Item {index + 1}
+                    </h3>
+                    {collateralItems.length > 1 && (
+                      <button
+                        onClick={() => removeCollateralItem(item.id)}
+                        className="text-red-400 hover:text-red-300 transition-colors"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Tipo de Garantia */}
+                  <div className="space-y-3">
+                    <label className="block text-sm font-bold text-white">Tipo do Bem:</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { id: 'carro', label: 'Carro', icon: Car, color: 'text-yellow-400' },
+                        { id: 'moto', label: 'Moto', icon: Car, color: 'text-blue-400' },
+                        { id: 'celular', label: 'Celular', icon: Smartphone, color: 'text-green-400' },
+                        { id: 'notebook', label: 'Notebook/Tablet', icon: Tv, color: 'text-purple-400' },
+                        { id: 'tv', label: 'TV', icon: Tv, color: 'text-pink-400' },
+                        { id: 'eletrodomestico', label: 'Eletrodoméstico', icon: Package, color: 'text-orange-400' },
+                      ].map((tipo) => (
                         <button
-                          key={cond}
-                          onClick={() => setGuarantee({ ...guarantee, condition: cond })}
-                          className={`p-3 rounded-lg border text-sm font-bold transition-all ${guarantee.condition === cond
-                            ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]'
-                            : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'
-                            }`}
+                          key={tipo.id}
+                          onClick={() => updateCollateralItem(item.id, 'type', tipo.id)}
+                          className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
+                            item.type === tipo.id
+                              ? 'border-[#D4AF37] bg-[#D4AF37]/10 ring-2 ring-[#D4AF37]'
+                              : 'border-zinc-700 hover:border-zinc-500'
+                          }`}
                         >
-                          {cond}
+                          <tipo.icon size={24} className={tipo.color} />
+                          <span className="text-xs font-bold">{tipo.label}</span>
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  {/* Fotos do Bem */}
-                  <div className="space-y-2">
-                    <h3 className="font-bold text-[#D4AF37]">📷 Fotos do Bem (OBRIGATÓRIO)</h3>
-                    <p className="text-xs text-zinc-500">
-                      {guarantee.type === 'carro' || guarantee.type === 'moto' || guarantee.type === 'jetski'
-                        ? 'Envie fotos: frente, lateral, traseira, interior e documento (CRLV)'
-                        : 'Envie fotos de todos os ângulos mostrando a condição do aparelho'}
-                    </p>
-                    {renderUploadArea('photos', 'Fotos do Bem em Garantia', guarantee.photos, true)}
-                  </div>
+                  {item.type && (
+                    <>
+                      {/* Descrição */}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-bold text-white">
+                          Descreva o bem (marca, modelo, ano):
+                        </label>
+                        <textarea
+                          value={item.description}
+                          onChange={(e) => updateCollateralItem(item.id, 'description', e.target.value)}
+                          placeholder="Ex: iPhone 14 Pro 256GB Preto"
+                          className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-[#D4AF37] outline-none min-h-[60px]"
+                        />
+                      </div>
 
-                  {/* Documento do veículo (CRLV) - apenas para veículos */}
-                  {(guarantee.type === 'carro' || guarantee.type === 'moto' || guarantee.type === 'jetski' || guarantee.type === 'outro') && (
-                    <div className="space-y-2 border-t border-zinc-800 pt-4">
-                      <h3 className="font-bold text-[#D4AF37]">📄 Documento do Veículo (CRLV)</h3>
-                      <p className="text-xs text-zinc-500">O veículo deve estar quitado e sem débitos.</p>
-                      {renderUploadArea('vehicleCRLV', 'CRLV do Veículo', formData.vehicleCRLV)}
-                    </div>
-                  )}
+                      {/* Valor Estimado */}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-bold text-white">
+                          Valor Estimado (R$):
+                        </label>
+                        <input
+                          type="text"
+                          value={item.estimatedValue}
+                          onChange={(e) => updateCollateralItem(item.id, 'estimatedValue', e.target.value)}
+                          placeholder="Ex: 3.500,00"
+                          className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-[#D4AF37] outline-none"
+                        />
+                      </div>
 
-                  {/* Nota Fiscal - para eletrônicos (OBRIGATÓRIO) */}
-                  {(guarantee.type === 'celular' || guarantee.type === 'notebook') && (
-                    <div className="space-y-2 border-t border-zinc-800 pt-4">
-                      <h3 className="font-bold text-[#D4AF37]">📄 Nota Fiscal do Aparelho (OBRIGATÓRIO)</h3>
-                      <p className="text-xs text-zinc-500">Envie a nota fiscal ou comprovante de compra do aparelho.</p>
-                      {renderUploadArea('proofPurchase', 'Nota Fiscal ou Comprovante de Compra', formData.proofPurchase)}
-                    </div>
+                      {/* Condição */}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-bold text-white">Condição:</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {['Ótimo', 'Bom', 'Regular'].map((cond) => (
+                            <button
+                              key={cond}
+                              onClick={() => updateCollateralItem(item.id, 'condition', cond)}
+                              className={`p-3 rounded-lg border text-sm font-bold transition-all ${
+                                item.condition === cond
+                                  ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]'
+                                  : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                              }`}
+                            >
+                              {cond}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Checkbox Nota Fiscal */}
+                      <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 space-y-3">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={item.hasInvoice}
+                            onChange={(e) => {
+                              updateCollateralItem(item.id, 'hasInvoice', e.target.checked);
+                              if (!e.target.checked) {
+                                updateCollateralItem(item.id, 'invoiceUrl', null);
+                              }
+                            }}
+                            className="w-5 h-5 rounded border-zinc-600 text-[#D4AF37] focus:ring-[#D4AF37]"
+                          />
+                          <span className="font-bold text-white">Possuo a Nota Fiscal deste item</span>
+                        </label>
+
+                        {item.hasInvoice ? (
+                          <div className="space-y-2 border-t border-zinc-800 pt-3">
+                            <p className="text-xs text-green-400">
+                              ✅ Ótimo! Envie a nota fiscal ou comprovante de compra.
+                            </p>
+                            {renderUploadArea(`invoice_${item.id}`, 'Nota Fiscal', item.invoiceUrl ? [item.invoiceUrl] : [])}
+                          </div>
+                        ) : (
+                          <div className="bg-yellow-900/20 border border-yellow-600/40 rounded-lg p-3">
+                            <p className="text-xs text-yellow-400">
+                              ⚠️ Bens sem nota fiscal passarão por uma avaliação de valor mais rigorosa.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Fotos (múltiplas) */}
+                      <div className="space-y-2">
+                        <h3 className="font-bold text-[#D4AF37]">📷 Fotos do Bem</h3>
+                        <p className="text-xs text-zinc-500">
+                          Envie várias fotos de diferentes ângulos (frente, verso, laterais, detalhes)
+                        </p>
+                        {renderUploadArea(`photos_${item.id}`, 'Fotos do Item', item.photos, true)}
+                      </div>
+                    </>
                   )}
                 </div>
-              )}
+              ))}
+
+              {/* Botão Adicionar Item */}
+              <button
+                onClick={addCollateralItem}
+                className="w-full p-4 rounded-xl border-2 border-dashed border-[#D4AF37] bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10 transition-all flex items-center justify-center gap-2 text-[#D4AF37] font-bold"
+              >
+                <Plus size={24} />
+                Adicionar outro bem
+              </button>
             </div>
           )}
 
