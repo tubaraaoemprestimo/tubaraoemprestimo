@@ -87,7 +87,7 @@ export function Step1Main({ sessionId, onDecline }: Step1Props) {
     trackPurchase({ sessionId, step: 1, productName: 'Método Tubarão', amount: 497 });
 
     try {
-      const response = await fetch(`${API_URL}/api/checkout`, {
+      const response = await fetch(`${API_URL}/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
