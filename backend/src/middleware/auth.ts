@@ -63,7 +63,9 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
  * Middleware que exige role de ADMIN
  */
 export const requireAdmin = (req: Request, res: Response, next: NextFunction): void => {
+    console.log('[Auth] requireAdmin - user:', req.user ? `${req.user.id} (${req.user.role})` : 'null');
     if (!req.user || req.user.role !== 'ADMIN') {
+        console.log('[Auth] Acesso negado - user não é ADMIN');
         res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
         return;
     }
