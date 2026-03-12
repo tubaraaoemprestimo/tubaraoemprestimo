@@ -284,7 +284,13 @@ cpfLookupRouter.get('/trackflow/:cpf', requireAdmin, async (req, res) => {
         });
 
     } catch (error: any) {
-        console.error('Erro ao consultar TrackFlow:', error.message);
+        console.error('[TrackFlow] Erro ao consultar CPF:', error.message);
+
+        // Log detalhado do erro da API externa
+        if (error.response) {
+            console.error('[TrackFlow] Status:', error.response.status);
+            console.error('[TrackFlow] Response data:', JSON.stringify(error.response.data, null, 2));
+        }
 
         // Tratar erros específicos
         if (error.response) {
@@ -296,7 +302,7 @@ cpfLookupRouter.get('/trackflow/:cpf', requireAdmin, async (req, res) => {
                 return res.status(402).json({ success: false, error: 'Saldo insuficiente na wallet TrackFlow' });
             }
             if (status === 403) {
-                return res.status(403).json({ success: false, error: 'Plano TrackFlow inativo' });
+                return res.status(403).json({ success: false, error: 'Acesso negado ou Plano TrackFlow Inativo' });
             }
             if (status === 429) {
                 return res.status(429).json({ success: false, error: 'Limite de requisições excedido' });
