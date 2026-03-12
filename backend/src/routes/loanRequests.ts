@@ -130,6 +130,36 @@ function validateRequestByProfile(data: any): string | null {
         }
     }
 
+    // GARANTIA needs collateral items
+    if (profile === 'GARANTIA') {
+        if (!data.collateralItems || !Array.isArray(data.collateralItems) || data.collateralItems.length === 0) {
+            return 'Pelo menos 1 item de garantia é obrigatório.';
+        }
+
+        // Validar cada item
+        for (let i = 0; i < data.collateralItems.length; i++) {
+            const item = data.collateralItems[i];
+
+            if (!item.type) {
+                return `Item ${i + 1}: Tipo de garantia obrigatório.`;
+            }
+            if (!item.description) {
+                return `Item ${i + 1}: Descrição obrigatória.`;
+            }
+            if (!item.estimatedValue) {
+                return `Item ${i + 1}: Valor estimado obrigatório.`;
+            }
+            if (!item.photos || item.photos.length === 0) {
+                return `Item ${i + 1}: Fotos obrigatórias.`;
+            }
+
+            // Se hasInvoice=true, invoiceUrl é obrigatório
+            if (item.hasInvoice && !item.invoiceUrl) {
+                return `Item ${i + 1}: Nota fiscal obrigatória (você marcou que possui).`;
+            }
+        }
+    }
+
     return null;
 }
 
@@ -300,6 +330,7 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 workCardUrl: normalizeDocField(data.workCardUrl || data.workCard),
                 // Dados extras (endereço detalhado, fotos casa, garantia, etc.)
                 supplementalDescription: data.supplementalDescription || null,
+                collateralItems: data.collateralItems || null,
                 // Banco
                 bankName: data.bankName,
                 bankAgency: data.bankAgency,

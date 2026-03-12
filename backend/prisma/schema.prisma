@@ -329,6 +329,7 @@ model LoanRequest {
   partner                 User?     @relation(fields: [partnerId], references: [id], name: "LoanRequestPartner")
   loan                    Loan?
   partnerCommissions      PartnerCommission[] @relation("PartnerCommissionLoanRequest")
+  collateralItems         Json?     @map("collateral_items")
 
   @@map("loan_requests")
 }
