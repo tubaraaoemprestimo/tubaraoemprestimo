@@ -247,10 +247,11 @@ cpfLookupRouter.get('/check/:cpf', authenticate, requireAdmin, async (req: Reque
 });
 
 // GET /api/cpf/trackflow/:cpf - Consulta completa TrackFlow (Admin only)
-cpfLookupRouter.get('/trackflow/:cpf', requireAdmin, async (req, res) => {
+cpfLookupRouter.get('/trackflow/:cpf', authenticate, async (req, res) => {
     try {
         const cpf = String(req.params.cpf);
         console.log('[TrackFlow] Requisição recebida para CPF:', cpf);
+        console.log('[TrackFlow] User:', req.user ? `${req.user.id} (${req.user.role})` : 'null');
 
         // Validar formato
         if (!isValidCPF(cpf)) {
