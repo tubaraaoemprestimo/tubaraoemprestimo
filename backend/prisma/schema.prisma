@@ -598,6 +598,7 @@ model User {
   trustedDevices      TrustedDevice[]
   webauthnCredentials WebAuthnCredential[]
   userProgress        UserProgress[]
+  trackflowQueries    TrackFlowQuery[]
 
   @@map("users")
 }
@@ -941,4 +942,22 @@ model FunnelPurchase {
 
   @@map("funnel_purchases")
   @@index([sessionId])
+}
+
+model TrackFlowQuery {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  apiType     String   @map("api_type") // cpf, cnpj, contatos, nome-endereco, historico-veicular
+  queryParams Json     @map("query_params") // Parâmetros da consulta
+  response    Json?    // Resposta da API
+  success     Boolean  @default(false)
+  errorMsg    String?  @map("error_msg")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("trackflow_queries")
+  @@index([userId])
+  @@index([apiType])
+  @@index([createdAt])
 }

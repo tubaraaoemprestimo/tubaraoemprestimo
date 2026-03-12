@@ -42,6 +42,7 @@ import { funilRouter } from './routes/funil';
 import { cursoRouter } from './routes/curso';
 import { checkoutRouter } from './routes/checkout';
 import { stripeWebhookRouter } from './routes/webhooks/stripe';
+import trackflowRouter from './routes/trackflow';
 import { initCronJobs } from './cron/installmentReminders';
 import { startCollectionCron } from './cron/collectionCron';
 
@@ -120,6 +121,7 @@ app.use('/api/returning-clients', returningClientsRouter);
 app.use('/api/funil', funilRouter);
 app.use('/api/curso', cursoRouter);
 app.use('/api/checkout', checkoutRouter);
+app.use('/api/trackflow', trackflowRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {

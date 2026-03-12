@@ -39,8 +39,8 @@ export const DataSearchNew: React.FC = () => {
         setResult(null);
 
         try {
-            let url = '';
-            let params: any = { token: TRACKFLOW_TOKEN };
+            let apiType = '';
+            let queryParams: any = {};
 
             switch (activeTab) {
                 case 'cpf':
@@ -49,8 +49,8 @@ export const DataSearchNew: React.FC = () => {
                         setLoading(false);
                         return;
                     }
-                    url = `${TRACKFLOW_BASE_URL}/cpf`;
-                    params.cpf = cpf.replace(/\D/g, '');
+                    apiType = 'cpf';
+                    queryParams.cpf = cpf.replace(/\D/g, '');
                     break;
 
                 case 'cnpj':
@@ -59,37 +59,37 @@ export const DataSearchNew: React.FC = () => {
                         setLoading(false);
                         return;
                     }
-                    url = `${TRACKFLOW_BASE_URL}/cnpj`;
-                    params.cnpj = cnpj.replace(/\D/g, '');
+                    apiType = 'cnpj';
+                    queryParams.cnpj = cnpj.replace(/\D/g, '');
                     break;
 
                 case 'contatos':
-                    url = `${TRACKFLOW_BASE_URL}/contatos`;
-                    if (cpf) params.cpf = cpf.replace(/\D/g, '');
-                    if (cnpj) params.cnpj = cnpj.replace(/\D/g, '');
-                    if (telefone) params.telefone = telefone.replace(/\D/g, '');
-                    if (email) params.email = email;
-                    if (nome) params.nome = nome;
+                    if (cpf) queryParams.cpf = cpf.replace(/\D/g, '');
+                    if (cnpj) queryParams.cnpj = cnpj.replace(/\D/g, '');
+                    if (telefone) queryParams.telefone = telefone.replace(/\D/g, '');
+                    if (email) queryParams.email = email;
+                    if (nome) queryParams.nome = nome;
 
                     if (!cpf && !cnpj && !telefone && !email && !nome) {
                         addToast('Preencha pelo menos um campo', 'warning');
                         setLoading(false);
                         return;
                     }
+                    apiType = 'contatos';
                     break;
 
                 case 'nome-endereco':
-                    url = `${TRACKFLOW_BASE_URL}/nome-endereco`;
-                    if (nome) params.nome = nome;
-                    if (cpf) params.cpf = cpf.replace(/\D/g, '');
-                    if (uf) params.uf = uf;
-                    if (cidade) params.cidade = cidade;
+                    if (nome) queryParams.nome = nome;
+                    if (cpf) queryParams.cpf = cpf.replace(/\D/g, '');
+                    if (uf) queryParams.uf = uf;
+                    if (cidade) queryParams.cidade = cidade;
 
                     if (!nome && !cpf) {
                         addToast('Digite um nome ou CPF', 'warning');
                         setLoading(false);
                         return;
                     }
+                    apiType = 'nome-endereco';
                     break;
 
                 case 'veiculo':
@@ -98,17 +98,30 @@ export const DataSearchNew: React.FC = () => {
                         setLoading(false);
                         return;
                     }
-                    url = `${TRACKFLOW_BASE_URL}/historico-veicular`;
-                    params.tvalue = veiculoType;
-                    params.value = veiculoValue.replace(/\D/g, '');
+                    apiType = 'historico-veicular';
+                    queryParams.tvalue = veiculoType;
+                    queryParams.value = veiculoValue.replace(/\D/g, '');
                     break;
             }
 
-            const response = await axios.get<TrackFlowResponse>(url, { params, timeout: 30000 });
+            // Chamar backend que salva no banco e consulta TrackFlow
+            const token = localStorage.getItem('token');
+            const response = await axios.post(
+                '/api/trackflow/query',
+                { apiType, queryParams },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                    timeout: 30000
+                }
+            );
 
             if (response.data.success) {
-                setResult(response.data);
-                addToast('Consulta realizada com sucesso!', 'success');
+                setResult(response.data.data);
+                if (response.data.cached) {
+                    addToast('Consulta em cache (últimas 24h)', 'info');
+                } else {
+                    addToast('Consulta realizada com sucesso!', 'success');
+                }
             } else {
                 addToast(response.data.error || 'Erro na consulta', 'error');
             }
