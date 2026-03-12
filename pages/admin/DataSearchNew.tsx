@@ -21,6 +21,9 @@ export const DataSearchNew: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabType>('cpf');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
+    const [history, setHistory] = useState<any[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
 
     // Form states
     const [cpf, setCpf] = useState('');
@@ -33,6 +36,11 @@ export const DataSearchNew: React.FC = () => {
     const [placa, setPlaca] = useState('');
     const [veiculoType, setVeiculoType] = useState<'placa' | 'cpf' | 'cnpj' | 'renavam' | 'chassi'>('placa');
     const [veiculoValue, setVeiculoValue] = useState('');
+
+    // Carregar histórico ao montar componente
+    React.useEffect(() => {
+        loadHistory();
+    }, [activeTab]);
 
     const handleSearch = async () => {
         setLoading(true);
@@ -122,6 +130,7 @@ export const DataSearchNew: React.FC = () => {
                 } else {
                     addToast('Consulta realizada com sucesso!', 'success');
                 }
+                loadHistory(); // Recarregar histórico após nova consulta
             } else {
                 addToast(response.data.error || 'Erro na consulta', 'error');
             }
@@ -130,6 +139,41 @@ export const DataSearchNew: React.FC = () => {
             addToast(error.response?.data?.error || 'Erro ao consultar API', 'error');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadHistory = async () => {
+        setLoadingHistory(true);
+        try {
+            const token = localStorage.getItem('token');
+            const apiTypeMap: any = {
+                'cpf': 'cpf',
+                'cnpj': 'cnpj',
+                'contatos': 'contatos',
+                'nome-endereco': 'nome-endereco',
+                'veiculo': 'historico-veicular'
+            };
+
+            const response = await axios.get('/api/trackflow/history', {
+                params: { apiType: apiTypeMap[activeTab], limit: 20 },
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (response.data.success) {
+                setHistory(response.data.queries || []);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar histórico:', error);
+        } finally {
+            setLoadingHistory(false);
+        }
+    };
+
+    const viewHistoryItem = (item: any) => {
+        if (item.success && item.response) {
+            setResult(item.response);
+            setShowHistory(false);
+            addToast('Consulta carregada do histórico', 'info');
         }
     };
 
@@ -181,8 +225,78 @@ export const DataSearchNew: React.FC = () => {
 
     return (
         <div className="p-8 bg-black min-h-screen text-white">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-[#D4AF37] flex items-center gap-3">
+            <div className="mb-8 flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-[#D4AF37] flex items-center gap-3">
+                        <Database size={32} /> Central de Investigação TrackFlow
+                    </h1>
+                    <p className="text-zinc-500 mt-2">
+                        5 APIs disponíveis: CPF, CNPJ, Contatos, Nome/Endereço e Histórico Veicular
+                    </p>
+                </div>
+                <button
+                    onClick={() => setShowHistory(!showHistory)}
+                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                    <FileText size={18} />
+                    {showHistory ? 'Ocultar Histórico' : 'Ver Histórico'}
+                    {history.length > 0 && (
+                        <span className="bg-[#D4AF37] text-black px-2 py-0.5 rounded-full text-xs font-bold">
+                            {history.length}
+                        </span>
+                    )}
+                </button>
+            </div>
+
+            {/* Histórico de Consultas */}
+            {showHistory && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-8">
+                    <h2 className="text-xl font-bold text-[#D4AF37] mb-4">Histórico de Consultas</h2>
+                    {loadingHistory ? (
+                        <div className="flex items-center justify-center py-8">
+                            <Loader2 className="animate-spin text-[#D4AF37]" size={32} />
+                        </div>
+                    ) : history.length === 0 ? (
+                        <p className="text-zinc-500 text-center py-8">Nenhuma consulta realizada ainda</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {history.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className="bg-black border border-zinc-800 rounded-xl p-4 hover:border-[#D4AF37] transition-colors cursor-pointer"
+                                    onClick={() => viewHistoryItem(item)}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            {item.success ? (
+                                                <Check className="text-green-400" size={20} />
+                                            ) : (
+                                                <AlertTriangle className="text-red-400" size={20} />
+                                            )}
+                                            <div>
+                                                <p className="font-bold text-white">
+                                                    {item.apiType.toUpperCase()}
+                                                </p>
+                                                <p className="text-xs text-zinc-500">
+                                                    {formatDate(item.createdAt)} - {new Date(item.createdAt).toLocaleTimeString('pt-BR')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm text-zinc-400">
+                                                {JSON.stringify(item.queryParams).substring(0, 50)}...
+                                            </p>
+                                            {!item.success && item.errorMsg && (
+                                                <p className="text-xs text-red-400 mt-1">{item.errorMsg}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
                     <Database size={32} /> Central de Investigação TrackFlow
                 </h1>
                 <p className="text-zinc-500 mt-2">
