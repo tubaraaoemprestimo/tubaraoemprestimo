@@ -95,6 +95,9 @@ export default function ConsultaCPFCard({ cpf }: ConsultaCPFCardProps) {
         setLoading(true);
         try {
             const response = await apiService.consultarCPFTrackFlow(cpf);
+            console.log('[TrackFlow] Resposta completa:', response);
+            console.log('[TrackFlow] Estrutura data:', response?.data);
+            console.log('[TrackFlow] Consulta:', response?.data?.consulta);
             setData(response);
             setExpanded(true);
             addToast('Consulta realizada com sucesso!', 'success');
