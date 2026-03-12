@@ -245,3 +245,69 @@ cpfLookupRouter.get('/check/:cpf', authenticate, requireAdmin, async (req: Reque
         res.status(500).json({ error: 'Erro ao verificar CPF' });
     }
 });
+
+// GET /api/cpf/trackflow/:cpf - Consulta completa TrackFlow (Admin only)
+router.get('/trackflow/:cpf', requireAdmin, async (req, res) => {
+    try {
+        const { cpf } = req.params;
+
+        // Validar formato
+        if (!isValidCPF(cpf)) {
+            return res.status(400).json({
+                success: false,
+                error: 'CPF inválido'
+            });
+        }
+
+        // Higienizar CPF
+        const cpfLimpo = cpf.replace(/\D/g, '');
+
+        // Chamar API TrackFlow
+        const trackflowToken = process.env.TRACKFLOW_API_TOKEN;
+        if (!trackflowToken) {
+            return res.status(500).json({
+                success: false,
+                error: 'Token TrackFlow não configurado'
+            });
+        }
+
+        const trackflowUrl = `https://apis.trackflow.services/api/cpf?cpf=${cpfLimpo}&token=${trackflowToken}`;
+
+        const response = await axios.get(trackflowUrl, {
+            timeout: 30000 // 30 segundos
+        });
+
+        // Retornar dados
+        return res.json({
+            success: true,
+            data: response.data
+        });
+
+    } catch (error: any) {
+        console.error('Erro ao consultar TrackFlow:', error.message);
+
+        // Tratar erros específicos
+        if (error.response) {
+            const status = error.response.status;
+            if (status === 401) {
+                return res.status(401).json({ success: false, error: 'Token TrackFlow inválido' });
+            }
+            if (status === 402) {
+                return res.status(402).json({ success: false, error: 'Saldo insuficiente na wallet TrackFlow' });
+            }
+            if (status === 403) {
+                return res.status(403).json({ success: false, error: 'Plano TrackFlow inativo' });
+            }
+            if (status === 429) {
+                return res.status(429).json({ success: false, error: 'Limite de requisições excedido' });
+            }
+        }
+
+        return res.status(500).json({
+            success: false,
+            error: 'Erro ao consultar CPF na TrackFlow'
+        });
+    }
+});
+
+export default router;

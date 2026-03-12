@@ -854,6 +854,12 @@ export const apiService = {
         const { data, error } = await api.post('/scheduled-status/generate-caption', { imageUrl });
         if (error) throw new Error((error as any).error || 'Erro ao gerar legenda');
         return data?.caption || '';
+    },
+
+    // Consulta CPF completa via TrackFlow
+    consultarCPFTrackFlow: async (cpf: string) => {
+        const response = await api.get(`/cpf/trackflow/${cpf}`);
+        return response.data;
     }
 };
 

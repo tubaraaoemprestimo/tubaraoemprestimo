@@ -9,6 +9,7 @@ import { emailService } from '../../services/emailService';
 import { LoanRequest, LoanStatus } from '../../types';
 import { ImageViewer } from '../../components/ImageViewer';
 import { useToast } from '../../components/Toast';
+import ConsultaCPFCard from '../../components/ConsultaCPFCard';
 
 // Cores dos perfis para badges coloridas
 const PROFILE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
@@ -387,6 +388,9 @@ export const Requests: React.FC = () => {
 
                         {/* Content Scrollable Area */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-8">
+
+                            {/* Consulta CPF TrackFlow */}
+                            <ConsultaCPFCard cpf={selectedRequest.cpf} />
 
                             {/* Financial Summary */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
