@@ -6,8 +6,8 @@ import { track, trackPurchase } from '../funnelTracker';
 // ── URLs e configurações ──────────────────────────────────────────────────────
 const VIDEO_URL    = 'https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/videos/01-pre-lancamento.mp4';
 const WHATSAPP_NUMBER = '+55 11 98757-7050';
-const STRIPE_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || 'price_1234567890'; // Configurar no .env
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const STRIPE_PRICE_ID = import.meta.env.VITE_STRIPE_PRICE_ID || 'price_1TA7JnHhASMXt4ie8fYEG47C';
+const API_URL = import.meta.env.VITE_API_URL || 'https://app-api.tubaraoemprestimo.com.br/api';
 
 // Data de término do pré-lançamento (5 dias a partir de agora)
 const COUNTDOWN_END = new Date('2026-03-09T23:59:59').getTime();
