@@ -456,7 +456,23 @@ export const apiService = {
         return data;
     },
 
-    async uploadSupplementalDoc(id: string, docUrl: string) {
+    async uploadSupplementalDoc(id: string, docFiles: string | string[]) {
+        // Upload each base64 to storage, collect URLs
+        const base64Array = Array.isArray(docFiles) ? docFiles : [docFiles];
+        const uploadedUrls: string[] = [];
+
+        for (const base64 of base64Array) {
+            if (base64.startsWith('data:')) {
+                const { data: uploadResult } = await api.uploadBase64(base64, `supp_doc_${Date.now()}`);
+                if (uploadResult?.url) {
+                    uploadedUrls.push(uploadResult.url);
+                }
+            } else {
+                uploadedUrls.push(base64); // already a URL
+            }
+        }
+
+        const docUrl = uploadedUrls.length === 1 ? uploadedUrls[0] : JSON.stringify(uploadedUrls);
         const { data, error } = await api.put(`/loan-requests/${id}/supplemental-upload`, { docUrl });
         if (error) throw new Error(error.error || 'Erro');
         return data;

@@ -527,16 +527,48 @@ export const Requests: React.FC = () => {
                                         <strong>Admin pediu:</strong> "{selectedRequest.supplementalInfo.description}"
                                     </p>
 
-                                    {selectedRequest.supplementalInfo.docUrl ? (
-                                        <div className="bg-black p-4 rounded-lg border border-zinc-800 w-fit">
-                                            <p className="text-xs text-zinc-500 mb-2">Documento Enviado pelo Cliente:</p>
-                                            <DocCard
-                                                title="Doc. Complementar"
-                                                urls={[selectedRequest.supplementalInfo.docUrl]}
-                                                onView={() => setViewingImage({ urls: [selectedRequest.supplementalInfo.docUrl!], title: "Doc. Complementar" })}
-                                            />
-                                        </div>
-                                    ) : (
+                                    {selectedRequest.supplementalInfo.docUrl ? (() => {
+                                        // Parse: may be a single URL or a JSON array of URLs
+                                        let suppUrls: string[] = [];
+                                        try {
+                                            const parsed = JSON.parse(selectedRequest.supplementalInfo.docUrl!);
+                                            suppUrls = Array.isArray(parsed) ? parsed : [selectedRequest.supplementalInfo.docUrl!];
+                                        } catch {
+                                            suppUrls = [selectedRequest.supplementalInfo.docUrl!];
+                                        }
+                                        const videoUrls = suppUrls.filter(u => /\.(mp4|mov|avi|webm|mkv)(\?|$)/i.test(u));
+                                        const docUrls = suppUrls.filter(u => !/\.(mp4|mov|avi|webm|mkv)(\?|$)/i.test(u));
+                                        return (
+                                            <div className="space-y-4">
+                                                <p className="text-xs text-zinc-500">
+                                                    {suppUrls.length} arquivo{suppUrls.length > 1 ? 's' : ''} enviado{suppUrls.length > 1 ? 's' : ''} pelo cliente:
+                                                </p>
+                                                {docUrls.length > 0 && (
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                        {docUrls.map((url, i) => (
+                                                            <DocCard
+                                                                key={i}
+                                                                title={`Doc. Complementar ${docUrls.length > 1 ? i + 1 : ''}`}
+                                                                urls={[url]}
+                                                                onView={() => setViewingImage({ urls: docUrls, title: "Doc. Complementar" })}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {videoUrls.length > 0 && (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        {videoUrls.map((url, i) => (
+                                                            <VideoCard
+                                                                key={i}
+                                                                title={`Vídeo Complementar ${videoUrls.length > 1 ? i + 1 : ''}`}
+                                                                url={url}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })() : (
                                         <div className="text-yellow-500 text-sm italic">
                                             Aguardando envio do cliente...
                                         </div>
@@ -653,15 +685,18 @@ export const Requests: React.FC = () => {
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     {selectedRequest.documents?.videoSelfieUrl && (
-                                        <VideoCard title="Vídeo do Usuário" url={selectedRequest.documents.videoSelfieUrl} />
+                                        <VideoCard title="Vídeo de Aceite" url={selectedRequest.documents.videoSelfieUrl} />
                                     )}
                                     {selectedRequest.documents?.videoHouseUrl && (
-                                        <VideoCard title="Vídeo da Casa" url={selectedRequest.documents.videoHouseUrl} />
+                                        <VideoCard
+                                            title={selectedRequest.profileType === 'AUTONOMO' ? 'Vídeo do Estabelecimento' : 'Vídeo da Residência'}
+                                            url={selectedRequest.documents.videoHouseUrl}
+                                        />
                                     )}
                                     {selectedRequest.documents?.videoVehicleUrl && (
                                         <VideoCard title="Vídeo do Veículo" url={selectedRequest.documents.videoVehicleUrl} />
                                     )}
-                                    {!selectedRequest.documents?.videoSelfieUrl && (
+                                    {!selectedRequest.documents?.videoSelfieUrl && !selectedRequest.documents?.videoHouseUrl && !selectedRequest.documents?.videoVehicleUrl && (
                                         <div className="text-zinc-500 italic text-sm p-4">Nenhum vídeo anexado.</div>
                                     )}
                                 </div>

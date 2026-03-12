@@ -328,6 +328,26 @@ export const Wizard: React.FC = () => {
   // Cálculos com taxas REAIS do banco
   const getAmount = () => customAmount ? parseFloat(customAmount) || 0 : selectedAmount;
 
+  // ── FASE 1: Strict Validation — pode avançar no step atual? ──────────────
+  const canProceedOnCurrentStep = (() => {
+    // LIMPA_NOME step 4: assinatura obrigatória
+    if (profileType === 'LIMPA_NOME' && currentStep === 4) {
+      return !!formData.signature;
+    }
+    // Step de documentos (vídeos obrigatórios)
+    const docsStep = profileType === 'GARANTIA' ? 6 : 5;
+    if (
+      profileType !== 'LIMPA_NOME' &&
+      profileType !== 'INVESTIDOR' &&
+      currentStep === docsStep
+    ) {
+      if (profileType !== 'MOTO' && !formData.videoHouse) return false;
+      if (profileType !== 'MOTO' && !formData.videoSelfie) return false;
+      if (needsGuarantee && !guarantee.video) return false;
+    }
+    return true;
+  })();
+
   const calculateTotal = () => {
     if (!settings) return 0;
     return loanSettingsService.calculateTotal(getAmount(), settings.interestRateMonthly);
@@ -2861,6 +2881,9 @@ export const Wizard: React.FC = () => {
                       <VideoUpload label="🎥 Vídeo do Estabelecimento (OBRIGATÓRIO)" subtitle="Mostre seu local de trabalho"
                         videoUrl={formData.videoHouse} onUpload={(url) => setFormData({ ...formData, videoHouse: url })}
                         onRemove={() => setFormData({ ...formData, videoHouse: '' })} />
+                      {!formData.videoHouse && (
+                        <p className="text-red-500 text-xs mt-2">⚠️ O envio do vídeo do estabelecimento é obrigatório para prosseguir.</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2905,7 +2928,7 @@ export const Wizard: React.FC = () => {
                   {renderUploadArea('housePhotos', 'Fotos da Fachada/Frente da Casa (OBRIGATÓRIO)', formData.housePhotos)}
 
                   {/* Vídeo da residência - não obrigatório para MOTO */}
-                  {profileType !== 'MOTO' && (
+                  {profileType !== 'MOTO' && profileType !== 'AUTONOMO' && (
                     <div className="bg-black p-4 rounded-xl border border-zinc-800">
                       <VideoUpload
                         label="🎥 Vídeo da sua Residência (OBRIGATÓRIO)"
@@ -2914,6 +2937,9 @@ export const Wizard: React.FC = () => {
                         onUpload={(url) => setFormData({ ...formData, videoHouse: url })}
                         onRemove={() => setFormData({ ...formData, videoHouse: '' })}
                       />
+                      {!formData.videoHouse && (
+                        <p className="text-red-500 text-xs mt-2">⚠️ O envio do vídeo da residência é obrigatório para prosseguir.</p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2940,6 +2966,9 @@ export const Wizard: React.FC = () => {
                         onUpload={(url) => setGuarantee({ ...guarantee, video: url })}
                         onRemove={() => setGuarantee({ ...guarantee, video: '' })}
                       />
+                      {!guarantee.video && (
+                        <p className="text-red-500 text-xs mt-2">⚠️ O envio do vídeo do bem em garantia é obrigatório para prosseguir.</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2961,6 +2990,9 @@ export const Wizard: React.FC = () => {
                         onUpload={(url) => setFormData({ ...formData, videoSelfie: url })}
                         onRemove={() => setFormData({ ...formData, videoSelfie: '' })}
                       />
+                      {!formData.videoSelfie && (
+                        <p className="text-red-500 text-xs mt-2">⚠️ O envio do vídeo de aceite é obrigatório para prosseguir.</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -3007,6 +3039,9 @@ export const Wizard: React.FC = () => {
                   </p>
                 </div>
                 <SignaturePad onSign={(sig) => setFormData({ ...formData, signature: sig })} />
+                {!formData.signature && (
+                  <p className="text-red-500 text-xs mt-1">⚠️ A assinatura é obrigatória para prosseguir.</p>
+                )}
               </div>
             </div>
           )}
@@ -3148,7 +3183,7 @@ export const Wizard: React.FC = () => {
         <div className="fixed bottom-0 left-0 w-full p-4 bg-black/90 border-t border-zinc-900 flex gap-4 z-40 backdrop-blur-md">
           {currentStep > 1 && <Button onClick={handleBack} variant="secondary" className="flex-1">Voltar</Button>}
           {currentStep < steps.length ? (
-            <Button onClick={handleNext} className="flex-1 font-bold text-lg">
+            <Button onClick={handleNext} disabled={!canProceedOnCurrentStep} className="flex-1 font-bold text-lg">
               {currentStep === 1 ? 'Começar Simulação' : 'Continuar'}
             </Button>
           ) : (

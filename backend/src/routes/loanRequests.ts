@@ -102,10 +102,48 @@ function normalizeDocField(value: any): string | null {
     return String(value);
 }
 
+// ── Validação estrita por profileType ──────────────────────────────────────
+function validateRequestByProfile(data: any): string | null {
+    const profile = data.profileType as string | undefined;
+
+    // Todos os perfis de empréstimo/financiamento precisam de assinatura
+    if (['CLT', 'AUTONOMO', 'MOTO', 'GARANTIA'].includes(profile || '')) {
+        if (!data.signatureUrl && !data.signature) {
+            return 'Assinatura obrigatória.';
+        }
+        if (!data.videoSelfieUrl && !data.videoSelfie) {
+            return 'Vídeo de aceite (videoSelfie) obrigatório.';
+        }
+    }
+
+    // AUTONOMO e CLT e GARANTIA precisam do vídeo da residência/estabelecimento
+    if (['CLT', 'AUTONOMO', 'GARANTIA'].includes(profile || '')) {
+        if (!data.videoHouseUrl && !data.videoHouse) {
+            return 'Vídeo da residência/estabelecimento (videoHouse) obrigatório.';
+        }
+    }
+
+    // LIMPA_NOME precisa de assinatura
+    if (profile === 'LIMPA_NOME') {
+        if (!data.signatureUrl && !data.signature) {
+            return 'Assinatura obrigatória para serviço Limpa Nome.';
+        }
+    }
+
+    return null;
+}
+
 // POST /api/loan-requests — Nova solicitação
 loanRequestsRouter.post('/', async (req: Request, res: Response) => {
     try {
         const data = req.body;
+
+        // Validação estrita dos campos obrigatórios por tipo de perfil
+        const validationError = validateRequestByProfile(data);
+        if (validationError) {
+            res.status(400).json({ error: validationError });
+            return;
+        }
 
         // Busca ou cria customer
         let customer = await prisma.customer.findFirst({

@@ -57,6 +57,7 @@ export const ClientDashboard: React.FC = () => {
   const [isOffersModalOpen, setIsOffersModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [selectedDocFiles, setSelectedDocFiles] = useState<File[]>([]);
   const [contractPdfUrl, setContractPdfUrl] = useState<string | null>(null);
 const [loanHistory, setLoanHistory] = useState<LoanRequest[]>([]);
 const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -254,20 +255,38 @@ if (user) {
     }
   };
 
-  const handleDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && pendingRequest) {
-      setUploadingDoc(true);
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const result = reader.result as string;
-        await apiService.uploadSupplementalDoc(pendingRequest.id, result);
-        setUploadingDoc(false);
-        setIsUploadModalOpen(false);
-        addToast("Documento enviado! Sua análise continuará.", 'success');
-        loadDashboardData(); // Refresh state
-      };
-      reader.readAsDataURL(file);
+  const handleDocFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setSelectedDocFiles(prev => [...prev, ...files]);
+    }
+    // Reset input so same files can be re-selected if needed
+    e.target.value = '';
+  };
+
+  const handleDocUploadSubmit = async () => {
+    if (selectedDocFiles.length === 0 || !pendingRequest) return;
+    setUploadingDoc(true);
+    try {
+      // Convert all files to base64 and upload
+      const uploadPromises = selectedDocFiles.map(file =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        })
+      );
+      const base64Files = await Promise.all(uploadPromises);
+      await apiService.uploadSupplementalDoc(pendingRequest.id, base64Files);
+      setUploadingDoc(false);
+      setIsUploadModalOpen(false);
+      setSelectedDocFiles([]);
+      addToast("Documentos enviados! Sua análise continuará.", 'success');
+      loadDashboardData();
+    } catch (err) {
+      setUploadingDoc(false);
+      addToast("Erro ao enviar. Tente novamente.", 'error');
     }
   };
 
@@ -604,19 +623,29 @@ if (user) {
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
               <h3 className="text-xl font-bold text-white">Enviar Documento</h3>
-              <button onClick={() => setIsUploadModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
+              <button onClick={() => { setIsUploadModalOpen(false); setSelectedDocFiles([]); }}>
+                <X className="text-zinc-500 hover:text-white" />
+              </button>
             </div>
 
-            <p className="text-sm text-zinc-400 mb-6">
-              Selecione uma foto ou PDF do documento solicitado: <br />
-              <strong className="text-white">"{pendingRequest?.supplementalInfo?.description}"</strong>
+            <p className="text-sm text-zinc-400 mb-4">
+              Selecione as fotos, PDFs ou vídeos solicitados:
             </p>
+            {pendingRequest?.supplementalInfo?.description && (
+              <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg px-4 py-3 mb-5">
+                <p className="text-sm text-blue-300">
+                  <strong className="text-white">Admin pediu:</strong> "{pendingRequest.supplementalInfo.description}"
+                </p>
+              </div>
+            )}
 
-            <div className="relative mb-6">
+            {/* Drop zone / file selector */}
+            <div className="relative mb-4">
               <input
                 type="file"
-                accept="image/*,application/pdf"
-                onChange={handleDocUpload}
+                accept="image/*,application/pdf,video/mp4,video/quicktime,video/x-msvideo,video/webm,video/*"
+                multiple
+                onChange={handleDocFileSelect}
                 className="hidden"
                 id="supp-upload"
                 disabled={uploadingDoc}
@@ -624,18 +653,53 @@ if (user) {
               <label
                 htmlFor="supp-upload"
                 className={`flex flex-col items-center justify-center gap-2 w-full p-8 rounded-xl border-2 border-dashed cursor-pointer transition-all ${uploadingDoc
-                  ? 'bg-zinc-800 border-zinc-700 opacity-50'
+                  ? 'bg-zinc-800 border-zinc-700 opacity-50 cursor-not-allowed'
                   : 'bg-zinc-900/50 border-zinc-700 hover:border-[#D4AF37] hover:bg-zinc-800'
                   }`}
               >
                 <Upload size={32} className="text-[#D4AF37]" />
-                <span className="font-bold text-sm text-white">{uploadingDoc ? "Enviando..." : "Toque para selecionar"}</span>
+                <span className="font-bold text-sm text-white">Toque para selecionar</span>
+                <span className="text-xs text-zinc-500">Fotos, PDFs e Vídeos aceitos</span>
               </label>
             </div>
 
-            <Button onClick={() => setIsUploadModalOpen(false)} variant="secondary" className="w-full">
-              Cancelar
-            </Button>
+            {/* File preview list */}
+            {selectedDocFiles.length > 0 && (
+              <div className="mb-5 space-y-2">
+                <p className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">
+                  {selectedDocFiles.length} arquivo{selectedDocFiles.length > 1 ? 's' : ''} selecionado{selectedDocFiles.length > 1 ? 's' : ''}:
+                </p>
+                <ul className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                  {selectedDocFiles.map((f, i) => (
+                    <li key={i} className="flex items-center justify-between bg-zinc-800 rounded-lg px-3 py-2">
+                      <span className="text-xs text-zinc-300 truncate max-w-[240px]">
+                        {f.type.startsWith('video/') ? '🎥' : f.type === 'application/pdf' ? '📄' : '🖼️'} {f.name}
+                      </span>
+                      <button
+                        onClick={() => setSelectedDocFiles(prev => prev.filter((_, idx) => idx !== i))}
+                        className="ml-2 text-zinc-500 hover:text-red-400 shrink-0"
+                      >
+                        <X size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <Button onClick={() => { setIsUploadModalOpen(false); setSelectedDocFiles([]); }} variant="secondary" className="flex-1">
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleDocUploadSubmit}
+                disabled={selectedDocFiles.length === 0 || uploadingDoc}
+                isLoading={uploadingDoc}
+                className="flex-1 font-bold"
+              >
+                {uploadingDoc ? 'Enviando...' : `Enviar ${selectedDocFiles.length > 0 ? `(${selectedDocFiles.length})` : ''}`}
+              </Button>
+            </div>
           </div>
         </div>
       )}
