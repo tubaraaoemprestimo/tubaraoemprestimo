@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import apiService from '../services/apiService';
-import { useToast } from '../hooks/useToast';
+import { useToast } from './Toast';
 
 interface ConsultaCPFCardProps {
     cpf: string;
