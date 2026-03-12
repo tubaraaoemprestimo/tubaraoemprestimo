@@ -250,6 +250,7 @@ cpfLookupRouter.get('/check/:cpf', authenticate, requireAdmin, async (req: Reque
 cpfLookupRouter.get('/trackflow/:cpf', requireAdmin, async (req, res) => {
     try {
         const cpf = String(req.params.cpf);
+        console.log('[TrackFlow] Requisição recebida para CPF:', cpf);
 
         // Validar formato
         if (!isValidCPF(cpf)) {
