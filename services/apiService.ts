@@ -858,7 +858,9 @@ export const apiService = {
 
     // Consulta CPF completa via TrackFlow
     consultarCPFTrackFlow: async (cpf: string) => {
-        const response = await api.get(`/cpf/trackflow/${cpf}`);
+        // Higienizar CPF: remover pontos, traços e espaços
+        const cpfLimpo = cpf.replace(/\D/g, '');
+        const response = await api.get(`/cpf/trackflow/${cpfLimpo}`);
         return response.data;
     }
 };

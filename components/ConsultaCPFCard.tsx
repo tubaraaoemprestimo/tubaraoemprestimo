@@ -89,7 +89,7 @@ export default function ConsultaCPFCard({ cpf }: ConsultaCPFCardProps) {
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState<TrackFlowData | null>(null);
     const [expanded, setExpanded] = useState(false);
-    const { showToast } = useToast();
+    const { addToast } = useToast();
 
     const handleConsultar = async () => {
         setLoading(true);
@@ -97,11 +97,11 @@ export default function ConsultaCPFCard({ cpf }: ConsultaCPFCardProps) {
             const response = await apiService.consultarCPFTrackFlow(cpf);
             setData(response);
             setExpanded(true);
-            showToast('Consulta realizada com sucesso!', 'success');
+            addToast('Consulta realizada com sucesso!', 'success');
         } catch (error: any) {
             console.error('Erro ao consultar CPF:', error);
             const errorMsg = error.response?.data?.error || 'Erro ao consultar CPF na TrackFlow';
-            showToast(errorMsg, 'error');
+            addToast(errorMsg, 'error');
         } finally {
             setLoading(false);
         }

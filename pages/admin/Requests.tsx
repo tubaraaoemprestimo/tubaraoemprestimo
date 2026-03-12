@@ -389,8 +389,13 @@ export const Requests: React.FC = () => {
                         {/* Content Scrollable Area */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-8">
 
-                            {/* Consulta CPF TrackFlow */}
-                            <ConsultaCPFCard cpf={selectedRequest.cpf} />
+                            {/* SEÇÃO: INVESTIGAÇÃO & ANÁLISE DE RISCO */}
+                            <div className="bg-zinc-950 border-2 border-[#D4AF37] rounded-xl p-6">
+                                <h3 className="text-[#D4AF37] font-bold text-lg uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    🔍 Investigação & Análise de Risco
+                                </h3>
+                                <ConsultaCPFCard cpf={selectedRequest.cpf} />
+                            </div>
 
                             {/* Financial Summary */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
