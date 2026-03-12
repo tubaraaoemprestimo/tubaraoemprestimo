@@ -24,6 +24,7 @@ import { Customers } from './pages/admin/Customers';
 import { Investors } from './pages/admin/Investors';
 import { ImportContacts } from './pages/admin/ImportContacts';
 import { DataSearch } from './pages/admin/DataSearch';
+import { DataSearchNew } from './pages/admin/DataSearchNew';
 import { Partners } from './pages/admin/Partners';
 import { QualificationLeadsAdmin } from './pages/admin/QualificationLeadsAdmin';
 import { ScheduledStatus } from './pages/admin/ScheduledStatus';
@@ -539,7 +540,8 @@ function App() {
             <Route path="/admin/contract-migrations" element={<AdminLayout><ContractMigrations /></AdminLayout>} />
             <Route path="/admin/collection-automation" element={<AdminLayout><CollectionAutomationPanel /></AdminLayout>} />
             <Route path="/admin/import-contacts" element={<AdminLayout><ImportContacts /></AdminLayout>} />
-            <Route path="/admin/data-search" element={<AdminLayout><DataSearch /></AdminLayout>} />
+            <Route path="/admin/data-search" element={<AdminLayout><DataSearchNew /></AdminLayout>} />
+            <Route path="/admin/data-search-old" element={<AdminLayout><DataSearch /></AdminLayout>} />
             <Route path="/admin/partners" element={<AdminLayout><Partners /></AdminLayout>} />
             <Route path="/admin/qualification-leads" element={<AdminLayout><QualificationLeadsAdmin /></AdminLayout>} />
             <Route path="/admin/scheduled-status" element={<AdminLayout><ScheduledStatus /></AdminLayout>} />
