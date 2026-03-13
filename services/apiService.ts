@@ -390,6 +390,17 @@ export const apiService = {
         if (uploadedData.occupation) {
             extraData.occupation = uploadedData.occupation;
         }
+        // AUTONOMO: CNPJ e endereço do negócio
+        if (uploadedData.cnpj) {
+            extraData.cnpj = uploadedData.cnpj;
+        }
+        if (uploadedData.businessAddress) {
+            extraData.businessAddress = uploadedData.businessAddress;
+        }
+        // MOTO: Cor escolhida
+        if (uploadedData.motoColor) {
+            extraData.motoColor = uploadedData.motoColor;
+        }
         // Endereço da empresa
         if (uploadedData.companyCep || uploadedData.companyStreet) {
             extraData.companyAddress = {

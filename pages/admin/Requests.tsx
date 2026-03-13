@@ -555,6 +555,51 @@ export const Requests: React.FC = () => {
                                 </div>
                             )}
 
+                            {/* MOTO: Cor Escolhida */}
+                            {selectedRequest.profileType === 'MOTO' && (() => {
+                                let extraData: any = {};
+                                try {
+                                    if (selectedRequest.supplementalDescription) {
+                                        extraData = JSON.parse(selectedRequest.supplementalDescription);
+                                    }
+                                } catch { /* ignore */ }
+
+                                if (extraData.motoColor) {
+                                    return (
+                                        <div className="flex items-center gap-3 p-3 bg-zinc-900 border border-blue-500/30 rounded-xl">
+                                            <div className="flex-1">
+                                                <p className="text-xs text-zinc-500">Cor da Moto Escolhida</p>
+                                                <p className="text-blue-400 font-bold text-sm">{extraData.motoColor}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+
+                            {/* Termos e Declarações Aceitas */}
+                            {(selectedRequest.contractTermsAccepted || selectedRequest.declarationAccepted) && (
+                                <div className="bg-green-900/20 border border-green-600/40 p-4 rounded-xl">
+                                    <h3 className="text-green-400 font-bold text-sm uppercase tracking-wider mb-3 flex items-center gap-2">
+                                        ✅ Termos Aceitos
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {selectedRequest.contractTermsAccepted && (
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <Check size={16} className="text-green-400" />
+                                                <span className="text-white">Termos do Contrato Aceitos</span>
+                                            </div>
+                                        )}
+                                        {selectedRequest.declarationAccepted && (
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <Check size={16} className="text-green-400" />
+                                                <span className="text-white">Declaração de Veracidade Aceita</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Contrato PDF Download */}
                             {selectedRequest.contractPdfUrl && (
                                 <div className="flex items-center gap-3 p-3 bg-zinc-900 border border-emerald-500/30 rounded-xl">
@@ -730,18 +775,35 @@ export const Requests: React.FC = () => {
 
                                 const hasCompanyData = extraData.occupation || extraData.companyAddress || extraData.whatsappPersonal ||
                                                       selectedRequest.companyName || selectedRequest.companyProfession ||
-                                                      selectedRequest.companyWorkSince || selectedRequest.companyIncome;
+                                                      selectedRequest.companyWorkSince || selectedRequest.companyIncome ||
+                                                      extraData.cnpj || extraData.businessAddress;
 
                                 if (!hasCompanyData) return null;
 
                                 return (
                                     <div className="bg-zinc-950 border border-zinc-800 p-4 rounded-xl">
-                                        <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider mb-4">Dados Profissionais</h3>
+                                        <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider mb-4">
+                                            {selectedRequest.profileType === 'AUTONOMO' ? 'Dados do Negócio' : 'Dados Profissionais'}
+                                        </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             {extraData.occupation && (
                                                 <div className="bg-black p-3 rounded-lg border border-zinc-800">
                                                     <p className="text-xs text-zinc-500 uppercase">Profissão</p>
                                                     <p className="font-bold text-white">{extraData.occupation}</p>
+                                                </div>
+                                            )}
+                                            {/* AUTONOMO: CNPJ */}
+                                            {selectedRequest.profileType === 'AUTONOMO' && extraData.cnpj && (
+                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                    <p className="text-xs text-zinc-500 uppercase">CNPJ do Negócio</p>
+                                                    <p className="font-bold text-white">{extraData.cnpj}</p>
+                                                </div>
+                                            )}
+                                            {/* AUTONOMO: Endereço do Comércio */}
+                                            {selectedRequest.profileType === 'AUTONOMO' && extraData.businessAddress && (
+                                                <div className="bg-black p-3 rounded-lg border border-zinc-800 md:col-span-2">
+                                                    <p className="text-xs text-zinc-500 uppercase">Endereço do Comércio</p>
+                                                    <p className="font-bold text-white">{extraData.businessAddress}</p>
                                                 </div>
                                             )}
                                             {selectedRequest.companyName && (
