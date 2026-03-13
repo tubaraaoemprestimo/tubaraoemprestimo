@@ -787,6 +787,367 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
     }
 });
 
+// PUT /api/loan-requests/:id/approve-with-counteroffer — Aprovar com Contraproposta
+loanRequestsRouter.put('/:id/approve-with-counteroffer', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const id = req.params.id as string;
+        const { approvedAmount } = req.body;
+
+        if (!approvedAmount || approvedAmount <= 0) {
+            return res.status(400).json({ error: 'Valor aprovado inválido' });
+        }
+
+        // Buscar solicitação original
+        const originalRequest = await prisma.loanRequest.findUnique({ where: { id } });
+        if (!originalRequest) {
+            return res.status(404).json({ error: 'Solicitação não encontrada' });
+        }
+
+        // Salvar valor original se ainda não foi salvo
+        const requestedAmount = originalRequest.requestedAmount || originalRequest.amount;
+
+        // Atualizar solicitação com contraproposta
+        const request = await prisma.loanRequest.update({
+            where: { id },
+            data: {
+                requestedAmount, // Preservar valor original
+                approvedAmount: parseFloat(approvedAmount),
+                approvedAt: new Date(),
+                approvedById: req.user!.id,
+                status: 'PENDING_ACCEPTANCE', // Novo status aguardando aceite do cliente
+                counterOfferAccepted: false
+            }
+        });
+
+        // ====== NOTIFICAÇÕES AUTOMÁTICAS ======
+        const requestedFormatted = requestedAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const approvedFormatted = parseFloat(approvedAmount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // Email de contraproposta
+        if (request.email) {
+            const emailContent = brandedEmailHtml(`
+                <h2 style="color: #D4AF37;">🎉 Crédito Pré-Aprovado!</h2>
+                <p>Olá, <strong>${request.clientName}</strong>!</p>
+                <p>Temos uma ótima notícia! Seu pedido de crédito foi analisado e <strong style="color: #4CAF50;">PRÉ-APROVADO</strong>!</p>
+
+                <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border: 2px solid #D4AF37; border-radius: 12px; padding: 20px; margin: 20px 0;">
+                    <p style="margin: 8px 0; color: #aaa;">Valor Solicitado:</p>
+                    <p style="margin: 8px 0; font-size: 18px; text-decoration: line-through; color: #666;">${requestedFormatted}</p>
+
+                    <p style="margin: 15px 0 8px 0; color: #D4AF37; font-weight: bold;">💰 Valor Liberado:</p>
+                    <p style="margin: 8px 0; font-size: 32px; font-weight: bold; color: #4CAF50;">${approvedFormatted}</p>
+
+                    <p style="margin: 15px 0 5px 0; color: #aaa; font-size: 13px;">
+                        ✅ Crédito disponível para saque<br>
+                        ✅ Sem consulta ao SPC/Serasa<br>
+                        ✅ Aprovação em minutos
+                    </p>
+                </div>
+
+                <div style="background: #1a1a1a; border-left: 4px solid #D4AF37; padding: 15px; margin: 20px 0;">
+                    <p style="margin: 0; color: #D4AF37; font-weight: bold;">⚡ AÇÃO NECESSÁRIA</p>
+                    <p style="margin: 10px 0 0 0;">Acesse o app agora e clique em <strong>"Aceitar Contrato"</strong> para liberar o saldo na sua conta!</p>
+                </div>
+
+                <p style="text-align: center; margin: 25px 0;">
+                    <a href="https://www.tubaraoemprestimo.com.br" style="display: inline-block; background: #D4AF37; color: #000; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                        ✍️ ACEITAR CONTRATO
+                    </a>
+                </p>
+
+                <p style="color: #888; font-size: 13px; margin-top: 20px;">
+                    <strong>Importante:</strong> Esta oferta é válida por 48 horas. Após este prazo, será necessário fazer uma nova análise.
+                </p>
+            `);
+            emailService.send(request.email, '🎉 Crédito Pré-Aprovado — Aceite Agora!', emailContent).catch(() => { });
+        }
+
+        // WhatsApp de contraproposta
+        if (request.phone) {
+            const waMsg = `🎉 *CRÉDITO PRÉ-APROVADO!*\n\n` +
+                `Olá, ${request.clientName.split(' ')[0]}!\n\n` +
+                `Seu pedido foi analisado e temos uma ótima notícia:\n\n` +
+                `💰 *Valor Liberado:* ${approvedFormatted}\n` +
+                `📊 *Parcelas:* ${request.installments}x\n\n` +
+                `✅ Crédito disponível para saque\n` +
+                `✅ Sem consulta ao SPC/Serasa\n` +
+                `✅ Aprovação em minutos\n\n` +
+                `⚡ *AÇÃO NECESSÁRIA:*\n` +
+                `Acesse o app e clique em *"Aceitar Contrato"* para liberar o saldo!\n\n` +
+                `🔗 https://www.tubaraoemprestimo.com.br\n\n` +
+                `⏰ Oferta válida por 48 horas.\n\n` +
+                `_Tubarão Empréstimos 🦈_`;
+
+            sendWhatsAppNotification(request.phone, waMsg);
+        }
+
+        // Notificação no sistema
+        if (request.customerId) {
+            await prisma.notification.create({
+                data: {
+                    customerId: request.customerId,
+                    customerEmail: request.email,
+                    title: '🎉 Crédito Pré-Aprovado!',
+                    message: `Seu crédito de ${approvedFormatted} foi pré-aprovado! Acesse o app e aceite o contrato para liberar o saldo.`,
+                    type: 'SUCCESS'
+                }
+            }).catch(() => { });
+        }
+
+        // Push notification para o cliente
+        if (request.userId) {
+            sendPushToUser(
+                request.userId,
+                '🎉 Crédito Pré-Aprovado!',
+                `${approvedFormatted} liberado! Aceite o contrato agora.`
+            ).catch(() => { });
+        }
+
+        res.json({ success: true, request });
+    } catch (error: any) {
+        console.error('[LoanRequests] Approve with counteroffer error:', error);
+        res.status(500).json({ error: 'Erro ao aprovar com contraproposta' });
+    }
+});
+
+// PUT /api/loan-requests/:id/accept-counteroffer — Cliente aceita a contraproposta
+loanRequestsRouter.put('/:id/accept-counteroffer', async (req: Request, res: Response) => {
+    try {
+        const id = req.params.id as string;
+        const userId = req.user!.id;
+
+        // Buscar solicitação
+        const request = await prisma.loanRequest.findUnique({ where: { id } });
+
+        if (!request) {
+            return res.status(404).json({ error: 'Solicitação não encontrada' });
+        }
+
+        // Verificar se é do usuário logado
+        if (request.userId !== userId) {
+            return res.status(403).json({ error: 'Acesso negado' });
+        }
+
+        // Verificar se está aguardando aceite
+        if (request.status !== 'PENDING_ACCEPTANCE') {
+            return res.status(400).json({ error: 'Esta solicitação não está aguardando aceite' });
+        }
+
+        // Verificar se já foi aceita
+        if (request.counterOfferAccepted) {
+            return res.status(400).json({ error: 'Contrato já foi aceito' });
+        }
+
+        // Atualizar para aceito e mudar status para APPROVED
+        const updatedRequest = await prisma.loanRequest.update({
+            where: { id },
+            data: {
+                counterOfferAccepted: true,
+                counterOfferAcceptedAt: new Date(),
+                status: 'APPROVED',
+                amount: request.approvedAmount || request.amount // Usar valor aprovado
+            }
+        });
+
+        // Criar empréstimo com o valor aprovado
+        if (updatedRequest.customerId && updatedRequest.approvedAmount) {
+            const loan = await prisma.loan.create({
+                data: {
+                    customerId: updatedRequest.customerId,
+                    requestId: updatedRequest.id,
+                    amount: updatedRequest.approvedAmount,
+                    installmentsCount: updatedRequest.installments,
+                    remainingAmount: updatedRequest.approvedAmount,
+                    status: 'APPROVED',
+                    startDate: new Date(),
+                    isService: updatedRequest.profileType === 'LIMPA_NOME',
+                    isInvestment: updatedRequest.profileType === 'INVESTIDOR',
+                    isLoan: ['CLT', 'AUTONOMO', 'MOTO', 'GARANTIA'].includes(updatedRequest.profileType || '')
+                }
+            });
+
+            // Gerar parcelas
+            const installmentAmount = updatedRequest.approvedAmount / updatedRequest.installments;
+            const installments = [];
+            for (let i = 1; i <= updatedRequest.installments; i++) {
+                const dueDate = new Date();
+                dueDate.setMonth(dueDate.getMonth() + i);
+                if (updatedRequest.preferredDueDay) dueDate.setDate(updatedRequest.preferredDueDay);
+
+                installments.push({
+                    loanId: loan.id,
+                    dueDate,
+                    amount: installmentAmount,
+                    status: 'OPEN'
+                });
+            }
+            await prisma.installment.createMany({ data: installments });
+
+            // Atualizar customer
+            await prisma.customer.update({
+                where: { id: updatedRequest.customerId },
+                data: {
+                    activeLoansCount: { increment: 1 },
+                    totalDebt: { increment: updatedRequest.approvedAmount }
+                }
+            });
+
+            // Criar transação
+            await prisma.transaction.create({
+                data: {
+                    type: 'OUT',
+                    description: `Empréstimo aprovado (contraproposta aceita) - ${updatedRequest.clientName}`,
+                    amount: updatedRequest.approvedAmount,
+                    category: 'LOAN',
+                    date: new Date()
+                }
+            });
+
+            // ====== COMISSÃO DE PARCEIROS ======
+            try {
+                if (updatedRequest.partnerId && updatedRequest.isPartnerReferral) {
+                    let commissionAmount = 0;
+                    const profileType = updatedRequest.profileType || 'CLT';
+                    const amount = updatedRequest.approvedAmount;
+
+                    switch (profileType) {
+                        case 'MOTO':
+                            commissionAmount = 250;
+                            break;
+                        case 'LIMPA_NOME':
+                            commissionAmount = 50;
+                            break;
+                        case 'INVESTIDOR':
+                            commissionAmount = amount * 0.01;
+                            break;
+                        default:
+                            if (amount >= 10000) {
+                                commissionAmount = 180;
+                            } else if (amount >= 5000) {
+                                commissionAmount = 150;
+                            } else {
+                                commissionAmount = 120;
+                            }
+                            break;
+                    }
+
+                    await prisma.partnerCommission.create({
+                        data: {
+                            partnerId: updatedRequest.partnerId,
+                            loanRequestId: updatedRequest.id,
+                            contractId: loan.id,
+                            totalCommission: commissionAmount,
+                            commissionAmount: 0,
+                            commissionRate: 0,
+                            installmentsReleased: 0,
+                            releasedPercent: 0,
+                            status: 'PENDING',
+                            notes: `Comissão ${profileType} - Contraproposta aceita - R$ ${commissionAmount.toFixed(2)}`
+                        }
+                    });
+                }
+            } catch (commissionErr) {
+                console.error('[LoanRequests] Partner commission error:', commissionErr);
+            }
+
+            // ====== GERAR PIX PARA PARCELAS ======
+            try {
+                const pixSetting = await prisma.systemSetting.findFirst({ where: { key: 'pix_key' } });
+                if (pixSetting?.value) {
+                    const loanWithData = await prisma.loan.findFirst({
+                        where: { id: loan.id },
+                        include: { installments: true, customer: true }
+                    });
+                    if (loanWithData) {
+                        const { generateInstallmentPixData, saveInstallmentQRCode } = await import('../services/pix');
+                        for (const [index, inst] of loanWithData.installments.entries()) {
+                            const installmentNum = index + 1;
+                            const { pixCode, qrCodeBuffer } = await generateInstallmentPixData(
+                                pixSetting.value,
+                                Number(inst.amount),
+                                loanWithData.customer.name,
+                                loanWithData.customer.city || 'SAO PAULO',
+                                installmentNum,
+                                loanWithData.id
+                            );
+                            await saveInstallmentQRCode(prisma, inst.id, qrCodeBuffer, pixCode);
+                        }
+                    }
+                }
+            } catch (pixErr) {
+                console.error('[LoanRequests] PIX generation error:', pixErr);
+            }
+        }
+
+        // ====== NOTIFICAÇÕES ======
+        const approvedFormatted = (updatedRequest.approvedAmount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // Email de confirmação
+        if (updatedRequest.email) {
+            const emailContent = brandedEmailHtml(`
+                <h2 style="color: #4CAF50;">✅ Contrato Aceito com Sucesso!</h2>
+                <p>Olá, <strong>${updatedRequest.clientName}</strong>!</p>
+                <p>Seu contrato foi aceito e o crédito está sendo processado!</p>
+
+                <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border: 2px solid #4CAF50; border-radius: 12px; padding: 20px; margin: 20px 0; text-align: center;">
+                    <p style="margin: 0; color: #4CAF50; font-size: 16px;">💰 Valor Liberado</p>
+                    <p style="margin: 10px 0; font-size: 36px; font-weight: bold; color: #4CAF50;">${approvedFormatted}</p>
+                    <p style="margin: 0; color: #aaa; font-size: 14px;">Em ${updatedRequest.installments}x parcelas</p>
+                </div>
+
+                <div style="background: #1a1a1a; border-left: 4px solid #D4AF37; padding: 15px; margin: 20px 0;">
+                    <p style="margin: 0 0 10px 0; color: #D4AF37; font-weight: bold;">📋 Próximos Passos:</p>
+                    <p style="margin: 5px 0;">✅ Seu crédito está sendo transferido</p>
+                    <p style="margin: 5px 0;">✅ Você receberá os boletos/PIX das parcelas</p>
+                    <p style="margin: 5px 0;">✅ Acompanhe tudo pelo app</p>
+                </div>
+
+                <p style="text-align: center; margin: 25px 0;">
+                    <a href="https://www.tubaraoemprestimo.com.br" style="display: inline-block; background: #D4AF37; color: #000; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                        ACESSAR MEU PAINEL
+                    </a>
+                </p>
+            `);
+            emailService.send(updatedRequest.email, '✅ Contrato Aceito — Tubarão Empréstimos', emailContent).catch(() => { });
+        }
+
+        // WhatsApp de confirmação
+        if (updatedRequest.phone) {
+            const waMsg = `✅ *CONTRATO ACEITO!*\n\n` +
+                `Parabéns, ${updatedRequest.clientName.split(' ')[0]}!\n\n` +
+                `Seu contrato foi aceito com sucesso!\n\n` +
+                `💰 *Valor:* ${approvedFormatted}\n` +
+                `📊 *Parcelas:* ${updatedRequest.installments}x\n\n` +
+                `📋 *Próximos Passos:*\n` +
+                `✅ Seu crédito está sendo transferido\n` +
+                `✅ Você receberá os boletos/PIX\n` +
+                `✅ Acompanhe pelo app\n\n` +
+                `🔗 https://www.tubaraoemprestimo.com.br\n\n` +
+                `_Tubarão Empréstimos 🦈_`;
+
+            sendWhatsAppNotification(updatedRequest.phone, waMsg);
+        }
+
+        // Notificação no sistema
+        if (updatedRequest.customerId) {
+            await prisma.notification.create({
+                data: {
+                    customerId: updatedRequest.customerId,
+                    customerEmail: updatedRequest.email,
+                    title: '✅ Contrato Aceito!',
+                    message: `Seu contrato de ${approvedFormatted} foi aceito! O crédito está sendo processado.`,
+                    type: 'SUCCESS'
+                }
+            }).catch(() => { });
+        }
+
+        res.json({ success: true, request: updatedRequest });
+    } catch (error: any) {
+        console.error('[LoanRequests] Accept counteroffer error:', error);
+        res.status(500).json({ error: 'Erro ao aceitar contraproposta' });
+    }
+});
+
 // PUT /api/loan-requests/:id/reject — Rejeitar
 loanRequestsRouter.put('/:id/reject', requireAdmin, async (req: Request, res: Response) => {
     try {

@@ -51,6 +51,10 @@ export const Requests: React.FC = () => {
     const [isDocRequestOpen, setIsDocRequestOpen] = useState(false);
     const [docRequestDesc, setDocRequestDesc] = useState('');
 
+    // Approval Modal with Counteroffer
+    const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+    const [approvedAmount, setApprovedAmount] = useState('');
+
     // Editing Values
     const [isEditing, setIsEditing] = useState(false);
     const [editAmount, setEditAmount] = useState(0);
@@ -86,6 +90,38 @@ export const Requests: React.FC = () => {
         setSelectedRequest(null);
         loadRequests();
         addToast("Solicitação aprovada e saldo liberado.", 'success');
+    };
+
+    const openApprovalModal = () => {
+        if (!selectedRequest) return;
+        // Pré-preencher com o valor solicitado
+        setApprovedAmount(selectedRequest.amount.toString());
+        setIsApprovalModalOpen(true);
+    };
+
+    const handleApproveWithCounteroffer = async () => {
+        if (!selectedRequest || !approvedAmount) return;
+
+        const amount = parseFloat(approvedAmount);
+        if (isNaN(amount) || amount <= 0) {
+            addToast('Valor aprovado inválido', 'error');
+            return;
+        }
+
+        setProcessing(selectedRequest.id);
+        try {
+            await apiService.approveWithCounteroffer(selectedRequest.id, amount);
+
+            setProcessing(null);
+            setIsApprovalModalOpen(false);
+            setApprovedAmount('');
+            setSelectedRequest(null);
+            loadRequests();
+            addToast("Contraproposta enviada ao cliente!", 'success');
+        } catch (error) {
+            setProcessing(null);
+            addToast("Erro ao enviar contraproposta", 'error');
+        }
     };
 
     const handleReject = async (id: string) => {
@@ -907,7 +943,7 @@ export const Requests: React.FC = () => {
                                     <Button variant="danger" className="flex-1 sm:flex-initial" onClick={() => handleReject(selectedRequest.id)} isLoading={processing === selectedRequest.id}>
                                         <X size={18} className="mr-2" /> REPROVAR
                                     </Button>
-                                    <Button variant="gold" className="flex-1 sm:flex-initial bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]" onClick={() => handleApprove(selectedRequest.id)} isLoading={processing === selectedRequest.id}>
+                                    <Button variant="gold" className="flex-1 sm:flex-initial bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]" onClick={openApprovalModal} isLoading={processing === selectedRequest.id}>
                                         <Check size={18} className="mr-2" /> {selectedRequest.profileType === 'LIMPA_NOME' ? 'APROVAR SERVIÇO' :
                                             selectedRequest.profileType === 'MOTO' ? 'APROVAR FINANCIAMENTO' : 'APROVAR EMPRÉSTIMO'}
                                     </Button>
@@ -943,6 +979,87 @@ export const Requests: React.FC = () => {
                         <Button onClick={handleRequestDoc} isLoading={!!processing} className="w-full">
                             <Send size={18} className="mr-2" /> Enviar Solicitação
                         </Button>
+                    </div>
+                </div>
+            )}
+
+            {/* Approval Modal with Counteroffer */}
+            {isApprovalModalOpen && selectedRequest && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] p-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl animate-in zoom-in duration-200">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Check className="text-[#D4AF37]" /> Aprovar Empréstimo
+                            </h3>
+                            <button onClick={() => setIsApprovalModalOpen(false)}>
+                                <X className="text-zinc-500 hover:text-white" />
+                            </button>
+                        </div>
+
+                        {/* Valor Solicitado */}
+                        <div className="bg-black border border-zinc-800 rounded-xl p-4 mb-4">
+                            <p className="text-xs text-zinc-500 mb-1">Valor Solicitado pelo Cliente</p>
+                            <p className="text-2xl font-bold text-white">
+                                R$ {selectedRequest.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                            <p className="text-xs text-zinc-500 mt-1">
+                                Em {selectedRequest.installments}x parcelas
+                            </p>
+                        </div>
+
+                        {/* Input Valor Aprovado */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-bold text-white mb-2">
+                                💰 Valor a Aprovar (Contraproposta)
+                            </label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                value={approvedAmount}
+                                onChange={(e) => setApprovedAmount(e.target.value)}
+                                className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white text-2xl font-bold focus:border-[#D4AF37] outline-none"
+                                placeholder="0.00"
+                            />
+                            <p className="text-xs text-zinc-500 mt-2">
+                                💡 Dica: Você pode aprovar um valor menor que o solicitado. O cliente receberá uma notificação para aceitar a contraproposta.
+                            </p>
+                        </div>
+
+                        {/* Preview da Contraproposta */}
+                        {approvedAmount && parseFloat(approvedAmount) > 0 && (
+                            <div className="bg-gradient-to-r from-[#D4AF37]/10 to-orange-500/10 border border-[#D4AF37] rounded-xl p-4 mb-6">
+                                <p className="text-xs text-zinc-400 mb-2">Preview da Notificação ao Cliente:</p>
+                                <div className="bg-black rounded-lg p-3">
+                                    <p className="text-[#D4AF37] font-bold text-sm">🎉 Crédito Pré-Aprovado!</p>
+                                    <p className="text-white text-lg font-bold mt-1">
+                                        R$ {parseFloat(approvedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </p>
+                                    <p className="text-xs text-zinc-500 mt-1">
+                                        Cliente precisa aceitar o contrato para liberar o saldo
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Botões */}
+                        <div className="flex gap-3">
+                            <Button
+                                variant="secondary"
+                                className="flex-1"
+                                onClick={() => setIsApprovalModalOpen(false)}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                variant="gold"
+                                className="flex-1 bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]"
+                                onClick={handleApproveWithCounteroffer}
+                                isLoading={!!processing}
+                                disabled={!approvedAmount || parseFloat(approvedAmount) <= 0}
+                            >
+                                <Check size={18} className="mr-2" /> Confirmar Aprovação
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}

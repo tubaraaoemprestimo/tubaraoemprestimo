@@ -432,6 +432,18 @@ export const apiService = {
         return data;
     },
 
+    async approveWithCounteroffer(id: string, approvedAmount: number) {
+        const { data, error } = await api.put(`/loan-requests/${id}/approve-with-counteroffer`, { approvedAmount });
+        if (error) throw new Error(error.error || 'Erro ao aprovar com contraproposta');
+        return data;
+    },
+
+    async acceptCounteroffer(id: string) {
+        const { data, error } = await api.put(`/loan-requests/${id}/accept-counteroffer`, {});
+        if (error) throw new Error(error.error || 'Erro ao aceitar contraproposta');
+        return data;
+    },
+
     async rejectLoan(id: string) {
         const { data, error } = await api.put(`/loan-requests/${id}/reject`, {});
         if (error) throw new Error(error.error || 'Erro ao rejeitar');

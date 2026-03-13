@@ -253,6 +253,12 @@ model LoanRequest {
   phone                   String
   preferredContactTime    String?   @map("preferred_contact_time")
   amount                  Float     @default(0)
+  requestedAmount         Float?    @map("requested_amount") // Valor original solicitado pelo cliente
+  approvedAmount          Float?    @map("approved_amount")  // Valor aprovado pelo analista (contraproposta)
+  approvedAt              DateTime? @map("approved_at")      // Data/hora da aprovação
+  approvedById            String?   @map("approved_by_id")   // ID do admin que aprovou
+  counterOfferAccepted    Boolean   @default(false) @map("counter_offer_accepted") // Cliente aceitou a contraproposta
+  counterOfferAcceptedAt  DateTime? @map("counter_offer_accepted_at") // Data/hora do aceite
   installments            Int       @default(1)
   status                  String    @default("PENDING")
   profileType             String?   @map("profile_type")
@@ -327,6 +333,7 @@ model LoanRequest {
   customer                Customer? @relation(fields: [customerId], references: [id], name: "LoanRequestCustomer")
   user                    User?     @relation(fields: [userId], references: [id], name: "LoanRequestUser")
   partner                 User?     @relation(fields: [partnerId], references: [id], name: "LoanRequestPartner")
+  approvedBy              User?     @relation(fields: [approvedById], references: [id], name: "LoanRequestApprovedBy")
   loan                    Loan?
   partnerCommissions      PartnerCommission[] @relation("PartnerCommissionLoanRequest")
   collateralItems         Json?     @map("collateral_items")
@@ -589,6 +596,7 @@ model User {
   loanRequests        LoanRequest[]        @relation("LoanRequestUser")
   partnerCustomers    Customer[]           @relation("CustomerPartner")
   partnerLoanRequests LoanRequest[]        @relation("LoanRequestPartner")
+  approvedLoanRequests LoanRequest[]       @relation("LoanRequestApprovedBy")
   partnerCommissions  PartnerCommission[]  @relation("PartnerCommissionPartner")
   partnerBonuses      PartnerBonus[]       @relation("PartnerBonusPartner")
   partnerInvites      PartnerInvite[]      @relation("PartnerInvitePartner")
