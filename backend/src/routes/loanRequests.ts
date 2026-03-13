@@ -422,6 +422,31 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
             emailService.send(req.user!.email, emailSubject, clientHtml).catch(() => { });
         }
 
+        // Email para o Admin notificando nova solicitação
+        try {
+            const adminEmail = process.env.ADMIN_EMAIL;
+            if (adminEmail) {
+                const adminBody = '<div style="font-family:Arial,sans-serif;background:#000;color:#fff;padding:30px;border-radius:12px">'
+                    + '<h2 style="color:#D4AF37">📋 Nova Solicitação Recebida</h2>'
+                    + '<p><b style="color:#D4AF37">Cliente:</b> ' + (data.clientName || req.user!.name) + '</p>'
+                    + '<p><b style="color:#D4AF37">Serviço:</b> ' + typeLabel + '</p>'
+                    + '<p><b style="color:#D4AF37">E-mail:</b> ' + req.user!.email + '</p>'
+                    + '<p><b style="color:#D4AF37">Telefone:</b> ' + (data.phone || 'N/A') + '</p>'
+                    + '<div style="text-align:center;margin:20px 0">'
+                    + '<a href="https://www.tubaraoemprestimo.com.br/#/admin/requests" style="background:#D4AF37;color:#000;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:bold">Analisar no Painel</a>'
+                    + '</div></div>';
+                emailService.send(
+                    adminEmail,
+                    '📋 Nova Solicitação: ' + (data.clientName || req.user!.name) + ' — ' + typeLabel,
+                    adminBody
+                ).catch((err: any) => {
+                    console.error('[LoanRequests] Falha ao enviar email ao admin:', err?.message);
+                });
+            }
+        } catch (emailErr: any) {
+            console.error('[LoanRequests] Erro ao montar email do admin:', emailErr?.message);
+        }
+
         // WhatsApp para o cliente
         if (data.phone) {
             sendWhatsAppNotification(data.phone,
