@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Search, User, Phone, MapPin, Database, Copy, Building2, UserSearch, Car, Mail, Home, Briefcase, Users, Calendar, DollarSign, Shield, AlertTriangle, ExternalLink, FileText, CreditCard, Heart, GraduationCap, Skull, Check, Loader2, Download } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
-import axios from 'axios';
+import { api } from '../../services/apiClient';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -120,31 +120,31 @@ export const DataSearchNew: React.FC = () => {
             }
 
             // Chamar backend que salva no banco e consulta TrackFlow
-            const token = localStorage.getItem('token');
-            const API_URL = import.meta.env.VITE_API_URL || 'https://app-api.tubaraoemprestimo.com.br';
-            const response = await axios.post(
-                `${API_URL}/api/trackflow/query`,
+            const { data: response, error } = await api.post<any>('/api/trackflow/query',
                 { apiType, queryParams },
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                    timeout: 30000
-                }
+                { timeout: 30000 }
             );
 
-            if (response.data.success) {
-                setResult(response.data.data);
-                if (response.data.cached) {
+            if (error) {
+                addToast(error.error || 'Erro ao consultar API', 'error');
+                setLoading(false);
+                return;
+            }
+
+            if (response.success) {
+                setResult(response.data);
+                if (response.cached) {
                     addToast('Consulta em cache (últimas 24h)', 'info');
                 } else {
                     addToast('Consulta realizada com sucesso!', 'success');
                 }
                 loadHistory(); // Recarregar histórico após nova consulta
             } else {
-                addToast(response.data.error || 'Erro na consulta', 'error');
+                addToast(response.error || 'Erro na consulta', 'error');
             }
         } catch (error: any) {
             console.error('Erro na consulta TrackFlow:', error);
-            addToast(error.response?.data?.error || 'Erro ao consultar API', 'error');
+            addToast(error?.error || 'Erro ao consultar API', 'error');
         } finally {
             setLoading(false);
         }
@@ -153,8 +153,6 @@ export const DataSearchNew: React.FC = () => {
     const loadHistory = async () => {
         setLoadingHistory(true);
         try {
-            const token = localStorage.getItem('token');
-            const API_URL = import.meta.env.VITE_API_URL || 'https://app-api.tubaraoemprestimo.com.br';
             const apiTypeMap: any = {
                 'cpf': 'cpf',
                 'cnpj': 'cnpj',
@@ -163,13 +161,12 @@ export const DataSearchNew: React.FC = () => {
                 'veiculo': 'historico-veicular'
             };
 
-            const response = await axios.get(`${API_URL}/api/trackflow/history`, {
-                params: { apiType: apiTypeMap[activeTab], limit: 100 },
-                headers: { Authorization: `Bearer ${token}` }
+            const { data: response } = await api.get<any>(`/api/trackflow/history`, {
+                params: { apiType: apiTypeMap[activeTab], limit: 100 }
             });
 
-            if (response.data.success) {
-                setHistory(response.data.queries || []);
+            if (response && response.success) {
+                setHistory(response.queries || []);
             }
         } catch (error) {
             console.error('Erro ao carregar histórico:', error);
