@@ -22,18 +22,22 @@ router.post('/query', authenticate, async (req: Request, res: Response) => {
 
         console.log('[TrackFlow] Nova consulta:', { apiType, queryParams, userId });
 
-        // Verificar se já existe consulta idêntica nas últimas 24h
+        // Verificar se já existe consulta idêntica nas últimas 24h (buscar todas e filtrar manualmente)
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const existingQuery = await prisma.trackFlowQuery.findFirst({
+        const recentQueries = await prisma.trackFlowQuery.findMany({
             where: {
                 userId,
                 apiType,
-                queryParams: queryParams,
                 createdAt: { gte: oneDayAgo },
                 success: true
             },
             orderBy: { createdAt: 'desc' }
         });
+
+        // Filtrar manualmente por queryParams idêntico
+        const existingQuery = recentQueries.find(q =>
+            JSON.stringify(q.queryParams) === JSON.stringify(queryParams)
+        );
 
         if (existingQuery && existingQuery.response) {
             console.log('[TrackFlow] Retornando consulta em cache (últimas 24h)');
