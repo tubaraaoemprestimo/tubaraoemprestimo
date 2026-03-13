@@ -76,7 +76,7 @@ router.post('/query', authenticate, async (req: Request, res: Response) => {
         console.log('[TrackFlow] Chamando API:', url, params);
 
         // Chamar API TrackFlow
-        const response = await axios.get(url, { params, timeout: 30000 });
+        const response = await axios.get(url, { params, timeout: 60000 });
 
         console.log('[TrackFlow] Resposta da API:', {
             status: response.status,

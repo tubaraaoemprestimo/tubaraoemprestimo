@@ -122,7 +122,7 @@ export const DataSearchNew: React.FC = () => {
             // Chamar backend que salva no banco e consulta TrackFlow
             const { data: response, error } = await api.post<any>('/trackflow/query',
                 { apiType, queryParams },
-                { timeout: 30000 }
+                { timeout: 90000 }
             );
 
             if (error) {
