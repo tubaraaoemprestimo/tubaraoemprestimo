@@ -79,10 +79,32 @@ app.use(cors({
 app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRouter);
 
 // Body parsing (para todas as outras rotas)
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '200mb' }));
+app.use(express.urlencoded({ extended: true, limit: '200mb' }));
 
-// Static files (uploads)
+// Static files (uploads) — detecta MIME type pelo conteúdo do arquivo
+app.get('/uploads/:date/:filename', (req, res) => {
+    const filePath = path.join(__dirname, '..', 'uploads', req.params.date, req.params.filename);
+    if (!require('fs').existsSync(filePath)) {
+        res.status(404).json({ error: 'File not found' });
+        return;
+    }
+    const fd = require('fs').openSync(filePath, 'r');
+    const magic = Buffer.alloc(16);
+    require('fs').readSync(fd, magic, 0, 16, 0);
+    require('fs').closeSync(fd);
+    let contentType = 'application/octet-stream';
+    if (magic[0] === 0xFF && magic[1] === 0xD8 && magic[2] === 0xFF) contentType = 'image/jpeg';
+    else if (magic[0] === 0x89 && magic[1] === 0x50 && magic[2] === 0x4E && magic[3] === 0x47) contentType = 'image/png';
+    else if (magic[0] === 0x47 && magic[1] === 0x49 && magic[2] === 0x46) contentType = 'image/gif';
+    else if (magic[0] === 0x52 && magic[1] === 0x49 && magic[2] === 0x46 && magic[8] === 0x57 && magic[9] === 0x45) contentType = 'image/webp';
+    else if (magic[4] === 0x66 && magic[5] === 0x74 && magic[6] === 0x79 && magic[7] === 0x70) contentType = 'video/mp4';
+    else if (magic[0] === 0x1A && magic[1] === 0x45 && magic[2] === 0xDF && magic[3] === 0xA3) contentType = 'video/webm';
+    else if (magic[0] === 0x25 && magic[1] === 0x50 && magic[2] === 0x44 && magic[3] === 0x46) contentType = 'application/pdf';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.sendFile(filePath);
+});
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // ============= ROUTES =============
