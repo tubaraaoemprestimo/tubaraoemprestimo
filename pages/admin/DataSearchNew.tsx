@@ -223,6 +223,366 @@ export const DataSearchNew: React.FC = () => {
         setResult(null);
     };
 
+    // Renderizar dados formatados baseado no tipo de consulta
+    const renderFormattedData = (result: any) => {
+        const data = result.data;
+
+        // CPF ou Contatos (retorna dados de pessoa)
+        if (result.api === 'cpf' || result.api === 'contatos') {
+            const pessoa = data?.consulta || data?.consulta?.[0]?.consulta || {};
+            const cadastral = pessoa?.cadastral || {};
+
+            return (
+                <div className="space-y-6">
+                    {/* Dados Cadastrais */}
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                        <h3 className="text-xl font-bold text-[#D4AF37] mb-4 flex items-center gap-2">
+                            <User size={24} /> Dados Cadastrais
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <InfoCard label="Nome" value={cadastral.nome} icon={<User size={16} />} />
+                            <InfoCard label="CPF" value={formatCPF(cadastral.cpf)} icon={<CreditCard size={16} />} />
+                            <InfoCard label="Data Nascimento" value={cadastral.dataNasc} icon={<Calendar size={16} />} />
+                            <InfoCard label="Idade" value={`${cadastral.idade} anos`} icon={<Calendar size={16} />} />
+                            <InfoCard label="Sexo" value={cadastral.sexo === 'M' ? 'Masculino' : 'Feminino'} icon={<User size={16} />} />
+                            <InfoCard label="Naturalidade" value={cadastral.naturalidade} icon={<MapPin size={16} />} />
+                            <InfoCard label="Mãe" value={cadastral.mae?.nome} icon={<Heart size={16} />} />
+                            <InfoCard label="Pai" value={cadastral.pai?.nome} icon={<Heart size={16} />} />
+                            <InfoCard label="Renda Estimada" value={cadastral.renda} icon={<DollarSign size={16} />} />
+                            <InfoCard label="Escolaridade" value={cadastral.escolaridade} icon={<GraduationCap size={16} />} />
+                            <InfoCard label="Classe Social" value={`${cadastral.classeSocial} (${cadastral.subClasseSocial})`} icon={<Users size={16} />} />
+                            <InfoCard label="RG" value={cadastral.rg?.numero} icon={<CreditCard size={16} />} />
+                        </div>
+                    </div>
+
+                    {/* Endereços */}
+                    {pessoa.enderecos && pessoa.enderecos.length > 0 && (
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4 flex items-center gap-2">
+                                <Home size={24} /> Endereços ({pessoa.enderecos.length})
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {pessoa.enderecos.slice(0, 6).map((end: any, idx: number) => (
+                                    <div key={idx} className="bg-black border border-zinc-800 rounded-xl p-4">
+                                        <div className="flex items-start justify-between mb-2">
+                                            <span className={`text-xs px-2 py-1 rounded-full font-bold ${
+                                                end.classificacao === 'A' ? 'bg-green-500/20 text-green-400' :
+                                                end.classificacao === 'B' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                'bg-zinc-700 text-zinc-400'
+                                            }`}>
+                                                {end.classificacao || 'N/A'}
+                                            </span>
+                                            <span className="text-xs text-zinc-500">
+                                                {formatDate(end.dataInformacao)}
+                                            </span>
+                                        </div>
+                                        <p className="text-white font-bold text-sm">
+                                            {end.endereco}, {end.numero}
+                                        </p>
+                                        {end.complemento && (
+                                            <p className="text-zinc-400 text-xs">{end.complemento}</p>
+                                        )}
+                                        <p className="text-zinc-400 text-sm mt-1">
+                                            {end.bairro} - {end.cidade}/{end.uf}
+                                        </p>
+                                        <p className="text-zinc-500 text-xs mt-1">CEP: {end.cep}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Telefones */}
+                    {pessoa.telefones && pessoa.telefones.length > 0 && (
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4 flex items-center gap-2">
+                                <Phone size={24} /> Telefones ({pessoa.telefones.length})
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {pessoa.telefones.slice(0, 12).map((tel: any, idx: number) => (
+                                    <div key={idx} className="bg-black border border-zinc-800 rounded-xl p-3 flex items-center justify-between">
+                                        <div>
+                                            <p className="text-white font-bold">{formatPhone(tel.telefone)}</p>
+                                            <p className="text-xs text-zinc-500">
+                                                {tel.tipo === 3 ? 'Celular' : tel.tipo === 1 ? 'Fixo' : 'Outro'} - {tel.classificacao}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            onClick={() => copyToClipboard(tel.telefone)}
+                                            className="bg-zinc-800 hover:bg-zinc-700 p-2"
+                                        >
+                                            <Copy size={14} />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Emails */}
+                    {pessoa.emails && pessoa.emails.length > 0 && (
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4 flex items-center gap-2">
+                                <Mail size={24} /> E-mails ({pessoa.emails.length})
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {pessoa.emails.map((email: any, idx: number) => (
+                                    <div key={idx} className="bg-black border border-zinc-800 rounded-xl p-3 flex items-center justify-between">
+                                        <p className="text-white font-mono text-sm">{email.email}</p>
+                                        <Button
+                                            onClick={() => copyToClipboard(email.email)}
+                                            className="bg-zinc-800 hover:bg-zinc-700 p-2"
+                                        >
+                                            <Copy size={14} />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Empregos */}
+                    {pessoa.empregos && pessoa.empregos.length > 0 && (
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4 flex items-center gap-2">
+                                <Briefcase size={24} /> Vínculos Empregatícios ({pessoa.empregos.length})
+                            </h3>
+                            <div className="space-y-3">
+                                {pessoa.empregos.slice(0, 5).map((emp: any, idx: number) => (
+                                    <div key={idx} className="bg-black border border-zinc-800 rounded-xl p-4">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <p className="text-white font-bold">{emp.razao_social}</p>
+                                                {emp.nome_fantasia && (
+                                                    <p className="text-zinc-400 text-sm">{emp.nome_fantasia}</p>
+                                                )}
+                                                <p className="text-zinc-500 text-xs mt-1">
+                                                    CNPJ: {formatCNPJ(emp.cnpj_empregador)}
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                {emp.salario && (
+                                                    <p className="text-green-400 font-bold">{emp.salario}</p>
+                                                )}
+                                                <p className="text-xs text-zinc-500">
+                                                    {formatDate(emp.data_admissao)}
+                                                    {emp.data_demissao && ` - ${formatDate(emp.data_demissao)}`}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {emp.descricao_cbo && (
+                                            <p className="text-zinc-400 text-sm mt-2">{emp.descricao_cbo}</p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Veículos */}
+                    {pessoa.placas && pessoa.placas.length > 0 && (
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4 flex items-center gap-2">
+                                <Car size={24} /> Veículos ({pessoa.placas.length})
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {pessoa.placas.map((veiculo: any, idx: number) => (
+                                    <div key={idx} className="bg-black border border-zinc-800 rounded-xl p-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="bg-[#D4AF37] text-black px-3 py-1 rounded font-bold">
+                                                {veiculo.placa}
+                                            </span>
+                                            <span className="text-xs text-zinc-500">
+                                                {veiculo.anoFab}/{veiculo.anoModelo}
+                                            </span>
+                                        </div>
+                                        <p className="text-white font-bold">{veiculo.modelo}</p>
+                                        <p className="text-zinc-400 text-sm">Renavam: {veiculo.renavam}</p>
+                                        <p className="text-zinc-400 text-sm">Chassi: {veiculo.chassi}</p>
+                                        <p className="text-zinc-500 text-xs mt-2">{veiculo.combustivel}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Dívida Ativa */}
+                    {pessoa.dividaAtiva && pessoa.dividaAtiva.length > 0 && (
+                        <div className="bg-red-900/20 border border-red-500/50 rounded-2xl p-6">
+                            <h3 className="text-xl font-bold text-red-400 mb-4 flex items-center gap-2">
+                                <AlertTriangle size={24} /> Dívida Ativa ({pessoa.dividaAtiva.length})
+                            </h3>
+                            <div className="space-y-3">
+                                {pessoa.dividaAtiva.map((divida: any, idx: number) => (
+                                    <div key={idx} className="bg-black border border-red-900 rounded-xl p-4">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <p className="text-white font-bold">{divida.receita_principal}</p>
+                                                <p className="text-zinc-400 text-sm">Inscrição: {divida.numero_inscricao}</p>
+                                                <p className="text-zinc-500 text-xs">
+                                                    {divida.situacao_inscricao} - {formatDate(divida.data_inscricao)}
+                                                </p>
+                                            </div>
+                                            <p className="text-red-400 font-bold text-lg">
+                                                R$ {parseFloat(divida.valor_consolidado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // CNPJ
+        if (result.api === 'cnpj') {
+            return (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                    <h3 className="text-xl font-bold text-[#D4AF37] mb-4 flex items-center gap-2">
+                        <Building2 size={24} /> Dados da Empresa
+                    </h3>
+                    <pre className="bg-black border border-zinc-800 rounded-xl p-4 text-xs text-zinc-300 overflow-auto max-h-[600px]">
+                        {JSON.stringify(data, null, 2)}
+                    </pre>
+                </div>
+            );
+        }
+
+        // Histórico Veicular
+        if (result.api === 'historico-veicular') {
+            const consulta = data?.consulta?.[0] || {};
+            const pf = consulta.pf || {};
+
+            return (
+                <div className="space-y-6">
+                    {/* Dados do Veículo */}
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                        <h3 className="text-xl font-bold text-[#D4AF37] mb-4 flex items-center gap-2">
+                            <Car size={24} /> Dados do Veículo
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <InfoCard label="Placa" value={consulta.placa} icon={<Car size={16} />} />
+                            <InfoCard label="Modelo" value={consulta.modelo} icon={<Car size={16} />} />
+                            <InfoCard label="Ano Fab/Modelo" value={`${consulta.ano_fabricacao}/${consulta.ano_modelo}`} icon={<Calendar size={16} />} />
+                            <InfoCard label="Chassi" value={consulta.chassi} icon={<Shield size={16} />} />
+                            <InfoCard label="Renavam" value={consulta.renavam} icon={<FileText size={16} />} />
+                            <InfoCard label="Combustível" value={consulta.combustivel} icon={<AlertTriangle size={16} />} />
+                            <InfoCard label="Tipo" value={consulta.tipo} icon={<Car size={16} />} />
+                            <InfoCard label="Espécie" value={consulta.especie} icon={<Car size={16} />} />
+                        </div>
+                    </div>
+
+                    {/* Fotos do Veículo */}
+                    {consulta.fotosVeiculo && consulta.fotosVeiculo.length > 0 && (
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4">
+                                Fotos do Veículo ({consulta.fotosVeiculo.length})
+                            </h3>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {consulta.fotosVeiculo.slice(0, 8).map((foto: string, idx: number) => (
+                                    <img
+                                        key={idx}
+                                        src={foto}
+                                        alt={`Veículo ${idx + 1}`}
+                                        className="w-full h-32 object-cover rounded-xl border border-zinc-700 hover:border-[#D4AF37] transition-colors cursor-pointer"
+                                        onClick={() => window.open(foto, '_blank')}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Dados do Proprietário */}
+                    {pf.cadastral && (
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4 flex items-center gap-2">
+                                <User size={24} /> Proprietário
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <InfoCard label="Nome" value={pf.cadastral.nome} icon={<User size={16} />} />
+                                <InfoCard label="CPF" value={formatCPF(pf.cadastral.cpf)} icon={<CreditCard size={16} />} />
+                                <InfoCard label="Data Nascimento" value={pf.cadastral.dataNasc} icon={<Calendar size={16} />} />
+                                <InfoCard label="Idade" value={`${pf.cadastral.idade} anos`} icon={<Calendar size={16} />} />
+                                <InfoCard label="Naturalidade" value={pf.cadastral.naturalidade} icon={<MapPin size={16} />} />
+                                <InfoCard label="Renda" value={pf.cadastral.renda} icon={<DollarSign size={16} />} />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Endereços do Proprietário */}
+                    {pf.enderecos && pf.enderecos.length > 0 && (
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4 flex items-center gap-2">
+                                <Home size={24} /> Endereços do Proprietário ({pf.enderecos.length})
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {pf.enderecos.slice(0, 4).map((end: any, idx: number) => (
+                                    <div key={idx} className="bg-black border border-zinc-800 rounded-xl p-4">
+                                        <p className="text-white font-bold text-sm">
+                                            {end.endereco}, {end.numero}
+                                        </p>
+                                        {end.complemento && (
+                                            <p className="text-zinc-400 text-xs">{end.complemento}</p>
+                                        )}
+                                        <p className="text-zinc-400 text-sm mt-1">
+                                            {end.bairro} - {end.cidade}/{end.uf}
+                                        </p>
+                                        <p className="text-zinc-500 text-xs mt-1">CEP: {end.cep}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Telefones do Proprietário */}
+                    {pf.telefones && pf.telefones.length > 0 && (
+                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                            <h3 className="text-xl font-bold text-[#D4AF37] mb-4 flex items-center gap-2">
+                                <Phone size={24} /> Telefones do Proprietário ({pf.telefones.length})
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {pf.telefones.slice(0, 9).map((tel: any, idx: number) => (
+                                    <div key={idx} className="bg-black border border-zinc-800 rounded-xl p-3">
+                                        <p className="text-white font-bold">{formatPhone(tel.telefone)}</p>
+                                        <p className="text-xs text-zinc-500">
+                                            {tel.tipo === 3 ? 'Celular' : tel.tipo === 1 ? 'Fixo' : 'Outro'}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Fallback: JSON bruto
+        return (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                <pre className="bg-black border border-zinc-800 rounded-xl p-4 text-xs text-zinc-300 overflow-auto max-h-[600px]">
+                    {JSON.stringify(data, null, 2)}
+                </pre>
+            </div>
+        );
+    };
+
+    // Componente auxiliar para cards de informação
+    const InfoCard = ({ label, value, icon }: { label: string; value: any; icon: React.ReactNode }) => {
+        if (!value || value === 'N/A' || value === '') return null;
+
+        return (
+            <div className="bg-black border border-zinc-800 rounded-xl p-3">
+                <div className="flex items-center gap-2 mb-1">
+                    <span className="text-zinc-500">{icon}</span>
+                    <p className="text-xs text-zinc-500 uppercase">{label}</p>
+                </div>
+                <p className="text-white font-bold text-sm">{value}</p>
+            </div>
+        );
+    };
+
     return (
         <div className="p-8 bg-black min-h-screen text-white">
             <div className="mb-8 flex items-center justify-between">
@@ -524,24 +884,35 @@ export const DataSearchNew: React.FC = () => {
 
             {/* Results */}
             {result && result.success && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-bold text-[#D4AF37]">Resultado da Consulta</h2>
-                        <span className="text-xs bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full">
-                            API: {result.api}
-                        </span>
+                <div className="space-y-6">
+                    {/* Header com ações */}
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <h2 className="text-2xl font-bold text-[#D4AF37]">Resultado da Consulta</h2>
+                                <span className="text-xs bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full font-bold">
+                                    {result.api?.toUpperCase()}
+                                </span>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    onClick={() => copyToClipboard(JSON.stringify(result.data, null, 2))}
+                                    className="bg-zinc-800 text-white hover:bg-zinc-700"
+                                >
+                                    <Copy size={16} className="mr-2" /> Copiar JSON
+                                </Button>
+                                <Button
+                                    onClick={() => {/* TODO: Exportar PDF */}}
+                                    className="bg-[#D4AF37] text-black hover:bg-[#B5942F]"
+                                >
+                                    <FileText size={16} className="mr-2" /> Exportar PDF
+                                </Button>
+                            </div>
+                        </div>
                     </div>
 
-                    <pre className="bg-black border border-zinc-800 rounded-xl p-4 text-xs text-zinc-300 overflow-auto max-h-[600px]">
-                        {JSON.stringify(result.data, null, 2)}
-                    </pre>
-
-                    <Button
-                        onClick={() => copyToClipboard(JSON.stringify(result.data, null, 2))}
-                        className="mt-4 bg-zinc-800 text-white hover:bg-zinc-700"
-                    >
-                        <Copy size={16} className="mr-2" /> Copiar JSON
-                    </Button>
+                    {/* Renderizar dados formatados baseado no tipo de API */}
+                    {renderFormattedData(result)}
                 </div>
             )}
         </div>
