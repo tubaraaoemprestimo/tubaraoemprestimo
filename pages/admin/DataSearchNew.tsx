@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Search, User, Phone, MapPin, Database, Copy, Building2, UserSearch, Car, Mail, Home, Briefcase, Users, Calendar, DollarSign, Shield, AlertTriangle, ExternalLink, FileText, CreditCard, Heart, GraduationCap, Skull, Check, Loader2 } from 'lucide-react';
+import { Search, User, Phone, MapPin, Database, Copy, Building2, UserSearch, Car, Mail, Home, Briefcase, Users, Calendar, DollarSign, Shield, AlertTriangle, ExternalLink, FileText, CreditCard, Heart, GraduationCap, Skull, Check, Loader2, Download } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
 import axios from 'axios';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const TRACKFLOW_TOKEN = '46e3cab6883b9755ce85aed22086f74b182c38415e47f6bd18b28f788f2f914f';
 const TRACKFLOW_BASE_URL = 'https://apis.trackflow.services/api';
@@ -274,6 +276,69 @@ export const DataSearchNew: React.FC = () => {
         setPlaca('');
         setVeiculoValue('');
         setResult(null);
+    };
+
+    // Exportar resultado para PDF
+    const exportToPDF = async () => {
+        if (!result) {
+            addToast('Nenhum resultado para exportar', 'warning');
+            return;
+        }
+
+        try {
+            addToast('Gerando PDF...', 'info');
+
+            const element = document.getElementById('result-container');
+            if (!element) {
+                addToast('Erro ao capturar resultado', 'error');
+                return;
+            }
+
+            // Capturar o elemento como imagem
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                backgroundColor: '#000000',
+                logging: false,
+                useCORS: true
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            const imgWidth = 210; // A4 width in mm
+            const pageHeight = 297; // A4 height in mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            // Adicionar primeira página
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            // Adicionar páginas extras se necessário
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            // Gerar nome do arquivo
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            const apiType = result.api || 'consulta';
+            const fileName = `TrackFlow_${apiType}_${timestamp}.pdf`;
+
+            // Salvar PDF
+            pdf.save(fileName);
+            addToast('PDF exportado com sucesso!', 'success');
+        } catch (error: any) {
+            console.error('Erro ao exportar PDF:', error);
+            addToast('Erro ao exportar PDF: ' + error.message, 'error');
+        }
     };
 
     // Renderizar dados formatados baseado no tipo de consulta
@@ -1007,7 +1072,7 @@ export const DataSearchNew: React.FC = () => {
 
             {/* Results */}
             {result && result.success && (
-                <div className="space-y-6">
+                <div id="result-container" className="space-y-6">
                     {/* Header com ações */}
                     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
                         <div className="flex items-center justify-between mb-4">
@@ -1025,10 +1090,10 @@ export const DataSearchNew: React.FC = () => {
                                     <Copy size={16} className="mr-2" /> Copiar JSON
                                 </Button>
                                 <Button
-                                    onClick={() => {/* TODO: Exportar PDF */}}
+                                    onClick={exportToPDF}
                                     className="bg-[#D4AF37] text-black hover:bg-[#B5942F]"
                                 >
-                                    <FileText size={16} className="mr-2" /> Exportar PDF
+                                    <Download size={16} className="mr-2" /> Exportar PDF
                                 </Button>
                             </div>
                         </div>
