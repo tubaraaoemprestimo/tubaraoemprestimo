@@ -297,12 +297,6 @@ export const DataSearchNew: React.FC = () => {
                     )}
                 </div>
             )}
-                    <Database size={32} /> Central de Investigação TrackFlow
-                </h1>
-                <p className="text-zinc-500 mt-2">
-                    5 APIs disponíveis: CPF, CNPJ, Contatos, Nome/Endereço e Histórico Veicular
-                </p>
-            </div>
 
             {/* Tabs */}
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-8">
