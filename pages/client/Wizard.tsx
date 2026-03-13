@@ -513,7 +513,24 @@ export const Wizard: React.FC = () => {
 
       if (newFiles.length === 0) return;
 
-      if (isGuarantee) {
+      // Verificar se é campo de collateralItems (invoice_${id} ou photos_${id})
+      if (fieldName.startsWith('invoice_') || fieldName.startsWith('photos_')) {
+        const itemId = fieldName.split('_')[1];
+        const field = fieldName.startsWith('invoice_') ? 'invoiceUrl' : 'photos';
+
+        setCollateralItems(prev => prev.map(item => {
+          if (item.id === itemId) {
+            if (field === 'invoiceUrl') {
+              // invoiceUrl é string | null, pegar apenas a primeira foto
+              return { ...item, invoiceUrl: newFiles[0] };
+            } else {
+              // photos é array
+              return { ...item, photos: [...item.photos, ...newFiles] };
+            }
+          }
+          return item;
+        }));
+      } else if (isGuarantee) {
         setGuarantee(prev => ({
           ...prev,
           [fieldName]: [...(prev[fieldName as keyof typeof prev] as string[]), ...newFiles]
@@ -585,7 +602,24 @@ export const Wizard: React.FC = () => {
   };
 
   const removeFile = (fieldName: string, index: number, isGuarantee = false) => {
-    if (isGuarantee) {
+    // Verificar se é campo de collateralItems (invoice_${id} ou photos_${id})
+    if (fieldName.startsWith('invoice_') || fieldName.startsWith('photos_')) {
+      const itemId = fieldName.split('_')[1];
+      const field = fieldName.startsWith('invoice_') ? 'invoiceUrl' : 'photos';
+
+      setCollateralItems(prev => prev.map(item => {
+        if (item.id === itemId) {
+          if (field === 'invoiceUrl') {
+            // invoiceUrl é string | null
+            return { ...item, invoiceUrl: null };
+          } else {
+            // photos é array
+            return { ...item, photos: item.photos.filter((_, i) => i !== index) };
+          }
+        }
+        return item;
+      }));
+    } else if (isGuarantee) {
       setGuarantee(prev => {
         const files = prev[fieldName as keyof typeof prev] as string[];
         return { ...prev, [fieldName]: files.filter((_, i) => i !== index) };
@@ -3014,7 +3048,7 @@ export const Wizard: React.FC = () => {
                             <p className="text-xs text-green-400">
                               ✅ Ótimo! Envie a nota fiscal ou comprovante de compra.
                             </p>
-                            {renderUploadArea(`invoice_${item.id}`, 'Nota Fiscal', item.invoiceUrl ? [item.invoiceUrl] : [])}
+                            {renderUploadArea(`invoice_${item.id}`, 'Nota Fiscal', item.invoiceUrl ? [item.invoiceUrl] : [], true)}
                           </div>
                         ) : (
                           <div className="bg-yellow-900/20 border border-yellow-600/40 rounded-lg p-3">
