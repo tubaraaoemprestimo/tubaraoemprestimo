@@ -162,7 +162,7 @@ export const DataSearchNew: React.FC = () => {
             };
 
             const response = await axios.get('/api/trackflow/history', {
-                params: { apiType: apiTypeMap[activeTab], limit: 20 },
+                params: { apiType: apiTypeMap[activeTab], limit: 100 },
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -174,6 +174,49 @@ export const DataSearchNew: React.FC = () => {
         } finally {
             setLoadingHistory(false);
         }
+    };
+
+    // Calcular estatísticas do histórico
+    const getStatistics = () => {
+        const total = history.length;
+        const success = history.filter(h => h.success).length;
+        const error = history.filter(h => !h.success).length;
+        const cached = history.filter(h => h.response?.cached).length;
+
+        // Consultas por tipo
+        const byType: any = {};
+        history.forEach(h => {
+            byType[h.apiType] = (byType[h.apiType] || 0) + 1;
+        });
+
+        // Consultas por dia (últimos 7 dias)
+        const byDay: any = {};
+        const last7Days = Array.from({ length: 7 }, (_, i) => {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            return date.toISOString().split('T')[0];
+        }).reverse();
+
+        last7Days.forEach(day => {
+            byDay[day] = 0;
+        });
+
+        history.forEach(h => {
+            const day = new Date(h.createdAt).toISOString().split('T')[0];
+            if (byDay[day] !== undefined) {
+                byDay[day]++;
+            }
+        });
+
+        return {
+            total,
+            success,
+            error,
+            cached,
+            successRate: total > 0 ? ((success / total) * 100).toFixed(1) : '0',
+            byType,
+            byDay
+        };
     };
 
     const viewHistoryItem = (item: any) => {
@@ -730,6 +773,97 @@ export const DataSearchNew: React.FC = () => {
             {showHistory && (
                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-8">
                     <h2 className="text-xl font-bold text-[#D4AF37] mb-4">Histórico de Consultas</h2>
+
+                    {/* Dashboard de Estatísticas */}
+                    {history.length > 0 && (
+                        <div className="mb-6 space-y-4">
+                            {/* Cards de Estatísticas */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="bg-black border border-zinc-800 rounded-xl p-4">
+                                    <p className="text-xs text-zinc-400 mb-1">Total de Consultas</p>
+                                    <p className="text-2xl font-bold text-white">{getStatistics().total}</p>
+                                </div>
+                                <div className="bg-black border border-green-900/30 rounded-xl p-4">
+                                    <p className="text-xs text-zinc-400 mb-1">Sucesso</p>
+                                    <p className="text-2xl font-bold text-green-400">{getStatistics().success}</p>
+                                </div>
+                                <div className="bg-black border border-red-900/30 rounded-xl p-4">
+                                    <p className="text-xs text-zinc-400 mb-1">Erros</p>
+                                    <p className="text-2xl font-bold text-red-400">{getStatistics().error}</p>
+                                </div>
+                                <div className="bg-black border border-blue-900/30 rounded-xl p-4">
+                                    <p className="text-xs text-zinc-400 mb-1">Taxa de Sucesso</p>
+                                    <p className="text-2xl font-bold text-blue-400">{getStatistics().successRate}%</p>
+                                </div>
+                            </div>
+
+                            {/* Gráfico de Consultas por Tipo */}
+                            <div className="bg-black border border-zinc-800 rounded-xl p-4">
+                                <h3 className="text-sm font-bold text-zinc-400 mb-3">Consultas por Tipo</h3>
+                                <div className="space-y-2">
+                                    {Object.entries(getStatistics().byType).map(([type, count]: [string, any]) => (
+                                        <div key={type} className="flex items-center gap-3">
+                                            <div className="w-24 text-xs text-zinc-400 uppercase">{type}</div>
+                                            <div className="flex-1 bg-zinc-900 rounded-full h-6 overflow-hidden">
+                                                <div
+                                                    className="bg-[#D4AF37] h-full flex items-center justify-end pr-2"
+                                                    style={{ width: `${(count / getStatistics().total) * 100}%` }}
+                                                >
+                                                    <span className="text-xs font-bold text-black">{count}</span>
+                                                </div>
+                                            </div>
+                                            <div className="w-12 text-xs text-zinc-400 text-right">
+                                                {((count / getStatistics().total) * 100).toFixed(0)}%
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Gráfico de Consultas por Dia */}
+                            <div className="bg-black border border-zinc-800 rounded-xl p-4">
+                                <h3 className="text-sm font-bold text-zinc-400 mb-3">Consultas nos Últimos 7 Dias</h3>
+                                <div className="flex items-end justify-between gap-2 h-32">
+                                    {Object.entries(getStatistics().byDay).map(([day, count]: [string, any]) => {
+                                        const maxCount = Math.max(...Object.values(getStatistics().byDay) as number[]);
+                                        const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                                        return (
+                                            <div key={day} className="flex-1 flex flex-col items-center gap-2">
+                                                <div className="w-full bg-zinc-900 rounded-t-lg relative" style={{ height: `${height}%`, minHeight: count > 0 ? '20px' : '0' }}>
+                                                    {count > 0 && (
+                                                        <div className="absolute inset-0 bg-[#D4AF37] rounded-t-lg flex items-center justify-center">
+                                                            <span className="text-xs font-bold text-black">{count}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-zinc-500 text-center">
+                                                    {new Date(day).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Créditos Economizados */}
+                            {getStatistics().cached > 0 && (
+                                <div className="bg-gradient-to-r from-green-900/20 to-emerald-900/20 border border-green-700/40 rounded-xl p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-xs text-green-400 mb-1">💰 Créditos Economizados (Cache 24h)</p>
+                                            <p className="text-2xl font-bold text-green-400">{getStatistics().cached} consultas</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-xs text-zinc-400">Economia estimada</p>
+                                            <p className="text-lg font-bold text-green-400">
+                                                R$ {(getStatistics().cached * 0.50).toFixed(2)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Filtros */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
