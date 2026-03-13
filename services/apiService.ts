@@ -401,6 +401,10 @@ export const apiService = {
         if (uploadedData.motoColor) {
             extraData.motoColor = uploadedData.motoColor;
         }
+        // Dados bancários adicionais
+        if (uploadedData.accountHolderCpf) {
+            extraData.accountHolderCpf = uploadedData.accountHolderCpf;
+        }
         // Endereço da empresa
         if (uploadedData.companyCep || uploadedData.companyStreet) {
             extraData.companyAddress = {

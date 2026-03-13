@@ -906,6 +906,24 @@ export const Requests: React.FC = () => {
                                                 <p className="font-bold text-white">{selectedRequest.accountHolderName}</p>
                                             </div>
                                         )}
+                                        {(() => {
+                                            let extraData: any = {};
+                                            try {
+                                                if (selectedRequest.supplementalDescription) {
+                                                    extraData = JSON.parse(selectedRequest.supplementalDescription);
+                                                }
+                                            } catch { /* ignore */ }
+
+                                            if (extraData.accountHolderCpf) {
+                                                return (
+                                                    <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                        <p className="text-xs text-zinc-500 uppercase">CPF do Titular</p>
+                                                        <p className="font-bold text-white">{extraData.accountHolderCpf}</p>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
                                     </div>
                                 </div>
                             )}
