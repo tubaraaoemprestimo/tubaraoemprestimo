@@ -728,7 +728,11 @@ export const Requests: React.FC = () => {
                                     }
                                 } catch { /* ignore */ }
 
-                                if (!extraData.occupation && !extraData.companyAddress && !extraData.whatsappPersonal) return null;
+                                const hasCompanyData = extraData.occupation || extraData.companyAddress || extraData.whatsappPersonal ||
+                                                      selectedRequest.companyName || selectedRequest.companyProfession ||
+                                                      selectedRequest.companyWorkSince || selectedRequest.companyIncome;
+
+                                if (!hasCompanyData) return null;
 
                                 return (
                                     <div className="bg-zinc-950 border border-zinc-800 p-4 rounded-xl">
@@ -738,6 +742,36 @@ export const Requests: React.FC = () => {
                                                 <div className="bg-black p-3 rounded-lg border border-zinc-800">
                                                     <p className="text-xs text-zinc-500 uppercase">Profissão</p>
                                                     <p className="font-bold text-white">{extraData.occupation}</p>
+                                                </div>
+                                            )}
+                                            {selectedRequest.companyName && (
+                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                    <p className="text-xs text-zinc-500 uppercase">Empresa</p>
+                                                    <p className="font-bold text-white">{selectedRequest.companyName}</p>
+                                                </div>
+                                            )}
+                                            {selectedRequest.companyProfession && (
+                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                    <p className="text-xs text-zinc-500 uppercase">Cargo</p>
+                                                    <p className="font-bold text-white">{selectedRequest.companyProfession}</p>
+                                                </div>
+                                            )}
+                                            {selectedRequest.companyWorkSince && (
+                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                    <p className="text-xs text-zinc-500 uppercase">Trabalha desde</p>
+                                                    <p className="font-bold text-white">{selectedRequest.companyWorkSince}</p>
+                                                </div>
+                                            )}
+                                            {selectedRequest.companyIncome && (
+                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                    <p className="text-xs text-zinc-500 uppercase">Renda da Empresa</p>
+                                                    <p className="font-bold text-green-400">R$ {selectedRequest.companyIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                                </div>
+                                            )}
+                                            {selectedRequest.companyPaymentDay && (
+                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                    <p className="text-xs text-zinc-500 uppercase">Dia do Pagamento</p>
+                                                    <p className="font-bold text-white">Dia {selectedRequest.companyPaymentDay}</p>
                                                 </div>
                                             )}
                                             {extraData.whatsappPersonal && (
@@ -766,6 +800,53 @@ export const Requests: React.FC = () => {
                                     </div>
                                 );
                             })()}
+
+                            {/* Dados Bancários */}
+                            {selectedRequest.profileType !== 'LIMPA_NOME' && (selectedRequest.bankName || selectedRequest.pixKey) && (
+                                <div className="bg-zinc-950 border border-zinc-800 p-4 rounded-xl">
+                                    <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                                        🏦 Dados Bancários
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {selectedRequest.bankName && (
+                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                <p className="text-xs text-zinc-500 uppercase">Banco</p>
+                                                <p className="font-bold text-white">{selectedRequest.bankName}</p>
+                                            </div>
+                                        )}
+                                        {selectedRequest.bankAgency && (
+                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                <p className="text-xs text-zinc-500 uppercase">Agência</p>
+                                                <p className="font-bold text-white">{selectedRequest.bankAgency}</p>
+                                            </div>
+                                        )}
+                                        {selectedRequest.bankAccount && (
+                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                <p className="text-xs text-zinc-500 uppercase">Conta</p>
+                                                <p className="font-bold text-white">{selectedRequest.bankAccount}</p>
+                                                {selectedRequest.bankAccountType && (
+                                                    <p className="text-xs text-zinc-400 mt-1">Tipo: {selectedRequest.bankAccountType}</p>
+                                                )}
+                                            </div>
+                                        )}
+                                        {selectedRequest.pixKey && (
+                                            <div className="bg-black p-3 rounded-lg border border-zinc-800 md:col-span-2">
+                                                <p className="text-xs text-zinc-500 uppercase">Chave PIX</p>
+                                                <p className="font-bold text-green-400">{selectedRequest.pixKey}</p>
+                                                {selectedRequest.pixKeyType && (
+                                                    <p className="text-xs text-zinc-400 mt-1">Tipo: {selectedRequest.pixKeyType}</p>
+                                                )}
+                                            </div>
+                                        )}
+                                        {selectedRequest.accountHolderName && (
+                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                <p className="text-xs text-zinc-500 uppercase">Titular da Conta</p>
+                                                <p className="font-bold text-white">{selectedRequest.accountHolderName}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Video Gallery - hide for LIMPA_NOME */}
                             {selectedRequest.profileType !== 'LIMPA_NOME' && selectedRequest.documents && <div className="space-y-4">
@@ -839,6 +920,41 @@ export const Requests: React.FC = () => {
                                     </div>
                                 </div>
 
+                                {/* CLT: Carteira de Trabalho */}
+                                {selectedRequest.profileType === 'CLT' && (
+                                    <div>
+                                        <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4">📋 Documentos CLT</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            {selectedRequest.workCardUrl && ensureArray(selectedRequest.workCardUrl).filter(Boolean).length > 0 ? (
+                                                <DocCard
+                                                    title="Carteira de Trabalho (CTPS)"
+                                                    urls={ensureArray(selectedRequest.workCardUrl)}
+                                                    onView={() => setViewingImage({ urls: ensureArray(selectedRequest.workCardUrl), title: "Carteira de Trabalho" })}
+                                                />
+                                            ) : (
+                                                <div className="bg-red-900/20 border border-red-600/40 rounded-lg p-4 md:col-span-3">
+                                                    <p className="text-red-400 text-sm font-bold">⚠️ ATENÇÃO: Carteira de Trabalho NÃO foi enviada pelo cliente!</p>
+                                                    <p className="text-red-300 text-xs mt-1">Este documento é obrigatório para perfil CLT.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* MOTO/AUTONOMO: CNH */}
+                                {(selectedRequest.profileType === 'MOTO' || selectedRequest.profileType === 'AUTONOMO') && selectedRequest.documents?.idCardUrl && ensureArray(selectedRequest.documents.idCardUrl).length > 0 && (
+                                    <div>
+                                        <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4">🏍️ Habilitação (CNH)</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <DocCard
+                                                title="CNH (Carteira de Habilitação)"
+                                                urls={ensureArray(selectedRequest.documents?.idCardUrl)}
+                                                onView={() => setViewingImage({ urls: ensureArray(selectedRequest.documents?.idCardUrl), title: "CNH" })}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Vehicle Documents (Conditional) */}
                                 {selectedRequest.documents?.vehicleUrl && ensureArray(selectedRequest.documents.vehicleUrl).length > 0 && (
                                     <div>
@@ -908,6 +1024,20 @@ export const Requests: React.FC = () => {
                                                                 title="Fachada da Casa"
                                                                 urls={ensureArray(extraData.housePhotos)}
                                                                 onView={() => setViewingImage({ urls: ensureArray(extraData.housePhotos), title: "Fotos da Residência" })}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Boleto em Nome do Cliente */}
+                                                {extraData.billInName && ensureArray(extraData.billInName).filter(Boolean).length > 0 && (
+                                                    <div>
+                                                        <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4">🧾 Boleto em Nome do Cliente</h3>
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                            <DocCard
+                                                                title="Boleto/Conta em Seu Nome"
+                                                                urls={ensureArray(extraData.billInName)}
+                                                                onView={() => setViewingImage({ urls: ensureArray(extraData.billInName), title: "Boleto em Nome do Cliente" })}
                                                             />
                                                         </div>
                                                     </div>

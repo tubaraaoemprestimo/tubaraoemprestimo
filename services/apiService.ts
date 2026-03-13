@@ -275,6 +275,7 @@ export const apiService = {
                 videoSelfieUrl: req.videoSelfieUrl,
                 videoHouseUrl: req.videoHouseUrl,
                 videoVehicleUrl: req.videoVehicleUrl,
+                workCardUrl: req.workCardUrl,
             },
             references: req.references || {
                 fatherPhone: req.fatherPhone || '',
@@ -282,6 +283,19 @@ export const apiService = {
                 spousePhone: req.spousePhone || '',
             },
             signatureUrl: req.signatureUrl,
+            workCardUrl: req.workCardUrl,
+            bankName: req.bankName,
+            bankAgency: req.bankAgency,
+            bankAccount: req.bankAccount,
+            bankAccountType: req.bankAccountType,
+            pixKey: req.pixKey,
+            pixKeyType: req.pixKeyType,
+            accountHolderName: req.accountHolderName,
+            companyName: req.companyName,
+            companyProfession: req.companyProfession,
+            companyWorkSince: req.companyWorkSince,
+            companyIncome: req.companyIncome,
+            companyPaymentDay: req.companyPaymentDay,
         }));
     },
 
