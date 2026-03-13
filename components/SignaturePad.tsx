@@ -52,7 +52,9 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({ onSign }) => {
 
   const stopDrawing = () => {
     if (isDrawing && canvasRef.current) {
-      onSign(canvasRef.current.toDataURL());
+      // Comprimir assinatura para JPEG com qualidade 0.7 (reduz tamanho em ~70%)
+      const compressedSignature = canvasRef.current.toDataURL('image/jpeg', 0.7);
+      onSign(compressedSignature);
     }
     setIsDrawing(false);
   };

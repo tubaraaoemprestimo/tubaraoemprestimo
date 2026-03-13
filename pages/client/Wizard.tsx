@@ -1114,8 +1114,19 @@ export const Wizard: React.FC = () => {
       navigate('/client/dashboard');
     } catch (error: any) {
       console.error('Erro ao enviar solicitação de investidor:', error);
+      console.error('Detalhes completos:', error?.response?.data || error?.message || error);
       setLoading(false);
-      addToast('Erro ao enviar. Tente novamente.', 'error');
+
+      let errorMsg = 'Erro ao enviar. Tente novamente.';
+      if (error?.response?.data?.error) {
+        errorMsg = error.response.data.error;
+      } else if (error?.response?.data?.message) {
+        errorMsg = error.response.data.message;
+      } else if (error?.message) {
+        errorMsg = error.message;
+      }
+
+      addToast(`Erro: ${errorMsg}`, 'error');
     }
   };
 
@@ -1329,12 +1340,26 @@ export const Wizard: React.FC = () => {
       navigate('/client/dashboard');
     } catch (error: any) {
       console.error('❌ Erro ao enviar solicitação:', error);
-      console.error('❌ Detalhes:', error?.message || error);
+      console.error('❌ Detalhes completos:', error?.response?.data || error?.message || error);
       setLoading(false);
-      const msg = error?.message === 'Falha ao submeter'
-        ? 'Erro ao enviar. Verifique seus dados e tente novamente.'
-        : 'Erro ao enviar. Tente novamente.';
-      addToast(msg, 'error');
+
+      // Mostrar erro real do servidor para debug
+      let errorMsg = 'Erro ao enviar. Tente novamente.';
+
+      if (error?.response?.data?.error) {
+        errorMsg = error.response.data.error;
+      } else if (error?.response?.data?.message) {
+        errorMsg = error.response.data.message;
+      } else if (error?.message) {
+        errorMsg = error.message;
+      }
+
+      // Se for erro de tamanho de payload
+      if (errorMsg.includes('payload') || errorMsg.includes('too large') || errorMsg.includes('413')) {
+        errorMsg = 'Arquivo muito grande. Tente tirar fotos com menor resolução.';
+      }
+
+      addToast(`Erro: ${errorMsg}`, 'error');
     }
   };
 

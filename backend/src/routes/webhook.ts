@@ -804,9 +804,34 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
             }
             if (lastError) throw lastError;
         } catch (aiError: any) {
-            console.error(`[Webhook] Erro na IA (todos providers falharam):`, aiError?.response?.data || aiError.message);
+            console.error(`[Webhook] ❌ Erro na IA (todos providers falharam):`, aiError?.response?.data || aiError.message);
+
+            // Salvar erro no histórico
             await prisma.aiChatHistory.create({ data: { phone, role: 'user', content: fullMessage } });
             await prisma.aiChatHistory.create({ data: { phone, role: 'system', content: 'ERROR', metadata: { error: aiError.message, provider } } });
+
+            // 🚨 FALLBACK AUTOMÁTICO: Enviar mensagem de "atendentes ocupados"
+            const fallbackMessage = `Olá! 👋\n\nNossos atendentes estão ocupados no momento, mas já vamos te responder em breve.\n\nSe for urgente, você pode ligar para nosso telefone de contato.\n\nObrigado pela compreensão! 🙏`;
+
+            try {
+                const fallbackSent = await sendWhatsAppReply(waConfig, phone, fallbackMessage);
+                console.log(`[Webhook] ${fallbackSent ? '✅' : '❌'} Mensagem de fallback enviada para ${phone}`);
+
+                // Salvar fallback no histórico
+                if (fallbackSent) {
+                    await prisma.aiChatHistory.create({
+                        data: {
+                            phone,
+                            role: 'assistant',
+                            content: fallbackMessage,
+                            metadata: { fallback: true, reason: 'AI_FAILURE' }
+                        }
+                    });
+                }
+            } catch (fallbackError: any) {
+                console.error(`[Webhook] ❌ Falha ao enviar mensagem de fallback:`, fallbackError.message);
+            }
+
             return;
         }
 
