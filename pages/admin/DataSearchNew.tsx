@@ -120,7 +120,7 @@ export const DataSearchNew: React.FC = () => {
             }
 
             // Chamar backend que salva no banco e consulta TrackFlow
-            const { data: response, error } = await api.post<any>('/api/trackflow/query',
+            const { data: response, error } = await api.post<any>('/trackflow/query',
                 { apiType, queryParams },
                 { timeout: 30000 }
             );
@@ -161,7 +161,7 @@ export const DataSearchNew: React.FC = () => {
                 'veiculo': 'historico-veicular'
             };
 
-            const { data: response } = await api.get<any>(`/api/trackflow/history`, {
+            const { data: response } = await api.get<any>(`/trackflow/history`, {
                 params: { apiType: apiTypeMap[activeTab], limit: 100 }
             });
 
