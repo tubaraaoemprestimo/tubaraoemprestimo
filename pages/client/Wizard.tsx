@@ -191,6 +191,16 @@ export const Wizard: React.FC = () => {
   const [needsGuarantee, setNeedsGuarantee] = useState(false);
   const [isDraggingSlider, setIsDraggingSlider] = useState(false);
 
+  // Garantia (single item - CLT, MOTO, CAPITAL_GIRO)
+  const [guarantee, setGuarantee] = useState({
+    type: '',
+    description: '',
+    condition: '',
+    estimatedValue: '',
+    photos: [] as string[],
+    video: ''
+  });
+
   // Refs para auto-scroll
   const returningClientSectionRef = useRef<HTMLDivElement>(null);
   const referralSectionRef = useRef<HTMLDivElement>(null);
@@ -1210,6 +1220,16 @@ export const Wizard: React.FC = () => {
 
       // Enviar múltiplos itens de garantia (GARANTIA profile)
       const uploadedCollateralItems = profileType === 'GARANTIA' ? collateralItems : null;
+
+      // Montar objeto de garantia para envio (CLT, MOTO, etc.)
+      const uploadedGuarantee = needsGuarantee ? {
+        type: guarantee.type,
+        description: guarantee.description,
+        condition: guarantee.condition,
+        estimatedValue: guarantee.estimatedValue,
+        photos: guaranteePhotos,
+        video: guaranteeVideoUrl
+      } : null;
 
       // Registrar evento de submissão (antifraude)
       const user = apiService.auth.getUser();
