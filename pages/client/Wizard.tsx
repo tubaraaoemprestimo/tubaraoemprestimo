@@ -492,26 +492,96 @@ export const Wizard: React.FC = () => {
     setFormData({ ...formData, [name]: newValue });
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldName: string, isGuarantee = false) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: string, isGuarantee = false) => {
     const files = e.target.files;
-    if (files && files.length > 0) {
-      const newFiles: string[] = [];
-      const promises = Array.from(files).map((file: File) => {
-        return new Promise<void>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => { newFiles.push(reader.result as string); resolve(); };
-          reader.readAsDataURL(file);
-        });
-      });
+    if (!files || files.length === 0) return;
 
-      Promise.all(promises).then(() => {
-        if (isGuarantee) {
-          setGuarantee(prev => ({ ...prev, [fieldName]: [...(prev[fieldName as keyof typeof prev] as string[]), ...newFiles] }));
-        } else {
-          setFormData(prev => ({ ...prev, [fieldName]: [...(prev[fieldName as keyof typeof prev] as string[]), ...newFiles] }));
+    try {
+      const newFiles: string[] = [];
+
+      for (const file of Array.from(files)) {
+        // Validar tamanho (max 5MB por foto)
+        if (file.size > 5 * 1024 * 1024) {
+          addToast(`Foto muito grande: ${file.name}. Máximo 5MB por foto.`, 'warning');
+          continue;
         }
-      });
+
+        // Comprimir imagem antes de converter para base64
+        const compressed = await compressImage(file);
+        newFiles.push(compressed);
+      }
+
+      if (newFiles.length === 0) return;
+
+      if (isGuarantee) {
+        setGuarantee(prev => ({
+          ...prev,
+          [fieldName]: [...(prev[fieldName as keyof typeof prev] as string[]), ...newFiles]
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          [fieldName]: [...(prev[fieldName as keyof typeof prev] as string[]), ...newFiles]
+        }));
+      }
+
+      addToast(`${newFiles.length} foto(s) adicionada(s)`, 'success');
+    } catch (error) {
+      console.error('Erro ao processar fotos:', error);
+      addToast('Erro ao processar fotos. Tente novamente.', 'error');
     }
+  };
+
+  // Função para comprimir imagem
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+
+      reader.onload = (e) => {
+        const img = new Image();
+
+        img.onerror = () => reject(new Error('Erro ao carregar imagem'));
+
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Redimensionar se muito grande (max 1920px)
+          const maxDimension = 1920;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = (height / width) * maxDimension;
+              width = maxDimension;
+            } else {
+              width = (width / height) * maxDimension;
+              height = maxDimension;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Erro ao criar canvas'));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Comprimir para JPEG com qualidade 0.8
+          const compressed = canvas.toDataURL('image/jpeg', 0.8);
+          resolve(compressed);
+        };
+
+        img.src = e.target?.result as string;
+      };
+
+      reader.readAsDataURL(file);
+    });
   };
 
   const removeFile = (fieldName: string, index: number, isGuarantee = false) => {
