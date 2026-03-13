@@ -61,15 +61,9 @@ export const NotificationCenter: React.FC = () => {
         const message = (notification.message || '').toLowerCase();
         const text = `${title} ${message}`;
 
-        // Prioridade 1: Mensagens WhatsApp - extrair número do telefone
+        // Prioridade 1: Mensagens WhatsApp
         if (text.includes('whatsapp') || text.includes('mensagem')) {
-            // Tentar extrair número do telefone da mensagem (formato: 5511999998888)
-            const phoneMatch = message.match(/\d{12,13}/);
-            if (phoneMatch) {
-                return `/admin/chat/${phoneMatch[0]}`;
-            }
-            // Fallback para chat geral
-            return '/admin/chat';
+            return '/admin/chatbot';
         }
 
         // Prioridade 2: Outras notificações

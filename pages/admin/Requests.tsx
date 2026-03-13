@@ -57,8 +57,8 @@ export const Requests: React.FC = () => {
 
     // Editing Values
     const [isEditing, setIsEditing] = useState(false);
-    const [editAmount, setEditAmount] = useState(0);
-    const [editInstallments, setEditInstallments] = useState(0);
+    const [editAmount, setEditAmount] = useState<string>('');
+    const [editInstallments, setEditInstallments] = useState<string>('');
 
     // Filters
     const [filterStatus, setFilterStatus] = useState<string>('ALL');
@@ -349,8 +349,8 @@ export const Requests: React.FC = () => {
                                         <td className="p-4">
                                             <Button variant="secondary" size="sm" className="py-1 px-3" onClick={() => {
                                                 setSelectedRequest(req);
-                                                setEditAmount(req.amount);
-                                                setEditInstallments(req.installments);
+                                                setEditAmount(String(req.amount ?? ''));
+                                                setEditInstallments(String(req.installments ?? ''));
                                                 setIsEditing(false);
                                             }}>
                                                 <Eye size={16} className="mr-2" /> Detalhes
@@ -400,15 +400,17 @@ export const Requests: React.FC = () => {
                                     <>
                                         <Button size="sm" variant="danger" onClick={() => setIsEditing(false)}>Cancelar</Button>
                                         <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={async () => {
-                                            if (editAmount <= 0 || editInstallments <= 0) {
-                                                addToast('Valores inválidos', 'error');
+                                            const amtNum = parseFloat(editAmount);
+                                            const instNum = parseInt(editInstallments);
+                                            if (isNaN(amtNum) || amtNum <= 0) {
+                                                addToast('Valor inválido', 'error');
                                                 return;
                                             }
                                             setProcessing('saving');
-                                            const success = await apiService.updateLoanRequestValues(selectedRequest.id, editAmount, editInstallments);
+                                            const success = await apiService.updateLoanRequestValues(selectedRequest.id, amtNum, instNum || 0);
                                             if (success) {
                                                 addToast('Proposta atualizada!', 'success');
-                                                setSelectedRequest({ ...selectedRequest, amount: editAmount, installments: editInstallments });
+                                                setSelectedRequest({ ...selectedRequest, amount: amtNum, installments: instNum || 0 });
                                                 setIsEditing(false);
                                                 loadRequests();
                                             } else {
@@ -458,10 +460,12 @@ export const Requests: React.FC = () => {
                                             <div className="p-4 rounded-xl border bg-zinc-800 border-[#D4AF37]">
                                                 <p className="text-xs text-[#D4AF37] mb-1 uppercase tracking-wide">Valor (R$)</p>
                                                 <input
-                                                    type="number"
+                                                    type="text"
+                                                    inputMode="decimal"
                                                     value={editAmount}
-                                                    onChange={e => setEditAmount(Number(e.target.value))}
+                                                    onChange={e => setEditAmount(e.target.value.replace(/[^0-9.,]/g, ''))}
                                                     className="w-full bg-black border border-zinc-700 rounded p-2 text-white font-bold text-lg"
+                                                    placeholder="Ex: 2500.00"
                                                 />
                                             </div>
                                         ) : (
@@ -509,9 +513,10 @@ export const Requests: React.FC = () => {
                                             <div className="p-4 rounded-xl border bg-zinc-800 border-[#D4AF37]">
                                                 <p className="text-xs text-[#D4AF37] mb-1 uppercase tracking-wide">Parcelas (opcional)</p>
                                                 <input
-                                                    type="number"
+                                                    type="text"
+                                                    inputMode="numeric"
                                                     value={editInstallments}
-                                                    onChange={e => setEditInstallments(Number(e.target.value))}
+                                                    onChange={e => setEditInstallments(e.target.value.replace(/[^0-9]/g, ''))}
                                                     className="w-full bg-black border border-zinc-700 rounded p-2 text-white font-bold text-lg"
                                                     placeholder="Ex: 4"
                                                 />
