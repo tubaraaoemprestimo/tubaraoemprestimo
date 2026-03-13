@@ -121,8 +121,9 @@ export const DataSearchNew: React.FC = () => {
 
             // Chamar backend que salva no banco e consulta TrackFlow
             const token = localStorage.getItem('token');
+            const API_URL = import.meta.env.VITE_API_URL || 'https://app-api.tubaraoemprestimo.com.br';
             const response = await axios.post(
-                '/api/trackflow/query',
+                `${API_URL}/api/trackflow/query`,
                 { apiType, queryParams },
                 {
                     headers: { Authorization: `Bearer ${token}` },
@@ -153,6 +154,7 @@ export const DataSearchNew: React.FC = () => {
         setLoadingHistory(true);
         try {
             const token = localStorage.getItem('token');
+            const API_URL = import.meta.env.VITE_API_URL || 'https://app-api.tubaraoemprestimo.com.br';
             const apiTypeMap: any = {
                 'cpf': 'cpf',
                 'cnpj': 'cnpj',
@@ -161,7 +163,7 @@ export const DataSearchNew: React.FC = () => {
                 'veiculo': 'historico-veicular'
             };
 
-            const response = await axios.get('/api/trackflow/history', {
+            const response = await axios.get(`${API_URL}/api/trackflow/history`, {
                 params: { apiType: apiTypeMap[activeTab], limit: 100 },
                 headers: { Authorization: `Bearer ${token}` }
             });
