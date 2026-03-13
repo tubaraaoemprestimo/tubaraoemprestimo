@@ -152,7 +152,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 initCronJobs();
 startCollectionCron();
 
-app.listen(PORT, () => {
+app.listen(Number(PORT), "0.0.0.0", () => {
     console.log(`ðŸ¦ˆ TubarÃ£o Backend rodando na porta ${PORT}`);
     console.log(`ðŸ“ Ambiente: ${process.env.NODE_ENV || 'development'}`);
     console.log(`ðŸŒ CORS: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
