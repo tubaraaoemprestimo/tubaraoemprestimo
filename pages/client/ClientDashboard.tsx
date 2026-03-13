@@ -407,6 +407,75 @@ if (user) {
           </div>
         )}
 
+        {/* Card de Contraproposta Aguardando Aceite */}
+        {pendingRequest && pendingRequest.status === 'PENDING_ACCEPTANCE' && !pendingRequest.counterOfferAccepted && (
+          <div className="mx-4 mb-4 bg-gradient-to-br from-[#D4AF37]/20 to-orange-500/20 border-2 border-[#D4AF37] rounded-2xl p-6 shadow-2xl animate-pulse">
+            <div className="text-center mb-4">
+              <div className="inline-block bg-[#D4AF37] text-black px-4 py-2 rounded-full font-bold text-sm mb-3">
+                🎉 CRÉDITO PRÉ-APROVADO!
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-2">Seu crédito está liberado!</h3>
+              <p className="text-zinc-400 text-sm">Aceite o contrato para receber o valor na sua conta</p>
+            </div>
+
+            <div className="bg-black/50 border border-[#D4AF37]/30 rounded-xl p-4 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs text-zinc-500">Valor Solicitado</span>
+                <span className="text-sm text-zinc-400 line-through">
+                  R$ {(pendingRequest.requestedAmount || pendingRequest.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-[#D4AF37]">💰 Valor Liberado</span>
+                <span className="text-3xl font-bold text-[#4CAF50]">
+                  R$ {(pendingRequest.approvedAmount || pendingRequest.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="mt-2 pt-2 border-t border-zinc-800">
+                <div className="flex items-center justify-between text-xs text-zinc-500">
+                  <span>Parcelas</span>
+                  <span className="font-bold text-white">{pendingRequest.installments}x de R$ {((pendingRequest.approvedAmount || pendingRequest.amount) / pendingRequest.installments).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-black/30 border border-zinc-800 rounded-xl p-3 mb-4 space-y-2">
+              <div className="flex items-center gap-2 text-green-400 text-xs">
+                <CheckCircle size={14} />
+                <span>Crédito disponível para saque</span>
+              </div>
+              <div className="flex items-center gap-2 text-green-400 text-xs">
+                <CheckCircle size={14} />
+                <span>Sem consulta ao SPC/Serasa</span>
+              </div>
+              <div className="flex items-center gap-2 text-green-400 text-xs">
+                <CheckCircle size={14} />
+                <span>Aprovação em minutos</span>
+              </div>
+            </div>
+
+            <button
+              onClick={async () => {
+                try {
+                  await apiService.acceptCounteroffer(pendingRequest.id);
+                  addToast('Contrato aceito! Seu crédito está sendo processado.', 'success');
+                  loadDashboardData();
+                } catch (error) {
+                  addToast('Erro ao aceitar contrato', 'error');
+                }
+              }}
+              className="w-full bg-[#D4AF37] hover:bg-[#B5942F] text-black font-bold py-4 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg"
+            >
+              <CheckCircle size={20} />
+              ✍️ ACEITAR CONTRATO E LIBERAR SALDO
+            </button>
+
+            <p className="text-center text-xs text-zinc-500 mt-3">
+              ⏰ Esta oferta é válida por 48 horas
+            </p>
+          </div>
+        )}
+
         {/* Só mostrar timeline se houver solicitação em andamento (PENDING ou WAITING_DOCS) */}
         {pendingRequest &&
          (pendingRequest.status === LoanStatus.PENDING || pendingRequest.status === LoanStatus.WAITING_DOCS) &&
