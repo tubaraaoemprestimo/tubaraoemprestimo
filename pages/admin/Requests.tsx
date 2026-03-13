@@ -1001,25 +1001,30 @@ export const Requests: React.FC = () => {
                                 </div>
 
                                 {/* CLT: Carteira de Trabalho */}
-                                {selectedRequest.profileType === 'CLT' && (
-                                    <div>
-                                        <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4">📋 Documentos CLT</h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            {selectedRequest.workCardUrl && ensureArray(selectedRequest.workCardUrl).filter(Boolean).length > 0 ? (
-                                                <DocCard
-                                                    title="Carteira de Trabalho (CTPS)"
-                                                    urls={ensureArray(selectedRequest.workCardUrl)}
-                                                    onView={() => setViewingImage({ urls: ensureArray(selectedRequest.workCardUrl), title: "Carteira de Trabalho" })}
-                                                />
-                                            ) : (
-                                                <div className="bg-red-900/20 border border-red-600/40 rounded-lg p-4 md:col-span-3">
-                                                    <p className="text-red-400 text-sm font-bold">⚠️ ATENÇÃO: Carteira de Trabalho NÃO foi enviada pelo cliente!</p>
-                                                    <p className="text-red-300 text-xs mt-1">Este documento é obrigatório para perfil CLT.</p>
-                                                </div>
-                                            )}
+                                {selectedRequest.profileType === 'CLT' && (() => {
+                                    console.log('CLT workCardUrl:', selectedRequest.workCardUrl);
+                                    console.log('CLT workCardUrl array:', ensureArray(selectedRequest.workCardUrl));
+
+                                    return (
+                                        <div>
+                                            <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4">📋 Documentos CLT</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                {selectedRequest.workCardUrl && ensureArray(selectedRequest.workCardUrl).filter(Boolean).length > 0 ? (
+                                                    <DocCard
+                                                        title="Carteira de Trabalho (CTPS)"
+                                                        urls={ensureArray(selectedRequest.workCardUrl)}
+                                                        onView={() => setViewingImage({ urls: ensureArray(selectedRequest.workCardUrl), title: "Carteira de Trabalho" })}
+                                                    />
+                                                ) : (
+                                                    <div className="bg-red-900/20 border border-red-600/40 rounded-lg p-4 md:col-span-3">
+                                                        <p className="text-red-400 text-sm font-bold">⚠️ ATENÇÃO: Carteira de Trabalho NÃO foi enviada pelo cliente!</p>
+                                                        <p className="text-red-300 text-xs mt-1">Este documento é obrigatório para perfil CLT.</p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    );
+                                })()}
 
                                 {/* MOTO/AUTONOMO: CNH */}
                                 {(selectedRequest.profileType === 'MOTO' || selectedRequest.profileType === 'AUTONOMO') && selectedRequest.documents?.idCardUrl && ensureArray(selectedRequest.documents.idCardUrl).length > 0 && (
@@ -1385,7 +1390,17 @@ const VideoCard = ({ title, url }: { title: string, url: string }) => (
 );
 
 const DocCard = ({ title, urls, isSignature, onView }: { title: string, urls: string[], isSignature?: boolean, onView: () => void }) => {
-    const isPdf = urls.length > 0 && urls[0] && (urls[0].toLowerCase().includes('.pdf') || urls[0].toLowerCase().includes('work_card'));
+    // Detectar PDF: verifica extensão .pdf, content-type, ou se é work_card
+    const isPdf = urls.length > 0 && urls[0] && (
+        urls[0].toLowerCase().includes('.pdf') ||
+        urls[0].toLowerCase().includes('work_card') ||
+        urls[0].toLowerCase().includes('work-card') ||
+        title.toLowerCase().includes('carteira') ||
+        title.toLowerCase().includes('ctps')
+    );
+
+    // Debug log
+    console.log('DocCard:', { title, url: urls[0], isPdf });
 
     return (
         <div className="space-y-2 group">
@@ -1393,17 +1408,18 @@ const DocCard = ({ title, urls, isSignature, onView }: { title: string, urls: st
             <div className={`rounded-xl border border-zinc-800 bg-black overflow-hidden relative ${isSignature ? 'h-24 bg-white/5' : 'aspect-[4/3]'}`}>
                 {urls.length > 0 ? (
                     isPdf ? (
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-4">
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-4 bg-zinc-900">
                             <FileText size={48} className="text-red-500" />
-                            <p className="text-xs text-zinc-400 text-center">Documento PDF</p>
+                            <p className="text-xs text-zinc-400 text-center font-bold">Documento PDF</p>
+                            <p className="text-[10px] text-zinc-600 text-center break-all px-2">{urls[0].split('/').pop()}</p>
                             <a
                                 href={urls[0]}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-2 px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition-all"
+                                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-bold transition-all shadow-lg"
                                 onClick={(e) => e.stopPropagation()}
                             >
-                                <ExternalLink size={12} /> Abrir PDF
+                                <ExternalLink size={14} /> Abrir PDF
                             </a>
                         </div>
                     ) : (
