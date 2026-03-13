@@ -514,7 +514,8 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
             data: {
                 title: `📩 Mensagem WhatsApp: ${senderName}`,
                 message: `${content.substring(0, 200)}`,
-                type: 'INFO'
+                type: 'INFO',
+                actionUrl: '/admin/chatbot'
             }
         }).catch(() => { });
         // Push para admins
@@ -580,7 +581,8 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
                 data: {
                     title: '🤖 Transferência Chatbot',
                     message: `${clientName} (${phone}) solicitou atendimento humano. Mensagem: "${content.substring(0, 200)}"`,
-                    type: 'ALERT'
+                    type: 'ALERT',
+                    actionUrl: '/admin/chatbot'
                 }
             }).catch(() => { });
             // WhatsApp para admins

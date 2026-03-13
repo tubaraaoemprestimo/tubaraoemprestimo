@@ -80,7 +80,8 @@ authRouter.post('/register', async (req: Request, res: Response) => {
                                 data: {
                                     title: '👤 Novo Cliente Cadastrado',
                                     message: `${user.name} (${user.email}) acabou de se cadastrar na plataforma.`,
-                                    type: 'INFO'
+                                    type: 'INFO',
+                                    actionUrl: '/admin/customers'
                                 }
                             }).catch(() => {});
                         }
