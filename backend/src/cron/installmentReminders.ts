@@ -503,6 +503,140 @@ const scheduleCommissionCancellation = () => {
   job.start();
 };
 
+// ============ LEMBRETE DE CONTRAPROPOSTA (24h) ============
+const scheduleCounterOfferReminder = () => {
+  // Roda a cada 2 horas para verificar contrapropostas não aceitas
+  const job = new CronJob('0 */2 * * *', async () => {
+    try {
+      console.log('[Cron] Verificando contrapropostas pendentes...');
+
+      // Buscar contrapropostas com mais de 24h sem aceite
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+
+      const pendingOffers = await prisma.loanRequest.findMany({
+        where: {
+          status: 'PENDING_ACCEPTANCE',
+          counterOfferAccepted: false,
+          approvedAt: {
+            lte: twentyFourHoursAgo, // Mais de 24h
+            gte: fortyEightHoursAgo  // Menos de 48h (não enviar para expiradas)
+          }
+        }
+      });
+
+      console.log(`[Cron] ${pendingOffers.length} contrapropostas aguardando aceite há mais de 24h`);
+
+      for (const offer of pendingOffers) {
+        const approvedFormatted = (offer.approvedAmount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const hoursLeft = Math.max(0, Math.round((48 * 60 * 60 * 1000 - (Date.now() - new Date(offer.approvedAt!).getTime())) / (1000 * 60 * 60)));
+
+        // WhatsApp de lembrete
+        if (offer.phone) {
+          try {
+            const config = await prisma.whatsappConfig.findFirst();
+            if (config?.isConnected) {
+              const { normalizePhoneBR } = await import('../services/whatsapp');
+              const number = normalizePhoneBR(offer.phone);
+
+              const waMsg = `⏰ *LEMBRETE: Crédito Aguardando Aceite!*\n\n` +
+                `Olá, ${offer.clientName.split(' ')[0]}!\n\n` +
+                `Seu crédito de *${approvedFormatted}* está aprovado e aguardando seu aceite.\n\n` +
+                `⚠️ *Restam apenas ${hoursLeft} horas* para aceitar!\n\n` +
+                `Acesse o app agora e clique em *"Aceitar Contrato"*:\n` +
+                `🔗 https://www.tubaraoemprestimo.com.br\n\n` +
+                `Não perca esta oportunidade!\n\n` +
+                `_Tubarão Empréstimos 🦈_`;
+
+              const axios = (await import('axios')).default;
+              await axios.post(`${config.apiUrl}/message/sendText/${config.instanceName}`, {
+                number, text: waMsg,
+                options: { delay: 1200, presence: 'composing', linkPreview: false }
+              }, { headers: { apikey: config.apiKey }, timeout: 15000 }).catch(() => {});
+            }
+          } catch (e) {
+            console.error('[Cron] WhatsApp reminder error:', e);
+          }
+        }
+
+        // Email de lembrete
+        if (offer.email) {
+          try {
+            const emailHtml = brandedHtml(`
+              <h2 style="color:#D4AF37;">⏰ Seu Crédito Está Esperando!</h2>
+              <p>Olá, <strong>${offer.clientName}</strong>!</p>
+              <p>Seu crédito de <strong style="color:#4CAF50;font-size:24px;">${approvedFormatted}</strong> foi aprovado e está aguardando seu aceite.</p>
+
+              <div style="background:#1a1a1a;border:2px solid #FF6B6B;border-radius:12px;padding:20px;margin:20px 0;text-align:center;">
+                <p style="color:#FF6B6B;font-size:18px;font-weight:bold;margin:0;">⚠️ Restam apenas ${hoursLeft} horas!</p>
+                <p style="color:#aaa;font-size:13px;margin:10px 0 0 0;">Após este prazo, será necessário uma nova análise.</p>
+              </div>
+
+              <p style="text-align:center;margin:25px 0;">
+                <a href="https://www.tubaraoemprestimo.com.br" style="display:inline-block;background:#D4AF37;color:#000;padding:15px 40px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;">
+                  ✍️ ACEITAR CONTRATO AGORA
+                </a>
+              </p>
+            `);
+            emailService.send(offer.email, `⏰ Restam ${hoursLeft}h — Aceite seu crédito de ${approvedFormatted}!`, emailHtml).catch(() => {});
+          } catch (e) {
+            console.error('[Cron] Email reminder error:', e);
+          }
+        }
+
+        // Push notification
+        if (offer.userId) {
+          sendPushToUser(
+            offer.userId,
+            `⏰ Restam ${hoursLeft}h!`,
+            `Seu crédito de ${approvedFormatted} está aguardando aceite!`
+          ).catch(() => {});
+        }
+      }
+
+      // Expirar contrapropostas com mais de 48h
+      const expiredOffers = await prisma.loanRequest.findMany({
+        where: {
+          status: 'PENDING_ACCEPTANCE',
+          counterOfferAccepted: false,
+          approvedAt: { lt: fortyEightHoursAgo }
+        }
+      });
+
+      if (expiredOffers.length > 0) {
+        console.log(`[Cron] Expirando ${expiredOffers.length} contrapropostas com mais de 48h`);
+
+        for (const offer of expiredOffers) {
+          await prisma.loanRequest.update({
+            where: { id: offer.id },
+            data: { status: 'EXPIRED' }
+          });
+
+          // Notificar expiração
+          if (offer.phone) {
+            try {
+              const config = await prisma.whatsappConfig.findFirst();
+              if (config?.isConnected) {
+                const { normalizePhoneBR } = await import('../services/whatsapp');
+                const number = normalizePhoneBR(offer.phone);
+                const axios = (await import('axios')).default;
+                await axios.post(`${config.apiUrl}/message/sendText/${config.instanceName}`, {
+                  number,
+                  text: `⏰ *Proposta Expirada*\n\nOlá, ${offer.clientName.split(' ')[0]}.\n\nSua proposta de crédito expirou pois não foi aceita em 48 horas.\n\nVocê pode fazer uma nova solicitação pelo app:\n🔗 https://www.tubaraoemprestimo.com.br\n\n_Tubarão Empréstimos 🦈_`,
+                  options: { delay: 1200, presence: 'composing', linkPreview: false }
+                }, { headers: { apikey: config.apiKey }, timeout: 15000 }).catch(() => {});
+              }
+            } catch (e) {}
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Cron] Counteroffer reminder error:', err);
+    }
+  });
+  job.start();
+};
+
 // ============ INIT ============
 export const initCronJobs = () => {
   scheduleInstallmentReminders();
@@ -510,6 +644,7 @@ export const initCronJobs = () => {
   // scheduleWhatsAppStatus(); // Temporariamente desabilitado até migration completa
   schedulePartnerBonusEvaluation();
   scheduleCommissionCancellation();
-  console.log('[Cron] initialized (reminders + late detection + partner bonus + commission cancellation)');
+  scheduleCounterOfferReminder();
+  console.log('[Cron] initialized (reminders + late detection + partner bonus + commission cancellation + counteroffer reminder)');
 };
 

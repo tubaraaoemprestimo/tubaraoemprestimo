@@ -1,7 +1,7 @@
 ﻿
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { DollarSign, Users, AlertTriangle, TrendingUp, Check, X, Maximize, Layers, Activity, BarChart3, LayoutGrid, Clock } from 'lucide-react';
+import { DollarSign, Users, AlertTriangle, TrendingUp, Check, X, Maximize, Layers, Activity, BarChart3, LayoutGrid, Clock, Zap, Target, Timer } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { apiService } from '../../services/apiService';
 import { whatsappService } from '../../services/whatsappService';
@@ -21,6 +21,7 @@ export const Dashboard: React.FC = () => {
   const [viewingImage, setViewingImage] = useState<{ urls: string[]; title: string } | null>(null);
   const [viewMode, setViewMode] = useState<'standard' | 'advanced'>('advanced');
   const [settings, setSettings] = useState<{ monthlyInterestRate: number }>({ monthlyInterestRate: 5 });
+  const [counterOfferStats, setCounterOfferStats] = useState<any>(null);
 
   useEffect(() => {
     loadData();
@@ -33,6 +34,12 @@ export const Dashboard: React.FC = () => {
     ]);
     setAllRequests(reqs);
     setSettings(sett);
+
+    // Load counteroffer analytics
+    try {
+      const analytics = await apiService.getCounterOfferAnalytics();
+      if (analytics?.success) setCounterOfferStats(analytics.analytics);
+    } catch {}
   };
 
   // Derived data
@@ -252,6 +259,59 @@ export const Dashboard: React.FC = () => {
                 <KPICard title="Inadimplência" value={defaultRate} suffix="%" icon={AlertTriangle} trend={`${defaultedRequests.length} casos`} isBad={defaultRate > 10} />
                 <KPICard title="Receita Projetada" value={projectedRevenue} prefix="R$" icon={TrendingUp} trend={`${settings.monthlyInterestRate}% a.m.`} />
               </div>
+
+              {/* Counteroffer Analytics Card */}
+              {counterOfferStats && counterOfferStats.totalCounterOffers > 0 && (
+                <div className="bg-gradient-to-r from-zinc-900 to-zinc-900 border border-orange-700/30 rounded-2xl p-6">
+                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-orange-400">
+                    <Target size={20} /> Analytics de Contrapropostas
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-black border border-zinc-800 rounded-xl p-4">
+                      <p className="text-xs text-zinc-500 mb-1">Total Enviadas</p>
+                      <p className="text-2xl font-bold text-white">{counterOfferStats.totalCounterOffers}</p>
+                    </div>
+                    <div className="bg-black border border-zinc-800 rounded-xl p-4">
+                      <p className="text-xs text-zinc-500 mb-1">Taxa de Aceite</p>
+                      <p className="text-2xl font-bold text-green-400">{counterOfferStats.acceptanceRate}%</p>
+                      <p className="text-[10px] text-zinc-500">{counterOfferStats.totalAccepted} aceitas</p>
+                    </div>
+                    <div className="bg-black border border-zinc-800 rounded-xl p-4">
+                      <p className="text-xs text-zinc-500 mb-1">Aguardando Aceite</p>
+                      <p className="text-2xl font-bold text-orange-400">{counterOfferStats.pendingAcceptance}</p>
+                    </div>
+                    <div className="bg-black border border-zinc-800 rounded-xl p-4">
+                      <p className="text-xs text-zinc-500 mb-1">Tempo Médio Aceite</p>
+                      <p className="text-2xl font-bold text-white">{counterOfferStats.avgAcceptanceTimeHours}h</p>
+                      {counterOfferStats.fastAcceptCount > 0 && (
+                        <p className="text-[10px] text-yellow-400 flex items-center gap-1">
+                          <Zap size={10} /> {counterOfferStats.fastAcceptCount} aceites rápidos (&lt;1h)
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="bg-black border border-zinc-800 rounded-xl p-4">
+                      <p className="text-xs text-zinc-500 mb-1">Total Solicitado vs Aprovado</p>
+                      <div className="flex items-center gap-3">
+                        <span className="text-zinc-400 text-sm line-through">R$ {counterOfferStats.totalRequested?.toLocaleString('pt-BR')}</span>
+                        <span className="text-green-400 font-bold">R$ {counterOfferStats.totalApproved?.toLocaleString('pt-BR')}</span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 mt-1">Desconto médio: {counterOfferStats.avgDiscountRate}%</p>
+                    </div>
+                    <div className="bg-black border border-zinc-800 rounded-xl p-4">
+                      <p className="text-xs text-zinc-500 mb-2">Por Perfil</p>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(counterOfferStats.byProfile || {}).map(([profile, data]: [string, any]) => (
+                          <span key={profile} className="text-[10px] bg-zinc-900 border border-zinc-700 rounded-full px-2 py-1">
+                            {profile}: {data.rate}% ({data.accepted}/{data.total})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Pending Loans Table */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">

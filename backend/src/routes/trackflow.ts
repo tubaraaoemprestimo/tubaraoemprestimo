@@ -158,7 +158,7 @@ router.get('/history', authenticate, async (req: Request, res: Response) => {
 router.get('/query/:id', authenticate, async (req: Request, res: Response) => {
     try {
         const userId = (req as any).user.id;
-        const { id } = req.params;
+        const id = String(req.params.id);
 
         const query = await prisma.trackFlowQuery.findFirst({
             where: { id, userId }

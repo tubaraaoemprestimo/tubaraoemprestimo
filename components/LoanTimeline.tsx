@@ -14,13 +14,14 @@ export const LoanTimeline: React.FC<LoanTimelineProps> = ({ status, date, amount
     { id: 1, label: 'Enviado', icon: FileText, done: true },
     { id: 2, label: 'Análise Docs', icon: Search, done: true },
     { id: 3, label: 'Análise Crédito', icon: Clock, done: status !== LoanStatus.PENDING && status !== LoanStatus.WAITING_DOCS },
-    { id: 4, label: 'Liberação', icon: CreditCard, done: status === LoanStatus.APPROVED || status === LoanStatus.PAID },
+    { id: 4, label: status === LoanStatus.PENDING_ACCEPTANCE ? 'Aceite' : 'Liberação', icon: CreditCard, done: status === LoanStatus.APPROVED || status === LoanStatus.PAID },
   ];
 
   // Determine active step index
   let activeIndex = 1; // Default to Analysis
   if (status === LoanStatus.WAITING_DOCS) activeIndex = 1;
   if (status === LoanStatus.PENDING) activeIndex = 2;
+  if (status === LoanStatus.PENDING_ACCEPTANCE) activeIndex = 3; // Awaiting client acceptance
   if (status === LoanStatus.APPROVED || status === LoanStatus.PAID) activeIndex = 3;
   if (status === LoanStatus.REJECTED) activeIndex = 2; // Stop at credit analysis
 
@@ -31,6 +32,8 @@ export const LoanTimeline: React.FC<LoanTimelineProps> = ({ status, date, amount
         return { label: 'Em Análise', color: 'text-yellow-400', bgColor: 'bg-yellow-500/10', borderColor: 'border-yellow-500/30', icon: Loader2, iconClass: 'animate-spin' };
       case LoanStatus.WAITING_DOCS:
         return { label: 'Aguard. Documentos', color: 'text-blue-400', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/30', icon: AlertTriangle, iconClass: '' };
+      case LoanStatus.PENDING_ACCEPTANCE:
+        return { label: 'Pré-Aprovado!', color: 'text-orange-400', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/30', icon: DollarSign, iconClass: 'animate-pulse' };
       case LoanStatus.APPROVED:
         return { label: 'Aprovado!', color: 'text-green-400', bgColor: 'bg-green-500/10', borderColor: 'border-green-500/30', icon: CheckCircle2, iconClass: '' };
       case LoanStatus.REJECTED:
@@ -132,6 +135,13 @@ export const LoanTimeline: React.FC<LoanTimelineProps> = ({ status, date, amount
         <div className="mt-4 p-3 bg-blue-900/20 border border-blue-900/50 rounded-lg text-blue-400 text-xs text-center flex items-center justify-center gap-2">
           <AlertTriangle size={16} />
           Precisamos de um documento adicional para continuar a análise.
+        </div>
+      )}
+
+      {status === LoanStatus.PENDING_ACCEPTANCE && (
+        <div className="mt-4 p-3 bg-orange-900/20 border border-orange-900/50 rounded-lg text-orange-400 text-xs text-center flex items-center justify-center gap-2">
+          <DollarSign size={16} className="animate-pulse" />
+          Seu crédito foi pré-aprovado! Aceite o contrato acima para liberar o saldo.
         </div>
       )}
     </div>

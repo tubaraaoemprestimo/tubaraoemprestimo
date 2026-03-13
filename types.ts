@@ -9,6 +9,7 @@ export enum LoanStatus {
   PENDING = 'PENDING',
   WAITING_DOCS = 'WAITING_DOCS', // New Status
   RETURNING_PENDING = 'RETURNING_PENDING', // Cliente antigo aguardando aprovação
+  PENDING_ACCEPTANCE = 'PENDING_ACCEPTANCE', // Contraproposta aguardando aceite do cliente
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   PAID = 'PAID',
@@ -107,6 +108,14 @@ export interface LoanRequest {
   signatureUrl?: string;
   contractPdfUrl?: string;
   supplementalDescription?: string;
+
+  // Contraproposta
+  requestedAmount?: number;
+  approvedAmount?: number;
+  approvedAt?: string;
+  approvedById?: string;
+  counterOfferAccepted?: boolean;
+  counterOfferAcceptedAt?: string;
 }
 
 export interface DashboardStats {

@@ -74,3 +74,110 @@ adminRouter.delete('/blacklist/:id', authenticate, isAdmin, async (req: Request,
         res.status(500).json({ error: 'Erro ao remover da blacklist' });
     }
 });
+
+// =============================================
+// ANALYTICS DE CONTRAPROPOSTAS
+// =============================================
+
+// GET /api/admin/counteroffer-analytics
+adminRouter.get('/counteroffer-analytics', authenticate, isAdmin, async (req: Request, res: Response) => {
+    try {
+        // Total de contrapropostas enviadas
+        const totalCounterOffers = await prisma.loanRequest.count({
+            where: { approvedAmount: { not: null } }
+        });
+
+        // Total aceitas
+        const totalAccepted = await prisma.loanRequest.count({
+            where: {
+                approvedAmount: { not: null },
+                counterOfferAccepted: true
+            }
+        });
+
+        // Aguardando aceite
+        const pendingAcceptance = await prisma.loanRequest.count({
+            where: { status: 'PENDING_ACCEPTANCE' }
+        });
+
+        // Taxa de aceite
+        const acceptanceRate = totalCounterOffers > 0
+            ? Math.round((totalAccepted / totalCounterOffers) * 100)
+            : 0;
+
+        // Todas as contrapropostas com dados para cálculos
+        const allCounterOffers = await prisma.loanRequest.findMany({
+            where: { approvedAmount: { not: null } },
+            select: {
+                id: true,
+                clientName: true,
+                amount: true,
+                requestedAmount: true,
+                approvedAmount: true,
+                approvedAt: true,
+                counterOfferAccepted: true,
+                counterOfferAcceptedAt: true,
+                status: true,
+                profileType: true,
+                createdAt: true
+            },
+            orderBy: { approvedAt: 'desc' },
+            take: 50
+        });
+
+        // Tempo médio de aceite (em horas)
+        const acceptedOffers = allCounterOffers.filter(o => o.counterOfferAccepted && o.approvedAt && o.counterOfferAcceptedAt);
+        let avgAcceptanceTimeHours = 0;
+        let fastAcceptCount = 0; // Aceitos em menos de 1h
+
+        if (acceptedOffers.length > 0) {
+            const totalMs = acceptedOffers.reduce((sum, o) => {
+                const diff = new Date(o.counterOfferAcceptedAt!).getTime() - new Date(o.approvedAt!).getTime();
+                if (diff < 60 * 60 * 1000) fastAcceptCount++; // Menos de 1h
+                return sum + diff;
+            }, 0);
+            avgAcceptanceTimeHours = Math.round((totalMs / acceptedOffers.length) / (1000 * 60 * 60) * 10) / 10;
+        }
+
+        // Valor total aprovado vs solicitado
+        const totalRequested = allCounterOffers.reduce((sum, o) => sum + (o.requestedAmount || o.amount), 0);
+        const totalApproved = allCounterOffers.reduce((sum, o) => sum + (o.approvedAmount || 0), 0);
+        const avgDiscountRate = totalRequested > 0
+            ? Math.round(((totalRequested - totalApproved) / totalRequested) * 100)
+            : 0;
+
+        // Por perfil
+        const byProfile: Record<string, { total: number; accepted: number; rate: number }> = {};
+        for (const offer of allCounterOffers) {
+            const profile = offer.profileType || 'N/A';
+            if (!byProfile[profile]) byProfile[profile] = { total: 0, accepted: 0, rate: 0 };
+            byProfile[profile].total++;
+            if (offer.counterOfferAccepted) byProfile[profile].accepted++;
+        }
+        for (const profile of Object.keys(byProfile)) {
+            byProfile[profile].rate = byProfile[profile].total > 0
+                ? Math.round((byProfile[profile].accepted / byProfile[profile].total) * 100)
+                : 0;
+        }
+
+        res.json({
+            success: true,
+            analytics: {
+                totalCounterOffers,
+                totalAccepted,
+                pendingAcceptance,
+                acceptanceRate,
+                avgAcceptanceTimeHours,
+                fastAcceptCount, // Aceitos em menos de 1h (badge "Aprovação Rápida")
+                totalRequested: Math.round(totalRequested * 100) / 100,
+                totalApproved: Math.round(totalApproved * 100) / 100,
+                avgDiscountRate,
+                byProfile
+            },
+            recentOffers: allCounterOffers
+        });
+    } catch (err) {
+        console.error('[Admin] Error fetching counteroffer analytics:', err);
+        res.status(500).json({ error: 'Erro ao buscar analytics de contrapropostas' });
+    }
+});

@@ -438,6 +438,12 @@ export const apiService = {
         return data;
     },
 
+    async getCounterOfferAnalytics() {
+        const { data, error } = await api.get('/admin/counteroffer-analytics');
+        if (error) throw new Error(error.error || 'Erro ao buscar analytics');
+        return data;
+    },
+
     async acceptCounteroffer(id: string) {
         const { data, error } = await api.put(`/loan-requests/${id}/accept-counteroffer`, {});
         if (error) throw new Error(error.error || 'Erro ao aceitar contraproposta');

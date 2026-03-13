@@ -334,11 +334,13 @@ export const Requests: React.FC = () => {
                                             <span className={`px-2 py-1 rounded-full text-xs font-bold ${req.status === LoanStatus.APPROVED ? 'bg-green-900/30 text-green-400' :
                                                 req.status === LoanStatus.REJECTED ? 'bg-red-900/30 text-red-400' :
                                                     req.status === LoanStatus.WAITING_DOCS ? 'bg-blue-900/30 text-blue-400' :
-                                                        req.status === 'RETURNING_PENDING' ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-700' :
-                                                            'bg-yellow-900/30 text-yellow-400'
+                                                        req.status === LoanStatus.PENDING_ACCEPTANCE ? 'bg-orange-900/30 text-orange-400 border border-orange-700' :
+                                                            req.status === 'RETURNING_PENDING' ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-700' :
+                                                                'bg-yellow-900/30 text-yellow-400'
                                                 }`}>
                                                 {req.status === LoanStatus.WAITING_DOCS ? 'AGUARDANDO DOC' :
-                                                    req.status === 'RETURNING_PENDING' ? '🔄 CLIENTE ANTIGO' : req.status}
+                                                    req.status === LoanStatus.PENDING_ACCEPTANCE ? '⏳ AGUARDANDO ACEITE' :
+                                                        req.status === 'RETURNING_PENDING' ? '🔄 CLIENTE ANTIGO' : req.status}
                                             </span>
                                         </td>
                                         <td className="p-4 text-zinc-500 text-sm">
@@ -464,6 +466,43 @@ export const Requests: React.FC = () => {
                                             </div>
                                         ) : (
                                             <InfoBox label="Valor Solicitado" value={`R$ ${selectedRequest.amount.toLocaleString()}`} highlight />
+                                        )}
+
+                                        {/* Badge Contraproposta */}
+                                        {selectedRequest.approvedAmount && (
+                                            <div className="p-4 rounded-xl border bg-green-900/20 border-green-700">
+                                                <p className="text-xs text-green-400 mb-1 uppercase tracking-wide">Valor Aprovado (Contraproposta)</p>
+                                                <p className="font-bold text-green-400 text-lg">R$ {selectedRequest.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                                {selectedRequest.approvedAt && (
+                                                    <p className="text-xs text-zinc-500 mt-1">Aprovado em {new Date(selectedRequest.approvedAt).toLocaleString('pt-BR')}</p>
+                                                )}
+                                                {selectedRequest.counterOfferAccepted ? (
+                                                    <div className="flex items-center gap-2 mt-2">
+                                                        <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
+                                                            ✅ CONTRATO ACEITO
+                                                        </span>
+                                                        {selectedRequest.counterOfferAcceptedAt && selectedRequest.approvedAt && (
+                                                            (() => {
+                                                                const diff = new Date(selectedRequest.counterOfferAcceptedAt).getTime() - new Date(selectedRequest.approvedAt).getTime();
+                                                                const hours = diff / (1000 * 60 * 60);
+                                                                return hours < 1 ? (
+                                                                    <span className="bg-[#D4AF37] text-black px-2 py-1 rounded text-xs font-bold animate-pulse">
+                                                                        ⚡ APROVAÇÃO RÁPIDA ({Math.round(hours * 60)}min)
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-xs text-zinc-500">
+                                                                        em {Math.round(hours * 10) / 10}h
+                                                                    </span>
+                                                                );
+                                                            })()
+                                                        )}
+                                                    </div>
+                                                ) : selectedRequest.status === 'PENDING_ACCEPTANCE' ? (
+                                                    <span className="inline-block bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold mt-2">
+                                                        ⏳ AGUARDANDO ACEITE DO CLIENTE
+                                                    </span>
+                                                ) : null}
+                                            </div>
                                         )}
 
                                         {isEditing && (

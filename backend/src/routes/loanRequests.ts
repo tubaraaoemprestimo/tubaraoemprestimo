@@ -66,7 +66,7 @@ loanRequestsRouter.get('/pending', async (req: Request, res: Response) => {
         const request = await prisma.loanRequest.findFirst({
             where: {
                 userId: req.user!.id,
-                status: { in: ['PENDING', 'WAITING_DOCS'] }
+                status: { in: ['PENDING', 'WAITING_DOCS', 'PENDING_ACCEPTANCE'] }
             },
             orderBy: { createdAt: 'desc' }
         });

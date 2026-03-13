@@ -476,9 +476,9 @@ if (user) {
           </div>
         )}
 
-        {/* Só mostrar timeline se houver solicitação em andamento (PENDING ou WAITING_DOCS) */}
+        {/* Só mostrar timeline se houver solicitação em andamento (PENDING, WAITING_DOCS ou PENDING_ACCEPTANCE) */}
         {pendingRequest &&
-         (pendingRequest.status === LoanStatus.PENDING || pendingRequest.status === LoanStatus.WAITING_DOCS) &&
+         (pendingRequest.status === LoanStatus.PENDING || pendingRequest.status === LoanStatus.WAITING_DOCS || pendingRequest.status === LoanStatus.PENDING_ACCEPTANCE) &&
          pendingRequest.amount > 0 && (
           <div className="px-4 mb-3">
             <LoanTimeline
