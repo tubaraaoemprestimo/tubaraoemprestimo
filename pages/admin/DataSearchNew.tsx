@@ -25,6 +25,11 @@ export const DataSearchNew: React.FC = () => {
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
 
+    // Filtros do histórico
+    const [filterPeriod, setFilterPeriod] = useState<'all' | 'today' | 'week' | 'month'>('all');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'success' | 'error'>('all');
+    const [filterSearch, setFilterSearch] = useState('');
+
     // Form states
     const [cpf, setCpf] = useState('');
     const [cnpj, setCnpj] = useState('');
@@ -175,6 +180,54 @@ export const DataSearchNew: React.FC = () => {
             setShowHistory(false);
             addToast('Consulta carregada do histórico', 'info');
         }
+    };
+
+    // Filtrar histórico
+    const getFilteredHistory = () => {
+        let filtered = [...history];
+
+        // Filtro por período
+        if (filterPeriod !== 'all') {
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            filtered = filtered.filter(item => {
+                const itemDate = new Date(item.createdAt);
+
+                if (filterPeriod === 'today') {
+                    return itemDate >= today;
+                } else if (filterPeriod === 'week') {
+                    const weekAgo = new Date(today);
+                    weekAgo.setDate(weekAgo.getDate() - 7);
+                    return itemDate >= weekAgo;
+                } else if (filterPeriod === 'month') {
+                    const monthAgo = new Date(today);
+                    monthAgo.setMonth(monthAgo.getMonth() - 1);
+                    return itemDate >= monthAgo;
+                }
+                return true;
+            });
+        }
+
+        // Filtro por status
+        if (filterStatus !== 'all') {
+            filtered = filtered.filter(item => {
+                if (filterStatus === 'success') return item.success;
+                if (filterStatus === 'error') return !item.success;
+                return true;
+            });
+        }
+
+        // Filtro por busca (CPF, CNPJ, Placa, etc)
+        if (filterSearch.trim()) {
+            const search = filterSearch.toLowerCase().replace(/\D/g, '');
+            filtered = filtered.filter(item => {
+                const params = JSON.stringify(item.queryParams).toLowerCase().replace(/\D/g, '');
+                return params.includes(search);
+            });
+        }
+
+        return filtered;
     };
 
     const copyToClipboard = (text: string) => {
@@ -612,6 +665,51 @@ export const DataSearchNew: React.FC = () => {
             {showHistory && (
                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-8">
                     <h2 className="text-xl font-bold text-[#D4AF37] mb-4">Histórico de Consultas</h2>
+
+                    {/* Filtros */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        {/* Filtro por Período */}
+                        <div>
+                            <label className="block text-xs text-zinc-400 mb-2">Período</label>
+                            <select
+                                value={filterPeriod}
+                                onChange={(e) => setFilterPeriod(e.target.value as any)}
+                                className="w-full bg-black border border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-[#D4AF37] outline-none"
+                            >
+                                <option value="all">Todos</option>
+                                <option value="today">Hoje</option>
+                                <option value="week">Última Semana</option>
+                                <option value="month">Último Mês</option>
+                            </select>
+                        </div>
+
+                        {/* Filtro por Status */}
+                        <div>
+                            <label className="block text-xs text-zinc-400 mb-2">Status</label>
+                            <select
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value as any)}
+                                className="w-full bg-black border border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-[#D4AF37] outline-none"
+                            >
+                                <option value="all">Todos</option>
+                                <option value="success">Sucesso</option>
+                                <option value="error">Erro</option>
+                            </select>
+                        </div>
+
+                        {/* Busca */}
+                        <div className="md:col-span-2">
+                            <label className="block text-xs text-zinc-400 mb-2">Buscar (CPF, CNPJ, Placa, etc)</label>
+                            <input
+                                type="text"
+                                value={filterSearch}
+                                onChange={(e) => setFilterSearch(e.target.value)}
+                                placeholder="Digite para buscar..."
+                                className="w-full bg-black border border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-[#D4AF37] outline-none"
+                            />
+                        </div>
+                    </div>
+
                     {loadingHistory ? (
                         <div className="flex items-center justify-center py-8">
                             <Loader2 className="animate-spin text-[#D4AF37]" size={32} />
@@ -619,41 +717,66 @@ export const DataSearchNew: React.FC = () => {
                     ) : history.length === 0 ? (
                         <p className="text-zinc-500 text-center py-8">Nenhuma consulta realizada ainda</p>
                     ) : (
-                        <div className="space-y-3">
-                            {history.map((item) => (
-                                <div
-                                    key={item.id}
-                                    className="bg-black border border-zinc-800 rounded-xl p-4 hover:border-[#D4AF37] transition-colors cursor-pointer"
-                                    onClick={() => viewHistoryItem(item)}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            {item.success ? (
-                                                <Check className="text-green-400" size={20} />
-                                            ) : (
-                                                <AlertTriangle className="text-red-400" size={20} />
-                                            )}
-                                            <div>
-                                                <p className="font-bold text-white">
-                                                    {item.apiType.toUpperCase()}
-                                                </p>
-                                                <p className="text-xs text-zinc-500">
-                                                    {formatDate(item.createdAt)} - {new Date(item.createdAt).toLocaleTimeString('pt-BR')}
-                                                </p>
+                        <>
+                            {/* Contador de resultados filtrados */}
+                            <div className="flex items-center justify-between mb-4">
+                                <p className="text-sm text-zinc-400">
+                                    {getFilteredHistory().length} de {history.length} consultas
+                                </p>
+                                {(filterPeriod !== 'all' || filterStatus !== 'all' || filterSearch) && (
+                                    <button
+                                        onClick={() => {
+                                            setFilterPeriod('all');
+                                            setFilterStatus('all');
+                                            setFilterSearch('');
+                                        }}
+                                        className="text-xs text-[#D4AF37] hover:underline"
+                                    >
+                                        Limpar filtros
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="space-y-3">
+                                {getFilteredHistory().length === 0 ? (
+                                    <p className="text-zinc-500 text-center py-8">Nenhuma consulta encontrada com os filtros aplicados</p>
+                                ) : (
+                                    getFilteredHistory().map((item) => (
+                                        <div
+                                            key={item.id}
+                                            className="bg-black border border-zinc-800 rounded-xl p-4 hover:border-[#D4AF37] transition-colors cursor-pointer"
+                                            onClick={() => viewHistoryItem(item)}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    {item.success ? (
+                                                        <Check className="text-green-400" size={20} />
+                                                    ) : (
+                                                        <AlertTriangle className="text-red-400" size={20} />
+                                                    )}
+                                                    <div>
+                                                        <p className="font-bold text-white">
+                                                            {item.apiType.toUpperCase()}
+                                                        </p>
+                                                        <p className="text-xs text-zinc-500">
+                                                            {formatDate(item.createdAt)} - {new Date(item.createdAt).toLocaleTimeString('pt-BR')}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-sm text-zinc-400">
+                                                        {JSON.stringify(item.queryParams).substring(0, 50)}...
+                                                    </p>
+                                                    {!item.success && item.errorMsg && (
+                                                        <p className="text-xs text-red-400 mt-1">{item.errorMsg}</p>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-sm text-zinc-400">
-                                                {JSON.stringify(item.queryParams).substring(0, 50)}...
-                                            </p>
-                                            {!item.success && item.errorMsg && (
-                                                <p className="text-xs text-red-400 mt-1">{item.errorMsg}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
             )}
