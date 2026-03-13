@@ -115,7 +115,12 @@ export const DataSearchNew: React.FC = () => {
                     }
                     apiType = 'historico-veicular';
                     queryParams.tvalue = veiculoType;
-                    queryParams.value = veiculoValue.replace(/\D/g, '');
+                    // Placa e chassi precisam manter letras, só remove espaços e traços
+                    if (veiculoType === 'placa' || veiculoType === 'chassi') {
+                        queryParams.value = veiculoValue.replace(/[\s\-]/g, '').toUpperCase();
+                    } else {
+                        queryParams.value = veiculoValue.replace(/\D/g, '');
+                    }
                     break;
             }
 
