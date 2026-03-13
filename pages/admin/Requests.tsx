@@ -2,7 +2,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Check, X, Eye, Maximize, Layers, Download, Filter, Video, Users, Phone, FileWarning, Send, AlertTriangle, MapPin } from 'lucide-react';
+import { Check, X, Eye, Maximize, Layers, Download, Filter, Video, Users, Phone, FileWarning, Send, AlertTriangle, MapPin, FileText, ExternalLink } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { apiService } from '../../services/apiService';
 import { emailService } from '../../services/emailService';
@@ -1384,28 +1384,48 @@ const VideoCard = ({ title, url }: { title: string, url: string }) => (
     </div>
 );
 
-const DocCard = ({ title, urls, isSignature, onView }: { title: string, urls: string[], isSignature?: boolean, onView: () => void }) => (
-    <div className="space-y-2 group">
-        <p className="text-xs text-zinc-400 pl-1">{title}</p>
-        <div className={`rounded-xl border border-zinc-800 bg-black overflow-hidden relative ${isSignature ? 'h-24 bg-white/5' : 'aspect-[4/3]'}`}>
-            {urls.length > 0 ? (
-                <img src={urls[0]} className={`w-full h-full ${isSignature ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100`} alt={title} />
-            ) : (
-                <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">Pendente</div>
-            )}
+const DocCard = ({ title, urls, isSignature, onView }: { title: string, urls: string[], isSignature?: boolean, onView: () => void }) => {
+    const isPdf = urls.length > 0 && urls[0] && (urls[0].toLowerCase().includes('.pdf') || urls[0].toLowerCase().includes('work_card'));
 
-            {/* Multi-page badge */}
-            {urls.length > 1 && (
-                <div className="absolute top-2 right-2 bg-black/70 border border-zinc-700 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
-                    <Layers size={10} className="text-[#D4AF37]" /> +{urls.length - 1}
-                </div>
-            )}
+    return (
+        <div className="space-y-2 group">
+            <p className="text-xs text-zinc-400 pl-1">{title}</p>
+            <div className={`rounded-xl border border-zinc-800 bg-black overflow-hidden relative ${isSignature ? 'h-24 bg-white/5' : 'aspect-[4/3]'}`}>
+                {urls.length > 0 ? (
+                    isPdf ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-4">
+                            <FileText size={48} className="text-red-500" />
+                            <p className="text-xs text-zinc-400 text-center">Documento PDF</p>
+                            <a
+                                href={urls[0]}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition-all"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <ExternalLink size={12} /> Abrir PDF
+                            </a>
+                        </div>
+                    ) : (
+                        <img src={urls[0]} className={`w-full h-full ${isSignature ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100`} alt={title} />
+                    )
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">Pendente</div>
+                )}
 
-            {urls.length > 0 && (
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer" onClick={onView}>
-                    <Button size="sm" variant="secondary" className="shadow-xl"><Maximize size={14} className="mr-1" /> Ampliar</Button>
-                </div>
-            )}
+                {/* Multi-page badge */}
+                {urls.length > 1 && (
+                    <div className="absolute top-2 right-2 bg-black/70 border border-zinc-700 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
+                        <Layers size={10} className="text-[#D4AF37]" /> +{urls.length - 1}
+                    </div>
+                )}
+
+                {urls.length > 0 && !isPdf && (
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer" onClick={onView}>
+                        <Button size="sm" variant="secondary" className="shadow-xl"><Maximize size={14} className="mr-1" /> Ampliar</Button>
+                    </div>
+                )}
+            </div>
         </div>
-    </div>
-);
+    );
+};
