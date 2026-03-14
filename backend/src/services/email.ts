@@ -7,12 +7,24 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const RESEND_FROM = process.env.RESEND_FROM || 'Tubarão Empréstimos <contato@tubaraoemprestimo.com.br>';
 const RESEND_API_URL = 'https://api.resend.com/emails';
 
+// Queue para respeitar o rate limit do Resend (2 req/s)
+let lastEmailTime = 0;
+async function throttle() {
+    const now = Date.now();
+    const elapsed = now - lastEmailTime;
+    if (elapsed < 600) {
+        await new Promise(r => setTimeout(r, 600 - elapsed));
+    }
+    lastEmailTime = Date.now();
+}
+
 async function sendViaResend(to: string, subject: string, html: string): Promise<boolean> {
     if (!RESEND_API_KEY) {
         console.error('[Email] RESEND_API_KEY não configurada no .env');
         return false;
     }
 
+    await throttle();
     try {
         const response = await axios.post(RESEND_API_URL, {
             from: RESEND_FROM,
@@ -30,7 +42,8 @@ async function sendViaResend(to: string, subject: string, html: string): Promise
         console.log(`[Email] ✅ Enviado para ${to} via Resend (id: ${response.data?.id || 'ok'})`);
         return true;
     } catch (error: any) {
-        const errMsg = error?.response?.data?.message || error?.response?.data?.error || error.message;
+        const errData = error?.response?.data;
+        const errMsg = errData?.message || errData?.error || error.message;
         console.error(`[Email] ❌ Erro Resend para ${to}:`, errMsg);
         return false;
     }
