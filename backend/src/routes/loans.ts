@@ -6,6 +6,140 @@ import { sendWhatsAppMessage } from '../services/whatsapp';
 export const loansRouter = Router();
 loansRouter.use(authenticate);
 
+// GET /api/loans/admin/all — Admin: listar todos os contratos com filtros
+loansRouter.get('/admin/all', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const { status, type, search } = req.query as Record<string, string>;
+
+        const where: any = {};
+        if (status && status !== 'ALL') where.status = status;
+        if (type === 'LOAN') where.isLoan = true;
+        if (type === 'SERVICE') where.isService = true;
+        if (type === 'INVESTMENT') where.isInvestment = true;
+
+        const loans = await prisma.loan.findMany({
+            where,
+            include: {
+                customer: true,
+                installments: { orderBy: { dueDate: 'asc' } }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        // Filtro de busca por nome/CPF do cliente
+        const filtered = search
+            ? loans.filter(l =>
+                l.customer?.name?.toLowerCase().includes(search.toLowerCase()) ||
+                l.customer?.cpf?.includes(search)
+            )
+            : loans;
+
+        res.json(filtered);
+    } catch (err) {
+        console.error('[Loans] admin/all error:', err);
+        res.status(500).json({ error: 'Erro ao listar contratos' });
+    }
+});
+
+// GET /api/loans/:loanId/admin-details — Detalhes completos de um contrato (admin)
+loansRouter.get('/:loanId/admin-details', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const { loanId } = req.params;
+        const loan = await prisma.loan.findUnique({
+            where: { id: loanId },
+            include: {
+                customer: true,
+                installments: { orderBy: { dueDate: 'asc' } },
+                loanRequest: { select: { profileType: true, monthlyRate: true, contractMonths: true } }
+            }
+        });
+        if (!loan) { res.status(404).json({ error: 'Contrato não encontrado' }); return; }
+        res.json(loan);
+    } catch (err) {
+        console.error('[Loans] admin-details error:', err);
+        res.status(500).json({ error: 'Erro ao buscar detalhes' });
+    }
+});
+
+// PUT /api/loans/:loanId/admin-edit — Editar contrato (admin)
+loansRouter.put('/:loanId/admin-edit', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const { loanId } = req.params;
+        const { adminNotes, dailyInstallmentAmount, nextPaymentDate } = req.body;
+
+        const updated = await prisma.loan.update({
+            where: { id: loanId },
+            data: {
+                ...(adminNotes !== undefined && { adminNotes }),
+                ...(dailyInstallmentAmount !== undefined && { dailyInstallmentAmount: parseFloat(dailyInstallmentAmount) }),
+                ...(nextPaymentDate && { nextPaymentDate: new Date(nextPaymentDate) })
+            }
+        });
+
+        res.json({ success: true, loan: updated });
+    } catch (err) {
+        console.error('[Loans] admin-edit error:', err);
+        res.status(500).json({ error: 'Erro ao editar contrato' });
+    }
+});
+
+// POST /api/loans/:loanId/manual-payment — Registrar pagamento manual (admin)
+loansRouter.post('/:loanId/manual-payment', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const { loanId } = req.params;
+        const { installmentId, amount, paymentMethod, receiptUrl, notes } = req.body;
+
+        if (!installmentId || !amount) {
+            res.status(400).json({ error: 'installmentId e amount são obrigatórios' });
+            return;
+        }
+
+        const loan = await prisma.loan.findUnique({
+            where: { id: loanId },
+            include: { customer: true }
+        });
+        if (!loan) { res.status(404).json({ error: 'Contrato não encontrado' }); return; }
+
+        // Marcar parcela como paga
+        await prisma.installment.update({
+            where: { id: installmentId },
+            data: {
+                status: 'PAID',
+                paidAt: new Date(),
+                ...(receiptUrl && { proofUrl: receiptUrl })
+            }
+        });
+
+        // Atualizar remaining_amount e status do loan
+        const newRemaining = Math.max(0, loan.remainingAmount - parseFloat(amount));
+        await prisma.loan.update({
+            where: { id: loanId },
+            data: {
+                remainingAmount: newRemaining,
+                lastPaymentDate: new Date(),
+                status: newRemaining <= 0 ? 'PAID' : loan.status,
+                daysOverdue: 0
+            }
+        });
+
+        // Criar transação
+        await prisma.transaction.create({
+            data: {
+                type: 'IN',
+                description: `Pagamento manual - ${loan.customer?.name || String(loanId).substring(0, 8)} ${notes ? '| ' + notes : ''}`,
+                amount: parseFloat(amount),
+                category: 'PAYMENT',
+                date: new Date()
+            }
+        });
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[Loans] manual-payment error:', err);
+        res.status(500).json({ error: 'Erro ao registrar pagamento' });
+    }
+});
+
 // GET /api/loans — Empréstimos do cliente ou todos (admin)
 loansRouter.get('/', async (req: Request, res: Response) => {
     try {

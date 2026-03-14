@@ -329,3 +329,103 @@ financeRouter.get('/requests-map', requireAdmin, async (_req: Request, res: Resp
         res.status(500).json({ error: 'Erro ao buscar mapa de requests' });
     }
 });
+
+// GET /api/finance/today-summary - Resumo operacional do dia
+financeRouter.get('/today-summary', requireAdmin, async (_req: Request, res: Response) => {
+    try {
+        const today = new Date();
+        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
+        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+
+        // Parcelas vencendo hoje (OPEN com dueDate = hoje)
+        const installmentsDueToday = await prisma.installment.findMany({
+            where: {
+                status: 'OPEN',
+                dueDate: { gte: startOfDay, lte: endOfDay }
+            },
+            include: {
+                loan: {
+                    include: { customer: true }
+                }
+            },
+            orderBy: { dueDate: 'asc' }
+        });
+
+        const totalDueToday = installmentsDueToday.reduce((sum, i) => sum + i.amount, 0);
+
+        // Empréstimos em atraso: loans com status ACTIVE/DEFAULT que têm parcelas OPEN vencidas
+        const overdueInstallments = await prisma.installment.findMany({
+            where: {
+                status: 'OPEN',
+                dueDate: { lt: startOfDay }
+            },
+            select: { loanId: true },
+            distinct: ['loanId']
+        });
+        const overdueLoanIds = overdueInstallments.map(i => i.loanId);
+
+        const loansInDefault = overdueLoanIds.length > 0 ? await prisma.loan.findMany({
+            where: {
+                id: { in: overdueLoanIds },
+                status: { in: ['ACTIVE', 'DEFAULT', 'PAID'] }
+            },
+            include: {
+                customer: true,
+                installments: {
+                    where: { status: 'OPEN', dueDate: { lt: startOfDay } },
+                    orderBy: { dueDate: 'asc' },
+                    take: 1
+                }
+            }
+        }) : [];
+
+        // Pagamentos recebidos hoje
+        const paymentsToday = await prisma.installment.findMany({
+            where: {
+                status: 'PAID',
+                paidAt: { gte: startOfDay, lte: endOfDay }
+            }
+        });
+        const paymentsReceivedToday = paymentsToday.reduce((sum, i) => sum + i.amount, 0);
+
+        res.json({
+            totalDueToday,
+            installmentsDueCount: installmentsDueToday.length,
+            installmentsDueToday: installmentsDueToday.map(i => ({
+                installmentId: i.id,
+                loanId: i.loanId,
+                amount: i.amount,
+                dueDate: i.dueDate,
+                customer: i.loan?.customer ? {
+                    id: i.loan.customer.id,
+                    name: i.loan.customer.name,
+                    phone: i.loan.customer.phone
+                } : null
+            })),
+            loansInDefaultCount: loansInDefault.length,
+            loansInDefault: loansInDefault.map(l => {
+                const overdueInst = l.installments[0];
+                const daysOverdue = overdueInst
+                    ? Math.floor((Date.now() - new Date(overdueInst.dueDate).getTime()) / (1000 * 60 * 60 * 24))
+                    : 0;
+                return {
+                    loanId: l.id,
+                    amount: l.amount,
+                    remainingAmount: l.remainingAmount,
+                    daysOverdue,
+                    customer: l.customer ? {
+                        id: l.customer.id,
+                        name: l.customer.name,
+                        phone: l.customer.phone
+                    } : null,
+                    nextInstallment: overdueInst || null
+                };
+            }),
+            paymentsReceivedToday,
+            paymentsReceivedCount: paymentsToday.length
+        });
+    } catch (err) {
+        console.error('[Finance] today-summary error:', err);
+        res.status(500).json({ error: 'Erro ao buscar resumo do dia' });
+    }
+});

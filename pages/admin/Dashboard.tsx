@@ -10,6 +10,7 @@ import { LoanRequest, LoanStatus } from '../../types';
 import { useToast } from '../../components/Toast';
 import { ImageViewer } from '../../components/ImageViewer';
 import { AdvancedKPIs } from '../../components/AdvancedKPIs';
+import { TodayFinancialDashboard } from '../../components/TodayFinancialDashboard';
 
 const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
@@ -244,6 +245,11 @@ export const Dashboard: React.FC = () => {
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Sistema Online
           </div>
         </div>
+      </div>
+
+      {/* Dashboard Operacional do Dia */}
+      <div className="mb-8">
+        <TodayFinancialDashboard />
       </div>
 
       {viewMode === 'advanced' ? (

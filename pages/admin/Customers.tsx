@@ -50,6 +50,7 @@ export const Customers: React.FC = () => {
 
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'BLOCKED'>('ALL');
   const [originFilter, setOriginFilter] = useState<'ALL' | 'IMPORTED' | 'ORGANIC'>('ALL');
+  const [clientTypeFilter, setClientTypeFilter] = useState<'ALL' | 'LEADS' | 'ACTIVE_CLIENTS' | 'INACTIVE_CLIENTS'>('ALL');
 
   // Edit Customer Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -77,8 +78,20 @@ export const Customers: React.FC = () => {
       (originFilter === 'IMPORTED' && isImported) ||
       (originFilter === 'ORGANIC' && !isImported);
 
-    return matchesText && matchesStatus && matchesOrigin;
+    const isLead = (c.activeLoansCount || 0) === 0 && (c.totalDebt || 0) === 0;
+    const isActiveClient = (c.activeLoansCount || 0) > 0;
+    const isInactiveClient = (c.activeLoansCount || 0) === 0 && (c.totalDebt || 0) > 0;
+    const matchesClientType = clientTypeFilter === 'ALL' ||
+      (clientTypeFilter === 'LEADS' && isLead) ||
+      (clientTypeFilter === 'ACTIVE_CLIENTS' && isActiveClient) ||
+      (clientTypeFilter === 'INACTIVE_CLIENTS' && isInactiveClient);
+
+    return matchesText && matchesStatus && matchesOrigin && matchesClientType;
   });
+
+  const leadsCount = customers.filter(c => (c.activeLoansCount || 0) === 0 && (c.totalDebt || 0) === 0).length;
+  const activeClientsCount = customers.filter(c => (c.activeLoansCount || 0) > 0).length;
+  const inactiveClientsCount = customers.filter(c => (c.activeLoansCount || 0) === 0 && (c.totalDebt || 0) > 0).length;
 
   const totalImported = customers.filter(c => c.email.includes('@whatsapp.lead')).length;
 
@@ -605,6 +618,21 @@ export const Customers: React.FC = () => {
         </div>
         <div className="flex flex-col gap-4 w-full md:w-auto">
           <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+            {/* Filtro por tipo de cliente */}
+            <div className="flex bg-zinc-900 rounded-lg p-1 border border-zinc-800">
+              <button onClick={() => setClientTypeFilter('ALL')} className={`px-3 py-1 rounded-md text-sm transition-colors ${clientTypeFilter === 'ALL' ? 'bg-[#D4AF37] text-black font-bold' : 'text-zinc-400 hover:text-white'}`}>
+                Todos <span className="text-xs opacity-70">({customers.length})</span>
+              </button>
+              <button onClick={() => setClientTypeFilter('LEADS')} className={`px-3 py-1 rounded-md text-sm transition-colors ${clientTypeFilter === 'LEADS' ? 'bg-blue-600 text-white font-bold' : 'text-zinc-400 hover:text-white'}`}>
+                Leads <span className="text-xs opacity-70">({leadsCount})</span>
+              </button>
+              <button onClick={() => setClientTypeFilter('ACTIVE_CLIENTS')} className={`px-3 py-1 rounded-md text-sm transition-colors ${clientTypeFilter === 'ACTIVE_CLIENTS' ? 'bg-green-600 text-white font-bold' : 'text-zinc-400 hover:text-white'}`}>
+                Clientes Ativos <span className="text-xs opacity-70">({activeClientsCount})</span>
+              </button>
+              <button onClick={() => setClientTypeFilter('INACTIVE_CLIENTS')} className={`px-3 py-1 rounded-md text-sm transition-colors ${clientTypeFilter === 'INACTIVE_CLIENTS' ? 'bg-zinc-600 text-white font-bold' : 'text-zinc-400 hover:text-white'}`}>
+                Quitados <span className="text-xs opacity-70">({inactiveClientsCount})</span>
+              </button>
+            </div>
             <div className="flex bg-zinc-900 rounded-lg p-1 border border-zinc-800">
               <button onClick={() => setStatusFilter('ALL')} className={`px-3 py-1 rounded-md text-sm transition-colors ${statusFilter === 'ALL' ? 'bg-[#D4AF37] text-black font-bold' : 'text-zinc-400 hover:text-white'}`}>Todos</button>
               <button onClick={() => setStatusFilter('ACTIVE')} className={`px-3 py-1 rounded-md text-sm transition-colors ${statusFilter === 'ACTIVE' ? 'bg-green-600 text-white font-bold' : 'text-zinc-400 hover:text-white'}`}>Ativos</button>

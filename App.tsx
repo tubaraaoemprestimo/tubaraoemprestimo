@@ -21,6 +21,7 @@ import { Dashboard } from './pages/admin/Dashboard';
 import { Requests } from './pages/admin/Requests';
 import { Settings } from './pages/admin/Settings';
 import { Customers } from './pages/admin/Customers';
+import { Contracts as AdminContracts } from './pages/admin/Contracts';
 import { Investors } from './pages/admin/Investors';
 import { ImportContacts } from './pages/admin/ImportContacts';
 import { DataSearch } from './pages/admin/DataSearch';
@@ -204,6 +205,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-2 pb-1">Principal</p>
         <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin')}`}><LayoutDashboard size={18} /> Dashboard</Link>
         <Link to="/admin/customers" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/customers')}`}><Users size={18} /> Clientes</Link>
+        <Link to="/admin/contracts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/contracts')}`}><FileCheck size={18} /> Contratos</Link>
         <Link to="/admin/requests" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/requests')}`}><FileText size={18} /> Solicitações</Link>
         <Link to="/admin/investors" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/investors')}`}><Landmark size={18} /> Solicitações de Investidores</Link>
         <Link to="/admin/contract-migrations" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/contract-migrations')}`}><Users size={18} /> Migração de Contratos</Link>
@@ -536,6 +538,7 @@ function App() {
             <Route path="/admin" element={<AdminLayout><Dashboard /></AdminLayout>} />
             <Route path="/admin/requests" element={<AdminLayout><Requests /></AdminLayout>} />
             <Route path="/admin/customers" element={<AdminLayout><Customers /></AdminLayout>} />
+            <Route path="/admin/contracts" element={<AdminLayout><AdminContracts /></AdminLayout>} />
             <Route path="/admin/investors" element={<AdminLayout><Investors /></AdminLayout>} />
             <Route path="/admin/contract-migrations" element={<AdminLayout><ContractMigrations /></AdminLayout>} />
             <Route path="/admin/collection-automation" element={<AdminLayout><CollectionAutomationPanel /></AdminLayout>} />

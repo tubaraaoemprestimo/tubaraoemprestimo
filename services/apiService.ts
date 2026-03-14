@@ -559,6 +559,42 @@ export const apiService = {
         return data;
     },
 
+    // ============= ADMIN CONTRACTS =============
+
+    async getAdminLoans(params?: { status?: string; type?: string; search?: string }) {
+        const qs = new URLSearchParams();
+        if (params?.status) qs.set('status', params.status);
+        if (params?.type) qs.set('type', params.type);
+        if (params?.search) qs.set('search', params.search);
+        const { data, error } = await api.get(`/loans/admin/all?${qs.toString()}`);
+        if (error) return [];
+        return data || [];
+    },
+
+    async getAdminLoanDetails(loanId: string) {
+        const { data, error } = await api.get(`/loans/${loanId}/admin-details`);
+        if (error) return null;
+        return data;
+    },
+
+    async editAdminLoan(loanId: string, payload: any) {
+        const { data, error } = await api.put(`/loans/${loanId}/admin-edit`, payload);
+        if (error) throw new Error(error.error || 'Erro ao editar contrato');
+        return data;
+    },
+
+    async registerManualPayment(loanId: string, payload: any) {
+        const { data, error } = await api.post(`/loans/${loanId}/manual-payment`, payload);
+        if (error) throw new Error(error.error || 'Erro ao registrar pagamento');
+        return data;
+    },
+
+    async getTodaySummary() {
+        const { data, error } = await api.get('/finance/today-summary');
+        if (error) return null;
+        return data;
+    },
+
     // ============= CLIENT LOANS =============
 
     async getClientLoans() {
