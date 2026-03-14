@@ -1322,8 +1322,27 @@ export const Wizard: React.FC = () => {
         locationCapturedAt: location ? new Date().toISOString() : null,
       };
 
-      // Enviar múltiplos itens de garantia (GARANTIA profile)
-      const uploadedCollateralItems = profileType === 'GARANTIA' ? collateralItems : null;
+      // Enviar múltiplos itens de garantia (GARANTIA profile) - fazer upload das fotos
+      let uploadedCollateralItems = null;
+      if (profileType === 'GARANTIA' && collateralItems.length > 0) {
+        uploadedCollateralItems = await Promise.all(
+          collateralItems.map(async (item) => {
+            // Upload das fotos do item
+            const photoUrls = item.photos.length > 0
+              ? await uploadMultiple(item.photos, `collateral_${item.id}`)
+              : [];
+            // Upload da nota fiscal se existir
+            const invoiceUrl = item.invoiceUrl
+              ? await uploadToStorage(item.invoiceUrl, `invoice_${item.id}`)
+              : null;
+            return {
+              ...item,
+              photos: photoUrls,
+              invoiceUrl,
+            };
+          })
+        );
+      }
 
       // Montar objeto de garantia para envio (CLT, MOTO, etc.)
       const uploadedGuarantee = needsGuarantee ? {
@@ -1377,6 +1396,7 @@ export const Wizard: React.FC = () => {
         lateFeeFixed: settings.lateFeeFixed,
         hasGuarantee: needsGuarantee,
         guarantee: uploadedGuarantee,
+        collateralItems: uploadedCollateralItems,
         // Cliente recorrente
         isReturningClient: isReturningClient === 'sim',
         returningClientNote: isReturningClient === 'sim' ? returningClientNote : '',
