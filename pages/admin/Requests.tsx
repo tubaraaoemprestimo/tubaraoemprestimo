@@ -1847,6 +1847,7 @@ const VideoCard = ({ title, url }: { title: string, url: string }) => {
                 </div>
             )}
         </div>
+            )}
         {/* Link direto para baixar/abrir - sempre visível */}
         {url && (
             <a
