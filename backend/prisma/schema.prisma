@@ -345,23 +345,47 @@ model Loan {
   id                      String        @id @default(uuid())
   customerId              String        @map("customer_id")
   requestId               String        @unique @map("request_id")
-  amount                  Float
+  amount                  Float         // Valor principal aprovado/transferido
   installmentsCount       Int           @map("installments_count")
   remainingAmount         Float         @map("remaining_amount")
-  status                  String        @default("APPROVED")
+  status                  String        @default("ACTIVE") // ACTIVE, DEFAULT, COMPLETED, CANCELLED
   startDate               DateTime      @map("start_date")
   createdAt               DateTime      @default(now()) @map("created_at")
+  updatedAt               DateTime      @updatedAt @map("updated_at")
+
+  // Novos campos para gestão completa do contrato
+  principalAmount         Float         @map("principal_amount") // Valor final aprovado
+  dailyInstallmentAmount  Float?        @map("daily_installment_amount") // Valor da diária (para AUTONOMO)
+  totalInstallments       Int           @map("total_installments") // Quantidade total de parcelas/diárias
+  firstPaymentDate        DateTime?     @map("first_payment_date") // Data do primeiro pagamento
+  pixReceiptUrl           String?       @map("pix_receipt_url") // Comprovante de PIX enviado ao cliente
+  interestRate            Float?        @map("interest_rate") // Taxa de juros aplicada
+  paymentFrequency        String        @default("MONTHLY") @map("payment_frequency") // DAILY, WEEKLY, MONTHLY
+  dueDay                  Int?          @map("due_day") // Dia de vencimento (para mensais)
+
+  // Controle de inadimplência
+  daysOverdue             Int           @default(0) @map("days_overdue")
+  lastPaymentDate         DateTime?     @map("last_payment_date")
+  nextPaymentDate         DateTime?     @map("next_payment_date")
+
+  // Flags de classificação de contrato
   nivelOuroUtilizado      Boolean       @default(false) @map("nivel_ouro_utilizado")
   dataAtivacaoNivelOuro   DateTime?     @map("data_ativacao_nivel_ouro")
-  // Flags de classificação de contrato
   isService               Boolean       @default(false) @map("is_service")      // LIMPA_NOME
   isInvestment            Boolean       @default(false) @map("is_investment")   // INVESTIDOR
   isLoan                  Boolean       @default(true) @map("is_loan")          // EMPRÉSTIMO
+
+  // Observações e notas do admin
+  adminNotes              String?       @map("admin_notes")
+
   installments            Installment[]
   customer                Customer      @relation(fields: [customerId], references: [id])
   loanRequest             LoanRequest   @relation(fields: [requestId], references: [id])
 
   @@map("loans")
+  @@index([status])
+  @@index([customerId])
+  @@index([nextPaymentDate])
 }
 
 model MessageTemplate {
