@@ -1827,20 +1827,20 @@ const VideoCard = ({ title, url }: { title: string, url: string }) => {
                             playsInline
                             preload="metadata"
                             className="w-full h-full object-contain"
-                    onError={(e) => {
-                        const target = e.target as HTMLVideoElement;
-                        target.style.display = 'none';
-                        if (target.parentElement) {
-                            target.parentElement.innerHTML = `
-                                <div class="w-full h-full flex items-center justify-center text-zinc-500 text-sm flex-col gap-3 p-4">
-                                    <span>Vídeo não carregou</span>
-                                    <a href="${url}" target="_blank" rel="noopener noreferrer" class="bg-[#D4AF37] text-black px-4 py-2 rounded-lg text-sm font-bold hover:opacity-80">📺 Abrir Vídeo</a>
-                                    <span class="text-[10px] text-zinc-600">Se o vídeo não abrir, verifique se o arquivo foi enviado corretamente</span>
-                                </div>
-                            `;
-                        }
-                    }}
-                />
+                            onError={(e) => {
+                                const target = e.target as HTMLVideoElement;
+                                target.style.display = 'none';
+                                if (target.parentElement) {
+                                    target.parentElement.innerHTML = `
+                                        <div class="w-full h-full flex items-center justify-center text-zinc-500 text-sm flex-col gap-3 p-4">
+                                            <span>Vídeo não carregou</span>
+                                            <a href="${url}" target="_blank" rel="noopener noreferrer" class="bg-[#D4AF37] text-black px-4 py-2 rounded-lg text-sm font-bold hover:opacity-80">📺 Abrir Vídeo</a>
+                                            <span class="text-[10px] text-zinc-600">Se o vídeo não abrir, verifique se o arquivo foi enviado corretamente</span>
+                                        </div>
+                                    `;
+                                }
+                            }}
+                        />
             ) : (
                 <div className="w-full h-full flex items-center justify-center text-zinc-600 text-sm">
                     Nenhum vídeo disponível
