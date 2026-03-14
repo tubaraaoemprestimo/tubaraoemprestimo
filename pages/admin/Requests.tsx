@@ -1708,17 +1708,35 @@ const InfoBox = ({ label, value, highlight }: any) => (
     </div>
 );
 
-const VideoCard = ({ title, url }: { title: string, url: string }) => (
-    <div className="space-y-2 group">
-        <p className="text-xs text-zinc-400 pl-1">{title}</p>
-        <div className="rounded-xl border border-zinc-800 bg-black overflow-hidden relative aspect-video">
-            {url ? (
-                <video
-                    src={url}
-                    controls
-                    playsInline
-                    preload="metadata"
-                    className="w-full h-full object-contain"
+const VideoCard = ({ title, url }: { title: string, url: string }) => {
+    // Validar se a URL é válida (começa com http/https)
+    const isValidUrl = url && (url.startsWith('http://') || url.startsWith('https://'));
+
+    return (
+        <div className="space-y-2 group">
+            <p className="text-xs text-zinc-400 pl-1">{title}</p>
+            {!isValidUrl && url ? (
+                <div className="rounded-xl border-2 border-red-600 bg-red-900/20 p-4">
+                    <div className="flex items-center gap-2 text-red-400 mb-2">
+                        <AlertTriangle size={20} />
+                        <p className="font-bold text-sm">⚠️ Erro de Upload: Caminho Inválido</p>
+                    </div>
+                    <p className="text-xs text-red-300 mb-2">
+                        O arquivo não foi enviado corretamente para o Cloudflare R2.
+                    </p>
+                    <p className="text-xs text-zinc-400 font-mono bg-black p-2 rounded break-all">
+                        {url}
+                    </p>
+                </div>
+            ) : (
+                <div className="rounded-xl border border-zinc-800 bg-black overflow-hidden relative aspect-video">
+                    {url ? (
+                        <video
+                            src={url}
+                            controls
+                            playsInline
+                            preload="metadata"
+                            className="w-full h-full object-contain"
                     onError={(e) => {
                         const target = e.target as HTMLVideoElement;
                         target.style.display = 'none';
@@ -1754,30 +1772,48 @@ const VideoCard = ({ title, url }: { title: string, url: string }) => (
 );
 
 const DocCard = ({ title, urls, isSignature, onView }: { title: string, urls: string[], isSignature?: boolean, onView: () => void }) => {
+    // Validar URL
+    const firstUrl = urls.length > 0 ? urls[0] : '';
+    const isValidUrl = firstUrl && (firstUrl.startsWith('http://') || firstUrl.startsWith('https://'));
+
     // Detectar PDF: verifica extensão .pdf, content-type, ou se é work_card
-    const isPdf = urls.length > 0 && urls[0] && (
-        urls[0].toLowerCase().includes('.pdf') ||
-        urls[0].toLowerCase().includes('work_card') ||
-        urls[0].toLowerCase().includes('work-card') ||
+    const isPdf = firstUrl && (
+        firstUrl.toLowerCase().includes('.pdf') ||
+        firstUrl.toLowerCase().includes('work_card') ||
+        firstUrl.toLowerCase().includes('work-card') ||
         title.toLowerCase().includes('carteira') ||
         title.toLowerCase().includes('ctps')
     );
 
     // Debug log
-    console.log('DocCard:', { title, url: urls[0], isPdf });
+    console.log('DocCard:', { title, url: firstUrl, isPdf, isValidUrl });
 
     return (
         <div className="space-y-2 group">
             <p className="text-xs text-zinc-400 pl-1">{title}</p>
             <div className={`rounded-xl border border-zinc-800 bg-black overflow-hidden relative ${isSignature ? 'h-24 bg-white/5' : 'aspect-[4/3]'}`}>
-                {urls.length > 0 ? (
+                {!isValidUrl && firstUrl ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-4 bg-red-900/20 border-2 border-red-600">
+                        <AlertTriangle size={48} className="text-red-400" />
+                        <div className="text-center space-y-2">
+                            <p className="font-bold text-sm text-red-400">⚠️ Erro de Upload: Caminho Inválido</p>
+                            <p className="text-xs text-red-300">
+                                O arquivo não foi enviado corretamente para o Cloudflare R2.
+                            </p>
+                            <p className="text-xs text-zinc-500 mt-2">Caminho salvo:</p>
+                            <p className="text-[10px] text-zinc-400 font-mono bg-black p-2 rounded break-all max-w-full">
+                                {firstUrl}
+                            </p>
+                        </div>
+                    </div>
+                ) : urls.length > 0 ? (
                     isPdf ? (
                         <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-4 bg-zinc-900">
                             <FileText size={48} className="text-red-500" />
                             <p className="text-xs text-zinc-400 text-center font-bold">Documento PDF</p>
-                            <p className="text-[10px] text-zinc-600 text-center break-all px-2">{urls[0].split('/').pop()}</p>
+                            <p className="text-[10px] text-zinc-600 text-center break-all px-2">{firstUrl.split('/').pop()}</p>
                             <a
-                                href={urls[0]}
+                                href={firstUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-bold transition-all shadow-lg"
@@ -1787,7 +1823,7 @@ const DocCard = ({ title, urls, isSignature, onView }: { title: string, urls: st
                             </a>
                         </div>
                     ) : (
-                        <img src={urls[0]} className={`w-full h-full ${isSignature ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100`} alt={title} />
+                        <img src={firstUrl} className={`w-full h-full ${isSignature ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100`} alt={title} />
                     )
                 ) : (
                     <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">Pendente</div>
@@ -1800,7 +1836,7 @@ const DocCard = ({ title, urls, isSignature, onView }: { title: string, urls: st
                     </div>
                 )}
 
-                {urls.length > 0 && !isPdf && (
+                {urls.length > 0 && !isPdf && isValidUrl && (
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer" onClick={onView}>
                         <Button size="sm" variant="secondary" className="shadow-xl"><Maximize size={14} className="mr-1" /> Ampliar</Button>
                     </div>
