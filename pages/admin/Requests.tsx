@@ -55,6 +55,21 @@ export const Requests: React.FC = () => {
     const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
     const [approvedAmount, setApprovedAmount] = useState('');
 
+    // Contract Activation Modal (FASE 2)
+    const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
+    const [contractData, setContractData] = useState({
+        principalAmount: '',
+        dailyInstallmentAmount: '',
+        totalInstallments: '',
+        firstPaymentDate: '',
+        pixReceiptUrl: '',
+        interestRate: '',
+        paymentFrequency: 'MONTHLY',
+        dueDay: '',
+        adminNotes: ''
+    });
+    const [uploadingPix, setUploadingPix] = useState(false);
+
     // Editing Values
     const [isEditing, setIsEditing] = useState(false);
     const [editAmount, setEditAmount] = useState<string>('');
@@ -121,6 +136,131 @@ export const Requests: React.FC = () => {
         } catch (error) {
             setProcessing(null);
             addToast("Erro ao enviar contraproposta", 'error');
+        }
+    };
+
+    // FASE 2: Abrir modal de ativação de contrato
+    const openActivationModal = () => {
+        if (!selectedRequest) return;
+
+        // Pré-preencher com dados da solicitação
+        const firstPayment = new Date();
+        firstPayment.setDate(firstPayment.getDate() + 7); // 7 dias após hoje
+
+        setContractData({
+            principalAmount: selectedRequest.amount.toString(),
+            dailyInstallmentAmount: selectedRequest.profileType === 'AUTONOMO' ? '' : '',
+            totalInstallments: selectedRequest.installments.toString(),
+            firstPaymentDate: firstPayment.toISOString().split('T')[0],
+            pixReceiptUrl: '',
+            interestRate: selectedRequest.profileType === 'CLT' ? '30' : '',
+            paymentFrequency: selectedRequest.profileType === 'AUTONOMO' ? 'DAILY' : 'MONTHLY',
+            dueDay: selectedRequest.preferredDueDay?.toString() || '10',
+            adminNotes: ''
+        });
+
+        setIsActivationModalOpen(true);
+    };
+
+    // FASE 2: Upload do comprovante de PIX
+    const handlePixUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validar tamanho (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            addToast('Arquivo muito grande. Máximo 5MB.', 'error');
+            return;
+        }
+
+        setUploadingPix(true);
+        try {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setContractData(prev => ({ ...prev, pixReceiptUrl: reader.result as string }));
+                setUploadingPix(false);
+                addToast('Comprovante carregado!', 'success');
+            };
+            reader.onerror = () => {
+                setUploadingPix(false);
+                addToast('Erro ao carregar arquivo', 'error');
+            };
+            reader.readAsDataURL(file);
+        } catch (error) {
+            setUploadingPix(false);
+            addToast('Erro ao processar arquivo', 'error');
+        }
+    };
+
+    // FASE 2: Ativar contrato
+    const handleActivateContract = async () => {
+        if (!selectedRequest) return;
+
+        // Validações
+        if (!contractData.principalAmount || parseFloat(contractData.principalAmount) <= 0) {
+            addToast('Valor principal inválido', 'error');
+            return;
+        }
+        if (!contractData.totalInstallments || parseInt(contractData.totalInstallments) <= 0) {
+            addToast('Número de parcelas inválido', 'error');
+            return;
+        }
+        if (!contractData.firstPaymentDate) {
+            addToast('Data do primeiro pagamento obrigatória', 'error');
+            return;
+        }
+        if (!contractData.pixReceiptUrl) {
+            addToast('Comprovante de PIX obrigatório', 'error');
+            return;
+        }
+
+        setProcessing(selectedRequest.id);
+        try {
+            const payload = {
+                principalAmount: parseFloat(contractData.principalAmount),
+                dailyInstallmentAmount: contractData.dailyInstallmentAmount ? parseFloat(contractData.dailyInstallmentAmount) : null,
+                totalInstallments: parseInt(contractData.totalInstallments),
+                firstPaymentDate: contractData.firstPaymentDate,
+                pixReceiptUrl: contractData.pixReceiptUrl,
+                interestRate: contractData.interestRate ? parseFloat(contractData.interestRate) : null,
+                paymentFrequency: contractData.paymentFrequency,
+                dueDay: contractData.dueDay ? parseInt(contractData.dueDay) : null,
+                adminNotes: contractData.adminNotes || null
+            };
+
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://api.tubaraoemprestimo.com.br'}/api/loan-requests/${selectedRequest.id}/activate-contract`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('tubarao_token')}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro ao ativar contrato');
+            }
+
+            setProcessing(null);
+            setIsActivationModalOpen(false);
+            setContractData({
+                principalAmount: '',
+                dailyInstallmentAmount: '',
+                totalInstallments: '',
+                firstPaymentDate: '',
+                pixReceiptUrl: '',
+                interestRate: '',
+                paymentFrequency: 'MONTHLY',
+                dueDay: '',
+                adminNotes: ''
+            });
+            setSelectedRequest(null);
+            loadRequests();
+            addToast('✅ Contrato ativado com sucesso!', 'success');
+        } catch (error: any) {
+            setProcessing(null);
+            addToast(error.message || 'Erro ao ativar contrato', 'error');
         }
     };
 
@@ -1194,18 +1334,34 @@ export const Requests: React.FC = () => {
                                     }
                                 </span>
                                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full sm:w-auto">
-                                    {/* Request Doc Button */}
-                                    <Button variant="secondary" className="flex-1 sm:flex-initial" onClick={() => setIsDocRequestOpen(true)}>
-                                        <FileWarning size={18} className="mr-2" /> Solicitar Doc.
-                                    </Button>
+                                    {/* Botão Ativar Contrato - Aparece quando APPROVED */}
+                                    {selectedRequest.status === 'APPROVED' && (
+                                        <Button
+                                            variant="gold"
+                                            className="flex-1 sm:flex-initial bg-green-600 text-white font-bold hover:bg-green-700"
+                                            onClick={openActivationModal}
+                                        >
+                                            <Check size={18} className="mr-2" /> ATIVAR CONTRATO
+                                        </Button>
+                                    )}
 
-                                    <Button variant="danger" className="flex-1 sm:flex-initial" onClick={() => handleReject(selectedRequest.id)} isLoading={processing === selectedRequest.id}>
-                                        <X size={18} className="mr-2" /> REPROVAR
-                                    </Button>
-                                    <Button variant="gold" className="flex-1 sm:flex-initial bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]" onClick={openApprovalModal} isLoading={processing === selectedRequest.id}>
-                                        <Check size={18} className="mr-2" /> {selectedRequest.profileType === 'LIMPA_NOME' ? 'APROVAR SERVIÇO' :
-                                            selectedRequest.profileType === 'MOTO' ? 'APROVAR FINANCIAMENTO' : 'APROVAR EMPRÉSTIMO'}
-                                    </Button>
+                                    {/* Botões normais - Aparecem quando PENDING */}
+                                    {selectedRequest.status === 'PENDING' && (
+                                        <>
+                                            {/* Request Doc Button */}
+                                            <Button variant="secondary" className="flex-1 sm:flex-initial" onClick={() => setIsDocRequestOpen(true)}>
+                                                <FileWarning size={18} className="mr-2" /> Solicitar Doc.
+                                            </Button>
+
+                                            <Button variant="danger" className="flex-1 sm:flex-initial" onClick={() => handleReject(selectedRequest.id)} isLoading={processing === selectedRequest.id}>
+                                                <X size={18} className="mr-2" /> REPROVAR
+                                            </Button>
+                                            <Button variant="gold" className="flex-1 sm:flex-initial bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]" onClick={openApprovalModal} isLoading={processing === selectedRequest.id}>
+                                                <Check size={18} className="mr-2" /> {selectedRequest.profileType === 'LIMPA_NOME' ? 'APROVAR SERVIÇO' :
+                                                    selectedRequest.profileType === 'MOTO' ? 'APROVAR FINANCIAMENTO' : 'APROVAR EMPRÉSTIMO'}
+                                            </Button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -1317,6 +1473,214 @@ export const Requests: React.FC = () => {
                                 disabled={!approvedAmount || parseFloat(approvedAmount) <= 0}
                             >
                                 <Check size={18} className="mr-2" /> Confirmar Aprovação
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Contract Activation Modal (FASE 2) */}
+            {isActivationModalOpen && selectedRequest && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] p-4 overflow-y-auto">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl p-6 shadow-2xl animate-in zoom-in duration-200 my-8">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Check className="text-green-500" /> Ativar Contrato
+                            </h3>
+                            <button onClick={() => setIsActivationModalOpen(false)}>
+                                <X className="text-zinc-500 hover:text-white" />
+                            </button>
+                        </div>
+
+                        {/* Info da Solicitação */}
+                        <div className="bg-black border border-zinc-800 rounded-xl p-4 mb-6">
+                            <p className="text-xs text-zinc-500 mb-2">Cliente</p>
+                            <p className="text-lg font-bold text-white">{selectedRequest.clientName}</p>
+                            <p className="text-xs text-zinc-400 mt-1">{selectedRequest.email} • {selectedRequest.phone}</p>
+                        </div>
+
+                        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                            {/* Valor Principal */}
+                            <div>
+                                <label className="block text-sm font-bold text-white mb-2">
+                                    Valor Principal (R$) *
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={contractData.principalAmount}
+                                    onChange={(e) => setContractData(prev => ({ ...prev, principalAmount: e.target.value }))}
+                                    className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                                    placeholder="Ex: 5000.00"
+                                />
+                            </div>
+
+                            {/* Frequência de Pagamento */}
+                            <div>
+                                <label className="block text-sm font-bold text-white mb-2">
+                                    Frequência de Pagamento *
+                                </label>
+                                <select
+                                    value={contractData.paymentFrequency}
+                                    onChange={(e) => setContractData(prev => ({ ...prev, paymentFrequency: e.target.value }))}
+                                    className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                                >
+                                    <option value="MONTHLY">Mensal</option>
+                                    <option value="WEEKLY">Semanal</option>
+                                    <option value="DAILY">Diária (Comércio)</option>
+                                </select>
+                            </div>
+
+                            {/* Valor da Diária (se DAILY) */}
+                            {contractData.paymentFrequency === 'DAILY' && (
+                                <div>
+                                    <label className="block text-sm font-bold text-white mb-2">
+                                        Valor da Diária (R$)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={contractData.dailyInstallmentAmount}
+                                        onChange={(e) => setContractData(prev => ({ ...prev, dailyInstallmentAmount: e.target.value }))}
+                                        className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                                        placeholder="Ex: 166.67"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Total de Parcelas */}
+                            <div>
+                                <label className="block text-sm font-bold text-white mb-2">
+                                    Total de Parcelas/Diárias *
+                                </label>
+                                <input
+                                    type="number"
+                                    value={contractData.totalInstallments}
+                                    onChange={(e) => setContractData(prev => ({ ...prev, totalInstallments: e.target.value }))}
+                                    className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                                    placeholder="Ex: 30"
+                                />
+                            </div>
+
+                            {/* Data do Primeiro Pagamento */}
+                            <div>
+                                <label className="block text-sm font-bold text-white mb-2">
+                                    Data do Primeiro Pagamento *
+                                </label>
+                                <input
+                                    type="date"
+                                    value={contractData.firstPaymentDate}
+                                    onChange={(e) => setContractData(prev => ({ ...prev, firstPaymentDate: e.target.value }))}
+                                    className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                                />
+                            </div>
+
+                            {/* Dia de Vencimento (se MONTHLY) */}
+                            {contractData.paymentFrequency === 'MONTHLY' && (
+                                <div>
+                                    <label className="block text-sm font-bold text-white mb-2">
+                                        Dia de Vencimento
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="31"
+                                        value={contractData.dueDay}
+                                        onChange={(e) => setContractData(prev => ({ ...prev, dueDay: e.target.value }))}
+                                        className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                                        placeholder="Ex: 10"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Taxa de Juros */}
+                            <div>
+                                <label className="block text-sm font-bold text-white mb-2">
+                                    Taxa de Juros (% ao mês)
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={contractData.interestRate}
+                                    onChange={(e) => setContractData(prev => ({ ...prev, interestRate: e.target.value }))}
+                                    className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                                    placeholder="Ex: 30"
+                                />
+                            </div>
+
+                            {/* Upload Comprovante PIX */}
+                            <div>
+                                <label className="block text-sm font-bold text-white mb-2">
+                                    Comprovante de PIX * (OBRIGATÓRIO)
+                                </label>
+                                <div className="border-2 border-dashed border-zinc-700 rounded-lg p-6 text-center hover:border-[#D4AF37] transition-colors">
+                                    {contractData.pixReceiptUrl ? (
+                                        <div className="space-y-3">
+                                            <img
+                                                src={contractData.pixReceiptUrl}
+                                                alt="Comprovante PIX"
+                                                className="max-h-40 mx-auto rounded-lg border border-zinc-700"
+                                            />
+                                            <button
+                                                onClick={() => setContractData(prev => ({ ...prev, pixReceiptUrl: '' }))}
+                                                className="text-red-400 text-sm hover:text-red-300"
+                                            >
+                                                Remover
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <label className="cursor-pointer">
+                                            <input
+                                                type="file"
+                                                accept="image/*,.pdf"
+                                                onChange={handlePixUpload}
+                                                className="hidden"
+                                                disabled={uploadingPix}
+                                            />
+                                            <div className="flex flex-col items-center gap-2">
+                                                <FileText size={32} className="text-zinc-500" />
+                                                <p className="text-sm text-zinc-400">
+                                                    {uploadingPix ? 'Carregando...' : 'Clique para anexar o comprovante'}
+                                                </p>
+                                                <p className="text-xs text-zinc-600">PNG, JPG ou PDF (máx 5MB)</p>
+                                            </div>
+                                        </label>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Observações */}
+                            <div>
+                                <label className="block text-sm font-bold text-white mb-2">
+                                    Observações do Admin
+                                </label>
+                                <textarea
+                                    value={contractData.adminNotes}
+                                    onChange={(e) => setContractData(prev => ({ ...prev, adminNotes: e.target.value }))}
+                                    className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none resize-none"
+                                    rows={3}
+                                    placeholder="Observações internas sobre o contrato..."
+                                />
+                            </div>
+                        </div>
+
+                        {/* Botões */}
+                        <div className="flex gap-3 mt-6">
+                            <Button
+                                variant="secondary"
+                                className="flex-1"
+                                onClick={() => setIsActivationModalOpen(false)}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                variant="gold"
+                                className="flex-1 bg-green-600 text-white font-bold hover:bg-green-700"
+                                onClick={handleActivateContract}
+                                isLoading={!!processing}
+                                disabled={!contractData.principalAmount || !contractData.totalInstallments || !contractData.firstPaymentDate || !contractData.pixReceiptUrl}
+                            >
+                                <Check size={18} className="mr-2" /> Confirmar e Ativar Contrato
                             </Button>
                         </div>
                     </div>
