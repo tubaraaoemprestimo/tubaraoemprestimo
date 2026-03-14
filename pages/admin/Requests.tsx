@@ -1841,26 +1841,27 @@ const VideoCard = ({ title, url }: { title: string, url: string }) => {
                                 }
                             }}
                         />
-            ) : (
-                <div className="w-full h-full flex items-center justify-center text-zinc-600 text-sm">
-                    Nenhum vídeo disponível
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center text-zinc-600 text-sm">
+                            Nenhum vídeo disponível
+                        </div>
+                    )}
                 </div>
             )}
-        </div>
+            {/* Link direto para baixar/abrir - sempre visível */}
+            {url && (
+                <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-[#D4AF37] hover:underline flex items-center gap-1"
+                >
+                    📥 Baixar / Abrir em nova aba
+                </a>
             )}
-        {/* Link direto para baixar/abrir - sempre visível */}
-        {url && (
-            <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] text-[#D4AF37] hover:underline flex items-center gap-1"
-            >
-                📥 Baixar / Abrir em nova aba
-            </a>
-        )}
-    </div>
-);
+        </div>
+    );
+};
 
 const DocCard = ({ title, urls, isSignature, onView }: { title: string, urls: string[], isSignature?: boolean, onView: () => void }) => {
     // Validar URL
