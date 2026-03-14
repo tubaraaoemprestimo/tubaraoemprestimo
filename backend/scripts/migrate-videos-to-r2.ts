@@ -78,11 +78,14 @@ async function migrateVideos() {
 
         // Processar video_selfie_url
         if (request.videoSelfieUrl && !request.videoSelfieUrl.includes('r2.dev')) {
-            const localPath = request.videoSelfieUrl
+            let localPath = request.videoSelfieUrl
                 .replace('https://app-api.tubaraoemprestimo.com.br/', '')
                 .replace('//', '/');
 
-            const fullPath = path.join('/home/ubuntu/backend/backend', localPath);
+            // Se o caminho já contém /home/ubuntu/backend/backend, não adicionar novamente
+            const fullPath = localPath.startsWith('/home/ubuntu/backend/backend')
+                ? localPath
+                : path.join('/home/ubuntu/backend/backend', localPath);
 
             if (fs.existsSync(fullPath)) {
                 try {
@@ -101,11 +104,14 @@ async function migrateVideos() {
 
         // Processar video_house_url
         if (request.videoHouseUrl && !request.videoHouseUrl.includes('r2.dev') && !request.videoHouseUrl.includes('blob:')) {
-            const localPath = request.videoHouseUrl
+            let localPath = request.videoHouseUrl
                 .replace('https://app-api.tubaraoemprestimo.com.br/', '')
                 .replace('//', '/');
 
-            const fullPath = path.join('/home/ubuntu/backend/backend', localPath);
+            // Se o caminho já contém /home/ubuntu/backend/backend, não adicionar novamente
+            const fullPath = localPath.startsWith('/home/ubuntu/backend/backend')
+                ? localPath
+                : path.join('/home/ubuntu/backend/backend', localPath);
 
             if (fs.existsSync(fullPath)) {
                 try {
@@ -124,11 +130,14 @@ async function migrateVideos() {
 
         // Processar video_vehicle_url
         if (request.videoVehicleUrl && !request.videoVehicleUrl.includes('r2.dev')) {
-            const localPath = request.videoVehicleUrl
+            let localPath = request.videoVehicleUrl
                 .replace('https://app-api.tubaraoemprestimo.com.br/', '')
                 .replace('//', '/');
 
-            const fullPath = path.join('/home/ubuntu/backend/backend', localPath);
+            // Se o caminho já contém /home/ubuntu/backend/backend, não adicionar novamente
+            const fullPath = localPath.startsWith('/home/ubuntu/backend/backend')
+                ? localPath
+                : path.join('/home/ubuntu/backend/backend', localPath);
 
             if (fs.existsSync(fullPath)) {
                 try {
