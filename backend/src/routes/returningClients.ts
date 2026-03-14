@@ -253,8 +253,8 @@ router.patch('/:id/validate', authenticate, async (req, res) => {
     // Criar Loan
     const loan = await prisma.loan.create({
       data: {
-        customerId: migration.customer_id,
-        requestId: migration.loan_request_id,
+        customerId: migration.customer_id as string,
+        requestId: migration.loan_request_id as string,
         amount: adjustedAmount || migration.loan_amount,
         installmentsCount: 1,
         remainingAmount: adjustedAmount || migration.loan_amount,
@@ -263,7 +263,7 @@ router.patch('/:id/validate', authenticate, async (req, res) => {
         isService: false,
         isInvestment: false,
         isLoan: true
-      }
+      } as any
     });
 
     // Criar parcela/cobrança
