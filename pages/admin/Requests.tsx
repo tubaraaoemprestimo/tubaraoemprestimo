@@ -380,7 +380,7 @@ export const Requests: React.FC = () => {
             </div>
 
             {/* Guias por Tipo de Serviço */}
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex overflow-x-auto gap-2 mb-4 pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap scrollbar-hide">
                 {PROFILE_TABS.map((tab) => {
                     const count = getTabCount(tab.id);
                     const isActive = filterProfile === tab.id;
@@ -388,7 +388,7 @@ export const Requests: React.FC = () => {
                         <button
                             key={tab.id}
                             onClick={() => setFilterProfile(tab.id)}
-                            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-2 border-2 ${isActive
+                            className={`px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all duration-200 flex items-center gap-2 border-2 whitespace-nowrap shrink-0 ${isActive
                                 ? `${tab.bg} ${tab.text} ${tab.border} shadow-lg scale-[1.02]`
                                 : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600 hover:text-white'
                                 }`}
@@ -406,27 +406,28 @@ export const Requests: React.FC = () => {
             {/* Filtros por Status */}
             <div className="mb-6">
                 <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2 font-medium">Status:</p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap scrollbar-hide">
                     {['ALL', LoanStatus.RETURNING_PENDING, LoanStatus.PENDING, LoanStatus.WAITING_DOCS, LoanStatus.APPROVED, LoanStatus.REJECTED].map((status) => (
                         <button
                             key={status}
                             onClick={() => setFilterStatus(status)}
-                            className={`px-4 py-2 rounded-full text-xs font-bold transition-colors border ${filterStatus === status
+                            className={`px-3 md:px-4 py-2 rounded-full text-xs font-bold transition-colors border whitespace-nowrap shrink-0 ${filterStatus === status
                                 ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
                                 : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'
                                 }`}
                         >
                             {status === 'ALL' ? 'Todos' :
-                                status === LoanStatus.RETURNING_PENDING ? '🔄 Cliente Antigo' :
-                                    status === LoanStatus.WAITING_DOCS ? 'Aguardando Doc.' : status}
+                                status === LoanStatus.RETURNING_PENDING ? '🔄 Antigo' :
+                                    status === LoanStatus.WAITING_DOCS ? 'Aguardando' : status}
                         </button>
                     ))}
                 </div>
             </div>
 
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
+            {/* Desktop: Tabela */}
+            <div className="hidden md:block bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left min-w-[800px]">
+                    <table className="w-full text-left">
                         <thead className="bg-zinc-950 text-zinc-400">
                             <tr>
                                 <th className="p-4 font-medium">Cliente</th>
@@ -504,35 +505,124 @@ export const Requests: React.FC = () => {
                 </div>
             </div>
 
+            {/* Mobile: Cards */}
+            <div className="md:hidden space-y-3">
+                {filteredRequests.length === 0 ? (
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center text-zinc-500">
+                        Nenhuma solicitação encontrada com este filtro.
+                    </div>
+                ) : (
+                    filteredRequests.map((req) => (
+                        <div
+                            key={req.id}
+                            className={`bg-zinc-900 border-2 rounded-xl p-4 space-y-3 ${(req.profileType === 'GARANTIA' || req.profileType === 'GARANTIA_VEICULO') ? 'border-yellow-500' :
+                                req.profileType === 'MOTO' ? 'border-blue-500' :
+                                    req.profileType === 'LIMPA_NOME' ? 'border-purple-500' :
+                                        req.profileType === 'AUTONOMO' ? 'border-green-500' :
+                                            req.profileType === 'CLT' ? 'border-gray-500' : 'border-zinc-800'
+                                }`}
+                        >
+                            {/* Header: Nome + Badge */}
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="font-bold text-white text-base truncate">{req.clientName}</h3>
+                                    <p className="text-xs text-zinc-500">{req.cpf}</p>
+                                </div>
+                                {getProfileBadge(req.profileType)}
+                            </div>
+
+                            {/* Valor + Status */}
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-xs text-zinc-500 mb-0.5">Valor</p>
+                                    <p className="font-bold text-[#D4AF37] text-lg">
+                                        {req.profileType === 'LIMPA_NOME'
+                                            ? <span className="text-purple-400">Serviço</span>
+                                            : req.profileType === 'MOTO'
+                                                ? <span className="text-blue-400">Financiamento</span>
+                                                : `R$ ${req.amount?.toLocaleString() || '0'}`
+                                        }
+                                    </p>
+                                </div>
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap ${req.status === LoanStatus.APPROVED ? 'bg-green-900/30 text-green-400' :
+                                    req.status === LoanStatus.REJECTED ? 'bg-red-900/30 text-red-400' :
+                                        req.status === LoanStatus.WAITING_DOCS ? 'bg-blue-900/30 text-blue-400' :
+                                            req.status === LoanStatus.PENDING_ACCEPTANCE ? 'bg-orange-900/30 text-orange-400 border border-orange-700' :
+                                                req.status === 'RETURNING_PENDING' ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-700' :
+                                                    'bg-yellow-900/30 text-yellow-400'
+                                    }`}>
+                                    {req.status === LoanStatus.WAITING_DOCS ? 'AGUARDANDO DOC' :
+                                        req.status === LoanStatus.PENDING_ACCEPTANCE ? '⏳ ACEITE' :
+                                            req.status === 'RETURNING_PENDING' ? '🔄 ANTIGO' : req.status}
+                                </span>
+                            </div>
+
+                            {/* Data + Botão */}
+                            <div className="flex items-center justify-between gap-3 pt-2 border-t border-zinc-800">
+                                <p className="text-xs text-zinc-500">
+                                    {new Date(req.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </p>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="py-1.5 px-3 text-xs"
+                                    onClick={() => {
+                                        setSelectedRequest(req);
+                                        setEditAmount(String(req.amount ?? ''));
+                                        setEditInstallments(String(req.installments ?? ''));
+                                        setIsEditing(false);
+                                    }}
+                                >
+                                    <Eye size={14} className="mr-1" /> Ver
+                                </Button>
+                            </div>
+
+                            {/* Alerta Garantia */}
+                            {(req.profileType === 'GARANTIA' || req.profileType === 'GARANTIA_VEICULO') && (
+                                <div className="flex items-center gap-2 bg-yellow-900/20 border border-yellow-600/40 rounded-lg p-2">
+                                    <AlertTriangle size={14} className="text-yellow-400 shrink-0" />
+                                    <span className="text-xs text-yellow-400 font-medium">Conferir documentos</span>
+                                </div>
+                            )}
+                        </div>
+                    ))
+                )}
+            </div>
+
             {/* Advanced Review Modal */}
             {selectedRequest && (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-0 md:p-4">
-                    <div className="bg-zinc-900 border border-zinc-800 md:rounded-2xl w-full max-w-6xl h-full md:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-0 md:p-4 overflow-hidden">
+                    <div className="bg-zinc-900 border-0 md:border border-zinc-800 md:rounded-2xl w-full max-w-6xl h-full md:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
 
                         {/* Header */}
-                        <div className="flex justify-between items-center p-6 border-b border-zinc-800 bg-zinc-950">
+                        <div className="flex justify-between items-start md:items-center p-4 md:p-6 border-b border-zinc-800 bg-zinc-950 shrink-0">
                             <div>
-                                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                                    {selectedRequest.profileType === 'LIMPA_NOME' ? 'Análise de Serviço' :
-                                        selectedRequest.profileType === 'MOTO' ? 'Financiamento de Moto' :
-                                            (selectedRequest.profileType === 'GARANTIA' || selectedRequest.profileType === 'GARANTIA_VEICULO') ? 'Análise de Garantia' :
-                                                'Análise de Crédito'}
-                                    <span className={`text-xs px-2 py-1 rounded-full border ${selectedRequest.status === LoanStatus.APPROVED ? 'bg-green-900/30 text-green-500 border-green-800' :
+                                <h2 className="text-xl md:text-2xl font-bold text-white flex flex-wrap items-center gap-2">
+                                    <span className="truncate">
+                                        {selectedRequest.profileType === 'LIMPA_NOME' ? 'Análise de Serviço' :
+                                            selectedRequest.profileType === 'MOTO' ? 'Financiamento de Moto' :
+                                                (selectedRequest.profileType === 'GARANTIA' || selectedRequest.profileType === 'GARANTIA_VEICULO') ? 'Análise de Garantia' :
+                                                    'Análise de Crédito'}
+                                    </span>
+                                    <span className={`text-xs px-2 py-1 rounded-full border whitespace-nowrap ${selectedRequest.status === LoanStatus.APPROVED ? 'bg-green-900/30 text-green-500 border-green-800' :
                                         selectedRequest.status === LoanStatus.REJECTED ? 'bg-red-900/30 text-red-500 border-red-800' :
                                             selectedRequest.status === LoanStatus.WAITING_DOCS ? 'bg-blue-900/30 text-blue-500 border-blue-800' :
                                                 selectedRequest.status === 'RETURNING_PENDING' ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' :
                                                     'bg-yellow-900/30 text-yellow-500 border-yellow-800'
                                         }`}>
-                                        {selectedRequest.status === 'RETURNING_PENDING' ? '🔄 CLIENTE ANTIGO' : selectedRequest.status}
+                                        {selectedRequest.status === 'RETURNING_PENDING' ? '🔄 ANTIGO' : selectedRequest.status}
                                     </span>
                                 </h2>
-                                <p className="text-zinc-400 text-sm mt-1 flex items-center gap-2">
-                                    ID: {selectedRequest.id} • {selectedRequest.email} {getProfileBadge(selectedRequest.profileType)}
+                                <p className="text-zinc-400 text-xs md:text-sm mt-1 flex flex-wrap items-center gap-2">
+                                    <span className="truncate">ID: {selectedRequest.id.slice(0, 8)}...</span>
+                                    <span className="hidden md:inline">•</span>
+                                    <span className="truncate">{selectedRequest.email}</span>
+                                    {getProfileBadge(selectedRequest.profileType)}
                                 </p>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 shrink-0">
                                 {!isEditing && selectedRequest.profileType !== 'LIMPA_NOME' && selectedRequest.profileType !== 'MOTO' && (selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === 'RETURNING_PENDING') && (
-                                    <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)}>
+                                    <Button size="sm" variant="secondary" onClick={() => setIsEditing(true)} className="hidden md:flex">
                                         ✏️ Editar Valores
                                     </Button>
                                 )}
@@ -567,18 +657,18 @@ export const Requests: React.FC = () => {
                         </div>
 
                         {/* Content Scrollable Area */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 md:space-y-8">
 
                             {/* SEÇÃO: INVESTIGAÇÃO & ANÁLISE DE RISCO */}
-                            <div className="bg-zinc-950 border-2 border-[#D4AF37] rounded-xl p-6">
-                                <h3 className="text-[#D4AF37] font-bold text-lg uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <div className="bg-zinc-950 border-2 border-[#D4AF37] rounded-xl p-4 md:p-6">
+                                <h3 className="text-[#D4AF37] font-bold text-base md:text-lg uppercase tracking-wider mb-4 flex items-center gap-2">
                                     🔍 Investigação & Análise de Risco
                                 </h3>
                                 <ConsultaCPFCard cpf={selectedRequest.cpf} />
                             </div>
 
                             {/* Financial Summary */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                                 <InfoBox label="Cliente" value={selectedRequest.clientName} />
                                 <InfoBox label="CPF" value={selectedRequest.cpf} />
 
@@ -1702,9 +1792,9 @@ export const Requests: React.FC = () => {
 // --- Local Components (Reused/Shared logic) ---
 
 const InfoBox = ({ label, value, highlight }: any) => (
-    <div className={`p-4 rounded-xl border ${highlight ? 'bg-zinc-800 border-[#D4AF37]/50' : 'bg-black border-zinc-800'}`}>
-        <p className="text-xs text-zinc-500 mb-1 uppercase tracking-wide">{label}</p>
-        <p className={`font-bold truncate ${highlight ? 'text-[#D4AF37] text-lg' : 'text-white'}`}>{value}</p>
+    <div className={`p-3 md:p-4 rounded-xl border ${highlight ? 'bg-zinc-800 border-[#D4AF37]/50' : 'bg-black border-zinc-800'}`}>
+        <p className="text-[10px] md:text-xs text-zinc-500 mb-1 uppercase tracking-wide">{label}</p>
+        <p className={`font-bold text-sm md:text-base truncate ${highlight ? 'text-[#D4AF37]' : 'text-white'}`}>{value}</p>
     </div>
 );
 

@@ -48,6 +48,16 @@ body {
   width: 6px;
   height: 6px;
 }
+
+/* Hide scrollbar for mobile horizontal scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
 ::-webkit-scrollbar-track {
   background: #111;
 }
