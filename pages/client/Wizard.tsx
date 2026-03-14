@@ -500,15 +500,28 @@ export const Wizard: React.FC = () => {
       const newFiles: string[] = [];
 
       for (const file of Array.from(files)) {
-        // Validar tamanho (max 5MB por foto)
-        if (file.size > 5 * 1024 * 1024) {
-          addToast(`Foto muito grande: ${file.name}. Máximo 5MB por foto.`, 'warning');
+        const isPdf = file.type === 'application/pdf';
+        const maxSize = isPdf ? 20 * 1024 * 1024 : 5 * 1024 * 1024;
+
+        if (file.size > maxSize) {
+          addToast(`Arquivo muito grande: ${file.name}. Máximo ${isPdf ? '20MB' : '5MB'}.`, 'warning');
           continue;
         }
 
-        // Comprimir imagem antes de converter para base64
-        const compressed = await compressImage(file);
-        newFiles.push(compressed);
+        if (isPdf) {
+          // PDF: converter para base64 diretamente, sem canvas
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => resolve(ev.target?.result as string);
+            reader.onerror = () => reject(new Error('Erro ao ler PDF'));
+            reader.readAsDataURL(file);
+          });
+          newFiles.push(dataUrl);
+        } else {
+          // Imagem: comprimir via canvas
+          const compressed = await compressImage(file);
+          newFiles.push(compressed);
+        }
       }
 
       if (newFiles.length === 0) return;
@@ -521,10 +534,8 @@ export const Wizard: React.FC = () => {
         setCollateralItems(prev => prev.map(item => {
           if (item.id === itemId) {
             if (field === 'invoiceUrl') {
-              // invoiceUrl é string | null, pegar apenas a primeira foto
               return { ...item, invoiceUrl: newFiles[0] };
             } else {
-              // photos é array
               return { ...item, photos: [...item.photos, ...newFiles] };
             }
           }
@@ -542,10 +553,11 @@ export const Wizard: React.FC = () => {
         }));
       }
 
-      addToast(`${newFiles.length} foto(s) adicionada(s)`, 'success');
+      const hasPdf = Array.from(files).some(f => f.type === 'application/pdf');
+      addToast(hasPdf ? `PDF adicionado com sucesso` : `${newFiles.length} foto(s) adicionada(s)`, 'success');
     } catch (error) {
-      console.error('Erro ao processar fotos:', error);
-      addToast('Erro ao processar fotos. Tente novamente.', 'error');
+      console.error('Erro ao processar arquivo:', error);
+      addToast('Erro ao processar arquivo. Tente novamente.', 'error');
     }
   };
 
@@ -1529,37 +1541,57 @@ export const Wizard: React.FC = () => {
     </div>
   );
 
-  // Upload area que aceita PDF + Imagens (para CTPS Digital)
+  // Upload area que aceita APENAS PDF (para CTPS Digital)
   const renderPdfUploadArea = (name: string, label: string, files: string[], isGuarantee = false) => (
     <div className="space-y-3">
       <label className="text-sm text-zinc-400 font-medium block">{label}</label>
       <div className="grid grid-cols-3 gap-2">
-        {files.map((file, idx) => {
-          const isPdf = file.includes('application/pdf') || file.endsWith('.pdf');
-          return (
-            <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-zinc-700 bg-black group">
-              {isPdf ? (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900">
-                  <FileText size={32} className="text-red-500 mb-1" />
-                  <span className="text-xs text-zinc-400">PDF</span>
-                  <span className="text-[10px] text-green-500 mt-1">✓ Enviado</span>
-                </div>
-              ) : (
-                <img src={file} alt="" className="w-full h-full object-cover" />
-              )}
-              <button onClick={() => removeFile(name, idx, isGuarantee)} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <X size={12} />
-              </button>
+        {files.map((file, idx) => (
+          <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-green-700 bg-black group">
+            <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900">
+              <FileText size={32} className="text-red-500 mb-1" />
+              <span className="text-xs text-zinc-400">PDF</span>
+              <span className="text-[10px] text-green-500 mt-1">✓ Adicionado</span>
             </div>
-          );
-        })}
-        <div className="relative group">
-          <input type="file" id={`${isGuarantee ? 'g-' : ''}${name}`} multiple accept="application/pdf,image/*" onChange={(e) => handleFileChange(e, name, isGuarantee)} className="hidden" />
-          <label htmlFor={`${isGuarantee ? 'g-' : ''}${name}`} className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border border-dashed border-zinc-700 bg-zinc-900/50 hover:border-[#D4AF37] cursor-pointer">
-            <Plus size={24} className="text-zinc-500" />
-            <span className="text-[10px] text-zinc-600 mt-1">PDF ou Foto</span>
-          </label>
-        </div>
+            <button onClick={() => removeFile(name, idx, isGuarantee)} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+        {files.length === 0 && (
+          <div className="relative group col-span-3">
+            <input
+              type="file"
+              id={`${isGuarantee ? 'g-' : ''}${name}`}
+              accept="application/pdf"
+              onChange={(e) => handleFileChange(e, name, isGuarantee)}
+              className="hidden"
+            />
+            <label
+              htmlFor={`${isGuarantee ? 'g-' : ''}${name}`}
+              className="flex flex-col items-center justify-center w-full py-8 rounded-xl border-2 border-dashed border-[#D4AF37]/50 bg-zinc-900/50 hover:border-[#D4AF37] hover:bg-zinc-900 cursor-pointer transition-all"
+            >
+              <FileText size={36} className="text-red-500 mb-2" />
+              <span className="text-sm font-bold text-white">Selecionar PDF</span>
+              <span className="text-xs text-zinc-500 mt-1">Apenas arquivo .PDF (máx. 20MB)</span>
+            </label>
+          </div>
+        )}
+        {files.length > 0 && (
+          <div className="relative group">
+            <input
+              type="file"
+              id={`${isGuarantee ? 'g-' : ''}${name}-add`}
+              accept="application/pdf"
+              onChange={(e) => handleFileChange(e, name, isGuarantee)}
+              className="hidden"
+            />
+            <label htmlFor={`${isGuarantee ? 'g-' : ''}${name}-add`} className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border border-dashed border-zinc-700 bg-zinc-900/50 hover:border-[#D4AF37] cursor-pointer">
+              <Plus size={24} className="text-zinc-500" />
+              <span className="text-[10px] text-zinc-600 mt-1">+ PDF</span>
+            </label>
+          </div>
+        )}
       </div>
     </div>
   );
