@@ -812,6 +812,233 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
     }
 });
 
+// POST /api/loan-requests/:id/activate-contract — Ativar Contrato (FASE 2)
+loanRequestsRouter.post('/:id/activate-contract', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const id = req.params.id as string;
+        const {
+            principalAmount,
+            dailyInstallmentAmount,
+            totalInstallments,
+            firstPaymentDate,
+            pixReceiptUrl,
+            interestRate,
+            paymentFrequency,
+            dueDay,
+            adminNotes
+        } = req.body;
+
+        // Validações
+        if (!principalAmount || principalAmount <= 0) {
+            return res.status(400).json({ error: 'Valor principal inválido' });
+        }
+        if (!totalInstallments || totalInstallments <= 0) {
+            return res.status(400).json({ error: 'Número de parcelas inválido' });
+        }
+        if (!pixReceiptUrl) {
+            return res.status(400).json({ error: 'Comprovante de PIX obrigatório' });
+        }
+        if (!firstPaymentDate) {
+            return res.status(400).json({ error: 'Data do primeiro pagamento obrigatória' });
+        }
+
+        // Buscar solicitação
+        const request = await prisma.loanRequest.findUnique({
+            where: { id },
+            include: { customer: true }
+        });
+
+        if (!request) {
+            return res.status(404).json({ error: 'Solicitação não encontrada' });
+        }
+
+        if (request.status !== 'APPROVED' && request.status !== 'PENDING_ACCEPTANCE') {
+            return res.status(400).json({ error: 'Solicitação precisa estar aprovada' });
+        }
+
+        // Verificar se já existe um contrato ativo
+        const existingLoan = await prisma.loan.findUnique({
+            where: { requestId: id }
+        });
+
+        if (existingLoan) {
+            // Atualizar contrato existente
+            const updatedLoan = await prisma.loan.update({
+                where: { id: existingLoan.id },
+                data: {
+                    principalAmount: parseFloat(principalAmount),
+                    dailyInstallmentAmount: dailyInstallmentAmount ? parseFloat(dailyInstallmentAmount) : null,
+                    totalInstallments: parseInt(totalInstallments),
+                    firstPaymentDate: new Date(firstPaymentDate),
+                    pixReceiptUrl,
+                    interestRate: interestRate ? parseFloat(interestRate) : null,
+                    paymentFrequency: paymentFrequency || 'MONTHLY',
+                    dueDay: dueDay ? parseInt(dueDay) : null,
+                    adminNotes: adminNotes || null,
+                    status: 'ACTIVE',
+                    amount: parseFloat(principalAmount),
+                    remainingAmount: parseFloat(principalAmount),
+                    updatedAt: new Date()
+                }
+            });
+
+            // Calcular próxima data de pagamento
+            const nextPayment = new Date(firstPaymentDate);
+            if (paymentFrequency === 'DAILY') {
+                nextPayment.setDate(nextPayment.getDate() + 1);
+            } else if (paymentFrequency === 'WEEKLY') {
+                nextPayment.setDate(nextPayment.getDate() + 7);
+            } else {
+                nextPayment.setMonth(nextPayment.getMonth() + 1);
+            }
+
+            await prisma.loan.update({
+                where: { id: updatedLoan.id },
+                data: { nextPaymentDate: nextPayment }
+            });
+
+            return res.json({ success: true, loanId: updatedLoan.id, message: 'Contrato atualizado com sucesso' });
+        }
+
+        // Criar novo contrato
+        if (!request.customerId) {
+            return res.status(400).json({ error: 'Cliente não encontrado' });
+        }
+
+        const loan = await prisma.loan.create({
+            data: {
+                customerId: request.customerId,
+                requestId: request.id,
+                amount: parseFloat(principalAmount),
+                principalAmount: parseFloat(principalAmount),
+                dailyInstallmentAmount: dailyInstallmentAmount ? parseFloat(dailyInstallmentAmount) : null,
+                totalInstallments: parseInt(totalInstallments),
+                installmentsCount: parseInt(totalInstallments),
+                remainingAmount: parseFloat(principalAmount),
+                status: 'ACTIVE',
+                startDate: new Date(),
+                firstPaymentDate: new Date(firstPaymentDate),
+                pixReceiptUrl,
+                interestRate: interestRate ? parseFloat(interestRate) : null,
+                paymentFrequency: paymentFrequency || 'MONTHLY',
+                dueDay: dueDay ? parseInt(dueDay) : null,
+                adminNotes: adminNotes || null,
+                isService: request.profileType === 'LIMPA_NOME',
+                isInvestment: request.profileType === 'INVESTIDOR',
+                isLoan: ['CLT', 'AUTONOMO', 'MOTO', 'GARANTIA'].includes(request.profileType || '')
+            }
+        });
+
+        // Calcular próxima data de pagamento
+        const nextPayment = new Date(firstPaymentDate);
+        if (paymentFrequency === 'DAILY') {
+            nextPayment.setDate(nextPayment.getDate() + 1);
+        } else if (paymentFrequency === 'WEEKLY') {
+            nextPayment.setDate(nextPayment.getDate() + 7);
+        } else {
+            nextPayment.setMonth(nextPayment.getMonth() + 1);
+        }
+
+        await prisma.loan.update({
+            where: { id: loan.id },
+            data: { nextPaymentDate: nextPayment }
+        });
+
+        // Gerar parcelas
+        const installmentAmount = dailyInstallmentAmount
+            ? parseFloat(dailyInstallmentAmount)
+            : parseFloat(principalAmount) / parseInt(totalInstallments);
+
+        const installments = [];
+        for (let i = 1; i <= parseInt(totalInstallments); i++) {
+            const dueDate = new Date(firstPaymentDate);
+
+            if (paymentFrequency === 'DAILY') {
+                dueDate.setDate(dueDate.getDate() + (i - 1));
+            } else if (paymentFrequency === 'WEEKLY') {
+                dueDate.setDate(dueDate.getDate() + ((i - 1) * 7));
+            } else {
+                dueDate.setMonth(dueDate.getMonth() + (i - 1));
+                if (dueDay) dueDate.setDate(parseInt(dueDay));
+            }
+
+            installments.push({
+                loanId: loan.id,
+                dueDate,
+                amount: installmentAmount,
+                status: 'OPEN'
+            });
+        }
+        await prisma.installment.createMany({ data: installments });
+
+        // Atualizar customer
+        await prisma.customer.update({
+            where: { id: request.customerId },
+            data: {
+                activeLoansCount: { increment: 1 },
+                totalDebt: { increment: parseFloat(principalAmount) }
+            }
+        });
+
+        // Criar transação
+        await prisma.transaction.create({
+            data: {
+                type: 'OUT',
+                description: `Empréstimo ativado - ${request.clientName}`,
+                amount: parseFloat(principalAmount),
+                category: 'LOAN',
+                date: new Date()
+            }
+        });
+
+        // Atualizar status da solicitação
+        await prisma.loanRequest.update({
+            where: { id },
+            data: { status: 'ACTIVE' }
+        });
+
+        // Notificação para o cliente
+        const amountFormatted = parseFloat(principalAmount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        if (request.customerId) {
+            await prisma.notification.create({
+                data: {
+                    customerId: request.customerId,
+                    customerEmail: request.email,
+                    title: '💰 Contrato Ativado',
+                    message: `Seu empréstimo de ${amountFormatted} foi liberado! Confira o comprovante no app.`,
+                    type: 'SUCCESS'
+                }
+            }).catch(() => { });
+        }
+
+        // WhatsApp para o cliente
+        if (request.phone) {
+            const waMsg = `💰 *CONTRATO ATIVADO!*\n\n` +
+                `Olá, ${request.clientName}!\n\n` +
+                `Seu empréstimo de *${amountFormatted}* foi liberado! 🎉\n\n` +
+                `📱 Confira o comprovante de transferência no app.\n\n` +
+                `_Tubarão Empréstimos 🦈_`;
+
+            sendWhatsAppNotification(request.phone, waMsg);
+        }
+
+        // Notificação para admins
+        await prisma.notification.create({
+            data: {
+                title: '✅ Contrato Ativado',
+                message: `Contrato de ${request.clientName} (${amountFormatted}) foi ativado com sucesso.`,
+                type: 'SUCCESS'
+            }
+        }).catch(() => { });
+
+        res.json({ success: true, loanId: loan.id });
+    } catch (error: any) {
+        console.error('[LoanRequests] Activate contract error:', error);
+        res.status(500).json({ error: 'Erro ao ativar contrato' });
+    }
+});
+
 // PUT /api/loan-requests/:id/approve-with-counteroffer — Aprovar com Contraproposta
 loanRequestsRouter.put('/:id/approve-with-counteroffer', requireAdmin, async (req: Request, res: Response) => {
     try {
