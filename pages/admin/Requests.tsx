@@ -1163,7 +1163,7 @@ export const Requests: React.FC = () => {
                                 <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4 flex items-center gap-2">
                                     <Video size={16} /> Validação por Vídeo
                                 </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                                     {selectedRequest.documents?.videoSelfieUrl && (
                                         <VideoCard title="Vídeo de Aceite" url={selectedRequest.documents.videoSelfieUrl} />
                                     )}
@@ -1188,7 +1188,7 @@ export const Requests: React.FC = () => {
                                 {/* Personal Documents */}
                                 <div>
                                     <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4">Documentação Pessoal</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                                         <DocCard
                                             title="Selfie (Prova de Vida)"
                                             urls={ensureArray(selectedRequest.documents?.selfieUrl)}
@@ -1210,7 +1210,7 @@ export const Requests: React.FC = () => {
                                 {/* Financial Documents */}
                                 <div>
                                     <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4">Comprovantes</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                                         <DocCard
                                             title="Comp. Residência"
                                             urls={ensureArray(selectedRequest.documents?.proofOfAddressUrl)}
@@ -1238,7 +1238,7 @@ export const Requests: React.FC = () => {
                                     return (
                                         <div>
                                             <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4">📋 Documentos CLT</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                                                 {selectedRequest.workCardUrl && ensureArray(selectedRequest.workCardUrl).filter(Boolean).length > 0 ? (
                                                     <DocCard
                                                         title="Carteira de Trabalho (CTPS)"
@@ -1412,8 +1412,8 @@ export const Requests: React.FC = () => {
 
                         {/* Actions Footer */}
                         {(selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === LoanStatus.WAITING_DOCS || selectedRequest.status === 'RETURNING_PENDING') && (
-                            <div className="p-6 border-t border-zinc-800 bg-zinc-950 flex flex-col md:flex-row justify-between items-center gap-4">
-                                <span className="text-xs text-zinc-500 text-center md:text-left max-w-md">
+                            <div className="p-4 md:p-6 border-t border-zinc-800 bg-zinc-950 flex flex-col gap-3 md:gap-4 shrink-0">
+                                <span className="text-xs text-zinc-500 text-center md:text-left">
                                     {selectedRequest.profileType === 'LIMPA_NOME'
                                         ? 'Ao aprovar, o serviço Limpa Nome será iniciado para este cliente.'
                                         : selectedRequest.profileType === 'MOTO'
@@ -1423,12 +1423,12 @@ export const Requests: React.FC = () => {
                                                 : 'Se aprovar agora, o saldo será liberado na carteira.'
                                     }
                                 </span>
-                                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full sm:w-auto">
+                                <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto md:ml-auto">
                                     {/* Botão Ativar Contrato - Aparece quando APPROVED */}
                                     {selectedRequest.status === 'APPROVED' && (
                                         <Button
                                             variant="gold"
-                                            className="flex-1 sm:flex-initial bg-green-600 text-white font-bold hover:bg-green-700"
+                                            className="w-full md:w-auto bg-green-600 text-white font-bold hover:bg-green-700"
                                             onClick={openActivationModal}
                                         >
                                             <Check size={18} className="mr-2" /> ATIVAR CONTRATO
@@ -1439,16 +1439,16 @@ export const Requests: React.FC = () => {
                                     {selectedRequest.status === 'PENDING' && (
                                         <>
                                             {/* Request Doc Button */}
-                                            <Button variant="secondary" className="flex-1 sm:flex-initial" onClick={() => setIsDocRequestOpen(true)}>
+                                            <Button variant="secondary" className="w-full md:w-auto" onClick={() => setIsDocRequestOpen(true)}>
                                                 <FileWarning size={18} className="mr-2" /> Solicitar Doc.
                                             </Button>
 
-                                            <Button variant="danger" className="flex-1 sm:flex-initial" onClick={() => handleReject(selectedRequest.id)} isLoading={processing === selectedRequest.id}>
+                                            <Button variant="danger" className="w-full md:w-auto" onClick={() => handleReject(selectedRequest.id)} isLoading={processing === selectedRequest.id}>
                                                 <X size={18} className="mr-2" /> REPROVAR
                                             </Button>
-                                            <Button variant="gold" className="flex-1 sm:flex-initial bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]" onClick={openApprovalModal} isLoading={processing === selectedRequest.id}>
+                                            <Button variant="gold" className="w-full md:w-auto bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]" onClick={openApprovalModal} isLoading={processing === selectedRequest.id}>
                                                 <Check size={18} className="mr-2" /> {selectedRequest.profileType === 'LIMPA_NOME' ? 'APROVAR SERVIÇO' :
-                                                    selectedRequest.profileType === 'MOTO' ? 'APROVAR FINANCIAMENTO' : 'APROVAR EMPRÉSTIMO'}
+                                                    selectedRequest.profileType === 'MOTO' ? 'APROVAR FINANC.' : 'APROVAR'}
                                             </Button>
                                         </>
                                     )}
@@ -1462,22 +1462,22 @@ export const Requests: React.FC = () => {
             {/* Request Document Modal */}
             {isDocRequestOpen && (
                 <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] p-4">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in duration-200">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                <FileWarning className="text-[#D4AF37]" /> Solicitar Documento
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-4 md:p-6 shadow-2xl animate-in zoom-in duration-200">
+                        <div className="flex justify-between items-center mb-4 md:mb-6">
+                            <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+                                <FileWarning size={20} className="text-[#D4AF37]" /> Solicitar Documento
                             </h3>
-                            <button onClick={() => setIsDocRequestOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
+                            <button onClick={() => setIsDocRequestOpen(false)}><X size={20} className="text-zinc-500 hover:text-white" /></button>
                         </div>
 
-                        <p className="text-zinc-400 text-sm mb-4">
+                        <p className="text-zinc-400 text-xs md:text-sm mb-4">
                             O processo mudará para "AGUARDANDO DOC". O cliente receberá uma notificação para enviar o anexo.
                         </p>
 
                         <textarea
                             value={docRequestDesc}
                             onChange={(e) => setDocRequestDesc(e.target.value)}
-                            className="w-full h-32 bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none resize-none mb-4"
+                            className="w-full h-32 bg-black border border-zinc-700 rounded-lg p-3 text-sm md:text-base text-white focus:border-[#D4AF37] outline-none resize-none mb-4"
                             placeholder="Ex: Por favor, envie um comprovante de residência atualizado (últimos 60 dias)..."
                         />
 
@@ -1491,20 +1491,20 @@ export const Requests: React.FC = () => {
             {/* Approval Modal with Counteroffer */}
             {isApprovalModalOpen && selectedRequest && (
                 <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] p-4">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl animate-in zoom-in duration-200">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                <Check className="text-[#D4AF37]" /> Aprovar Empréstimo
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg p-4 md:p-6 shadow-2xl animate-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4 md:mb-6">
+                            <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+                                <Check size={20} className="text-[#D4AF37]" /> Aprovar Empréstimo
                             </h3>
                             <button onClick={() => setIsApprovalModalOpen(false)}>
-                                <X className="text-zinc-500 hover:text-white" />
+                                <X size={20} className="text-zinc-500 hover:text-white" />
                             </button>
                         </div>
 
                         {/* Valor Solicitado */}
-                        <div className="bg-black border border-zinc-800 rounded-xl p-4 mb-4">
+                        <div className="bg-black border border-zinc-800 rounded-xl p-3 md:p-4 mb-4">
                             <p className="text-xs text-zinc-500 mb-1">Valor Solicitado pelo Cliente</p>
-                            <p className="text-2xl font-bold text-white">
+                            <p className="text-xl md:text-2xl font-bold text-white">
                                 R$ {selectedRequest.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </p>
                             <p className="text-xs text-zinc-500 mt-1">
@@ -1513,7 +1513,7 @@ export const Requests: React.FC = () => {
                         </div>
 
                         {/* Input Valor Aprovado */}
-                        <div className="mb-6">
+                        <div className="mb-4 md:mb-6">
                             <label className="block text-sm font-bold text-white mb-2">
                                 💰 Valor a Aprovar (Contraproposta)
                             </label>
@@ -1522,7 +1522,7 @@ export const Requests: React.FC = () => {
                                 step="0.01"
                                 value={approvedAmount}
                                 onChange={(e) => setApprovedAmount(e.target.value)}
-                                className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white text-2xl font-bold focus:border-[#D4AF37] outline-none"
+                                className="w-full bg-black border border-zinc-700 rounded-xl p-3 md:p-4 text-white text-xl md:text-2xl font-bold focus:border-[#D4AF37] outline-none"
                                 placeholder="0.00"
                             />
                             <p className="text-xs text-zinc-500 mt-2">
@@ -1532,7 +1532,7 @@ export const Requests: React.FC = () => {
 
                         {/* Preview da Contraproposta */}
                         {approvedAmount && parseFloat(approvedAmount) > 0 && (
-                            <div className="bg-gradient-to-r from-[#D4AF37]/10 to-orange-500/10 border border-[#D4AF37] rounded-xl p-4 mb-6">
+                            <div className="bg-gradient-to-r from-[#D4AF37]/10 to-orange-500/10 border border-[#D4AF37] rounded-xl p-3 md:p-4 mb-4 md:mb-6">
                                 <p className="text-xs text-zinc-400 mb-2">Preview da Notificação ao Cliente:</p>
                                 <div className="bg-black rounded-lg p-3">
                                     <p className="text-[#D4AF37] font-bold text-sm">🎉 Crédito Pré-Aprovado!</p>
@@ -1547,17 +1547,17 @@ export const Requests: React.FC = () => {
                         )}
 
                         {/* Botões */}
-                        <div className="flex gap-3">
+                        <div className="flex flex-col md:flex-row gap-3">
                             <Button
                                 variant="secondary"
-                                className="flex-1"
+                                className="w-full md:flex-1"
                                 onClick={() => setIsApprovalModalOpen(false)}
                             >
                                 Cancelar
                             </Button>
                             <Button
                                 variant="gold"
-                                className="flex-1 bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]"
+                                className="w-full md:flex-1 bg-[#D4AF37] text-black font-bold hover:bg-[#B5942F]"
                                 onClick={handleApproveWithCounteroffer}
                                 isLoading={!!processing}
                                 disabled={!approvedAmount || parseFloat(approvedAmount) <= 0}
@@ -1571,25 +1571,25 @@ export const Requests: React.FC = () => {
 
             {/* Contract Activation Modal (FASE 2) */}
             {isActivationModalOpen && selectedRequest && (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] p-4 overflow-y-auto">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl p-6 shadow-2xl animate-in zoom-in duration-200 my-8">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                <Check className="text-green-500" /> Ativar Contrato
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] p-0 md:p-4 overflow-y-auto">
+                    <div className="bg-zinc-900 border-0 md:border border-zinc-800 md:rounded-2xl w-full max-w-2xl h-full md:h-auto md:max-h-[90vh] p-4 md:p-6 shadow-2xl animate-in zoom-in duration-200 overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4 md:mb-6 sticky top-0 bg-zinc-900 pb-4 border-b border-zinc-800 md:static md:border-0">
+                            <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+                                <Check size={20} className="text-green-500" /> Ativar Contrato
                             </h3>
                             <button onClick={() => setIsActivationModalOpen(false)}>
-                                <X className="text-zinc-500 hover:text-white" />
+                                <X size={20} className="text-zinc-500 hover:text-white" />
                             </button>
                         </div>
 
                         {/* Info da Solicitação */}
-                        <div className="bg-black border border-zinc-800 rounded-xl p-4 mb-6">
+                        <div className="bg-black border border-zinc-800 rounded-xl p-3 md:p-4 mb-4 md:mb-6">
                             <p className="text-xs text-zinc-500 mb-2">Cliente</p>
-                            <p className="text-lg font-bold text-white">{selectedRequest.clientName}</p>
+                            <p className="text-base md:text-lg font-bold text-white">{selectedRequest.clientName}</p>
                             <p className="text-xs text-zinc-400 mt-1">{selectedRequest.email} • {selectedRequest.phone}</p>
                         </div>
 
-                        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                        <div className="space-y-4 pb-4">
                             {/* Valor Principal */}
                             <div>
                                 <label className="block text-sm font-bold text-white mb-2">
