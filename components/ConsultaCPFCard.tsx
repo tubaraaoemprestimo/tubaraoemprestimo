@@ -116,7 +116,8 @@ export default function ConsultaCPFCard({ cpf }: ConsultaCPFCardProps) {
     };
 
     const formatCPF = (cpf: string) => {
-        return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+        const clean = (cpf || '').replace(/\D/g, '');
+        return clean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
     };
 
     const formatPhone = (phone: string) => {
@@ -136,7 +137,10 @@ export default function ConsultaCPFCard({ cpf }: ConsultaCPFCardProps) {
         }
     };
 
-    const consulta = data?.data?.consulta;
+    // Estrutura: apiService retorna { success, data: <trackflow_response> }
+    // TrackFlow retorna { success, api, data: { cpf, consulta: { ... } } }
+    const trackflowData = data?.data?.data || data?.data;
+    const consulta = trackflowData?.consulta;
 
     return (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
