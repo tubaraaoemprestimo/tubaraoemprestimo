@@ -50,7 +50,12 @@ export const Customers: React.FC = () => {
 
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'BLOCKED'>('ALL');
   const [originFilter, setOriginFilter] = useState<'ALL' | 'IMPORTED' | 'ORGANIC'>('ALL');
-  const [clientTypeFilter, setClientTypeFilter] = useState<'ALL' | 'LEADS' | 'ACTIVE_CLIENTS' | 'INACTIVE_CLIENTS'>('ALL');
+  const [clientTypeFilter, setClientTypeFilter] = useState<'ALL' | 'NEVER_REQUESTED' | 'ACTIVE_CLIENTS' | 'INACTIVE_CLIENTS'>('ALL');
+
+  // History Modal
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [historyCustomer, setHistoryCustomer] = useState<any>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Edit Customer Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -78,20 +83,21 @@ export const Customers: React.FC = () => {
       (originFilter === 'IMPORTED' && isImported) ||
       (originFilter === 'ORGANIC' && !isImported);
 
-    const isLead = (c.activeLoansCount || 0) === 0 && (c.totalDebt || 0) === 0;
+    // "Só Cadastrado" = nunca fez nenhuma solicitação (loanRequestsCount === 0)
+    const neverRequested = (c.loanRequestsCount || 0) === 0;
     const isActiveClient = (c.activeLoansCount || 0) > 0;
-    const isInactiveClient = (c.activeLoansCount || 0) === 0 && (c.totalDebt || 0) > 0;
+    const isInactiveClient = (c.loanRequestsCount || 0) > 0 && (c.activeLoansCount || 0) === 0;
     const matchesClientType = clientTypeFilter === 'ALL' ||
-      (clientTypeFilter === 'LEADS' && isLead) ||
+      (clientTypeFilter === 'NEVER_REQUESTED' && neverRequested) ||
       (clientTypeFilter === 'ACTIVE_CLIENTS' && isActiveClient) ||
       (clientTypeFilter === 'INACTIVE_CLIENTS' && isInactiveClient);
 
     return matchesText && matchesStatus && matchesOrigin && matchesClientType;
   });
 
-  const leadsCount = customers.filter(c => (c.activeLoansCount || 0) === 0 && (c.totalDebt || 0) === 0).length;
+  const neverRequestedCount = customers.filter(c => (c.loanRequestsCount || 0) === 0).length;
   const activeClientsCount = customers.filter(c => (c.activeLoansCount || 0) > 0).length;
-  const inactiveClientsCount = customers.filter(c => (c.activeLoansCount || 0) === 0 && (c.totalDebt || 0) > 0).length;
+  const inactiveClientsCount = customers.filter(c => (c.loanRequestsCount || 0) > 0 && (c.activeLoansCount || 0) === 0).length;
 
   const totalImported = customers.filter(c => c.email.includes('@whatsapp.lead')).length;
 
@@ -578,6 +584,20 @@ export const Customers: React.FC = () => {
     }
   };
 
+  const openHistoryModal = async (cust: Customer) => {
+    setHistoryCustomer(null);
+    setHistoryModalOpen(true);
+    setHistoryLoading(true);
+    try {
+      const data = await apiService.getCustomer(cust.id);
+      setHistoryCustomer(data);
+    } catch {
+      addToast('Erro ao carregar histórico do cliente.', 'error');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const handleUndoSync = async () => {
     if (!confirm('ATENÇÃO: Deseja apagar TODOS os contatos importados do WhatsApp? Esta ação não pode ser desfeita.')) return;
 
@@ -623,14 +643,14 @@ export const Customers: React.FC = () => {
               <button onClick={() => setClientTypeFilter('ALL')} className={`px-3 py-1 rounded-md text-sm transition-colors ${clientTypeFilter === 'ALL' ? 'bg-[#D4AF37] text-black font-bold' : 'text-zinc-400 hover:text-white'}`}>
                 Todos <span className="text-xs opacity-70">({customers.length})</span>
               </button>
-              <button onClick={() => setClientTypeFilter('LEADS')} className={`px-3 py-1 rounded-md text-sm transition-colors ${clientTypeFilter === 'LEADS' ? 'bg-blue-600 text-white font-bold' : 'text-zinc-400 hover:text-white'}`}>
-                Leads <span className="text-xs opacity-70">({leadsCount})</span>
+              <button onClick={() => setClientTypeFilter('NEVER_REQUESTED')} className={`px-3 py-1 rounded-md text-sm transition-colors ${clientTypeFilter === 'NEVER_REQUESTED' ? 'bg-blue-600 text-white font-bold' : 'text-zinc-400 hover:text-white'}`} title="Nunca solicitou empréstimo — campanhas e ofertas">
+                Só Cadastrado <span className="text-xs opacity-70">({neverRequestedCount})</span>
               </button>
               <button onClick={() => setClientTypeFilter('ACTIVE_CLIENTS')} className={`px-3 py-1 rounded-md text-sm transition-colors ${clientTypeFilter === 'ACTIVE_CLIENTS' ? 'bg-green-600 text-white font-bold' : 'text-zinc-400 hover:text-white'}`}>
                 Clientes Ativos <span className="text-xs opacity-70">({activeClientsCount})</span>
               </button>
-              <button onClick={() => setClientTypeFilter('INACTIVE_CLIENTS')} className={`px-3 py-1 rounded-md text-sm transition-colors ${clientTypeFilter === 'INACTIVE_CLIENTS' ? 'bg-zinc-600 text-white font-bold' : 'text-zinc-400 hover:text-white'}`}>
-                Quitados <span className="text-xs opacity-70">({inactiveClientsCount})</span>
+              <button onClick={() => setClientTypeFilter('INACTIVE_CLIENTS')} className={`px-3 py-1 rounded-md text-sm transition-colors ${clientTypeFilter === 'INACTIVE_CLIENTS' ? 'bg-zinc-600 text-white font-bold' : 'text-zinc-400 hover:text-white'}`} title="Já solicitou mas sem contrato ativo">
+                Histórico <span className="text-xs opacity-70">({inactiveClientsCount})</span>
               </button>
             </div>
             <div className="flex bg-zinc-900 rounded-lg p-1 border border-zinc-800">
@@ -760,6 +780,17 @@ export const Customers: React.FC = () => {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-2">
+                        {(cust.loanRequestsCount || 0) > 0 && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => openHistoryModal(cust)}
+                            title="Ver Histórico Completo"
+                            className="text-amber-400 hover:text-amber-300 bg-amber-900/20 border border-amber-700/50"
+                          >
+                            <BarChart2 size={16} />
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="secondary"
@@ -1271,6 +1302,118 @@ export const Customers: React.FC = () => {
               <Button onClick={handleCreateUser} isLoading={sending} className="w-full bg-amber-600 hover:bg-amber-700 text-white">
                 <UserPlus size={16} className="mr-2" /> Criar Usuário
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {historyModalOpen && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in duration-200">
+            <div className="sticky top-0 bg-zinc-900 flex justify-between items-center p-6 border-b border-zinc-800 z-10">
+              <h3 className="text-xl font-bold text-[#D4AF37] flex items-center gap-2">
+                <BarChart2 size={20} /> Histórico Completo
+              </h3>
+              <button onClick={() => setHistoryModalOpen(false)} className="text-zinc-500 hover:text-white"><X /></button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {historyLoading ? (
+                <div className="text-center text-zinc-500 py-12">Carregando histórico...</div>
+              ) : historyCustomer ? (
+                <>
+                  {/* Dados Pessoais */}
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+                    <h4 className="text-white font-bold mb-3">👤 Dados do Cliente</h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div><p className="text-zinc-500">Nome</p><p className="text-white font-semibold">{historyCustomer.name}</p></div>
+                      <div><p className="text-zinc-500">CPF</p><p className="text-white font-semibold">{historyCustomer.cpf}</p></div>
+                      <div><p className="text-zinc-500">Telefone</p><p className="text-white font-semibold">{historyCustomer.phone}</p></div>
+                      <div><p className="text-zinc-500">E-mail</p><p className="text-white font-semibold break-all">{historyCustomer.email}</p></div>
+                      {historyCustomer.city && <div><p className="text-zinc-500">Cidade</p><p className="text-white font-semibold">{historyCustomer.city}/{historyCustomer.state}</p></div>}
+                      <div><p className="text-zinc-500">Score Interno</p><p className="text-[#D4AF37] font-bold">{historyCustomer.internalScore || 0}</p></div>
+                    </div>
+                  </div>
+
+                  {/* Contratos Ativos */}
+                  {historyCustomer.loans && historyCustomer.loans.length > 0 && (
+                    <div>
+                      <h4 className="text-white font-bold mb-3">📋 Contratos ({historyCustomer.loans.length})</h4>
+                      <div className="space-y-3">
+                        {historyCustomer.loans.map((loan: any) => (
+                          <div key={loan.id} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                                loan.status === 'ACTIVE' ? 'bg-green-900/30 text-green-400' :
+                                loan.status === 'DEFAULT' ? 'bg-red-900/30 text-red-400' :
+                                loan.status === 'COMPLETED' ? 'bg-blue-900/30 text-blue-400' :
+                                'bg-zinc-800 text-zinc-400'
+                              }`}>{loan.status}</span>
+                              <span className="text-zinc-500 text-xs">{new Date(loan.startDate || loan.createdAt).toLocaleDateString('pt-BR')}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div><p className="text-zinc-500">Valor</p><p className="text-white font-bold">R$ {(loan.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>
+                              <div><p className="text-zinc-500">Restante</p><p className="text-white">R$ {(loan.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>
+                            </div>
+                            {loan.installments && loan.installments.length > 0 && (
+                              <div className="mt-3">
+                                <p className="text-zinc-500 text-xs mb-2">Parcelas ({loan.installments.length})</p>
+                                <div className="space-y-1">
+                                  {loan.installments.map((inst: any, idx: number) => (
+                                    <div key={idx} className="flex items-center justify-between bg-black rounded-lg p-2 text-xs">
+                                      <span className="text-zinc-400">{new Date(inst.dueDate).toLocaleDateString('pt-BR')}</span>
+                                      <span className="text-white">R$ {(inst.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                      <span className={`px-2 py-0.5 rounded font-bold ${inst.status === 'PAID' ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}`}>{inst.status}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Solicitações */}
+                  {historyCustomer.loanRequests && historyCustomer.loanRequests.length > 0 && (
+                    <div>
+                      <h4 className="text-white font-bold mb-3">📝 Solicitações ({historyCustomer.loanRequests.length})</h4>
+                      <div className="space-y-3">
+                        {historyCustomer.loanRequests.map((req: any) => (
+                          <div key={req.id} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                                req.status === 'APPROVED' || req.status === 'PENDING_ACCEPTANCE' ? 'bg-green-900/30 text-green-400' :
+                                req.status === 'REJECTED' ? 'bg-red-900/30 text-red-400' :
+                                req.status === 'PENDING' ? 'bg-yellow-900/30 text-yellow-400' :
+                                'bg-zinc-800 text-zinc-400'
+                              }`}>{req.status}</span>
+                              <span className="text-zinc-500 text-xs">{new Date(req.createdAt).toLocaleDateString('pt-BR')}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div><p className="text-zinc-500">Valor</p><p className="text-white font-bold">R$ {(req.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>
+                              <div><p className="text-zinc-500">Tipo</p><p className="text-white">{req.profileType || '-'}</p></div>
+                              {req.approvedAmount && <div><p className="text-zinc-500">Aprovado</p><p className="text-green-400 font-bold">R$ {req.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>}
+                            </div>
+                            {/* Documentos */}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {req.selfieUrl && <a href={req.selfieUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded">📷 Selfie</a>}
+                              {req.idCardUrl && <a href={Array.isArray(req.idCardUrl) ? req.idCardUrl[0] : req.idCardUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded">🪪 RG/CNH</a>}
+                              {req.proofOfAddressUrl && <a href={Array.isArray(req.proofOfAddressUrl) ? req.proofOfAddressUrl[0] : req.proofOfAddressUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded">🏠 Comprov. Endereço</a>}
+                              {req.proofIncomeUrl && <a href={Array.isArray(req.proofIncomeUrl) ? req.proofIncomeUrl[0] : req.proofIncomeUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded">💼 Comprov. Renda</a>}
+                              {req.workCardUrl && <a href={Array.isArray(req.workCardUrl) ? req.workCardUrl[0] : req.workCardUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded">📄 Carteira Trabalho</a>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center text-zinc-500 py-12">Nenhum dado encontrado.</div>
+              )}
             </div>
           </div>
         </div>

@@ -461,8 +461,8 @@ export const apiService = {
         return data;
     },
 
-    async approveWithCounteroffer(id: string, approvedAmount: number) {
-        const { data, error } = await api.put(`/loan-requests/${id}/approve-with-counteroffer`, { approvedAmount });
+    async approveWithCounteroffer(id: string, approvedAmount: number, interestRate?: number) {
+        const { data, error } = await api.put(`/loan-requests/${id}/approve-with-counteroffer`, { approvedAmount, interestRate });
         if (error) throw new Error(error.error || 'Erro ao aprovar com contraproposta');
         return data;
     },
@@ -640,6 +640,12 @@ export const apiService = {
         const { data, error } = await api.get('/customers');
         if (error) return [];
         return data || [];
+    },
+
+    async getCustomer(id: string) {
+        const { data, error } = await api.get(`/customers/${id}`);
+        if (error) throw new Error(error.error || 'Erro ao buscar cliente');
+        return data;
     },
 
     async toggleCustomerStatus(id: string, status: string) {

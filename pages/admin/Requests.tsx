@@ -54,6 +54,7 @@ export const Requests: React.FC = () => {
     // Approval Modal with Counteroffer
     const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
     const [approvedAmount, setApprovedAmount] = useState('');
+    const [approvedInterestRate, setApprovedInterestRate] = useState('');
 
     // Contract Activation Modal (FASE 2)
     const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
@@ -111,6 +112,7 @@ export const Requests: React.FC = () => {
         if (!selectedRequest) return;
         // Pré-preencher com o valor solicitado
         setApprovedAmount(selectedRequest.amount.toString());
+        setApprovedInterestRate('');
         setIsApprovalModalOpen(true);
     };
 
@@ -125,11 +127,13 @@ export const Requests: React.FC = () => {
 
         setProcessing(selectedRequest.id);
         try {
-            await apiService.approveWithCounteroffer(selectedRequest.id, amount);
+            const rate = approvedInterestRate ? parseFloat(approvedInterestRate) : undefined;
+            await apiService.approveWithCounteroffer(selectedRequest.id, amount, rate);
 
             setProcessing(null);
             setIsApprovalModalOpen(false);
             setApprovedAmount('');
+            setApprovedInterestRate('');
             setSelectedRequest(null);
             loadRequests();
             addToast("Contraproposta enviada ao cliente!", 'success');
@@ -1513,9 +1517,9 @@ export const Requests: React.FC = () => {
                         </div>
 
                         {/* Input Valor Aprovado */}
-                        <div className="mb-4 md:mb-6">
+                        <div className="mb-4">
                             <label className="block text-sm font-bold text-white mb-2">
-                                💰 Valor a Aprovar (Contraproposta)
+                                💰 Valor a Liberar (Contraproposta)
                             </label>
                             <input
                                 type="number"
@@ -1526,7 +1530,26 @@ export const Requests: React.FC = () => {
                                 placeholder="0.00"
                             />
                             <p className="text-xs text-zinc-500 mt-2">
-                                💡 Dica: Você pode aprovar um valor menor que o solicitado. O cliente receberá uma notificação para aceitar a contraproposta.
+                                💡 Dica: Você pode liberar um valor menor que o solicitado. O cliente verá apenas o valor aprovado.
+                            </p>
+                        </div>
+
+                        {/* Input Taxa de Juros Negociada */}
+                        <div className="mb-4 md:mb-6">
+                            <label className="block text-sm font-bold text-white mb-2">
+                                📊 Taxa de Juros Negociada (% a.m.) <span className="text-zinc-500 font-normal">— opcional</span>
+                            </label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                value={approvedInterestRate}
+                                onChange={(e) => setApprovedInterestRate(e.target.value)}
+                                className="w-full bg-black border border-zinc-700 rounded-xl p-3 md:p-4 text-white text-xl md:text-2xl font-bold focus:border-[#D4AF37] outline-none"
+                                placeholder="Ex: 15"
+                            />
+                            <p className="text-xs text-zinc-500 mt-2">
+                                Se informado, será salvo junto à contraproposta para uso na ativação do contrato.
                             </p>
                         </div>
 

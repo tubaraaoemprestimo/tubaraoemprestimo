@@ -10,11 +10,15 @@ customersRouter.get('/', async (_req: Request, res: Response) => {
     try {
         const customers = await prisma.customer.findMany({
             orderBy: { joinedAt: 'desc' },
+            include: {
+                _count: { select: { loanRequests: true } }
+            }
         });
 
-        // Prisma automatically returns camelCase fields, matching the frontend expectations.
-        // No need for manual mapping.
-        res.json(customers);
+        res.json(customers.map(c => ({
+            ...c,
+            loanRequestsCount: c._count.loanRequests
+        })));
     } catch (error) {
         console.error('[Customers] list error:', error);
         res.status(500).json({ error: 'Erro ao buscar clientes' });

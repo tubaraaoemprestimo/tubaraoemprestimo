@@ -1043,7 +1043,7 @@ loanRequestsRouter.post('/:id/activate-contract', requireAdmin, async (req: Requ
 loanRequestsRouter.put('/:id/approve-with-counteroffer', requireAdmin, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
-        const { approvedAmount } = req.body;
+        const { approvedAmount, interestRate } = req.body;
 
         if (!approvedAmount || approvedAmount <= 0) {
             return res.status(400).json({ error: 'Valor aprovado inválido' });
@@ -1059,16 +1059,23 @@ loanRequestsRouter.put('/:id/approve-with-counteroffer', requireAdmin, async (re
         const requestedAmount = originalRequest.requestedAmount || originalRequest.amount;
 
         // Atualizar solicitação com contraproposta
+        const updateData: any = {
+            requestedAmount, // Preservar valor original
+            approvedAmount: parseFloat(approvedAmount),
+            approvedAt: new Date(),
+            approvedById: req.user!.id,
+            status: 'PENDING_ACCEPTANCE', // Novo status aguardando aceite do cliente
+            counterOfferAccepted: false
+        };
+
+        // Salvar taxa de juros negociada, se informada
+        if (interestRate && parseFloat(interestRate) > 0) {
+            updateData.monthlyRate = parseFloat(interestRate);
+        }
+
         const request = await prisma.loanRequest.update({
             where: { id },
-            data: {
-                requestedAmount, // Preservar valor original
-                approvedAmount: parseFloat(approvedAmount),
-                approvedAt: new Date(),
-                approvedById: req.user!.id,
-                status: 'PENDING_ACCEPTANCE', // Novo status aguardando aceite do cliente
-                counterOfferAccepted: false
-            }
+            data: updateData
         });
 
         // ====== NOTIFICAÇÕES AUTOMÁTICAS ======

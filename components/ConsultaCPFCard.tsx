@@ -92,6 +92,11 @@ export default function ConsultaCPFCard({ cpf }: ConsultaCPFCardProps) {
     const { addToast } = useToast();
 
     const handleConsultar = async () => {
+        const cpfLimpo = cpf?.replace(/\D/g, '') || '';
+        if (!cpfLimpo || cpfLimpo.length !== 11) {
+            addToast('CPF inválido ou não informado nesta solicitação.', 'error');
+            return;
+        }
         setLoading(true);
         try {
             const response = await apiService.consultarCPFTrackFlow(cpf);
@@ -138,7 +143,7 @@ export default function ConsultaCPFCard({ cpf }: ConsultaCPFCardProps) {
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h3 className="text-lg font-bold text-white">Consulta Completa TrackFlow</h3>
-                    <p className="text-sm text-zinc-400">CPF: {formatCPF(cpf)}</p>
+                    <p className="text-sm text-zinc-400">CPF: {cpf?.replace(/\D/g, '').length === 11 ? formatCPF(cpf.replace(/\D/g, '')) : (cpf || 'Não informado')}</p>
                 </div>
                 <button
                     onClick={handleConsultar}

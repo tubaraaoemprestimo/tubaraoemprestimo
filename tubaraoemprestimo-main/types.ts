@@ -162,6 +162,9 @@ export interface Customer {
   // Código de indicação único do cliente
   referralCode?: string;
 
+  // Número de solicitações de empréstimo feitas pelo cliente
+  loanRequestsCount?: number;
+
   // Oferta de parcelamento enviada pelo admin
   installmentOffer?: {
     amount: number;
