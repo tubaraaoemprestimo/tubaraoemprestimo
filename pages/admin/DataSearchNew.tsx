@@ -617,7 +617,25 @@ export const DataSearchNew: React.FC = () => {
 
         // Histórico Veicular
         if (result.api === 'historico-veicular') {
-            const consulta = data?.consulta?.[0] || {};
+            const consultaArray = data?.consulta || [];
+
+            // Placa não encontrada na base
+            if (consultaArray.length === 0) {
+                return (
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center">
+                        <div className="text-6xl mb-4">🚗</div>
+                        <h3 className="text-xl font-bold text-zinc-300 mb-2">Nenhum dado encontrado</h3>
+                        <p className="text-zinc-500 text-sm">
+                            A placa/veículo consultado não foi encontrado na base de dados da TrackFlow.
+                        </p>
+                        <p className="text-zinc-600 text-xs mt-2">
+                            Tente consultar por Renavam, Chassi, ou CPF/CNPJ do proprietário.
+                        </p>
+                    </div>
+                );
+            }
+
+            const consulta = consultaArray[0] || {};
             const pf = consulta.pf || {};
 
             return (
