@@ -913,8 +913,8 @@ export const apiService = {
         return data || [];
     },
 
-    async approvePaymentReceipt(id: string, notes?: string) {
-        const { data, error } = await api.put(`/payment-receipts/${id}/approve`, { notes });
+    async approvePaymentReceipt(id: string, notes?: string, isDischarge?: boolean) {
+        const { data, error } = await api.put(`/payment-receipts/${id}/approve`, { notes, isDischarge });
         if (error) throw new Error((error as any).error || 'Erro ao aprovar');
         return data;
     },
@@ -963,6 +963,20 @@ export const apiService = {
         const cpfLimpo = cpf.replace(/\D/g, '');
         const response = await api.get(`/cpf/trackflow/${cpfLimpo}`);
         return response.data;
+    },
+
+    // ============= DOCUMENTS =============
+
+    async getDocuments() {
+        const { data, error } = await api.get('/documents');
+        if (error) return [];
+        return data || [];
+    },
+
+    async getDocument(id: string) {
+        const { data, error } = await api.get(`/documents/${id}`);
+        if (error) throw new Error((error as any).error || 'Erro ao buscar documento');
+        return data;
     }
 };
 

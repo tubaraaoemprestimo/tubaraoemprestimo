@@ -105,6 +105,8 @@ paymentReceiptsRouter.get('/', async (req: Request, res: Response) => {
 // PUT /api/payment-receipts/:id/approve — Admin confirma pagamento
 paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: Response) => {
     try {
+        const { isDischarge } = req.body; // Novo: flag de quitação total
+
         const receipt = await prisma.paymentReceipt.update({
             where: { id: req.params.id as string },
             data: {
@@ -128,28 +130,59 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
         // Atualizar remainingAmount do loan
         const loan = await prisma.loan.findUnique({
             where: { id: installment.loanId },
-            include: { installments: true }
+            include: { installments: true, customers: true }
         });
 
         if (loan) {
-            // Calcular total do empréstimo (soma de todas as parcelas)
-            const totalLoan = loan.installments.reduce((sum, i) => sum + Number(i.amount), 0);
+            let totalPaid = 0; // Declarar no escopo superior
 
-            // Calcular total pago (soma de todas as parcelas pagas)
-            const totalPaid = loan.installments
-                .filter(i => i.status === 'PAID')
-                .reduce((sum, i) => sum + Number(i.amount), 0);
+            // Se for quitação total
+            if (isDischarge) {
+                // Marcar TODAS as parcelas como pagas
+                await prisma.installment.updateMany({
+                    where: {
+                        loanId: loan.id,
+                        status: { not: 'PAID' }
+                    },
+                    data: {
+                        status: 'PAID',
+                        paidAt: new Date()
+                    }
+                });
 
-            // Calcular saldo devedor restante
-            const newRemaining = totalLoan - totalPaid;
+                // Calcular total pago
+                totalPaid = loan.installments
+                    .filter((i: any) => i.status === 'PAID' || i.id === installment.id)
+                    .reduce((sum: number, i: any) => sum + Number(i.amount), 0);
 
-            await prisma.loan.update({
-                where: { id: loan.id },
-                data: {
-                    remainingAmount: Math.max(0, newRemaining),
-                    status: newRemaining <= 0 ? 'PAID' : loan.status
-                }
-            });
+                // Marcar loan como quitado
+                await prisma.loan.update({
+                    where: { id: loan.id },
+                    data: {
+                        remainingAmount: 0,
+                        status: 'COMPLETED'
+                    }
+                });
+
+                console.log(`[PaymentReceipts] ✅ Loan ${loan.id} QUITADO (discharge)`);
+            } else {
+                // Fluxo normal: calcular saldo devedor
+                const totalLoan = loan.installments.reduce((sum, i) => sum + Number(i.amount), 0);
+                totalPaid = loan.installments
+                    .filter(i => i.status === 'PAID')
+                    .reduce((sum, i) => sum + Number(i.amount), 0);
+                const newRemaining = totalLoan - totalPaid;
+
+                await prisma.loan.update({
+                    where: { id: loan.id },
+                    data: {
+                        remainingAmount: Math.max(0, newRemaining),
+                        status: newRemaining <= 0 ? 'COMPLETED' : loan.status
+                    }
+                });
+
+                console.log(`[PaymentReceipts] Loan ${loan.id} updated: remainingAmount = R$ ${newRemaining.toFixed(2)}`);
+            }
 
             // Criar transação de entrada
             await prisma.transaction.create({
@@ -161,50 +194,116 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
                     date: new Date()
                 }
             }).catch(() => {});
-
-            console.log(`[PaymentReceipts] Loan ${loan.id} updated: remainingAmount = R$ ${newRemaining.toFixed(2)} (was R$ ${loan.remainingAmount.toFixed(2)}), totalPaid = R$ ${totalPaid.toFixed(2)}`);
         }
 
         // Busca dados do cliente
         const customer = await prisma.customer.findUnique({ where: { id: receipt.customerId } });
 
-        if (customer) {
+        if (customer && loan) {
+            // ====== GERAR RECIBO OU QUITAÇÃO ======
+            try {
+                const { generateReceiptHTML, generateDischargeHTML, saveDocument, getCompanySettings } = await import('../services/documentService');
+                const settings = await getCompanySettings();
+
+                if (isDischarge) {
+                    // Calcular total pago para quitação
+                    const totalPaidForDischarge = loan.installments
+                        .reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+
+                    // Gerar declaração de quitação
+                    const dischargeHTML = generateDischargeHTML({
+                        loan,
+                        customer,
+                        settings,
+                        totalPaid: totalPaidForDischarge
+                    });
+
+                    await saveDocument({
+                        type: 'DISCHARGE',
+                        customerId: customer.id,
+                        loanId: loan.id,
+                        title: `Declaração de Quitação - Contrato #${loan.id.substring(0, 8)}`,
+                        htmlContent: dischargeHTML,
+                        amount: Number(receipt.amount),
+                        metadata: { receiptId: receipt.id }
+                    });
+
+                    // Enviar email de quitação
+                    const { sendDischargeEmail } = await import('../services/emailService');
+                    await sendDischargeEmail({
+                        email: customer.email,
+                        name: customer.name,
+                        dischargeHTML,
+                        loanAmount: Number(loan.principalAmount)
+                    });
+
+                    console.log(`[PaymentReceipts] ✅ Quitação gerada e enviada para ${customer.email}`);
+                } else {
+                    // Gerar recibo de pagamento
+                    const receiptHTML = generateReceiptHTML({
+                        receipt,
+                        installment,
+                        loan,
+                        customer,
+                        settings
+                    });
+
+                    await saveDocument({
+                        type: 'RECEIPT',
+                        customerId: customer.id,
+                        loanId: loan.id,
+                        installmentId: installment.id,
+                        title: `Recibo de Pagamento #${receipt.id.substring(0, 8)}`,
+                        htmlContent: receiptHTML,
+                        amount: Number(receipt.amount),
+                        metadata: { installmentNumber: loan.installments.findIndex(i => i.id === installment.id) + 1 }
+                    });
+
+                    // Enviar email de recibo
+                    const { sendReceiptEmail } = await import('../services/emailService');
+                    await sendReceiptEmail({
+                        email: customer.email,
+                        name: customer.name,
+                        receiptHTML,
+                        amount: Number(receipt.amount),
+                        remainingBalance: Number(loan.remainingAmount)
+                    });
+
+                    console.log(`[PaymentReceipts] ✅ Recibo gerado e enviado para ${customer.email}`);
+                }
+            } catch (docError: any) {
+                console.error('[PaymentReceipts] Erro ao gerar documento:', docError.message);
+            }
+
             // Notificação interna
             await prisma.notification.create({
                 data: {
                     customerId: customer.id,
                     customerEmail: customer.email,
-                    title: '✅ Pagamento Confirmado',
-                    message: `Seu pagamento de R$ ${Number(receipt.amount).toFixed(2)} foi confirmado!`,
+                    title: isDischarge ? '🎉 Contrato Quitado' : '✅ Pagamento Confirmado',
+                    message: isDischarge
+                        ? `Parabéns! Seu contrato foi quitado!`
+                        : `Seu pagamento de R$ ${Number(receipt.amount).toFixed(2)} foi confirmado!`,
                     type: 'SUCCESS'
                 }
             }).catch(() => {});
 
-            // Email
-            if (customer.email) {
-                emailService.send(customer.email, '✅ Pagamento Confirmado — Tubarão Empréstimos',
-                    `<div style="font-family:Arial;max-width:600px;margin:0 auto;background:#000;color:#fff;padding:30px;border-radius:12px;">
-                    <h1 style="color:#D4AF37;text-align:center;">🦈 Tubarão Empréstimos</h1>
-                    <h2 style="color:#4CAF50;">Pagamento Confirmado!</h2>
-                    <p style="color:#ccc;">Olá, <strong>${customer.name}</strong>!</p>
-                    <p style="color:#ccc;">Seu pagamento de <strong style="color:#4CAF50;">R$ ${Number(receipt.amount).toFixed(2)}</strong> foi confirmado com sucesso.</p>
-                    <div style="text-align:center;margin:20px 0;">
-                        <a href="https://www.tubaraoemprestimo.com.br" style="background:#D4AF37;color:#000;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:bold;">Acessar App</a>
-                    </div>
-                    </div>`
-                ).catch(() => {});
-            }
-
             // WhatsApp
             if (customer.phone) {
-                sendWhatsAppMessage(customer.phone,
-                    `✅ *Pagamento Confirmado!*\n\nOlá, ${customer.name.split(' ')[0]}!\n\nSeu pagamento de R$ ${Number(receipt.amount).toFixed(2)} foi confirmado.\n\nAcesse o app para acompanhar suas parcelas.\n\n_Tubarão Empréstimos 🦈_`
-                ).catch(() => {});
+                const waMsg = isDischarge
+                    ? `🎉 *CONTRATO QUITADO!*\n\nParabéns, ${customer.name.split(' ')[0]}!\n\nSeu contrato foi quitado com sucesso! 🎊\n\nAcesse o app para ver sua declaração de quitação.\n\n_Tubarão Empréstimos 🦈_`
+                    : `✅ *Pagamento Confirmado!*\n\nOlá, ${customer.name.split(' ')[0]}!\n\nSeu pagamento de R$ ${Number(receipt.amount).toFixed(2)} foi confirmado.\n\nAcesse o app para ver seu recibo.\n\n_Tubarão Empréstimos 🦈_`;
+
+                sendWhatsAppMessage(customer.phone, waMsg).catch(() => {});
             }
 
             // Push
             if (customer.userId) {
-                sendPushToUser(customer.userId, '✅ Pagamento Confirmado', `Seu pagamento de R$ ${Number(receipt.amount).toFixed(2)} foi confirmado!`).catch(() => {});
+                sendPushToUser(
+                    customer.userId,
+                    isDischarge ? '🎉 Contrato Quitado' : '✅ Pagamento Confirmado',
+                    isDischarge ? 'Parabéns! Seu contrato foi quitado!' : `Seu pagamento de R$ ${Number(receipt.amount).toFixed(2)} foi confirmado!`
+                ).catch(() => {});
             }
         }
 

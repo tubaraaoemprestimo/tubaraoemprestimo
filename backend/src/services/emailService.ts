@@ -348,3 +348,305 @@ export async function sendLoanWelcomeEmail({ email, name, password, loanAmount, 
         return false;
     }
 }
+
+// ============================================================
+// EMAILS PARA DOCUMENTOS GERADOS (Contratos, Recibos, Quitações)
+// ============================================================
+
+interface SendContractEmailParams {
+    email: string;
+    name: string;
+    contractHTML: string;
+    loanAmount: number;
+    installments: number;
+}
+
+export async function sendContractEmail({ email, name, contractHTML, loanAmount, installments }: SendContractEmailParams): Promise<boolean> {
+    try {
+        if (!process.env.RESEND_API_KEY) {
+            console.error('[Resend] RESEND_API_KEY não configurada');
+            return false;
+        }
+
+        const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        const { data, error } = await resend.emails.send({
+            from: 'Tubarão Empréstimos <noreply@tubaraoemprestimo.com.br>',
+            to: [email],
+            subject: '📄 Seu Contrato de Empréstimo - Tubarão Empréstimos',
+            html: `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contrato de Empréstimo</title>
+</head>
+<body style="margin:0;padding:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:#0a0a0a;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0a;padding:40px 20px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#1a1a1a 0%,#0d0d0d 100%);border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(212,175,55,0.15);">
+
+    <!-- Header -->
+    <tr>
+        <td style="background:linear-gradient(135deg,#D4AF37 0%,#C5A028 100%);padding:36px 30px;text-align:center;">
+            <h1 style="margin:0;color:#000;font-size:30px;font-weight:bold;letter-spacing:2px;">🦈 TUBARÃO EMPRÉSTIMOS</h1>
+            <p style="margin:8px 0 0 0;color:#1a1a1a;font-size:13px;font-weight:600;letter-spacing:1px;">CONTRATO DE EMPRÉSTIMO</p>
+        </td>
+    </tr>
+
+    <!-- Conteúdo -->
+    <tr>
+        <td style="padding:40px 40px 20px 40px;">
+            <h2 style="margin:0 0 16px 0;color:#D4AF37;font-size:24px;text-align:center;">Contrato Ativado! 🎉</h2>
+            <p style="margin:0 0 20px 0;color:#c0c0c0;font-size:15px;line-height:1.8;text-align:center;">
+                Olá, <strong style="color:#fff;">${name}</strong>!
+            </p>
+            <p style="margin:0 0 20px 0;color:#c0c0c0;font-size:15px;line-height:1.8;">
+                Seu contrato de empréstimo foi ativado com sucesso! Abaixo você encontra o documento completo para seus registros.
+            </p>
+
+            <div style="background-color:#1a1a1a;border:1px solid #333;border-radius:10px;padding:20px;margin:0 0 30px 0;text-align:center;">
+                <p style="margin:0 0 6px 0;color:#999;font-size:13px;">Valor do Empréstimo</p>
+                <p style="margin:0;color:#D4AF37;font-size:28px;font-weight:bold;">${formatBRL(loanAmount)}</p>
+                <p style="margin:8px 0 0 0;color:#aaa;font-size:13px;">Parcelado em <strong style="color:#fff;">${installments}x</strong></p>
+            </div>
+
+            <div style="background-color:#0f1a0f;border:1px solid #2a4a2a;border-radius:10px;padding:20px 24px;margin:0 0 28px 0;">
+                <h4 style="margin:0 0 12px 0;color:#4caf50;font-size:15px;">📄 Seu Contrato</h4>
+                <p style="margin:0 0 12px 0;color:#c0c0c0;font-size:14px;line-height:1.7;">
+                    O contrato completo está anexado abaixo. Guarde este documento para seus registros.
+                </p>
+            </div>
+
+            <!-- Contrato inline -->
+            <div style="background:#fff;padding:20px;border-radius:8px;margin:0 0 28px 0;">
+                ${contractHTML}
+            </div>
+
+            <p style="margin:0;color:#888;font-size:13px;line-height:1.7;text-align:center;">
+                Dúvidas? Entre em contato conosco pelo WhatsApp ou app.<br>
+                Estamos aqui para ajudar! 🦈
+            </p>
+        </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+        <td style="background-color:#0d0d0d;padding:24px 30px;text-align:center;border-top:1px solid #333;">
+            <p style="margin:0 0 6px 0;color:#D4AF37;font-size:16px;font-weight:bold;">🦈 Tubarão Empréstimos LTDA</p>
+            <p style="margin:0;color:#555;font-size:12px;">© ${new Date().getFullYear()} Todos os direitos reservados.</p>
+        </td>
+    </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>
+            `.trim(),
+        });
+
+        if (error) {
+            console.error('[Resend] Erro ao enviar contrato:', error);
+            return false;
+        }
+
+        console.log(`[Resend] ✅ Contrato enviado para ${email} (ID: ${data?.id})`);
+        return true;
+    } catch (error: any) {
+        console.error('[Resend] Erro ao enviar contrato:', error.message);
+        return false;
+    }
+}
+
+interface SendReceiptEmailParams {
+    email: string;
+    name: string;
+    receiptHTML: string;
+    amount: number;
+    remainingBalance: number;
+}
+
+export async function sendReceiptEmail({ email, name, receiptHTML, amount, remainingBalance }: SendReceiptEmailParams): Promise<boolean> {
+    try {
+        if (!process.env.RESEND_API_KEY) {
+            console.error('[Resend] RESEND_API_KEY não configurada');
+            return false;
+        }
+
+        const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        const { data, error } = await resend.emails.send({
+            from: 'Tubarão Empréstimos <noreply@tubaraoemprestimo.com.br>',
+            to: [email],
+            subject: '✅ Recibo de Pagamento - Tubarão Empréstimos',
+            html: `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recibo de Pagamento</title>
+</head>
+<body style="margin:0;padding:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:#0a0a0a;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0a;padding:40px 20px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#1a1a1a 0%,#0d0d0d 100%);border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(212,175,55,0.15);">
+
+    <tr>
+        <td style="background:linear-gradient(135deg,#4caf50 0%,#388e3c 100%);padding:36px 30px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:30px;font-weight:bold;letter-spacing:2px;">✅ PAGAMENTO CONFIRMADO</h1>
+            <p style="margin:8px 0 0 0;color:#e8f5e9;font-size:13px;font-weight:600;letter-spacing:1px;">RECIBO DE PAGAMENTO</p>
+        </td>
+    </tr>
+
+    <tr>
+        <td style="padding:40px 40px 20px 40px;">
+            <h2 style="margin:0 0 16px 0;color:#4caf50;font-size:24px;text-align:center;">Pagamento Recebido! 🎉</h2>
+            <p style="margin:0 0 20px 0;color:#c0c0c0;font-size:15px;line-height:1.8;text-align:center;">
+                Olá, <strong style="color:#fff;">${name}</strong>!
+            </p>
+
+            <div style="background-color:#1a1a1a;border:1px solid #4caf50;border-radius:10px;padding:20px;margin:0 0 20px 0;text-align:center;">
+                <p style="margin:0 0 6px 0;color:#999;font-size:13px;">Valor Pago</p>
+                <p style="margin:0;color:#4caf50;font-size:28px;font-weight:bold;">${formatBRL(amount)}</p>
+                <p style="margin:12px 0 0 0;color:#aaa;font-size:13px;">Saldo Devedor: <strong style="color:#D4AF37;">${formatBRL(remainingBalance)}</strong></p>
+            </div>
+
+            <div style="background:#fff;padding:20px;border-radius:8px;margin:0 0 28px 0;">
+                ${receiptHTML}
+            </div>
+
+            <p style="margin:0;color:#888;font-size:13px;line-height:1.7;text-align:center;">
+                Guarde este recibo para seus registros. 🦈
+            </p>
+        </td>
+    </tr>
+
+    <tr>
+        <td style="background-color:#0d0d0d;padding:24px 30px;text-align:center;border-top:1px solid #333;">
+            <p style="margin:0 0 6px 0;color:#D4AF37;font-size:16px;font-weight:bold;">🦈 Tubarão Empréstimos LTDA</p>
+            <p style="margin:0;color:#555;font-size:12px;">© ${new Date().getFullYear()} Todos os direitos reservados.</p>
+        </td>
+    </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>
+            `.trim(),
+        });
+
+        if (error) {
+            console.error('[Resend] Erro ao enviar recibo:', error);
+            return false;
+        }
+
+        console.log(`[Resend] ✅ Recibo enviado para ${email} (ID: ${data?.id})`);
+        return true;
+    } catch (error: any) {
+        console.error('[Resend] Erro ao enviar recibo:', error.message);
+        return false;
+    }
+}
+
+interface SendDischargeEmailParams {
+    email: string;
+    name: string;
+    dischargeHTML: string;
+    loanAmount: number;
+}
+
+export async function sendDischargeEmail({ email, name, dischargeHTML, loanAmount }: SendDischargeEmailParams): Promise<boolean> {
+    try {
+        if (!process.env.RESEND_API_KEY) {
+            console.error('[Resend] RESEND_API_KEY não configurada');
+            return false;
+        }
+
+        const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        const { data, error } = await resend.emails.send({
+            from: 'Tubarão Empréstimos <noreply@tubaraoemprestimo.com.br>',
+            to: [email],
+            subject: '🎉 Contrato Quitado - Declaração de Quitação',
+            html: `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Declaração de Quitação</title>
+</head>
+<body style="margin:0;padding:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:#0a0a0a;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0a;padding:40px 20px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#1a1a1a 0%,#0d0d0d 100%);border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(212,175,55,0.15);">
+
+    <tr>
+        <td style="background:linear-gradient(135deg,#D4AF37 0%,#C5A028 100%);padding:36px 30px;text-align:center;">
+            <h1 style="margin:0;color:#000;font-size:36px;font-weight:bold;">🎉</h1>
+            <h1 style="margin:8px 0 0 0;color:#000;font-size:28px;font-weight:bold;letter-spacing:2px;">CONTRATO QUITADO</h1>
+            <p style="margin:8px 0 0 0;color:#1a1a1a;font-size:13px;font-weight:600;letter-spacing:1px;">DECLARAÇÃO DE QUITAÇÃO</p>
+        </td>
+    </tr>
+
+    <tr>
+        <td style="padding:40px 40px 20px 40px;">
+            <h2 style="margin:0 0 16px 0;color:#D4AF37;font-size:24px;text-align:center;">Parabéns, ${name}! 🎊</h2>
+            <p style="margin:0 0 20px 0;color:#c0c0c0;font-size:15px;line-height:1.8;text-align:center;">
+                Seu contrato foi <strong style="color:#4caf50;">quitado com sucesso</strong>!
+            </p>
+
+            <div style="background-color:#1a1a1a;border:2px solid #4caf50;border-radius:10px;padding:20px;margin:0 0 30px 0;text-align:center;">
+                <p style="margin:0 0 6px 0;color:#999;font-size:13px;">Valor Total Quitado</p>
+                <p style="margin:0;color:#4caf50;font-size:32px;font-weight:bold;">${formatBRL(loanAmount)}</p>
+                <p style="margin:12px 0 0 0;color:#4caf50;font-size:16px;font-weight:bold;">✅ SALDO ZERADO</p>
+            </div>
+
+            <div style="background-color:#0f1a0f;border:1px solid #2a4a2a;border-radius:10px;padding:20px 24px;margin:0 0 28px 0;">
+                <h4 style="margin:0 0 12px 0;color:#4caf50;font-size:15px;">📄 Sua Declaração de Quitação</h4>
+                <p style="margin:0;color:#c0c0c0;font-size:14px;line-height:1.7;">
+                    Este documento comprova que seu contrato foi quitado integralmente. Guarde-o para seus registros.
+                </p>
+            </div>
+
+            <div style="background:#fff;padding:20px;border-radius:8px;margin:0 0 28px 0;">
+                ${dischargeHTML}
+            </div>
+
+            <p style="margin:0;color:#888;font-size:13px;line-height:1.7;text-align:center;">
+                Obrigado pela confiança! Conte conosco sempre que precisar. 🦈
+            </p>
+        </td>
+    </tr>
+
+    <tr>
+        <td style="background-color:#0d0d0d;padding:24px 30px;text-align:center;border-top:1px solid #333;">
+            <p style="margin:0 0 6px 0;color:#D4AF37;font-size:16px;font-weight:bold;">🦈 Tubarão Empréstimos LTDA</p>
+            <p style="margin:0;color:#555;font-size:12px;">© ${new Date().getFullYear()} Todos os direitos reservados.</p>
+        </td>
+    </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>
+            `.trim(),
+        });
+
+        if (error) {
+            console.error('[Resend] Erro ao enviar quitação:', error);
+            return false;
+        }
+
+        console.log(`[Resend] ✅ Quitação enviada para ${email} (ID: ${data?.id})`);
+        return true;
+    } catch (error: any) {
+        console.error('[Resend] Erro ao enviar quitação:', error.message);
+        return false;
+    }
+}

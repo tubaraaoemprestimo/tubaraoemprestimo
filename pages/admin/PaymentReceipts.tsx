@@ -18,6 +18,7 @@ export const PaymentReceipts: React.FC = () => {
     const [selectedReceipt, setSelectedReceipt] = useState<PaymentReceipt | null>(null);
     const [rejectionReason, setRejectionReason] = useState('');
     const [processing, setProcessing] = useState<string | null>(null);
+    const [isDischarge, setIsDischarge] = useState(false);
 
     useEffect(() => {
         loadReceipts();
@@ -56,7 +57,7 @@ export const PaymentReceipts: React.FC = () => {
     const handleApprove = async (receipt: PaymentReceipt) => {
         setProcessing(receipt.id);
         try {
-            await api.put(`/finance/receipts/${receipt.id}/approve`, {});
+            await api.put(`/finance/receipts/${receipt.id}/approve`, { isDischarge });
 
             // Enviar notificação e atualizar score
             try {
@@ -68,8 +69,9 @@ export const PaymentReceipts: React.FC = () => {
                 );
             } catch { /* notification optional */ }
 
-            addToast('Pagamento aprovado! Parcela baixada.', 'success');
+            addToast(isDischarge ? 'Contrato quitado com sucesso!' : 'Pagamento aprovado! Parcela baixada.', 'success');
             setSelectedReceipt(null);
+            setIsDischarge(false);
             loadReceipts();
         } catch (err) {
             console.error('Error approving:', err);
@@ -318,6 +320,22 @@ export const PaymentReceipts: React.FC = () => {
                                         />
                                     </div>
 
+                                    {/* Checkbox Quitação Total */}
+                                    <div className="bg-black border border-zinc-700 rounded-lg p-4">
+                                        <label className="flex items-center gap-3 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={isDischarge}
+                                                onChange={(e) => setIsDischarge(e.target.checked)}
+                                                className="w-5 h-5 rounded border-zinc-600 text-[#D4AF37] focus:ring-[#D4AF37] focus:ring-offset-0 bg-zinc-800"
+                                            />
+                                            <div>
+                                                <p className="text-white font-semibold">✅ Quitação Total</p>
+                                                <p className="text-xs text-zinc-400">Marque se este pagamento quita o contrato completamente</p>
+                                            </div>
+                                        </label>
+                                    </div>
+
                                     <div className="flex gap-4">
                                         <Button
                                             variant="danger"
@@ -332,7 +350,7 @@ export const PaymentReceipts: React.FC = () => {
                                             onClick={() => handleApprove(selectedReceipt)}
                                             isLoading={processing === selectedReceipt.id}
                                         >
-                                            <Check size={18} /> Aprovar Pagamento
+                                            <Check size={18} /> {isDischarge ? 'Quitar Contrato' : 'Aprovar Pagamento'}
                                         </Button>
                                     </div>
                                 </div>

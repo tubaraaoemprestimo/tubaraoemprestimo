@@ -136,19 +136,26 @@ export const MyDocuments: React.FC = () => {
         loadDocuments();
     }, []);
 
-    const loadDocuments = () => {
-        const user = apiService.auth.getUser();
-        if (user) {
-            const allDocs = contractService.getDocuments(user.id);
-            setDocuments(allDocs);
+    const loadDocuments = async () => {
+        try {
+            const docs = await apiService.getDocuments();
+            setDocuments(docs);
+        } catch (error) {
+            console.error('Erro ao carregar documentos:', error);
+            addToast('Erro ao carregar documentos', 'error');
         }
     };
 
-    const handlePreview = (doc: GeneratedDocument) => {
-        const html = contractService.generateDocumentHTML(doc, brandSettings);
-        setPreviewHTML(html);
-        setSelectedDoc(doc);
-        setIsPreviewOpen(true);
+    const handlePreview = async (doc: GeneratedDocument) => {
+        try {
+            const fullDoc = await apiService.getDocument(doc.id);
+            setPreviewHTML(fullDoc.html_content);
+            setSelectedDoc(fullDoc);
+            setIsPreviewOpen(true);
+        } catch (error) {
+            console.error('Erro ao carregar documento:', error);
+            addToast('Erro ao carregar documento', 'error');
+        }
     };
 
     const handleSign = (doc: GeneratedDocument) => {

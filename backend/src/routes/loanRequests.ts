@@ -1032,6 +1032,53 @@ loanRequestsRouter.post('/:id/activate-contract', requireAdmin, async (req: Requ
             }
         }).catch(() => { });
 
+        // ====== GERAR CONTRATO AUTOMATICAMENTE ======
+        try {
+            const { generateContractHTML, saveDocument, getCompanySettings } = await import('../services/documentService');
+            const settings = await getCompanySettings();
+
+            const customer = await prisma.customer.findUnique({
+                where: { id: request.customerId! }
+            });
+
+            if (customer) {
+                const contractHTML = generateContractHTML({
+                    loan,
+                    customer,
+                    loanRequest: request,
+                    settings
+                });
+
+                await saveDocument({
+                    type: 'CONTRACT',
+                    customerId: customer.id,
+                    loanId: loan.id,
+                    title: `Contrato de Empréstimo #${loan.id.substring(0, 8)}`,
+                    htmlContent: contractHTML,
+                    amount: parseFloat(principalAmount),
+                    metadata: {
+                        installments: parseInt(totalInstallments),
+                        interestRate: interestRate || 0,
+                        firstPaymentDate: firstPaymentDate
+                    }
+                });
+
+                // Enviar contrato por email
+                const { sendContractEmail } = await import('../services/emailService');
+                await sendContractEmail({
+                    email: request.email,
+                    name: request.clientName,
+                    contractHTML,
+                    loanAmount: parseFloat(principalAmount),
+                    installments: parseInt(totalInstallments)
+                });
+
+                console.log(`[LoanRequests] ✅ Contrato gerado e enviado para ${request.email}`);
+            }
+        } catch (docError: any) {
+            console.error('[LoanRequests] Erro ao gerar contrato:', docError.message);
+        }
+
         res.json({ success: true, loanId: loan.id });
     } catch (error: any) {
         console.error('[LoanRequests] Activate contract error:', error);
