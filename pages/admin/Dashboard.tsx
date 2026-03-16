@@ -23,6 +23,7 @@ export const Dashboard: React.FC = () => {
   const [viewMode, setViewMode] = useState<'standard' | 'advanced'>('advanced');
   const [settings, setSettings] = useState<{ monthlyInterestRate: number }>({ monthlyInterestRate: 5 });
   const [counterOfferStats, setCounterOfferStats] = useState<any>(null);
+  const [activeLoansCount, setActiveLoansCount] = useState<number>(0);
 
   useEffect(() => {
     loadData();
@@ -35,6 +36,12 @@ export const Dashboard: React.FC = () => {
     ]);
     setAllRequests(reqs);
     setSettings(sett);
+
+    // Active loans count
+    try {
+      const loans = await apiService.getAdminLoans({ status: 'ACTIVE' });
+      setActiveLoansCount(Array.isArray(loans) ? loans.length : 0);
+    } catch {}
 
     // Load counteroffer analytics
     try {
@@ -261,7 +268,7 @@ export const Dashboard: React.FC = () => {
               {/* KPI Cards - Dados reais */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                 <KPICard title="Total Emprestado" value={totalLent} prefix="R$" icon={DollarSign} trend={lentTrend} />
-                <KPICard title="Clientes Ativos" value={activeClients} icon={Users} trend={`${pendingRequests.length} pendentes`} />
+                <KPICard title="Contratos Ativos" value={activeLoansCount} icon={Users} trend={`${pendingRequests.length} pendentes`} />
                 <KPICard title="Inadimplência" value={defaultRate} suffix="%" icon={AlertTriangle} trend={`${defaultedRequests.length} casos`} isBad={defaultRate > 10} />
                 <KPICard title="Receita Projetada" value={projectedRevenue} prefix="R$" icon={TrendingUp} trend={`${settings.monthlyInterestRate}% a.m.`} />
               </div>

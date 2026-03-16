@@ -204,6 +204,11 @@ export interface Customer {
   // Código de indicação único do cliente
   referralCode?: string;
 
+  // Origem do cadastro
+  source?: string;
+  source_detail?: string;
+  loanRequestsCount?: number;
+
   // Oferta de parcelamento enviada pelo admin
   installmentOffer?: {
     amount: number;

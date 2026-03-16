@@ -50,7 +50,7 @@ export const Customers: React.FC = () => {
 
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'BLOCKED'>('ALL');
   const [originFilter, setOriginFilter] = useState<'ALL' | 'IMPORTED' | 'ORGANIC'>('ALL');
-  const [clientTypeFilter, setClientTypeFilter] = useState<'ALL' | 'NEVER_REQUESTED' | 'ACTIVE_CLIENTS' | 'INACTIVE_CLIENTS'>('ALL');
+  const [clientTypeFilter, setClientTypeFilter] = useState<'ALL' | 'NEVER_REQUESTED' | 'ACTIVE_CLIENTS' | 'INACTIVE_CLIENTS' | 'WHATSAPP'>('ALL');
 
   // History Modal
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
@@ -92,10 +92,12 @@ export const Customers: React.FC = () => {
     const neverRequested = (c.loanRequestsCount || 0) === 0;
     const isActiveClient = (c.activeLoansCount || 0) > 0;
     const isInactiveClient = (c.loanRequestsCount || 0) > 0 && (c.activeLoansCount || 0) === 0;
+    const isWhatsappOnboarding = c.source === 'WHATSAPP_ONBOARDING';
     const matchesClientType = clientTypeFilter === 'ALL' ||
       (clientTypeFilter === 'NEVER_REQUESTED' && neverRequested) ||
       (clientTypeFilter === 'ACTIVE_CLIENTS' && isActiveClient) ||
-      (clientTypeFilter === 'INACTIVE_CLIENTS' && isInactiveClient);
+      (clientTypeFilter === 'INACTIVE_CLIENTS' && isInactiveClient) ||
+      (clientTypeFilter === 'WHATSAPP' && isWhatsappOnboarding);
 
     return matchesText && matchesStatus && matchesOrigin && matchesClientType;
   });
@@ -103,6 +105,7 @@ export const Customers: React.FC = () => {
   const neverRequestedCount = customers.filter(c => (c.loanRequestsCount || 0) === 0).length;
   const activeClientsCount = customers.filter(c => (c.activeLoansCount || 0) > 0).length;
   const inactiveClientsCount = customers.filter(c => (c.loanRequestsCount || 0) > 0 && (c.activeLoansCount || 0) === 0).length;
+  const whatsappOnboardingCount = customers.filter(c => c.source === 'WHATSAPP_ONBOARDING').length;
 
   const totalImported = customers.filter(c => c.email.includes('@whatsapp.lead')).length;
 
@@ -672,6 +675,9 @@ export const Customers: React.FC = () => {
               </button>
               <button onClick={() => setClientTypeFilter('INACTIVE_CLIENTS')} className={`px-3 py-1 rounded-md text-sm transition-colors ${clientTypeFilter === 'INACTIVE_CLIENTS' ? 'bg-zinc-600 text-white font-bold' : 'text-zinc-400 hover:text-white'}`} title="Já solicitou mas sem contrato ativo">
                 Histórico <span className="text-xs opacity-70">({inactiveClientsCount})</span>
+              </button>
+              <button onClick={() => setClientTypeFilter('WHATSAPP')} className={`px-3 py-1 rounded-md text-sm transition-colors ${clientTypeFilter === 'WHATSAPP' ? 'bg-green-700 text-white font-bold' : 'text-zinc-400 hover:text-white'}`} title="Cadastrados via WhatsApp automatico">
+                📱 WhatsApp <span className="text-xs opacity-70">({whatsappOnboardingCount})</span>
               </button>
             </div>
             <div className="flex bg-zinc-900 rounded-lg p-1 border border-zinc-800">
