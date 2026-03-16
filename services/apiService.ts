@@ -648,6 +648,18 @@ export const apiService = {
         return data;
     },
 
+    async startWhatsappOnboarding(phone: string) {
+        const { data, error } = await api.post('/whatsapp-onboarding/start', { phone });
+        if (error) throw new Error(error.error || 'Erro ao iniciar onboarding');
+        return data;
+    },
+
+    async getOnboardingSessions() {
+        const { data, error } = await api.get('/whatsapp-onboarding/sessions');
+        if (error) throw new Error(error.error || 'Erro ao listar sessões');
+        return data;
+    },
+
     async toggleCustomerStatus(id: string, status: string) {
         const { data, error } = await api.put(`/customers/${id}/status`, { status });
         if (error) throw new Error(error.error || 'Erro');

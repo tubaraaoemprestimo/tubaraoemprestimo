@@ -1,7 +1,7 @@
 ﻿
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings, Calendar, RotateCcw, Calculator, Edit2, Trash2, Gift, Upload, UserPlus, Save, Key } from 'lucide-react';
+import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings, Calendar, RotateCcw, Calculator, Edit2, Trash2, Gift, Upload, UserPlus, Save, Key, Smartphone } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 import { whatsappService } from '../../services/whatsappService';
 import { dataEnrichmentService } from '../../services/dataEnrichmentService';
@@ -56,6 +56,11 @@ export const Customers: React.FC = () => {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [historyCustomer, setHistoryCustomer] = useState<any>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  // WhatsApp Onboarding Modal
+  const [onboardingModalOpen, setOnboardingModalOpen] = useState(false);
+  const [onboardingPhone, setOnboardingPhone] = useState('');
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
 
   // Edit Customer Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -598,6 +603,22 @@ export const Customers: React.FC = () => {
     }
   };
 
+  const handleStartOnboarding = async () => {
+    const phone = onboardingPhone.replace(/\D/g, '');
+    if (phone.length < 10) { addToast('Telefone inválido. Informe DDD + número.', 'error'); return; }
+    setOnboardingLoading(true);
+    try {
+      await apiService.startWhatsappOnboarding(phone);
+      addToast('Onboarding iniciado! O cliente receberá a mensagem agora.', 'success');
+      setOnboardingModalOpen(false);
+      setOnboardingPhone('');
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao iniciar onboarding.', 'error');
+    } finally {
+      setOnboardingLoading(false);
+    }
+  };
+
   const handleUndoSync = async () => {
     if (!confirm('ATENÇÃO: Deseja apagar TODOS os contatos importados do WhatsApp? Esta ação não pode ser desfeita.')) return;
 
@@ -676,6 +697,9 @@ export const Customers: React.FC = () => {
                 className="w-full md:w-80 bg-zinc-900 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-white focus:border-[#D4AF37] outline-none"
               />
             </div>
+            <Button onClick={() => setOnboardingModalOpen(true)} variant="secondary" className="w-full md:w-auto bg-green-900/30 text-green-400 border border-green-700 hover:bg-green-900/50" title="Cadastrar cliente antigo via WhatsApp">
+              <Smartphone size={18} className="mr-2" /> Cadastrar via WhatsApp
+            </Button>
             <Button onClick={() => fileInputRef.current?.click()} variant="secondary" className="w-full md:w-auto bg-blue-900/20 text-blue-500 border border-blue-900/50 hover:bg-blue-900/30">
               <Upload size={18} className="mr-2" /> Importar
             </Button>
@@ -1414,6 +1438,72 @@ export const Customers: React.FC = () => {
               ) : (
                 <div className="text-center text-zinc-500 py-12">Nenhum dado encontrado.</div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ===== MODAL: ONBOARDING VIA WHATSAPP ===== */}
+      {onboardingModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-md p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-green-900/30 p-2 rounded-xl">
+                  <Smartphone size={24} className="text-green-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Cadastrar Cliente via WhatsApp</h2>
+                  <p className="text-xs text-zinc-400">O sistema irá enviar as perguntas automaticamente</p>
+                </div>
+              </div>
+              <button onClick={() => setOnboardingModalOpen(false)} className="text-zinc-500 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 space-y-2 text-sm text-zinc-300">
+              <p className="font-bold text-white">Como funciona:</p>
+              <ol className="list-decimal list-inside space-y-1 text-zinc-400">
+                <li>Você informa o WhatsApp do cliente</li>
+                <li>O sistema envia as perguntas automaticamente</li>
+                <li>Cliente responde: nome, e-mail, CPF, valor emprestado, juros, pago, devedor e vencimento</li>
+                <li>Sistema cria a conta e envia a senha por e-mail</li>
+                <li>Cliente acessa o sistema para acompanhar tudo</li>
+              </ol>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-zinc-300">WhatsApp do Cliente (com DDD)</label>
+              <input
+                type="tel"
+                value={onboardingPhone}
+                onChange={(e) => setOnboardingPhone(e.target.value)}
+                placeholder="Ex: 11999999999"
+                className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white text-xl font-bold focus:border-green-500 outline-none"
+                onKeyDown={(e) => e.key === 'Enter' && handleStartOnboarding()}
+              />
+              <p className="text-xs text-zinc-500">Apenas números com DDD. Ex: 11999999999</p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button onClick={() => setOnboardingModalOpen(false)} variant="secondary" className="flex-1">
+                Cancelar
+              </Button>
+              <button
+                onClick={handleStartOnboarding}
+                disabled={onboardingLoading}
+                className="flex-1 bg-green-600 hover:bg-green-500 disabled:bg-zinc-700 text-white font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                {onboardingLoading ? (
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : (
+                  <Smartphone size={18} />
+                )}
+                {onboardingLoading ? 'Enviando...' : 'Iniciar Cadastro'}
+              </button>
             </div>
           </div>
         </div>
