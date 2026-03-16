@@ -129,7 +129,7 @@ export const SERVICE_TERMS = {
     INVESTIDOR: {
         title: 'Contrato de Alocação de Capital - Aceite Eletrônico',
         color: 'cyan',
-        contractIntro: 'Ao prosseguir, o INVESTIDOR declara que leu, compreendeu e concorda integralmente com os termos do Contrato de Alocação de Capital firmado com a TUBARÃO EMPRÉSTIMO LTDA (CNPJ 61.086.937/0001-16).',
+        contractIntro: 'Ao prosseguir, o INVESTIDOR declara que leu, compreendeu e concorda integralmente com os termos do Contrato de Alocação de Capital firmado com a BM SOLUCTION MARKETING LTDA (CNPJ 57.241.795/0001-47).',
         registrationFields: [
             'Nome completo / Razão social',
             'CPF ou CNPJ',

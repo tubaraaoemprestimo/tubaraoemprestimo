@@ -256,8 +256,8 @@ export function generateLimpaNomeContractHTML(
   signatureUrl: string,
   brandSettings?: { companyName?: string; cnpj?: string; logoUrl?: string | null }
 ): string {
-  const companyName = brandSettings?.companyName || 'Tubarão Empréstimos';
-  const cnpj = brandSettings?.cnpj || '00.000.000/0001-00';
+  const companyName = brandSettings?.companyName || 'BM SOLUCTION MARKETING LTDA';
+  const cnpj = brandSettings?.cnpj || '57.241.795/0001-47';
   const logo = brandSettings?.logoUrl || '/Logo.png';
   const now = new Date();
   const dateStr = now.toLocaleDateString('pt-BR');
@@ -374,8 +374,8 @@ export function generateGenericContractHTML(
   signatureUrl: string,
   brandSettings?: { companyName?: string; cnpj?: string; logoUrl?: string | null; address?: string }
 ): string {
-  const companyName = brandSettings?.companyName || 'Tubarão Empréstimos';
-  const cnpj = brandSettings?.cnpj || '00.000.000/0001-00';
+  const companyName = brandSettings?.companyName || 'BM SOLUCTION MARKETING LTDA';
+  const cnpj = brandSettings?.cnpj || '57.241.795/0001-47';
   const logo = brandSettings?.logoUrl || '/Logo.png';
   const companyAddress = brandSettings?.address || 'Av. Paulista, 1000 - São Paulo, SP';
   const now = new Date();

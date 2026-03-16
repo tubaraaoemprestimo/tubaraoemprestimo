@@ -784,8 +784,8 @@ export const documentService = {
           <div class="amount">R$ ${receipt.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
         </div>
         <div class="footer">
-          <p>${brandSettings?.companyName || 'Tubarão Empréstimos'}</p>
-          <p>CNPJ: ${brandSettings?.cnpj || '00.000.000/0001-00'}</p>
+          <p>${brandSettings?.companyName || 'BM SOLUCTION MARKETING LTDA'}</p>
+          <p>CNPJ: ${brandSettings?.cnpj || '57.241.795/0001-47'}</p>
           <p>Documento gerado em ${new Date().toLocaleString('pt-BR')}</p>
         </div>
       </body>
@@ -831,10 +831,10 @@ export const documentService = {
           efeitos legais cabíveis.</p>
         </div>
         <div class="signature">
-          <div class="signature-line">${brandSettings?.companyName || 'Tubarão Empréstimos'}</div>
+          <div class="signature-line">${brandSettings?.companyName || 'BM SOLUCTION MARKETING LTDA'}</div>
         </div>
         <div class="footer">
-          <p>CNPJ: ${brandSettings?.cnpj || '00.000.000/0001-00'}</p>
+          <p>CNPJ: ${brandSettings?.cnpj || '57.241.795/0001-47'}</p>
           <p>${brandSettings?.address || ''}</p>
           <p>Documento gerado em ${new Date().toLocaleString('pt-BR')}</p>
         </div>

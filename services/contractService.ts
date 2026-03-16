@@ -90,7 +90,7 @@ const getDefaultTemplates = (): ContractTemplateExtended[] => [
         sections: [
             {
                 title: 'IDENTIFICAÇÃO DAS PARTES',
-                content: `**CREDOR:** TUBARÃO EMPRÉSTIMOS LTDA, inscrita no CNPJ sob nº {cnpj}, com sede em {endereco_empresa}.
+                content: `**CREDOR:** BM SOLUCTION MARKETING LTDA, inscrita no CNPJ sob nº {cnpj}, com sede em {endereco_empresa}.
 
 **DEVEDOR:** {nome}, brasileiro(a), portador(a) do CPF nº {cpf}, residente e domiciliado(a) em {endereco}.`
             },
@@ -206,7 +206,7 @@ export const contractService = {
             '{primeiro_vencimento}': new Date(loan.installments[0]?.dueDate || new Date()).toLocaleDateString('pt-BR'),
             '{data}': new Date().toLocaleDateString('pt-BR'),
             '{cidade}': brandSettings?.city || 'São Paulo',
-            '{cnpj}': brandSettings?.cnpj || '00.000.000/0001-00',
+            '{cnpj}': brandSettings?.cnpj || '57.241.795/0001-47',
             '{endereco_empresa}': brandSettings?.address || 'Rua Principal, 123',
             ...customVariables
         };
@@ -284,8 +284,8 @@ export const contractService = {
     // Generate document HTML for printing/PDF
     generateDocumentHTML: (doc: GeneratedDocument, brandSettings?: any): string => {
         const logo = brandSettings?.logoUrl || '/Logo.png';
-        const companyName = brandSettings?.companyName || 'Tubarão Empréstimos';
-        const cnpj = brandSettings?.cnpj || '00.000.000/0001-00';
+        const companyName = brandSettings?.companyName || 'BM SOLUCTION MARKETING LTDA';
+        const cnpj = brandSettings?.cnpj || '57.241.795/0001-47';
 
         // Convert markdown-like content to HTML
         let htmlContent = doc.content

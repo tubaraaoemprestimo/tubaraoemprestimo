@@ -21,8 +21,8 @@ export const BrandProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     primaryColor: '#FF0000',
     secondaryColor: '#D4AF37',
     backgroundColor: '#000000',
-    companyName: 'Tubarão Empréstimos S.A.',
-    cnpj: '00.000.000/0001-00',
+    companyName: 'BM SOLUCTION MARKETING LTDA',
+    cnpj: '57.241.795/0001-47',
     address: 'Av. Paulista, 1000 - SP',
     phone: '(11) 99999-9999'
   });
