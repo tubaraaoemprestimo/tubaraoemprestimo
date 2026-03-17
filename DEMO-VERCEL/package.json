@@ -1,0 +1,19 @@
+{
+  "name": "tubarao-demo",
+  "version": "1.0.0",
+  "description": "Demo completo do sistema Tubarão Empréstimos",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "echo 'Static site - no build needed'"
+  },
+  "keywords": [
+    "emprestimos",
+    "financeiro",
+    "demo",
+    "tubarao"
+  ],
+  "author": "BM SOLUCTION MARKETING LTDA",
+  "license": "UNLICENSED",
+  "private": true
+}
