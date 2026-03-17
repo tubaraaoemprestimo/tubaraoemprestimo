@@ -114,11 +114,34 @@ function validateRequestByProfile(data: any): string | null {
         return 'Referência 2 (nome e telefone) é obrigatória.';
     }
 
-    // Todos os perfis de empréstimo/financiamento precisam de assinatura
+    // Documentos básicos obrigatórios para TODOS os perfis de empréstimo
     if (['CLT', 'AUTONOMO', 'MOTO', 'GARANTIA'].includes(profile || '')) {
+        // Selfie obrigatória
+        if (!data.selfieUrl && !data.selfie) {
+            return 'Selfie obrigatória.';
+        }
+
+        // RG frente obrigatório
+        if (!data.idCardUrl && !data.idCardFront) {
+            return 'RG frente obrigatório.';
+        }
+
+        // RG verso obrigatório
+        if (!data.idCardBackUrl && !data.idCardBack) {
+            return 'RG verso obrigatório.';
+        }
+
+        // Comprovante de endereço obrigatório
+        if (!data.proofOfAddressUrl && !data.proofAddress) {
+            return 'Comprovante de endereço obrigatório.';
+        }
+
+        // Assinatura obrigatória
         if (!data.signatureUrl && !data.signature) {
             return 'Assinatura obrigatória.';
         }
+
+        // Vídeo selfie obrigatório
         if (!data.videoSelfieUrl && !data.videoSelfie) {
             return 'Vídeo de aceite (videoSelfie) obrigatório.';
         }
@@ -128,6 +151,13 @@ function validateRequestByProfile(data: any): string | null {
     if (['CLT', 'AUTONOMO', 'GARANTIA'].includes(profile || '')) {
         if (!data.videoHouseUrl && !data.videoHouse) {
             return 'Vídeo da residência/estabelecimento (videoHouse) obrigatório.';
+        }
+    }
+
+    // CLT precisa de carteira de trabalho
+    if (profile === 'CLT') {
+        if (!data.workCardUrl && !data.workCard) {
+            return 'Carteira de trabalho obrigatória para CLT.';
         }
     }
 
