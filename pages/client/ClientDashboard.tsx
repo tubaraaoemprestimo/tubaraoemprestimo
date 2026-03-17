@@ -59,6 +59,8 @@ export const ClientDashboard: React.FC = () => {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [selectedDocFiles, setSelectedDocFiles] = useState<File[]>([]);
   const [contractPdfUrl, setContractPdfUrl] = useState<string | null>(null);
+const [pixReceiptUrl, setPixReceiptUrl] = useState<string | null>(null);
+const [isPixReceiptOpen, setIsPixReceiptOpen] = useState(false);
 const [loanHistory, setLoanHistory] = useState<LoanRequest[]>([]);
 const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
@@ -135,13 +137,19 @@ const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
     if (loans.length > 0) {
       // Calcular saldo devedor apenas de empréstimos ativos (APPROVED)
-      const activeLoans = loans.filter(l => l.status === 'APPROVED');
+      const activeLoans = loans.filter(l => l.status === 'APPROVED' || l.status === 'ACTIVE');
+
+      // Buscar comprovante PIX do primeiro empréstimo ativo
+      const activeLoanWithPix = activeLoans.find(l => l.pixReceiptUrl);
+      if (activeLoanWithPix?.pixReceiptUrl) {
+        setPixReceiptUrl(activeLoanWithPix.pixReceiptUrl);
+      }
 
       // Calcular saldo devedor total (remainingAmount já vem atualizado do backend)
       totalDebt = activeLoans.reduce((acc, curr) => acc + (curr.remainingAmount || 0), 0);
 
       // Pegar o primeiro empréstimo ativo (não quitado) para verificar elegibilidade Nível Ouro
-      const notPaidLoans = activeLoans.filter(l => l.status === 'APPROVED');
+      const notPaidLoans = activeLoans.filter(l => l.status === 'APPROVED' || l.status === 'ACTIVE');
       if (notPaidLoans.length > 0) {
         activeLoan = notPaidLoans[0].id;
       }
@@ -510,6 +518,25 @@ if (user) {
             <a href={contractPdfUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold bg-green-600 text-white px-3 py-1.5 rounded-lg shrink-0 flex items-center gap-1">
               <Download size={12} /> Baixar
             </a>
+          </div>
+        )}
+
+        {/* ── COMPROVANTE PIX DO ADMIN ── */}
+        {pixReceiptUrl && (
+          <div className="mx-4 mb-3 bg-zinc-900 border border-[#D4AF37]/30 rounded-xl p-3 flex items-center gap-3">
+            <div className="bg-[#D4AF37]/20 p-2 rounded-lg">
+              <Wallet size={18} className="text-[#D4AF37]" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-bold text-white">Comprovante de Transferência</p>
+              <p className="text-[10px] text-zinc-400 mt-0.5">PIX enviado pelo Tubarão Empréstimos</p>
+            </div>
+            <button
+              onClick={() => setIsPixReceiptOpen(true)}
+              className="text-xs font-bold bg-[#D4AF37] text-black px-3 py-1.5 rounded-lg shrink-0 flex items-center gap-1"
+            >
+              <Eye size={12} /> Ver
+            </button>
           </div>
         )}
 
@@ -1098,6 +1125,72 @@ if (user) {
                 <p>Nenhuma campanha disponível no momento.</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL COMPROVANTE PIX ── */}
+      {isPixReceiptOpen && pixReceiptUrl && (
+        <div
+          className="fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center z-[70] p-4"
+          onClick={() => setIsPixReceiptOpen(false)}
+        >
+          <div
+            className="bg-zinc-900 border border-[#D4AF37]/40 rounded-2xl w-full max-w-sm shadow-2xl animate-in zoom-in duration-200 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center">
+                  <Wallet size={16} className="text-[#D4AF37]" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Comprovante PIX</p>
+                  <p className="text-[10px] text-zinc-400">Transferência do Tubarão Empréstimos</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPixReceiptOpen(false)}
+                className="text-zinc-500 hover:text-white p-1 rounded-full hover:bg-zinc-800 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Imagem */}
+            <div className="p-4 bg-black/50">
+              <img
+                src={pixReceiptUrl}
+                alt="Comprovante de transferência PIX"
+                className="w-full rounded-xl border border-zinc-800 object-contain max-h-[60vh]"
+                onError={e => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                }}
+              />
+              <div className="hidden text-center py-8 text-zinc-500">
+                <p className="text-sm">Não foi possível carregar o comprovante.</p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-4 border-t border-zinc-800 flex gap-3">
+              <a
+                href={pixReceiptUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#D4AF37] text-black text-sm font-bold rounded-xl"
+              >
+                <Download size={16} /> Abrir / Baixar
+              </a>
+              <button
+                onClick={() => setIsPixReceiptOpen(false)}
+                className="flex-1 py-2.5 bg-zinc-800 text-white text-sm font-bold rounded-xl hover:bg-zinc-700 transition-colors"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}
