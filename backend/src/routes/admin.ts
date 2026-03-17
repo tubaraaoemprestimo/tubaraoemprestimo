@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate } from '../middleware/auth';
+import bcrypt from 'bcryptjs';
+import { sendWhatsAppMessage } from '../services/whatsapp';
 
 export const adminRouter = Router();
 
@@ -179,5 +181,110 @@ adminRouter.get('/counteroffer-analytics', authenticate, isAdmin, async (req: Re
     } catch (err) {
         console.error('[Admin] Error fetching counteroffer analytics:', err);
         res.status(500).json({ error: 'Erro ao buscar analytics de contrapropostas' });
+    }
+});
+
+// =============================================
+// ENVIO MANUAL DE ACESSO AO APP
+// =============================================
+
+// POST /api/admin/send-access — Admin envia login e senha para cliente antigo via WhatsApp
+adminRouter.post('/send-access', authenticate, isAdmin, async (req: Request, res: Response) => {
+    try {
+        const { customerId, phone, name, email, cpf } = req.body;
+
+        if (!phone || !name) {
+            return res.status(400).json({ error: 'Telefone e nome são obrigatórios' });
+        }
+
+        const cleanPhone = phone.replace(/\D/g, '');
+
+        // Verifica se já existe usuário com esse telefone ou email
+        let user = await prisma.user.findFirst({
+            where: email ? { email } : undefined
+        });
+
+        let customer = customerId
+            ? await prisma.customer.findUnique({ where: { id: customerId } })
+            : null;
+
+        // Gera senha aleatória
+        const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#';
+        const password = Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+        const hashedPassword = await bcrypt.hash(password, 12);
+
+        if (!user) {
+            // Cria usuário novo
+            const userEmail = email || `${cleanPhone}@tubarao.app`;
+            user = await prisma.user.create({
+                data: {
+                    email: userEmail,
+                    password: hashedPassword,
+                    name,
+                    phone: cleanPhone,
+                    role: 'CLIENT'
+                }
+            });
+
+            // Cria customer se não existir
+            if (!customer) {
+                customer = await prisma.customer.create({
+                    data: {
+                        userId: user.id,
+                        name,
+                        cpf: cpf ? cpf.replace(/\D/g, '') : '00000000000',
+                        email: userEmail,
+                        phone: cleanPhone,
+                        status: 'ACTIVE'
+                    }
+                });
+            }
+
+            console.log(`[Admin] Novo usuário criado: ${user.email} para ${name} (${cleanPhone})`);
+        } else {
+            // Atualiza senha do usuário existente
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { password: hashedPassword }
+            });
+            console.log(`[Admin] Senha atualizada para usuário existente: ${user.email}`);
+        }
+
+        // Envia credenciais via WhatsApp
+        const appUrl = 'https://www.tubaraoemprestimo.com.br';
+        const msg =
+            `🦈 *Tubarão Empréstimos — Acesso ao App*\n\n` +
+            `Olá, ${name}! Seu acesso ao sistema foi liberado pelo administrador.\n\n` +
+            `📱 *Acesse:* ${appUrl}\n\n` +
+            `🔑 *Suas credenciais:*\n` +
+            `• E-mail: ${user.email}\n` +
+            `• Senha: ${password}\n\n` +
+            `⚠️ Recomendamos trocar sua senha no primeiro acesso.\n\n` +
+            `_Qualquer dúvida, fale conosco aqui no WhatsApp._`;
+
+        await sendWhatsAppMessage(cleanPhone, msg);
+
+        // Notificação no banco
+        if (customer) {
+            await prisma.notification.create({
+                data: {
+                    customerId: customer.id,
+                    title: '📱 Acesso Liberado!',
+                    message: `Seu acesso ao app foi liberado. Verifique suas credenciais no WhatsApp.`,
+                    type: 'SUCCESS'
+                }
+            }).catch(() => { });
+        }
+
+        return res.json({
+            success: true,
+            message: `Acesso enviado via WhatsApp para ${cleanPhone}`,
+            email: user.email,
+            userId: user.id,
+            customerId: customer?.id
+        });
+    } catch (err: any) {
+        console.error('[Admin] Erro ao enviar acesso:', err);
+        return res.status(500).json({ error: 'Erro ao enviar acesso: ' + err.message });
     }
 });
