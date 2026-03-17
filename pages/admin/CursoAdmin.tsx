@@ -163,10 +163,10 @@ function LessonModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-zinc-900 border border-zinc-700 rounded-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-3xl bg-zinc-900 border border-zinc-700 rounded-2xl overflow-hidden my-8">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 sticky top-0 bg-zinc-900 z-10">
           <h2 className="font-black text-lg">{isEdit ? 'Editar Aula' : 'Nova Aula'}</h2>
           <button onClick={handleCancel} className="p-1.5 hover:bg-zinc-800 rounded-lg transition-all">
             <X size={18} className="text-zinc-400" />
@@ -174,7 +174,7 @@ function LessonModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
           {/* Módulo */}
           <div>
             <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
