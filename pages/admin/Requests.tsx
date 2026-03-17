@@ -71,6 +71,11 @@ export const Requests: React.FC = () => {
     });
     const [uploadingPix, setUploadingPix] = useState(false);
 
+    // Send Access Modal
+    const [isSendAccessOpen, setIsSendAccessOpen] = useState(false);
+    const [sendAccessTarget, setSendAccessTarget] = useState<LoanRequest | null>(null);
+    const [sendingAccess, setSendingAccess] = useState(false);
+
     // Editing Values
     const [isEditing, setIsEditing] = useState(false);
     const [editAmount, setEditAmount] = useState<string>('');
@@ -310,6 +315,26 @@ export const Requests: React.FC = () => {
         addToast("Solicitação de documento enviada ao cliente.", 'success');
     };
 
+    const handleSendAccess = async () => {
+        if (!sendAccessTarget) return;
+        setSendingAccess(true);
+        try {
+            await apiService.adminSendAccess({
+                phone: sendAccessTarget.phone,
+                name: sendAccessTarget.clientName,
+                email: sendAccessTarget.email,
+                cpf: sendAccessTarget.cpf,
+            });
+            addToast(`✅ Acesso enviado via WhatsApp para ${sendAccessTarget.clientName}`, 'success');
+            setIsSendAccessOpen(false);
+            setSendAccessTarget(null);
+        } catch (err: any) {
+            addToast(err.message || 'Erro ao enviar acesso', 'error');
+        } finally {
+            setSendingAccess(false);
+        }
+    };
+
     const ensureArray = (src?: string | string[]): string[] => {
         if (!src) return [];
         if (Array.isArray(src)) return src;
@@ -492,14 +517,22 @@ export const Requests: React.FC = () => {
                                             {new Date(req.date).toLocaleDateString()}
                                         </td>
                                         <td className="p-4">
-                                            <Button variant="secondary" size="sm" className="py-1 px-3" onClick={() => {
-                                                setSelectedRequest(req);
-                                                setEditAmount(String(req.amount ?? ''));
-                                                setEditInstallments(String(req.installments ?? ''));
-                                                setIsEditing(false);
-                                            }}>
-                                                <Eye size={16} className="mr-2" /> Detalhes
-                                            </Button>
+                                            <div className="flex gap-2">
+                                                <Button variant="secondary" size="sm" className="py-1 px-3" onClick={() => {
+                                                    setSelectedRequest(req);
+                                                    setEditAmount(String(req.amount ?? ''));
+                                                    setEditInstallments(String(req.installments ?? ''));
+                                                    setIsEditing(false);
+                                                }}>
+                                                    <Eye size={16} className="mr-2" /> Detalhes
+                                                </Button>
+                                                <Button variant="secondary" size="sm" className="py-1 px-3 text-blue-400 border-blue-700 hover:bg-blue-900/30" onClick={() => {
+                                                    setSendAccessTarget(req);
+                                                    setIsSendAccessOpen(true);
+                                                }}>
+                                                    <Send size={14} className="mr-1" /> Acesso
+                                                </Button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -1438,6 +1471,16 @@ export const Requests: React.FC = () => {
                                             <Check size={18} className="mr-2" /> ATIVAR CONTRATO
                                         </Button>
                                     )}
+                                    {/* Botão Anexar Comprovante - Aparece quando ACTIVE */}
+                                    {selectedRequest.status === 'ACTIVE' && (
+                                        <Button
+                                            variant="secondary"
+                                            className="w-full md:w-auto border-blue-600 text-blue-400 hover:bg-blue-900/30"
+                                            onClick={openActivationModal}
+                                        >
+                                            <FileText size={18} className="mr-2" /> ANEXAR COMPROVANTE PIX
+                                        </Button>
+                                    )}
 
                                     {/* Botões normais - Aparecem quando PENDING */}
                                     {selectedRequest.status === 'PENDING' && (
@@ -1459,6 +1502,40 @@ export const Requests: React.FC = () => {
                                 </div>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Send Access Modal */}
+            {isSendAccessOpen && sendAccessTarget && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] p-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-4 md:p-6 shadow-2xl animate-in zoom-in duration-200">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <Send size={20} className="text-blue-400" /> Enviar Acesso ao App
+                            </h3>
+                            <button onClick={() => { setIsSendAccessOpen(false); setSendAccessTarget(null); }}><X size={20} className="text-zinc-500 hover:text-white" /></button>
+                        </div>
+                        <p className="text-zinc-400 text-sm mb-4">
+                            Será criado (ou atualizado) um acesso para o cliente e as credenciais enviadas via <strong className="text-white">WhatsApp</strong>.
+                        </p>
+                        <div className="bg-black border border-zinc-800 rounded-xl p-3 mb-4 space-y-1 text-sm">
+                            <p className="text-white font-bold">{sendAccessTarget.clientName}</p>
+                            <p className="text-zinc-400">{sendAccessTarget.phone}</p>
+                            <p className="text-zinc-400">{sendAccessTarget.email}</p>
+                        </div>
+                        <div className="flex gap-3">
+                            <Button variant="secondary" className="flex-1" onClick={() => { setIsSendAccessOpen(false); setSendAccessTarget(null); }}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                className="flex-1 bg-blue-600 text-white font-bold hover:bg-blue-700"
+                                onClick={handleSendAccess}
+                                isLoading={sendingAccess}
+                            >
+                                <Send size={16} className="mr-2" /> Enviar Acesso
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -1598,7 +1675,7 @@ export const Requests: React.FC = () => {
                     <div className="bg-zinc-900 border-0 md:border border-zinc-800 md:rounded-2xl w-full max-w-2xl h-full md:h-auto md:max-h-[90vh] p-4 md:p-6 shadow-2xl animate-in zoom-in duration-200 overflow-y-auto">
                         <div className="flex justify-between items-center mb-4 md:mb-6 sticky top-0 bg-zinc-900 pb-4 border-b border-zinc-800 md:static md:border-0">
                             <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
-                                <Check size={20} className="text-green-500" /> Ativar Contrato
+                                <Check size={20} className="text-green-500" /> {selectedRequest?.status === 'ACTIVE' ? 'Atualizar Comprovante PIX' : 'Ativar Contrato'}
                             </h3>
                             <button onClick={() => setIsActivationModalOpen(false)}>
                                 <X size={20} className="text-zinc-500 hover:text-white" />
@@ -1793,7 +1870,7 @@ export const Requests: React.FC = () => {
                                 isLoading={!!processing}
                                 disabled={!contractData.principalAmount || !contractData.totalInstallments || !contractData.firstPaymentDate || !contractData.pixReceiptUrl}
                             >
-                                <Check size={18} className="mr-2" /> Confirmar e Ativar Contrato
+                                <Check size={18} className="mr-2" /> {selectedRequest?.status === 'ACTIVE' ? 'Salvar Comprovante' : 'Confirmar e Ativar Contrato'}
                             </Button>
                         </div>
                     </div>

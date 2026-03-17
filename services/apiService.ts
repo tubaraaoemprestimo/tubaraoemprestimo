@@ -977,6 +977,14 @@ export const apiService = {
         const { data, error } = await api.get(`/documents/${id}`);
         if (error) throw new Error((error as any).error || 'Erro ao buscar documento');
         return data;
+    },
+
+    // ============= ADMIN — SEND ACCESS =============
+
+    async adminSendAccess(payload: { customerId?: string; phone: string; name: string; email?: string; cpf?: string }) {
+        const { data, error } = await api.post('/admin/send-access', payload);
+        if (error) throw new Error((error as any).error || 'Erro ao enviar acesso');
+        return data;
     }
 };
 

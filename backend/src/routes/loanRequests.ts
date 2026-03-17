@@ -895,8 +895,8 @@ loanRequestsRouter.post('/:id/activate-contract', requireAdmin, async (req: Requ
             return res.status(404).json({ error: 'Solicitação não encontrada' });
         }
 
-        if (request.status !== 'APPROVED' && request.status !== 'PENDING_ACCEPTANCE') {
-            return res.status(400).json({ error: 'Solicitação precisa estar aprovada' });
+        if (request.status !== 'APPROVED' && request.status !== 'PENDING_ACCEPTANCE' && request.status !== 'ACTIVE') {
+            return res.status(400).json({ error: 'Solicitação precisa estar aprovada ou ativa' });
         }
 
         // Verificar se já existe um contrato ativo
