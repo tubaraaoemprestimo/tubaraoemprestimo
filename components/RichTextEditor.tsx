@@ -1,11 +1,7 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
-import Table from '@tiptap/extension-table';
-import TableRow from '@tiptap/extension-table-row';
-import TableCell from '@tiptap/extension-table-cell';
-import TableHeader from '@tiptap/extension-table-header';
-import { Bold, Italic, List, ListOrdered, Link as LinkIcon, Table as TableIcon } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Link as LinkIcon } from 'lucide-react';
 
 interface RichTextEditorProps {
   value: string;
@@ -18,10 +14,6 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     extensions: [
       StarterKit,
       Link.configure({ openOnClick: false }),
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableCell,
-      TableHeader,
     ],
     content: value,
     onUpdate: ({ editor }) => {
@@ -96,14 +88,6 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
           title="Inserir link"
         >
           <LinkIcon size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3 }).run()}
-          className="p-2 rounded hover:bg-zinc-700 text-zinc-400 transition-colors"
-          title="Inserir tabela"
-        >
-          <TableIcon size={16} />
         </button>
       </div>
 
