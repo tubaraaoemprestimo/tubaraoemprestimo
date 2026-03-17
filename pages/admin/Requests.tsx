@@ -1480,18 +1480,20 @@ export const Requests: React.FC = () => {
                         </div>
 
                         {/* Actions Footer */}
-                        {(selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === LoanStatus.WAITING_DOCS || selectedRequest.status === 'RETURNING_PENDING') && (
+                        {(selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === LoanStatus.WAITING_DOCS || selectedRequest.status === 'RETURNING_PENDING' || selectedRequest.status === 'APPROVED' || selectedRequest.status === 'ACTIVE') && (
                             <div className="p-4 md:p-6 border-t border-zinc-800 bg-zinc-950 flex flex-col gap-3 md:gap-4 shrink-0">
-                                <span className="text-xs text-zinc-500 text-center md:text-left">
-                                    {selectedRequest.profileType === 'LIMPA_NOME'
-                                        ? 'Ao aprovar, o serviço Limpa Nome será iniciado para este cliente.'
-                                        : selectedRequest.profileType === 'MOTO'
-                                            ? 'Ao aprovar, o financiamento da moto será confirmado. Verifique entrada e documentos.'
-                                            : (selectedRequest.profileType === 'GARANTIA' || selectedRequest.profileType === 'GARANTIA_VEICULO')
-                                                ? 'Ao aprovar, o empréstimo com garantia será liberado. Verifique os documentos.'
-                                                : 'Se aprovar agora, o saldo será liberado na carteira.'
-                                    }
-                                </span>
+                                {(selectedRequest.status === LoanStatus.PENDING || selectedRequest.status === LoanStatus.WAITING_DOCS || selectedRequest.status === 'RETURNING_PENDING') && (
+                                    <span className="text-xs text-zinc-500 text-center md:text-left">
+                                        {selectedRequest.profileType === 'LIMPA_NOME'
+                                            ? 'Ao aprovar, o serviço Limpa Nome será iniciado para este cliente.'
+                                            : selectedRequest.profileType === 'MOTO'
+                                                ? 'Ao aprovar, o financiamento da moto será confirmado. Verifique entrada e documentos.'
+                                                : (selectedRequest.profileType === 'GARANTIA' || selectedRequest.profileType === 'GARANTIA_VEICULO')
+                                                    ? 'Ao aprovar, o empréstimo com garantia será liberado. Verifique os documentos.'
+                                                    : 'Se aprovar agora, o saldo será liberado na carteira.'
+                                        }
+                                    </span>
+                                )}
                                 <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto md:ml-auto">
                                     {/* Botão Ativar Contrato - Aparece quando APPROVED */}
                                     {selectedRequest.status === 'APPROVED' && (

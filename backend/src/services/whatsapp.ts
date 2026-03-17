@@ -87,6 +87,37 @@ export async function sendWhatsAppMessage(to: string, message: string): Promise<
     }
 }
 
+export async function sendWhatsAppImage(to: string, imageUrl: string, caption: string): Promise<boolean> {
+    try {
+        if (!to || !imageUrl) return false;
+        const config = await prisma.whatsappConfig.findFirst();
+        if (!config || !config.isConnected || !config.apiUrl || !config.instanceName) return false;
+
+        const number = normalizePhoneBR(to);
+        if (number.length < 12) return false;
+
+        const baseUrl = config.apiUrl.replace(/\/+$/, '');
+        const url = `${baseUrl}/message/sendMedia/${config.instanceName}`;
+
+        await axios.post(url, {
+            number,
+            mediatype: 'image',
+            mimetype: 'image/jpeg',
+            caption,
+            media: imageUrl,
+            options: { delay: 1200, presence: 'composing' }
+        }, {
+            headers: { apikey: config.apiKey, 'Content-Type': 'application/json' },
+            timeout: 20000
+        });
+        console.log(`[WhatsApp] ✅ Image sent to ${number}`);
+        return true;
+    } catch (error: any) {
+        console.error(`[WhatsApp] ❌ Image send failed to ${to}:`, error?.response?.data?.message || error.message);
+        return false;
+    }
+}
+
 export async function sendWhatsAppStatus(imageUrl: string, caption?: string) {
     try {
         const config = await prisma.whatsappConfig.findFirst();

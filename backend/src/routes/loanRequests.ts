@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { emailService } from '../services/email';
-import { sendWhatsAppMessage } from '../services/whatsapp';
+import { sendWhatsAppMessage, sendWhatsAppImage } from '../services/whatsapp';
 import { sendPushToUser, sendPushToRole } from './push';
 import axios from 'axios';
 
@@ -889,11 +889,19 @@ loanRequestsRouter.put('/:id/pix-receipt', requireAdmin, async (req: Request, re
             }).catch(() => { });
         }
 
-        // WhatsApp
+        // WhatsApp — envia imagem do comprovante + mensagem
         if (request.phone) {
-            sendWhatsAppNotification(request.phone,
-                `💰 *Comprovante de Transferência*\n\nOlá, ${request.clientName}!\n\nO comprovante do PIX do seu empréstimo está disponível no app. Acesse para visualizar.\n\n_Tubarão Empréstimos 🦈_`
-            );
+            const caption = `💰 *Comprovante de Transferência PIX*\n\nOlá, ${request.clientName}! Segue o comprovante do PIX do seu empréstimo.\n\n_Tubarão Empréstimos 🦈_`;
+
+            // Tenta enviar como imagem (base64 ou URL)
+            const sentAsImage = await sendWhatsAppImage(request.phone, pixReceiptUrl, caption).catch(() => false);
+
+            // Se falhar (ex: PDF), envia só texto + link app
+            if (!sentAsImage) {
+                sendWhatsAppNotification(request.phone,
+                    `💰 *Comprovante de Transferência Disponível*\n\nOlá, ${request.clientName}!\n\nSeu comprovante PIX está disponível no app. Acesse e visualize na tela inicial.\n\n_Tubarão Empréstimos 🦈_`
+                );
+            }
         }
 
         console.log(`[PIX] Comprovante anexado ao loan ${loan.id} para request ${id}`);
