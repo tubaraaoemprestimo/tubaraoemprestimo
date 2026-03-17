@@ -203,14 +203,16 @@ router.post(
   authenticate,
   requireAdmin,
   async (req: Request, res: Response) => {
-    const { moduleId, title, description, videoUrl, materialUrl, order, duration } = req.body as {
-      moduleId:     string;
-      title:        string;
-      description?: string;
-      videoUrl?:    string;
-      materialUrl?: string;
-      order?:       number;
-      duration?:    number;
+    const { moduleId, title, description, descriptionHtml, videoUrl, materialUrl, attachments, order, duration } = req.body as {
+      moduleId:         string;
+      title:            string;
+      description?:     string;
+      descriptionHtml?: string;
+      videoUrl?:        string;
+      materialUrl?:     string;
+      attachments?:     any[];
+      order?:           number;
+      duration?:        number;
     };
 
     if (!moduleId || !title) {
@@ -221,11 +223,13 @@ router.post(
       data: {
         moduleId,
         title,
-        description: description ?? null,
-        videoUrl:    videoUrl    ?? null,
-        materialUrl: materialUrl ?? null,
-        order:       order       ?? 0,
-        duration:    duration    ?? null,
+        description:     description     ?? null,
+        descriptionHtml: descriptionHtml ?? null,
+        videoUrl:        videoUrl        ?? null,
+        materialUrl:     materialUrl     ?? null,
+        attachments:     attachments     ?? [],
+        order:           order           ?? 0,
+        duration:        duration        ?? null,
       },
     });
 
@@ -243,24 +247,28 @@ router.put(
   requireAdmin,
   async (req: Request, res: Response) => {
     const id = String(req.params.id);
-    const { title, description, videoUrl, materialUrl, order, duration } = req.body as {
-      title?:       string;
-      description?: string;
-      videoUrl?:    string;
-      materialUrl?: string;
-      order?:       number;
-      duration?:    number;
+    const { title, description, descriptionHtml, videoUrl, materialUrl, attachments, order, duration } = req.body as {
+      title?:           string;
+      description?:     string;
+      descriptionHtml?: string;
+      videoUrl?:        string;
+      materialUrl?:     string;
+      attachments?:     any[];
+      order?:           number;
+      duration?:        number;
     };
 
     const lesson = await prisma.lesson.update({
       where: { id },
       data: {
-        ...(title       !== undefined && { title }),
-        ...(description !== undefined && { description }),
-        ...(videoUrl    !== undefined && { videoUrl }),
-        ...(materialUrl !== undefined && { materialUrl }),
-        ...(order       !== undefined && { order }),
-        ...(duration    !== undefined && { duration }),
+        ...(title           !== undefined && { title }),
+        ...(description     !== undefined && { description }),
+        ...(descriptionHtml !== undefined && { descriptionHtml }),
+        ...(videoUrl        !== undefined && { videoUrl }),
+        ...(materialUrl     !== undefined && { materialUrl }),
+        ...(attachments     !== undefined && { attachments }),
+        ...(order           !== undefined && { order }),
+        ...(duration        !== undefined && { duration }),
       },
     });
 

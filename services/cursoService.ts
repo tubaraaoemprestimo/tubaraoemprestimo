@@ -9,8 +9,15 @@ export interface Lesson {
   moduleId: string;
   title: string;
   description?: string;
+  descriptionHtml?: string;
   videoUrl?: string;
   materialUrl?: string;
+  attachments?: Array<{
+    name: string;
+    url: string;
+    type: string;
+    size: number;
+  }>;
   order: number;
   duration?: number;
   progress?: { isCompleted: boolean; completedAt?: string }[];
@@ -139,8 +146,10 @@ export const cursoService = {
     moduleId: string;
     title: string;
     description?: string;
+    descriptionHtml?: string;
     videoUrl?: string;
     materialUrl?: string;
+    attachments?: Array<{ name: string; url: string; type: string; size: number }>;
     order?: number;
     duration?: number;
   }): Promise<Lesson> =>
@@ -149,8 +158,10 @@ export const cursoService = {
   updateLesson: (id: string, data: Partial<{
     title: string;
     description: string;
+    descriptionHtml: string;
     videoUrl: string;
     materialUrl: string;
+    attachments: Array<{ name: string; url: string; type: string; size: number }>;
     order: number;
     duration: number;
   }>): Promise<Lesson> =>

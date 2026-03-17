@@ -13,10 +13,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus, Trash2, Edit2, Upload, CheckCircle2, AlertCircle,
   ChevronDown, ChevronRight, GripVertical, Users, BookOpen,
-  X, Loader2, Play
+  X, Loader2, Play, FileText
 } from 'lucide-react';
 import { cursoService, Module, Lesson, AdminUser } from '../../services/cursoService';
 import { useToast } from '../../components/Toast';
+import { RichTextEditor } from '../../components/RichTextEditor';
 
 // ─── Tipos locais ─────────────────────────────────────────────────────────────
 
@@ -39,17 +40,60 @@ function LessonModal({
 }) {
   const { addToast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
+  const attachmentRef = useRef<HTMLInputElement>(null);
 
   const [title, setTitle]           = useState(editLesson?.title ?? '');
   const [description, setDesc]      = useState(editLesson?.description ?? '');
+  const [descriptionHtml, setDescHtml] = useState(editLesson?.descriptionHtml ?? '');
   const [selModuleId, setModuleId]  = useState(editLesson?.moduleId ?? moduleId);
   const [file, setFile]             = useState<File | null>(null);
+  const [attachments, setAttachments] = useState<Array<{name: string; url: string; type: string; size: number}>>(
+    editLesson?.attachments ?? []
+  );
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const [status, setStatus]         = useState<UploadStatus>('idle');
   const [progress, setProgress]     = useState(0);
   const [errorMsg, setError]        = useState('');
   const abortRef = useRef<(() => void) | null>(null);
 
   const isEdit = !!editLesson;
+
+  const handleAttachmentSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setUploadingAttachments(true);
+    try {
+      const uploaded: Array<{name: string; url: string; type: string; size: number}> = [];
+
+      for (const file of files) {
+        // Solicitar presigned URL para attachment
+        const { presignedUrl, publicUrl } = await cursoService.getPresignedUrl(
+          file.name,
+          file.type
+        );
+
+        // Upload direto para R2
+        const { promise } = cursoService.uploadToR2(presignedUrl, file, () => {});
+        await promise;
+
+        uploaded.push({
+          name: file.name,
+          url: publicUrl,
+          type: file.type,
+          size: file.size,
+        });
+      }
+
+      setAttachments(prev => [...prev, ...uploaded]);
+      addToast(`${uploaded.length} arquivo(s) adicionado(s)`, 'success');
+    } catch (err: any) {
+      addToast(`Erro ao fazer upload: ${err.message}`, 'error');
+    } finally {
+      setUploadingAttachments(false);
+      if (attachmentRef.current) attachmentRef.current.value = '';
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,6 +132,8 @@ function LessonModal({
         await cursoService.updateLesson(editLesson.id, {
           title: title.trim(),
           description: description.trim() || undefined,
+          descriptionHtml: descriptionHtml.trim() || undefined,
+          attachments,
           videoUrl,
         });
       } else {
@@ -95,6 +141,8 @@ function LessonModal({
           moduleId: selModuleId,
           title: title.trim(),
           description: description.trim() || undefined,
+          descriptionHtml: descriptionHtml.trim() || undefined,
+          attachments,
           videoUrl,
         });
       }
@@ -161,14 +209,12 @@ function LessonModal({
           {/* Descrição */}
           <div>
             <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
-              Descrição <span className="text-zinc-600 font-normal">(opcional)</span>
+              Descrição da Aula <span className="text-zinc-600 font-normal">(opcional)</span>
             </label>
-            <textarea
-              value={description}
-              onChange={e => setDesc(e.target.value)}
-              rows={2}
-              placeholder="O que o aluno vai aprender nesta aula…"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-[#D4AF37] resize-none"
+            <RichTextEditor
+              value={descriptionHtml}
+              onChange={setDescHtml}
+              placeholder="O que o aluno vai aprender nesta aula… Use formatação rica, links, tabelas, etc."
             />
           </div>
 
@@ -226,6 +272,50 @@ function LessonModal({
               <p className="text-[11px] text-zinc-500 mt-1">
                 {(file.size / 1024 / 1024).toFixed(1)} MB
               </p>
+            )}
+          </div>
+
+          {/* Materiais Complementares */}
+          <div>
+            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
+              Materiais Complementares <span className="text-zinc-600 font-normal">(opcional)</span>
+            </label>
+            <input
+              ref={attachmentRef}
+              type="file"
+              multiple
+              accept=".pdf,.xlsx,.xls,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.gif"
+              className="hidden"
+              onChange={handleAttachmentSelect}
+            />
+            <button
+              type="button"
+              onClick={() => attachmentRef.current?.click()}
+              disabled={uploadingAttachments || status === 'uploading' || status === 'saving'}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 border border-dashed border-zinc-600 hover:border-[#D4AF37]/60 rounded-xl text-sm text-zinc-400 hover:text-white transition-all disabled:opacity-50"
+            >
+              <Upload size={16} />
+              {uploadingAttachments ? 'Enviando...' : 'Adicionar PDFs, planilhas, imagens…'}
+            </button>
+
+            {/* Lista de attachments */}
+            {attachments.length > 0 && (
+              <div className="space-y-2 mt-3">
+                {attachments.map((att, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2">
+                    <FileText size={14} className="text-[#D4AF37] shrink-0" />
+                    <span className="text-xs text-white flex-1 truncate">{att.name}</span>
+                    <span className="text-[10px] text-zinc-500">{(att.size / 1024).toFixed(0)} KB</span>
+                    <button
+                      type="button"
+                      onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                      className="text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 

@@ -23,8 +23,48 @@ export default {
                 'fade-in': 'fadeIn 0.3s ease-out',
                 'slide-up': 'slideUp 0.3s ease-out',
                 'pulse-slow': 'pulse 3s infinite',
-            }
+            },
+            typography: {
+                DEFAULT: {
+                    css: {
+                        maxWidth: 'none',
+                        color: '#a1a1aa',
+                        a: {
+                            color: '#D4AF37',
+                            '&:hover': {
+                                color: '#B8860B',
+                            },
+                        },
+                        strong: {
+                            color: '#ffffff',
+                        },
+                        h1: {
+                            color: '#ffffff',
+                        },
+                        h2: {
+                            color: '#ffffff',
+                        },
+                        h3: {
+                            color: '#ffffff',
+                        },
+                        h4: {
+                            color: '#ffffff',
+                        },
+                        code: {
+                            color: '#D4AF37',
+                        },
+                        'ul > li::marker': {
+                            color: '#D4AF37',
+                        },
+                        'ol > li::marker': {
+                            color: '#D4AF37',
+                        },
+                    },
+                },
+            },
         },
     },
-    plugins: [],
+    plugins: [
+        require('@tailwindcss/typography'),
+    ],
 }

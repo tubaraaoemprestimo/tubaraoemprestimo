@@ -11,7 +11,7 @@ import {
   ChevronDown, ChevronRight, CheckCircle2, ShieldCheck,
   Lock, BookOpen, Download, ArrowLeft, Menu, X, Trophy,
   Zap, Clock, Play, SkipForward,
-  GraduationCap, Award, Flame, Target, Medal, Star, Printer
+  GraduationCap, Award, Flame, Target, Medal, Star, Printer, FileText
 } from 'lucide-react';
 import { cursoService, PlayerData, Lesson, Module } from '../../services/cursoService';
 import { api } from '../../services/apiClient';
@@ -622,13 +622,43 @@ function VideoPlayer({
           <h1 className="text-xl md:text-2xl font-black text-white leading-tight mb-2">
             {lesson.title}
           </h1>
-          {lesson.description && (
+          {lesson.descriptionHtml ? (
+            <div
+              className="prose prose-invert prose-sm max-w-none text-zinc-400 leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: lesson.descriptionHtml }}
+            />
+          ) : lesson.description ? (
             <p className="text-zinc-400 text-sm leading-relaxed">{lesson.description}</p>
-          )}
+          ) : null}
           {lesson.duration && (
             <div className="flex items-center gap-1.5 mt-2">
               <Clock size={12} className="text-zinc-600" />
               <span className="text-xs text-zinc-600">{formatDuration(lesson.duration)} de duração</span>
+            </div>
+          )}
+
+          {/* Materiais complementares */}
+          {lesson.attachments && lesson.attachments.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Materiais Complementares</h4>
+              <div className="grid gap-2">
+                {lesson.attachments.map((att, idx) => (
+                  <a
+                    key={idx}
+                    href={att.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 hover:border-[#D4AF37]/40 rounded-xl px-4 py-3 transition-all group"
+                  >
+                    <FileText size={18} className="text-[#D4AF37] group-hover:scale-110 transition-transform shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{att.name}</p>
+                      <p className="text-[10px] text-zinc-500">{(att.size / 1024).toFixed(0)} KB</p>
+                    </div>
+                    <Download size={14} className="text-zinc-600 group-hover:text-[#D4AF37] transition-colors" />
+                  </a>
+                ))}
+              </div>
             </div>
           )}
         </div>

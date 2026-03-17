@@ -671,18 +671,20 @@ model Module {
 }
 
 model Lesson {
-  id          String         @id @default(uuid())
-  moduleId    String         @map("module_id")
-  title       String
-  description String?
-  videoUrl    String?        @map("video_url")
-  materialUrl String?        @map("material_url")
-  order       Int            @default(0)
-  duration    Int?           // duração em segundos (extraída no frontend após upload)
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
-  module      Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  progress    UserProgress[]
+  id              String         @id @default(uuid())
+  moduleId        String         @map("module_id")
+  title           String
+  description     String?
+  descriptionHtml String?        @map("description_html")
+  videoUrl        String?        @map("video_url")
+  materialUrl     String?        @map("material_url")
+  attachments     Json?          @default("[]")
+  order           Int            @default(0)
+  duration        Int?           // duração em segundos (extraída no frontend após upload)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  module          Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress        UserProgress[]
 
   @@map("lessons")
   @@index([moduleId])
