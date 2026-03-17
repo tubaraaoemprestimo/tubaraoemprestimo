@@ -116,6 +116,9 @@ export interface LoanRequest {
   approvedById?: string;
   counterOfferAccepted?: boolean;
   counterOfferAcceptedAt?: string;
+
+  // Tipo de parcelamento
+  installmentType?: 'DAILY' | 'MONTHLY'; // ✅ BUG 2 FIX: Adicionar tipo de parcelamento
 }
 
 export interface DashboardStats {

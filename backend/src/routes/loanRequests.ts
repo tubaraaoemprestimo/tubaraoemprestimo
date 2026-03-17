@@ -1346,7 +1346,9 @@ loanRequestsRouter.put('/:id/accept-counteroffer', async (req: Request, res: Res
                     customerId: updatedRequest.customerId,
                     requestId: updatedRequest.id,
                     amount: updatedRequest.approvedAmount,
+                    principalAmount: updatedRequest.approvedAmount, // ✅ FIX: Campo obrigatório
                     installmentsCount: updatedRequest.installments,
+                    totalInstallments: updatedRequest.installments, // ✅ FIX: Campo obrigatório
                     remainingAmount: updatedRequest.approvedAmount,
                     status: 'APPROVED',
                     startDate: new Date(),
@@ -1378,7 +1380,15 @@ loanRequestsRouter.put('/:id/accept-counteroffer', async (req: Request, res: Res
                 where: { id: updatedRequest.customerId },
                 data: {
                     activeLoansCount: { increment: 1 },
-                    totalDebt: { increment: updatedRequest.approvedAmount }
+                    totalDebt: { increment: updatedRequest.approvedAmount },
+                    // ✅ DEMANDA 2: Sincronizar dados da solicitação para o perfil do cliente
+                    instagram: updatedRequest.instagramHandle || undefined,
+                    street: updatedRequest.street || undefined,
+                    number: updatedRequest.number || undefined,
+                    neighborhood: updatedRequest.neighborhood || undefined,
+                    city: updatedRequest.city || undefined,
+                    state: updatedRequest.state || undefined,
+                    zipCode: updatedRequest.zipCode || undefined
                 }
             });
 

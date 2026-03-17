@@ -434,7 +434,16 @@ if (user) {
               <div className="mt-2 pt-2 border-t border-zinc-800">
                 <div className="flex items-center justify-between text-xs text-zinc-500">
                   <span>Parcelas</span>
-                  <span className="font-bold text-white">{pendingRequest.installments}x de R$ {((pendingRequest.approvedAmount || pendingRequest.amount) / pendingRequest.installments).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  {/* ✅ BUG 2 FIX: Renderização condicional baseada em installmentType */}
+                  {pendingRequest.installmentType === 'DAILY' ? (
+                    <span className="font-bold text-white">
+                      {pendingRequest.installments} diárias de R$ {((pendingRequest.approvedAmount || pendingRequest.amount) / pendingRequest.installments).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  ) : (
+                    <span className="font-bold text-white">
+                      {pendingRequest.installments}x de R$ {((pendingRequest.approvedAmount || pendingRequest.amount) / pendingRequest.installments).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -459,11 +468,13 @@ if (user) {
                 try {
                   await apiService.acceptCounteroffer(pendingRequest.id);
                   addToast('Contrato aceito! Seu crédito está sendo processado.', 'success');
-                  loadDashboardData();
                 } catch (error: any) {
                   console.error('Erro ao aceitar contraproposta:', error);
                   const errorMsg = error.response?.data?.error || error.message || 'Erro ao aceitar contrato';
                   addToast(errorMsg, 'error');
+                } finally {
+                  // ✅ BUG 1 FIX: Sempre recarregar dados (sucesso ou erro)
+                  loadDashboardData();
                 }
               }}
               className="w-full bg-[#D4AF37] hover:bg-[#B5942F] text-black font-bold py-4 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg"
