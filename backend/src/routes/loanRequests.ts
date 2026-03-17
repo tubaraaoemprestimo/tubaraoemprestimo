@@ -1542,11 +1542,7 @@ loanRequestsRouter.put('/:id/accept-counteroffer', async (req: Request, res: Res
         }
 
         // 🔥 NOTIFICAR ADMIN que cliente aceitou
-        await sendPushToRole('ADMIN', {
-            title: '✅ Contraproposta Aceita',
-            body: `${updatedRequest.clientName} aceitou ${approvedFormatted}`,
-            data: { type: 'COUNTEROFFER_ACCEPTED', requestId: updatedRequest.id }
-        }).catch(() => { });
+        await sendPushToRole('ADMIN', '✅ Contraproposta Aceita', `${updatedRequest.clientName} aceitou ${approvedFormatted}`).catch(() => { });
 
         res.json({ success: true, request: updatedRequest });
     } catch (error: any) {
@@ -1718,11 +1714,7 @@ loanRequestsRouter.put('/:id/supplemental-upload', async (req: Request, res: Res
         });
 
         // Notificar admin que documentos foram enviados
-        await sendPushToRole('ADMIN', {
-            title: '📄 Documentos Adicionais Enviados',
-            body: `${loanRequest.clientName} enviou os documentos solicitados`,
-            data: { type: 'DOCS_UPLOADED', requestId: id }
-        });
+        await sendPushToRole('ADMIN', '📄 Documentos Adicionais Enviados', `${loanRequest.clientName} enviou os documentos solicitados`);
 
         // Criar notificação no banco para admin
         await prisma.notification.create({
