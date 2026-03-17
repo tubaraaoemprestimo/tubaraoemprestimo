@@ -979,6 +979,14 @@ export const apiService = {
         return data;
     },
 
+    // ============= ADMIN — PIX RECEIPT =============
+
+    async attachPixReceipt(requestId: string, pixReceiptUrl: string) {
+        const { data, error } = await api.put(`/loan-requests/${requestId}/pix-receipt`, { pixReceiptUrl });
+        if (error) throw new Error((error as any).error || 'Erro ao anexar comprovante');
+        return data;
+    },
+
     // ============= ADMIN — SEND ACCESS =============
 
     async adminSendAccess(payload: { customerId?: string; phone: string; name: string; email?: string; cpf?: string }) {

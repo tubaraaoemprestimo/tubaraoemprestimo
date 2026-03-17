@@ -71,6 +71,12 @@ export const Requests: React.FC = () => {
     });
     const [uploadingPix, setUploadingPix] = useState(false);
 
+    // PIX Receipt Modal
+    const [isPixModalOpen, setIsPixModalOpen] = useState(false);
+    const [pixUploadUrl, setPixUploadUrl] = useState('');
+    const [uploadingPixDedicated, setUploadingPixDedicated] = useState(false);
+    const [attachingPix, setAttachingPix] = useState(false);
+
     // Send Access Modal
     const [isSendAccessOpen, setIsSendAccessOpen] = useState(false);
     const [sendAccessTarget, setSendAccessTarget] = useState<LoanRequest | null>(null);
@@ -332,6 +338,32 @@ export const Requests: React.FC = () => {
             addToast(err.message || 'Erro ao enviar acesso', 'error');
         } finally {
             setSendingAccess(false);
+        }
+    };
+
+    const handlePixFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) { addToast('Arquivo muito grande. Máximo 5MB.', 'error'); return; }
+        setUploadingPixDedicated(true);
+        const reader = new FileReader();
+        reader.onloadend = () => { setPixUploadUrl(reader.result as string); setUploadingPixDedicated(false); };
+        reader.onerror = () => { setUploadingPixDedicated(false); addToast('Erro ao carregar arquivo', 'error'); };
+        reader.readAsDataURL(file);
+    };
+
+    const handleAttachPixReceipt = async () => {
+        if (!selectedRequest || !pixUploadUrl) return;
+        setAttachingPix(true);
+        try {
+            await apiService.attachPixReceipt(selectedRequest.id, pixUploadUrl);
+            addToast('✅ Comprovante PIX anexado! Cliente foi notificado.', 'success');
+            setIsPixModalOpen(false);
+            setPixUploadUrl('');
+        } catch (err: any) {
+            addToast(err.message || 'Erro ao anexar comprovante', 'error');
+        } finally {
+            setAttachingPix(false);
         }
     };
 
@@ -1471,12 +1503,12 @@ export const Requests: React.FC = () => {
                                             <Check size={18} className="mr-2" /> ATIVAR CONTRATO
                                         </Button>
                                     )}
-                                    {/* Botão Anexar Comprovante - Aparece quando ACTIVE */}
-                                    {selectedRequest.status === 'ACTIVE' && (
+                                    {/* Botão Anexar Comprovante PIX — APPROVED ou ACTIVE */}
+                                    {(selectedRequest.status === 'ACTIVE' || selectedRequest.status === 'APPROVED') && (
                                         <Button
                                             variant="secondary"
                                             className="w-full md:w-auto border-blue-600 text-blue-400 hover:bg-blue-900/30"
-                                            onClick={openActivationModal}
+                                            onClick={() => { setPixUploadUrl(''); setIsPixModalOpen(true); }}
                                         >
                                             <FileText size={18} className="mr-2" /> ANEXAR COMPROVANTE PIX
                                         </Button>
@@ -1502,6 +1534,81 @@ export const Requests: React.FC = () => {
                                 </div>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* PIX Receipt Modal */}
+            {isPixModalOpen && selectedRequest && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] p-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-4 md:p-6 shadow-2xl animate-in zoom-in duration-200">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <FileText size={20} className="text-blue-400" /> Comprovante de Transferência PIX
+                            </h3>
+                            <button onClick={() => { setIsPixModalOpen(false); setPixUploadUrl(''); }}>
+                                <X size={20} className="text-zinc-500 hover:text-white" />
+                            </button>
+                        </div>
+
+                        <p className="text-zinc-400 text-sm mb-4">
+                            Anexe o comprovante do PIX enviado para <strong className="text-white">{selectedRequest.clientName}</strong>.
+                            O cliente será notificado e poderá visualizar no app.
+                        </p>
+
+                        {/* Upload Area */}
+                        <div className="border-2 border-dashed border-zinc-700 rounded-xl p-6 text-center hover:border-blue-500 transition-colors mb-4">
+                            {pixUploadUrl ? (
+                                <div className="space-y-3">
+                                    <img
+                                        src={pixUploadUrl}
+                                        alt="Comprovante PIX"
+                                        className="max-h-48 mx-auto rounded-lg border border-zinc-700 object-contain"
+                                        onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                        }}
+                                    />
+                                    <p className="text-xs text-green-400 font-bold">✅ Arquivo carregado</p>
+                                    <button
+                                        onClick={() => setPixUploadUrl('')}
+                                        className="text-red-400 text-xs hover:text-red-300"
+                                    >
+                                        Remover e escolher outro
+                                    </button>
+                                </div>
+                            ) : (
+                                <label className="cursor-pointer">
+                                    <input
+                                        type="file"
+                                        accept="image/*,.pdf"
+                                        onChange={handlePixFileUpload}
+                                        className="hidden"
+                                        disabled={uploadingPixDedicated}
+                                    />
+                                    <div className="flex flex-col items-center gap-2">
+                                        <FileText size={36} className="text-zinc-500" />
+                                        <p className="text-sm text-zinc-300 font-medium">
+                                            {uploadingPixDedicated ? 'Carregando...' : 'Clique para selecionar o comprovante'}
+                                        </p>
+                                        <p className="text-xs text-zinc-600">PNG, JPG ou PDF • máx 5MB</p>
+                                    </div>
+                                </label>
+                            )}
+                        </div>
+
+                        <div className="flex gap-3">
+                            <Button variant="secondary" className="flex-1" onClick={() => { setIsPixModalOpen(false); setPixUploadUrl(''); }}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                className="flex-1 bg-blue-600 text-white font-bold hover:bg-blue-700"
+                                onClick={handleAttachPixReceipt}
+                                isLoading={attachingPix}
+                                disabled={!pixUploadUrl || uploadingPixDedicated}
+                            >
+                                <Check size={16} className="mr-2" /> Anexar e Notificar Cliente
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}

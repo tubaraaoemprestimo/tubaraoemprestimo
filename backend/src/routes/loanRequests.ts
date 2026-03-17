@@ -855,6 +855,55 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
     }
 });
 
+// PUT /api/loan-requests/:id/pix-receipt — Anexar comprovante PIX ao loan existente
+loanRequestsRouter.put('/:id/pix-receipt', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const id = req.params.id as string;
+        const { pixReceiptUrl } = req.body;
+
+        if (!pixReceiptUrl) {
+            return res.status(400).json({ error: 'URL do comprovante obrigatória' });
+        }
+
+        const request = await prisma.loanRequest.findUnique({ where: { id } });
+        if (!request) return res.status(404).json({ error: 'Solicitação não encontrada' });
+
+        // Atualiza o loan associado
+        const loan = await prisma.loan.findFirst({ where: { requestId: id } });
+        if (!loan) return res.status(404).json({ error: 'Contrato não encontrado. Ative o contrato primeiro.' });
+
+        await prisma.loan.update({
+            where: { id: loan.id },
+            data: { pixReceiptUrl }
+        });
+
+        // Notificação para o cliente
+        if (request.customerId) {
+            await prisma.notification.create({
+                data: {
+                    customerId: request.customerId,
+                    title: '💰 Comprovante de Transferência Disponível',
+                    message: 'O comprovante do PIX do seu empréstimo está disponível no app.',
+                    type: 'SUCCESS'
+                }
+            }).catch(() => { });
+        }
+
+        // WhatsApp
+        if (request.phone) {
+            sendWhatsAppNotification(request.phone,
+                `💰 *Comprovante de Transferência*\n\nOlá, ${request.clientName}!\n\nO comprovante do PIX do seu empréstimo está disponível no app. Acesse para visualizar.\n\n_Tubarão Empréstimos 🦈_`
+            );
+        }
+
+        console.log(`[PIX] Comprovante anexado ao loan ${loan.id} para request ${id}`);
+        return res.json({ success: true, message: 'Comprovante anexado com sucesso' });
+    } catch (err: any) {
+        console.error('[PIX] Erro ao anexar comprovante:', err);
+        return res.status(500).json({ error: 'Erro ao anexar comprovante' });
+    }
+});
+
 // POST /api/loan-requests/:id/activate-contract — Ativar Contrato (FASE 2)
 loanRequestsRouter.post('/:id/activate-contract', requireAdmin, async (req: Request, res: Response) => {
     try {
