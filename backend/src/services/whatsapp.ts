@@ -87,9 +87,9 @@ export async function sendWhatsAppMessage(to: string, message: string): Promise<
     }
 }
 
-export async function sendWhatsAppImage(to: string, imageUrl: string, caption: string): Promise<boolean> {
+export async function sendWhatsAppMedia(to: string, mediaUrl: string, caption: string): Promise<boolean> {
     try {
-        if (!to || !imageUrl) return false;
+        if (!to || !mediaUrl) return false;
         const config = await prisma.whatsappConfig.findFirst();
         if (!config || !config.isConnected || !config.apiUrl || !config.instanceName) return false;
 
@@ -99,23 +99,42 @@ export async function sendWhatsAppImage(to: string, imageUrl: string, caption: s
         const baseUrl = config.apiUrl.replace(/\/+$/, '');
         const url = `${baseUrl}/message/sendMedia/${config.instanceName}`;
 
+        // Detectar tipo de arquivo pelo base64 ou extensão
+        let mediatype = 'image';
+        let mimetype = 'image/jpeg';
+
+        if (mediaUrl.includes('data:application/pdf') || mediaUrl.toLowerCase().includes('.pdf')) {
+            mediatype = 'document';
+            mimetype = 'application/pdf';
+        } else if (mediaUrl.includes('data:image/png')) {
+            mimetype = 'image/png';
+        } else if (mediaUrl.includes('data:image/jpeg') || mediaUrl.includes('data:image/jpg')) {
+            mimetype = 'image/jpeg';
+        }
+
         await axios.post(url, {
             number,
-            mediatype: 'image',
-            mimetype: 'image/jpeg',
+            mediatype,
+            mimetype,
             caption,
-            media: imageUrl,
+            media: mediaUrl,
+            fileName: mediatype === 'document' ? 'Comprovante_PIX.pdf' : undefined,
             options: { delay: 1200, presence: 'composing' }
         }, {
             headers: { apikey: config.apiKey, 'Content-Type': 'application/json' },
             timeout: 20000
         });
-        console.log(`[WhatsApp] ✅ Image sent to ${number}`);
+        console.log(`[WhatsApp] ✅ Media (${mediatype}) sent to ${number}`);
         return true;
     } catch (error: any) {
-        console.error(`[WhatsApp] ❌ Image send failed to ${to}:`, error?.response?.data?.message || error.message);
+        console.error(`[WhatsApp] ❌ Media send failed to ${to}:`, error?.response?.data?.message || error.message);
         return false;
     }
+}
+
+export async function sendWhatsAppImage(to: string, imageUrl: string, caption: string): Promise<boolean> {
+    // Mantido para compatibilidade, mas agora usa sendWhatsAppMedia
+    return sendWhatsAppMedia(to, imageUrl, caption);
 }
 
 export async function sendWhatsAppStatus(imageUrl: string, caption?: string) {
