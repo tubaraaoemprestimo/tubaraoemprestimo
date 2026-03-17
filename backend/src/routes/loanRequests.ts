@@ -106,6 +106,14 @@ function normalizeDocField(value: any): string | null {
 function validateRequestByProfile(data: any): string | null {
     const profile = data.profileType as string | undefined;
 
+    // Validar referências obrigatórias
+    if (!data.reference1Name || !data.reference1Phone) {
+        return 'Referência 1 (nome e telefone) é obrigatória.';
+    }
+    if (!data.reference2Name || !data.reference2Phone) {
+        return 'Referência 2 (nome e telefone) é obrigatória.';
+    }
+
     // Todos os perfis de empréstimo/financiamento precisam de assinatura
     if (['CLT', 'AUTONOMO', 'MOTO', 'GARANTIA'].includes(profile || '')) {
         if (!data.signatureUrl && !data.signature) {
@@ -297,6 +305,11 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 fatherPhoneRelationship: data.fatherPhoneRelationship || null,
                 motherPhoneRelationship: data.motherPhoneRelationship || null,
                 spousePhoneRelationship: data.spousePhoneRelationship || null,
+                // Referências pessoais
+                reference1Name: data.reference1Name || null,
+                reference1Phone: data.reference1Phone || null,
+                reference2Name: data.reference2Name || null,
+                reference2Phone: data.reference2Phone || null,
                 // Novos campos - Dados profissionais
                 companyAddress: data.companyAddress || null,
                 companyProfession: data.companyProfession || null,
@@ -1105,15 +1118,23 @@ loanRequestsRouter.put('/:id/approve-with-counteroffer', requireAdmin, async (re
         // Salvar valor original se ainda não foi salvo
         const requestedAmount = originalRequest.requestedAmount || originalRequest.amount;
 
+        // 🔥 BUG FIX: Se valor aprovado = valor solicitado, não precisa aceite do cliente
+        const needsAcceptance = parseFloat(approvedAmount) !== requestedAmount;
+
         // Atualizar solicitação com contraproposta
         const updateData: any = {
             requestedAmount, // Preservar valor original
             approvedAmount: parseFloat(approvedAmount),
             approvedAt: new Date(),
             approvedById: req.user!.id,
-            status: 'PENDING_ACCEPTANCE', // Novo status aguardando aceite do cliente
-            counterOfferAccepted: false
+            status: needsAcceptance ? 'PENDING_ACCEPTANCE' : 'APPROVED', // Se mesmo valor, já aprova direto
+            counterOfferAccepted: !needsAcceptance // Se não precisa aceite, marca como aceito
         };
+
+        // Se não precisa aceite, já marca data de aceite
+        if (!needsAcceptance) {
+            updateData.counterOfferAcceptedAt = new Date();
+        }
 
         // Salvar taxa de juros negociada, se informada
         if (interestRate && parseFloat(interestRate) > 0) {
@@ -1129,62 +1150,95 @@ loanRequestsRouter.put('/:id/approve-with-counteroffer', requireAdmin, async (re
         const requestedFormatted = requestedAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const approvedFormatted = parseFloat(approvedAmount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-        // Email de contraproposta
-        if (request.email) {
-            const emailContent = brandedEmailHtml(`
-                <h2 style="color: #D4AF37;">🎉 Crédito Pré-Aprovado!</h2>
-                <p>Olá, <strong>${request.clientName}</strong>!</p>
-                <p>Temos uma ótima notícia! Seu pedido de crédito foi analisado e <strong style="color: #4CAF50;">PRÉ-APROVADO</strong>!</p>
+        if (needsAcceptance) {
+            // CONTRAPROPOSTA - precisa aceite do cliente
+            // Email de contraproposta
+            if (request.email) {
+                const emailContent = brandedEmailHtml(`
+                    <h2 style="color: #D4AF37;">🎉 Crédito Pré-Aprovado!</h2>
+                    <p>Olá, <strong>${request.clientName}</strong>!</p>
+                    <p>Temos uma ótima notícia! Seu pedido de crédito foi analisado e <strong style="color: #4CAF50;">PRÉ-APROVADO</strong>!</p>
 
-                <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border: 2px solid #D4AF37; border-radius: 12px; padding: 20px; margin: 20px 0;">
-                    <p style="margin: 8px 0; color: #aaa;">Valor Solicitado:</p>
-                    <p style="margin: 8px 0; font-size: 18px; text-decoration: line-through; color: #666;">${requestedFormatted}</p>
+                    <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border: 2px solid #D4AF37; border-radius: 12px; padding: 20px; margin: 20px 0;">
+                        <p style="margin: 8px 0; color: #aaa;">Valor Solicitado:</p>
+                        <p style="margin: 8px 0; font-size: 18px; text-decoration: line-through; color: #666;">${requestedFormatted}</p>
 
-                    <p style="margin: 15px 0 8px 0; color: #D4AF37; font-weight: bold;">💰 Valor Liberado:</p>
-                    <p style="margin: 8px 0; font-size: 32px; font-weight: bold; color: #4CAF50;">${approvedFormatted}</p>
+                        <p style="margin: 15px 0 8px 0; color: #D4AF37; font-weight: bold;">💰 Valor Liberado:</p>
+                        <p style="margin: 8px 0; font-size: 32px; font-weight: bold; color: #4CAF50;">${approvedFormatted}</p>
 
-                    <p style="margin: 15px 0 5px 0; color: #aaa; font-size: 13px;">
-                        ✅ Crédito disponível para saque<br>
-                        ✅ Sem consulta ao SPC/Serasa<br>
-                        ✅ Aprovação em minutos
+                        <p style="margin: 15px 0 5px 0; color: #aaa; font-size: 13px;">
+                            ✅ Crédito disponível para saque<br>
+                            ✅ Sem consulta ao SPC/Serasa<br>
+                            ✅ Aprovação em minutos
+                        </p>
+                    </div>
+
+                    <div style="background: #1a1a1a; border-left: 4px solid #D4AF37; padding: 15px; margin: 20px 0;">
+                        <p style="margin: 0; color: #D4AF37; font-weight: bold;">⚡ AÇÃO NECESSÁRIA</p>
+                        <p style="margin: 10px 0 0 0;">Acesse o app agora e clique em <strong>"Aceitar Contrato"</strong> para liberar o saldo na sua conta!</p>
+                    </div>
+
+                    <p style="text-align: center; margin: 25px 0;">
+                        <a href="https://www.tubaraoemprestimo.com.br" style="display: inline-block; background: #D4AF37; color: #000; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                            ✍️ ACEITAR CONTRATO
+                        </a>
                     </p>
-                </div>
 
-                <div style="background: #1a1a1a; border-left: 4px solid #D4AF37; padding: 15px; margin: 20px 0;">
-                    <p style="margin: 0; color: #D4AF37; font-weight: bold;">⚡ AÇÃO NECESSÁRIA</p>
-                    <p style="margin: 10px 0 0 0;">Acesse o app agora e clique em <strong>"Aceitar Contrato"</strong> para liberar o saldo na sua conta!</p>
-                </div>
+                    <p style="color: #888; font-size: 13px; margin-top: 20px;">
+                        <strong>Importante:</strong> Esta oferta é válida por 48 horas. Após este prazo, será necessário fazer uma nova análise.
+                    </p>
+                `);
+                emailService.send(request.email, '🎉 Crédito Pré-Aprovado — Aceite Agora!', emailContent).catch(() => { });
+            }
 
-                <p style="text-align: center; margin: 25px 0;">
-                    <a href="https://www.tubaraoemprestimo.com.br" style="display: inline-block; background: #D4AF37; color: #000; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-                        ✍️ ACEITAR CONTRATO
-                    </a>
-                </p>
+            // WhatsApp de contraproposta
+            if (request.phone) {
+                const waMsg = `🎉 *CRÉDITO PRÉ-APROVADO!*\n\n` +
+                    `Olá, ${request.clientName.split(' ')[0]}!\n\n` +
+                    `Seu pedido foi analisado e temos uma ótima notícia:\n\n` +
+                    `💰 *Valor Liberado:* ${approvedFormatted}\n` +
+                    `📊 *Parcelas:* ${request.installments}x\n\n` +
+                    `✅ Crédito disponível para saque\n` +
+                    `✅ Sem consulta ao SPC/Serasa\n` +
+                    `✅ Aprovação em minutos\n\n` +
+                    `⚡ *AÇÃO NECESSÁRIA:*\n` +
+                    `Acesse o app e clique em *"Aceitar Contrato"* para liberar o saldo!\n\n` +
+                    `🔗 https://www.tubaraoemprestimo.com.br\n\n` +
+                    `⏰ Oferta válida por 48 horas.\n\n` +
+                    `_Tubarão Empréstimos 🦈_`;
 
-                <p style="color: #888; font-size: 13px; margin-top: 20px;">
-                    <strong>Importante:</strong> Esta oferta é válida por 48 horas. Após este prazo, será necessário fazer uma nova análise.
-                </p>
-            `);
-            emailService.send(request.email, '🎉 Crédito Pré-Aprovado — Aceite Agora!', emailContent).catch(() => { });
-        }
+                sendWhatsAppNotification(request.phone, waMsg);
+            }
+        } else {
+            // MESMO VALOR - aprovado direto, notificar que está aprovado
+            if (request.email) {
+                const emailContent = brandedEmailHtml(`
+                    <h2 style="color: #4CAF50;">✅ Crédito Aprovado!</h2>
+                    <p>Olá, <strong>${request.clientName}</strong>!</p>
+                    <p>Seu pedido de crédito foi <strong style="color: #4CAF50;">APROVADO</strong>!</p>
 
-        // WhatsApp de contraproposta
-        if (request.phone) {
-            const waMsg = `🎉 *CRÉDITO PRÉ-APROVADO!*\n\n` +
-                `Olá, ${request.clientName.split(' ')[0]}!\n\n` +
-                `Seu pedido foi analisado e temos uma ótima notícia:\n\n` +
-                `💰 *Valor Liberado:* ${approvedFormatted}\n` +
-                `📊 *Parcelas:* ${request.installments}x\n\n` +
-                `✅ Crédito disponível para saque\n` +
-                `✅ Sem consulta ao SPC/Serasa\n` +
-                `✅ Aprovação em minutos\n\n` +
-                `⚡ *AÇÃO NECESSÁRIA:*\n` +
-                `Acesse o app e clique em *"Aceitar Contrato"* para liberar o saldo!\n\n` +
-                `🔗 https://www.tubaraoemprestimo.com.br\n\n` +
-                `⏰ Oferta válida por 48 horas.\n\n` +
-                `_Tubarão Empréstimos 🦈_`;
+                    <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border: 2px solid #4CAF50; border-radius: 12px; padding: 20px; margin: 20px 0;">
+                        <p style="margin: 15px 0 8px 0; color: #4CAF50; font-weight: bold;">💰 Valor Aprovado:</p>
+                        <p style="margin: 8px 0; font-size: 32px; font-weight: bold; color: #4CAF50;">${approvedFormatted}</p>
+                        <p style="margin: 8px 0; color: #aaa;">Parcelas: ${request.installments}x</p>
+                    </div>
 
-            sendWhatsAppNotification(request.phone, waMsg);
+                    <p>Aguarde o contato da nossa equipe para finalizar o processo e liberar o crédito!</p>
+                `);
+                emailService.send(request.email, '✅ Crédito Aprovado!', emailContent).catch(() => { });
+            }
+
+            if (request.phone) {
+                const waMsg = `✅ *CRÉDITO APROVADO!*\n\n` +
+                    `Olá, ${request.clientName.split(' ')[0]}!\n\n` +
+                    `Seu pedido foi aprovado:\n\n` +
+                    `💰 *Valor:* ${approvedFormatted}\n` +
+                    `📊 *Parcelas:* ${request.installments}x\n\n` +
+                    `Aguarde o contato da nossa equipe para finalizar!\n\n` +
+                    `_Tubarão Empréstimos 🦈_`;
+
+                sendWhatsAppNotification(request.phone, waMsg);
+            }
         }
 
         // Notificação no sistema
@@ -1447,6 +1501,13 @@ loanRequestsRouter.put('/:id/accept-counteroffer', async (req: Request, res: Res
             }).catch(() => { });
         }
 
+        // 🔥 NOTIFICAR ADMIN que cliente aceitou
+        await sendPushToRole('ADMIN', {
+            title: '✅ Contraproposta Aceita',
+            body: `${updatedRequest.clientName} aceitou ${approvedFormatted}`,
+            data: { type: 'COUNTEROFFER_ACCEPTED', requestId: updatedRequest.id }
+        }).catch(() => { });
+
         res.json({ success: true, request: updatedRequest });
     } catch (error: any) {
         console.error('[LoanRequests] Accept counteroffer error:', error);
@@ -1587,18 +1648,59 @@ loanRequestsRouter.put('/:id/supplemental', requireAdmin, async (req: Request, r
 // PUT /api/loan-requests/:id/supplemental-upload — Upload doc suplementar
 loanRequestsRouter.put('/:id/supplemental-upload', async (req: Request, res: Response) => {
     try {
-        const { docUrl } = req.body;
-        await prisma.loanRequest.update({
-            where: { id: req.params.id as string },
+        const { docUrl, addressProofUrl, instagramHandle } = req.body;
+        const id = req.params.id as string;
+
+        // Buscar solicitação para validar e notificar
+        const loanRequest = await prisma.loanRequest.findUnique({
+            where: { id }
+        });
+
+        if (!loanRequest) {
+            return res.status(404).json({ error: 'Solicitação não encontrada' });
+        }
+
+        // Verificar se é o dono da solicitação (cliente só pode enviar seus próprios docs)
+        if (req.user!.role !== 'ADMIN' && loanRequest.userId !== req.user!.id) {
+            return res.status(403).json({ error: 'Não autorizado' });
+        }
+
+        // Atualizar documentos e voltar status para PENDING
+        const updated = await prisma.loanRequest.update({
+            where: { id },
             data: {
-                supplementalDocUrl: docUrl,
+                supplementalDocUrl: docUrl || loanRequest.supplementalDocUrl,
+                addressProofUrl: addressProofUrl || loanRequest.addressProofUrl,
+                instagramHandle: instagramHandle || loanRequest.instagramHandle,
                 supplementalUploadedAt: new Date(),
-                status: 'PENDING'
+                status: 'PENDING' // Volta para análise do admin
             }
         });
-        res.json({ success: true });
+
+        // Notificar admin que documentos foram enviados
+        await sendPushToRole('ADMIN', {
+            title: '📄 Documentos Adicionais Enviados',
+            body: `${loanRequest.clientName} enviou os documentos solicitados`,
+            data: { type: 'DOCS_UPLOADED', requestId: id }
+        });
+
+        // Criar notificação no banco para admin
+        await prisma.notification.create({
+            data: {
+                customerId: null,
+                customerEmail: null,
+                title: '📄 Documentos Adicionais Enviados',
+                message: `${loanRequest.clientName} enviou os documentos solicitados. Clique para revisar.`,
+                type: 'DOCS_UPLOADED',
+                metadata: JSON.stringify({ requestId: id }),
+                isRead: false
+            }
+        });
+
+        res.json({ success: true, request: updated });
     } catch (error) {
-        res.status(500).json({ error: 'Erro' });
+        console.error('Erro ao enviar documentos adicionais:', error);
+        res.status(500).json({ error: 'Erro ao enviar documentos' });
     }
 });
 

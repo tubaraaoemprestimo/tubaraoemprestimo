@@ -460,8 +460,10 @@ if (user) {
                   await apiService.acceptCounteroffer(pendingRequest.id);
                   addToast('Contrato aceito! Seu crédito está sendo processado.', 'success');
                   loadDashboardData();
-                } catch (error) {
-                  addToast('Erro ao aceitar contrato', 'error');
+                } catch (error: any) {
+                  console.error('Erro ao aceitar contraproposta:', error);
+                  const errorMsg = error.response?.data?.error || error.message || 'Erro ao aceitar contrato';
+                  addToast(errorMsg, 'error');
                 }
               }}
               className="w-full bg-[#D4AF37] hover:bg-[#B5942F] text-black font-bold py-4 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg"
