@@ -4,7 +4,6 @@ import { authenticate, requireAdmin } from '../middleware/auth';
 import webpush from 'web-push';
 
 export const pushRouter = Router();
-pushRouter.use(authenticate);
 
 // ============ Web Push Configuration ============
 
@@ -16,6 +15,26 @@ const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@tubarao.com';
 if (vapidPublicKey && vapidPrivateKey) {
     webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 }
+
+// ============ PUBLIC ENDPOINTS (before authentication) ============
+
+// GET /api/push/vapid-key - Public endpoint to get VAPID public key
+pushRouter.get('/vapid-key', async (_req: Request, res: Response) => {
+    try {
+        if (!vapidPublicKey) {
+            res.json({ publicKey: null, message: 'VAPID keys não configuradas' });
+            return;
+        }
+        res.json({ publicKey: vapidPublicKey });
+    } catch {
+        res.status(500).json({ error: 'Erro ao buscar VAPID key' });
+    }
+});
+
+// ============ AUTHENTICATED ENDPOINTS ============
+
+// Apply authentication to all routes below
+pushRouter.use(authenticate);
 
 // ============ Helper: Send Push to Subscription ============
 
@@ -367,17 +386,4 @@ pushRouter.delete('/subscriptions/:id', async (req: Request, res: Response) => {
     }
 });
 
-// GET /api/push/vapid-key - Retorna a VAPID public key (para o frontend se inscrever)
-pushRouter.get('/vapid-key', async (_req: Request, res: Response) => {
-    try {
-        if (!vapidPublicKey) {
-            // Return 200 with null key instead of 500 to avoid noisy console errors
-            res.json({ publicKey: null, message: 'VAPID keys não configuradas' });
-            return;
-        }
-        res.json({ publicKey: vapidPublicKey });
-    } catch {
-        res.status(500).json({ error: 'Erro ao buscar VAPID key' });
-    }
-});
 
