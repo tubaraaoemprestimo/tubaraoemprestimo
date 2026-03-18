@@ -64,8 +64,13 @@ aiRouter.post('/generate-caption-from-url', async (req: Request, res: Response) 
       Retorne APENAS o texto da legenda.
     `;
 
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    console.log('[AI] Calling Gemini API:', geminiUrl.replace(apiKey, 'API_KEY_HIDDEN'));
+    console.log('[AI] Image size:', imageSize, 'bytes');
+    console.log('[AI] MIME type:', imageResponse.headers['content-type']);
+
     const geminiResponse = await axios.post(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      geminiUrl,
       {
         contents: [{
           parts: [
@@ -99,7 +104,13 @@ aiRouter.post('/generate-caption-from-url', async (req: Request, res: Response) 
 
   } catch (error: any) {
     console.error('[AI] Caption generation failed:', error.message);
-    console.error('[AI] Full error:', error.response?.data || error);
+    console.error('[AI] Status code:', error.response?.status);
+    console.error('[AI] Response headers:', error.response?.headers);
+    console.error('[AI] Response data (first 500 chars):',
+      typeof error.response?.data === 'string'
+        ? error.response?.data.substring(0, 500)
+        : JSON.stringify(error.response?.data).substring(0, 500)
+    );
 
     // Return fallback caption
     return res.json({
