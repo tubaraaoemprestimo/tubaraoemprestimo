@@ -42,7 +42,8 @@ async function postStatusToWhatsApp(
     } catch (error: any) {
         const errorMsg = error.response?.data?.message || error.message || 'Erro desconhecido ao postar status';
         console.error('[WhatsApp Status] Erro ao postar:', errorMsg);
-        console.error('[WhatsApp Status] Full error:', error.response?.data || error.message);
+        console.error('[WhatsApp Status] Full error:', JSON.stringify(error.response?.data, null, 2) || error.message);
+        console.error('[WhatsApp Status] Status code:', error.response?.status);
         return { success: false, error: errorMsg };
     }
 }
