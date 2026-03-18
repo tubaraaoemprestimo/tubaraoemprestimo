@@ -93,6 +93,7 @@ export const Contracts: React.FC = () => {
   const [selectedInstallment, setSelectedInstallment] = useState<ContractInstallment | null>(null);
   const [paymentData, setPaymentData] = useState({ amount: '', paymentMethod: 'PIX', receiptUrl: '', notes: '' });
   const [registering, setRegistering] = useState(false);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -151,6 +152,35 @@ export const Contracts: React.FC = () => {
     setSelectedInstallment(inst);
     setPaymentData({ amount: String(inst.amount), paymentMethod: 'PIX', receiptUrl: '', notes: '' });
     setPaymentOpen(true);
+  };
+
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      addToast('Arquivo muito grande. Máximo 5MB.', 'error');
+      return;
+    }
+
+    setUploadingReceipt(true);
+    try {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        setPaymentData(d => ({ ...d, receiptUrl: base64 }));
+        addToast('Comprovante carregado!', 'success');
+        setUploadingReceipt(false);
+      };
+      reader.onerror = () => {
+        addToast('Erro ao ler arquivo', 'error');
+        setUploadingReceipt(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      addToast('Erro ao fazer upload', 'error');
+      setUploadingReceipt(false);
+    }
   };
 
   const handleRegisterPayment = async () => {
@@ -508,14 +538,49 @@ export const Contracts: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold mb-1">URL do Comprovante (opcional)</label>
-                <input
-                  type="text"
-                  value={paymentData.receiptUrl}
-                  onChange={e => setPaymentData(d => ({ ...d, receiptUrl: e.target.value }))}
-                  className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white focus:border-[#D4AF37] outline-none"
-                  placeholder="https://..."
-                />
+                <label className="block text-sm font-bold mb-1">Comprovante (PDF ou Imagem)</label>
+                {!paymentData.receiptUrl ? (
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-zinc-700 rounded-lg cursor-pointer hover:border-[#D4AF37] transition-colors bg-black">
+                    <Upload size={32} className="text-zinc-500 mb-2" />
+                    <span className="text-sm text-zinc-500">
+                      {uploadingReceipt ? 'Carregando...' : 'Clique para anexar PDF ou imagem'}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={handleReceiptUpload}
+                      disabled={uploadingReceipt}
+                      className="hidden"
+                    />
+                  </label>
+                ) : (
+                  <div className="relative">
+                    {paymentData.receiptUrl.includes('application/pdf') ? (
+                      <div className="bg-black border border-zinc-700 rounded-lg p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText size={24} className="text-red-400" />
+                          <span className="text-sm text-white">Comprovante.pdf</span>
+                        </div>
+                        <button
+                          onClick={() => setPaymentData(d => ({ ...d, receiptUrl: '' }))}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <img src={paymentData.receiptUrl} alt="Preview" className="w-full h-48 object-cover rounded-lg border border-zinc-700" />
+                        <button
+                          onClick={() => setPaymentData(d => ({ ...d, receiptUrl: '' }))}
+                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
