@@ -19,6 +19,10 @@ async function postStatusToWhatsApp(
         // Evolution API endpoint para postar status/stories
         const url = `${config.apiUrl}/message/sendStatus/${config.instanceName}`;
 
+        console.log('[WhatsApp Status] Posting to Evolution API:', url);
+        console.log('[WhatsApp Status] Image URL:', imageUrl);
+        console.log('[WhatsApp Status] Caption:', caption);
+
         await axios.post(url, {
             statusMessage: {
                 type: 'image',
@@ -40,6 +44,7 @@ async function postStatusToWhatsApp(
     } catch (error: any) {
         const errorMsg = error.response?.data?.message || error.message || 'Erro desconhecido ao postar status';
         console.error('[WhatsApp Status] Erro ao postar:', errorMsg);
+        console.error('[WhatsApp Status] Full error:', error.response?.data || error.message);
         return { success: false, error: errorMsg };
     }
 }
