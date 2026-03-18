@@ -338,12 +338,21 @@ whatsappStatusRouter.post('/schedule-bulk', authenticate, requireAdmin, async (r
         }
 
         const created = await prisma.scheduledStatus.createMany({
-            data: records.map((r: any) => ({
-                imageUrl: r.image_url || r.imageUrl,
-                caption: r.caption || null,
-                status: 'PENDING',
-                scheduledAt: new Date(r.scheduled_at || r.scheduledAt)
-            }))
+            data: records.map((r: any) => {
+                const scheduledAt = new Date(r.scheduled_at || r.scheduledAt);
+                return {
+                    imageUrl: r.image_url || r.imageUrl,
+                    caption: r.caption || null,
+                    status: 'PENDING',
+                    scheduledAt: scheduledAt,
+                    startDate: scheduledAt,
+                    selectedDays: [],
+                    postTimes: [],
+                    recurrence: 'ONCE',
+                    postsPerDay: 1,
+                    totalDays: 1
+                };
+            })
         });
 
         res.json({ success: true, count: created.count });
