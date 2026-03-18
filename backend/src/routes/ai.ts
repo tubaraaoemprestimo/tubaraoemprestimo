@@ -128,4 +128,32 @@ aiRouter.post('/generate-caption-from-url', async (req: Request, res: Response) 
   }
 });
 
+// Temporary endpoint to list available models
+aiRouter.get('/list-models', async (req: Request, res: Response) => {
+  try {
+    const config = await prisma.aiChatbotConfig.findFirst();
+    const apiKey = config?.geminiApiKey;
+
+    if (!apiKey) {
+      return res.status(400).json({ error: 'No API key configured' });
+    }
+
+    const response = await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    const models = response.data.models.filter((m: any) =>
+      m.supportedGenerationMethods?.includes('generateContent')
+    );
+
+    return res.json({
+      models: models.map((m: any) => ({
+        name: m.name,
+        displayName: m.displayName,
+        description: m.description
+      }))
+    });
+  } catch (error: any) {
+    console.error('[AI] List models failed:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 export { aiRouter };
