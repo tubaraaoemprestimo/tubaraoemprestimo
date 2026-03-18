@@ -165,7 +165,7 @@ export const AdvancedKPIs: React.FC = () => {
     return (
         <div className="space-y-6">
             {/* Top KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 <KPICard
                     title="Total Emprestado"
                     value={formatCurrency(kpis.totalLent)}
@@ -185,7 +185,7 @@ export const AdvancedKPIs: React.FC = () => {
                 <KPICard
                     title="Clientes Cadastrados"
                     value={kpis.registeredClients.toString()}
-                    trend={`+${kpis.newClientsThisMonth} esse mês`}
+                    trend={`+${kpis.newClientsThisMonth} este mês`}
                     trendUp={true}
                     icon={Users}
                     color="blue"
@@ -193,7 +193,7 @@ export const AdvancedKPIs: React.FC = () => {
                 <KPICard
                     title="Clientes Ativos"
                     value={kpis.activeClients.toString()}
-                    trend="com empréstimo/solicitação"
+                    trend="ativos agora"
                     trendUp={true}
                     icon={Zap}
                     color="gold"
@@ -477,10 +477,10 @@ const KPICard: React.FC<{
                 <div className={`p-2 bg-zinc-900/50 rounded-lg ${iconColorMap[color]}`}>
                     <Icon size={20} />
                 </div>
-                <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${isPositive ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'
+                <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full max-w-[130px] truncate ${isPositive ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'
                     }`}>
-                    {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                    {trend}
+                    <span className="flex-shrink-0">{isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}</span>
+                    <span className="truncate">{trend}</span>
                 </div>
             </div>
             <p className="text-zinc-400 text-sm mb-1">{title}</p>
