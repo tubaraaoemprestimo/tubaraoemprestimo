@@ -24,20 +24,18 @@ async function postStatusToWhatsApp(
         console.log('[WhatsApp Status] Caption:', caption);
 
         await axios.post(url, {
-            statusMessage: {
-                type: 'image',
-                content: imageUrl,
-                caption: caption || '',
-                allContacts: true,
-                backgroundColor: '#000000',
-                font: 1
-            }
+            type: 'image',
+            content: imageUrl,
+            caption: caption || '',
+            allContacts: true,
+            backgroundColor: '#000000',
+            font: 1
         }, {
             headers: {
                 apikey: config.apiKey,
                 'Content-Type': 'application/json'
             },
-            timeout: 30000
+            timeout: 60000
         });
 
         return { success: true };
