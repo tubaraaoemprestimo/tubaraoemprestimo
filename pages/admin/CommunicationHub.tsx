@@ -78,7 +78,13 @@ export const CommunicationHub: React.FC = () => {
   // Editing states
   const [editingCampaign, setEditingCampaign] = useState<Partial<Campaign>>({});
   const [editingCoupon, setEditingCoupon] = useState<Partial<Coupon>>({ discount_percent: 10, usage_limit: 100, active: true });
-  const [newStatus, setNewStatus] = useState({ imageUrl: '', caption: '', scheduledAt: '', recurrenceType: 'once' as 'once' | 'daily' | 'weekly' | 'monthly', recurrenceCount: 1 });
+  const [newStatus, setNewStatus] = useState({
+    imageUrl: '',
+    caption: '',
+    scheduledAt: '',
+    recurrenceType: 'once' as 'once' | 'daily' | 'weekly' | 'monthly',
+    recurrenceCount: 1
+  });
 
     // Search
     const [searchTerm, setSearchTerm] = useState('');
@@ -180,7 +186,7 @@ export const CommunicationHub: React.FC = () => {
 
     const handleScheduleStatus = async () => {
         if (!newStatus.imageUrl) {
-            addToast('Informe a URL da imagem', 'warning');
+            addToast('Adicione uma imagem', 'warning');
             return;
         }
         try {
@@ -223,6 +229,29 @@ export const CommunicationHub: React.FC = () => {
             loadAllData();
         } catch {
             addToast('Erro ao agendar status', 'error');
+        }
+    };
+
+    const handleDeleteStatus = async (id: string) => {
+        if (!confirm('Excluir status agendado?')) return;
+        try {
+            await api.delete(`/whatsapp/status/${id}`);
+            addToast('Status excluído', 'success');
+            loadAllData();
+        } catch {
+            addToast('Erro ao excluir status', 'error');
+        }
+    };
+
+    const handlePostStatusNow = async (id: string) => {
+        if (!confirm('Postar este status agora?')) return;
+        try {
+            const { error } = await api.post(`/whatsapp/post-now/${id}`);
+            if (error) throw new Error();
+            addToast('Status postado com sucesso!', 'success');
+            loadAllData();
+        } catch {
+            addToast('Erro ao postar status', 'error');
         }
     };
 
@@ -968,22 +997,24 @@ export const CommunicationHub: React.FC = () => {
       <button onClick={() => setIsStatusModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
     </div>
     <div className="space-y-4">
-      <div>
-        <label className="block text-sm text-zinc-400 mb-1">URL da Imagem *</label>
-        <input value={newStatus.imageUrl} onChange={e => setNewStatus(p => ({ ...p, imageUrl: e.target.value }))}
-          placeholder="https://..." className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white text-sm" />
-      </div>
-      {newStatus.imageUrl && (
-        <div className="aspect-video bg-black rounded-lg overflow-hidden border border-zinc-800">
-          <img src={newStatus.imageUrl} alt="Preview" className="w-full h-full object-cover" />
-        </div>
-      )}
+      {/* Image Upload Component */}
+      <ImageUpload
+        label="Imagem do Status *"
+        subtitle="Envie uma imagem ou vídeo para o status do WhatsApp"
+        imageUrl={newStatus.imageUrl}
+        onUpload={(url) => setNewStatus(p => ({ ...p, imageUrl: url }))}
+        onRemove={() => setNewStatus(p => ({ ...p, imageUrl: '' }))}
+        maxSize={10}
+        aspectRatio="9:16"
+      />
+
       <div>
         <label className="block text-sm text-zinc-400 mb-1">Legenda</label>
         <textarea value={newStatus.caption} onChange={e => setNewStatus(p => ({ ...p, caption: e.target.value }))}
           placeholder="Texto do status..." rows={3} className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white text-sm" />
       </div>
-      {/* AI Caption Generator - visible when image URL is provided */}
+
+      {/* AI Caption Generator - visible when image is uploaded */}
       {newStatus.imageUrl && (
         <AIGenerateCaption
           imageBase64={newStatus.imageUrl}
