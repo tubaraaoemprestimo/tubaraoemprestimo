@@ -1880,8 +1880,7 @@ loanRequestsRouter.delete('/:id', requireAdmin, async (req: Request, res: Respon
         await prisma.loanRequest.update({
             where: { id },
             data: {
-                status: 'CANCELLED',
-                adminNotes: `Cancelado: ${reason || 'Sem motivo especificado'}`
+                status: 'CANCELLED'
             }
         });
 
@@ -1925,8 +1924,7 @@ loanRequestsRouter.put('/:id/pause', requireAdmin, async (req: Request, res: Res
         await prisma.loanRequest.update({
             where: { id },
             data: {
-                status: 'PAUSED',
-                adminNotes: `Pausado (anterior: ${request.status}). Motivo: ${reason || 'N/A'}`
+                status: 'PAUSED'
             }
         });
 
