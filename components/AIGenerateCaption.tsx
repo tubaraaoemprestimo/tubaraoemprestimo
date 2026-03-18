@@ -20,11 +20,17 @@ export const AIGenerateCaption: React.FC<Props> = ({ imageBase64, onCaptionGener
             return;
         }
 
+        console.log('[AIGenerateCaption] Starting caption generation...');
+        console.log('[AIGenerateCaption] Image URL/Base64:', imageBase64.substring(0, 100) + '...');
+        console.log('[AIGenerateCaption] Is URL?', imageBase64.startsWith('http'));
+
         setIsLoading(true);
         try {
             // Se for URL do R2, enviar diretamente para o backend (evita CORS)
             if (imageBase64.startsWith('http')) {
+                console.log('[AIGenerateCaption] Using generateImageCaptionFromUrl method');
                 const caption = await aiService.generateImageCaptionFromUrl(imageBase64);
+                console.log('[AIGenerateCaption] Caption received:', caption);
                 if (caption) {
                     onCaptionGenerated(caption);
                     addToast("Legenda gerada com sucesso! ✨", 'success');
@@ -32,8 +38,10 @@ export const AIGenerateCaption: React.FC<Props> = ({ imageBase64, onCaptionGener
                     addToast("Não foi possível gerar a legenda.", 'error');
                 }
             } else {
+                console.log('[AIGenerateCaption] Using generateImageCaption method (base64)');
                 // Se já for base64, usar método normal
                 const caption = await aiService.generateImageCaption(imageBase64);
+                console.log('[AIGenerateCaption] Caption received:', caption);
                 if (caption) {
                     onCaptionGenerated(caption);
                     addToast("Legenda gerada com sucesso! ✨", 'success');
@@ -42,7 +50,7 @@ export const AIGenerateCaption: React.FC<Props> = ({ imageBase64, onCaptionGener
                 }
             }
         } catch (error) {
-            console.error(error);
+            console.error('[AIGenerateCaption] Error:', error);
             addToast("Erro ao conectar com a IA.", 'error');
         } finally {
             setIsLoading(false);
