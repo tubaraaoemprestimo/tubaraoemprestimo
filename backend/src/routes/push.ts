@@ -127,7 +127,57 @@ export async function sendPushToRole(role: string, title: string, body: string, 
 
 // ============ ROUTES ============
 
-// POST /api/push/register - Registrar token/subscription do dispositivo
+// POST /api/push/subscriptions - Registrar FCM token (Firebase)
+pushRouter.post('/subscriptions', async (req: Request, res: Response) => {
+    try {
+        const { fcm_token, user_email, device_type, device_info, is_active, last_used_at } = req.body;
+
+        if (!fcm_token) {
+            res.status(400).json({ error: 'Campo obrigatório: fcm_token' });
+            return;
+        }
+
+        const userId = req.user!.id;
+
+        // Verifica se já existe subscription com esse token
+        const existing = await prisma.pushSubscription.findFirst({
+            where: {
+                userId,
+                endpoint: fcm_token // Reutilizamos campo endpoint para FCM token
+            }
+        });
+
+        if (existing) {
+            // Atualiza subscription existente
+            await prisma.pushSubscription.update({
+                where: { id: existing.id },
+                data: {
+                    userAgent: device_info ? JSON.stringify(device_info) : req.headers['user-agent'] || null
+                }
+            });
+            console.log(`[Push] FCM token atualizado para user ${userId}`);
+            res.json({ success: true, message: 'Token atualizado', id: existing.id });
+        } else {
+            // Cria nova subscription
+            const sub = await prisma.pushSubscription.create({
+                data: {
+                    userId,
+                    endpoint: fcm_token, // FCM token no campo endpoint
+                    p256dh: '', // Não usado para FCM
+                    auth: '', // Não usado para FCM
+                    userAgent: device_info ? JSON.stringify(device_info) : req.headers['user-agent'] || null
+                }
+            });
+            console.log(`[Push] FCM token registrado para user ${userId}`);
+            res.json({ success: true, message: 'Token registrado', id: sub.id });
+        }
+    } catch (error: any) {
+        console.error('[Push] Erro ao registrar FCM token:', error);
+        res.status(500).json({ error: 'Erro ao registrar token' });
+    }
+});
+
+// POST /api/push/register - Registrar Web Push subscription (VAPID)
 pushRouter.post('/register', async (req: Request, res: Response) => {
     try {
         const { endpoint, p256dh, auth, userAgent } = req.body;
