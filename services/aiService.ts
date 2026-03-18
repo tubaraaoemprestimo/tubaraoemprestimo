@@ -257,7 +257,8 @@ export const aiService = {
     try {
       console.log("[aiService] Generating caption from URL via backend...");
 
-      const response = await fetch('/api/ai/generate-caption-from-url', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://www.tubaraoemprestimo.com.br';
+      const response = await fetch(`${apiUrl}/api/ai/generate-caption-from-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageUrl })
