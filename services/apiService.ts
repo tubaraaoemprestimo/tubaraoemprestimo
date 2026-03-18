@@ -1013,6 +1013,12 @@ export const apiService = {
         return data;
     },
 
+    async cancelLoan(id: string, reason: string) {
+        const { data, error } = await api.delete(`/loans/${id}/cancel`, { data: { reason } });
+        if (error) throw new Error((error as any).error || 'Erro ao cancelar contrato');
+        return data;
+    },
+
     async getAdminNotifications() {
         const { data } = await api.get('/notifications/admin');
         return data || [];
