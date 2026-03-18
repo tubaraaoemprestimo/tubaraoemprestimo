@@ -224,10 +224,6 @@ export const Requests: React.FC = () => {
             addToast('Data do primeiro pagamento obrigatória', 'error');
             return;
         }
-        if (!contractData.pixReceiptUrl) {
-            addToast('Comprovante de PIX obrigatório', 'error');
-            return;
-        }
 
         setProcessing(selectedRequest.id);
         try {
