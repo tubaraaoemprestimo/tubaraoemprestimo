@@ -20,6 +20,7 @@ interface KPIData {
     totalReceived: number;
     totalPending: number;
     totalDefaulted: number;
+    registeredClients: number;
     activeClients: number;
     newClientsThisMonth: number;
     approvalRate: number;
@@ -70,6 +71,7 @@ export const AdvancedKPIs: React.FC = () => {
         totalReceived: 0,
         totalPending: 0,
         totalDefaulted: 0,
+        registeredClients: 0,
         activeClients: 0,
         newClientsThisMonth: 0,
         approvalRate: 0,
@@ -120,12 +122,22 @@ export const AdvancedKPIs: React.FC = () => {
             const projections = Array.isArray(goalsData?.projections) ? goalsData.projections : [];
             const projectedRevenue = projections.reduce((acc, p) => acc + (p?.target || 0), 0) / 12;
 
+            // Clientes cadastrados = total de customers no sistema
+            const registeredClients = customers.length;
+
+            // Clientes ativos = customers com loan ACTIVE ou solicitação em andamento
+            const activeRequestStatuses = ['PENDING', 'WAITING_DOCS', 'PENDING_ACCEPTANCE', 'APPROVED', 'ACTIVE'];
+            const activeClientIds = new Set<string>();
+            loans.forEach(l => { if (l.status === 'ACTIVE' && l.customerId) activeClientIds.add(l.customerId); });
+            requests.forEach(r => { if (activeRequestStatuses.includes(r.status) && r.customerId) activeClientIds.add(r.customerId); });
+
             setKpis({
                 totalLent: totalLent,
                 totalReceived: totalReceived,
                 totalPending: pending.reduce((a, r) => a + r.amount, 0),
                 totalDefaulted: lateAmount,
-                activeClients: customers.filter(c => c.status === 'ACTIVE').length,
+                registeredClients,
+                activeClients: activeClientIds.size,
                 newClientsThisMonth: customers.filter(c => {
                     const joinDate = new Date(c.joinedAt);
                     const now = new Date();
@@ -153,7 +165,7 @@ export const AdvancedKPIs: React.FC = () => {
     return (
         <div className="space-y-6">
             {/* Top KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <KPICard
                     title="Total Emprestado"
                     value={formatCurrency(kpis.totalLent)}
@@ -171,12 +183,20 @@ export const AdvancedKPIs: React.FC = () => {
                     color="green"
                 />
                 <KPICard
-                    title="Clientes Ativos"
-                    value={kpis.activeClients.toString()}
-                    trend={`+${kpis.newClientsThisMonth} mês`}
+                    title="Clientes Cadastrados"
+                    value={kpis.registeredClients.toString()}
+                    trend={`+${kpis.newClientsThisMonth} esse mês`}
                     trendUp={true}
                     icon={Users}
                     color="blue"
+                />
+                <KPICard
+                    title="Clientes Ativos"
+                    value={kpis.activeClients.toString()}
+                    trend="com empréstimo/solicitação"
+                    trendUp={true}
+                    icon={Zap}
+                    color="gold"
                 />
                 <KPICard
                     title="Taxa Inadimplência"
