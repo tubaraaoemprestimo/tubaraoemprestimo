@@ -323,11 +323,14 @@ export const Requests: React.FC = () => {
                 adminNotes: contractData.adminNotes || null
             };
 
+            const storedAuth = localStorage.getItem('tubarao_auth');
+            const token = storedAuth ? JSON.parse(storedAuth).accessToken : null;
+
             const response = await fetch(`${getApiBaseUrl()}/loan-requests/${selectedRequest.id}/activate-contract`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('tubarao_token')}`
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify(payload)
             });
