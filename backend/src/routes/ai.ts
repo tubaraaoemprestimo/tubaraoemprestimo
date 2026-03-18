@@ -68,7 +68,7 @@ aiRouter.post('/generate-caption-from-url', async (req: Request, res: Response) 
       Retorne APENAS o texto da legenda.
     `;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
     console.log('[AI] Calling Gemini API:', geminiUrl.replace(apiKey, 'API_KEY_HIDDEN'));
     console.log('[AI] Image size:', imageSize, 'bytes');
     console.log('[AI] MIME type:', imageResponse.headers['content-type']);
