@@ -9,6 +9,7 @@ import { dataEnrichmentService } from '../../services/dataEnrichmentService';
 import { Customer, SystemSettings } from '../../types';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
+import { api } from '../../services/apiClient';
 
 export const Customers: React.FC = () => {
   const { addToast } = useToast();
@@ -1522,6 +1523,264 @@ const SectionCard: React.FC<{ title: string; children: React.ReactNode }> = ({ t
   </div>
 );
 
+// ── MapPortal ────────────────────────────────────────────────────────────────
+const MapPortal: React.FC<{ lat: number; lng: number; label?: string }> = ({ lat, lng, label }) => {
+  const [open, setOpen] = React.useState(false);
+  React.useEffect(() => {
+    if (!open) return;
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('keydown', fn);
+    return () => document.removeEventListener('keydown', fn);
+  }, [open]);
+
+  const gmUrl = `https://www.google.com/maps?q=${lat},${lng}&z=16`;
+  const embedUrl = `https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 text-xs bg-blue-900/30 hover:bg-blue-800/50 border border-blue-700/40 text-blue-400 px-3 py-1.5 rounded-lg transition-colors font-semibold"
+      >
+        📍 Ver no Mapa
+      </button>
+      {open && ReactDOM.createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.96)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setOpen(false)}>
+          <div style={{ width: '100%', maxWidth: '800px', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <p style={{ color: '#D4AF37', fontWeight: 700 }}>📍 {label || `${lat.toFixed(6)}, ${lng.toFixed(6)}`}</p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <a href={gmUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', background: '#27272a', color: '#d4d4d8', padding: '6px 14px', borderRadius: '8px', textDecoration: 'none', border: '1px solid #3f3f46' }} onClick={e => e.stopPropagation()}>↗ Google Maps</a>
+                <button onClick={() => setOpen(false)} style={{ fontSize: '12px', background: '#27272a', color: '#a1a1aa', padding: '6px 14px', borderRadius: '8px', border: '1px solid #3f3f46', cursor: 'pointer' }}>✕ Fechar</button>
+              </div>
+            </div>
+            <div style={{ borderRadius: '12px', overflow: 'hidden', height: '500px' }}>
+              <iframe src={embedUrl} width="100%" height="100%" style={{ border: 'none' }} title="Localização" loading="lazy" />
+            </div>
+            <p style={{ color: '#52525b', fontSize: '11px', textAlign: 'center', marginTop: '8px' }}>Pressione ESC para fechar</p>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+};
+
+// ── CapivaraPanel ────────────────────────────────────────────────────────────
+const CapivaraPanel: React.FC<{ cpf: string }> = ({ cpf }) => {
+  const [status, setStatus] = React.useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const [data, setData] = React.useState<any>(null);
+  const [error, setError] = React.useState('');
+
+  const pull = async () => {
+    const clean = cpf.replace(/\D/g, '');
+    if (!clean || clean.length !== 11) { setError('CPF inválido'); setStatus('error'); return; }
+    setStatus('loading');
+    setError('');
+    try {
+      const { data: resp, error: err } = await api.post<any>('/trackflow/query', { apiType: 'cpf', queryParams: { cpf: clean } }, { timeout: 90000 } as any);
+      if (err || !resp?.success) { setError(err?.error || resp?.error || 'Erro na consulta'); setStatus('error'); return; }
+      setData(resp.data);
+      setStatus('done');
+    } catch (e: any) {
+      setError(e.message || 'Erro desconhecido');
+      setStatus('error');
+    }
+  };
+
+  const fmt = (v: any) => v ? String(v) : '—';
+  const fmtPhone = (t: string) => t ? t.replace(/(\d{2})(\d{4,5})(\d{4})/, '($1) $2-$3') : '';
+
+  if (status === 'idle') return (
+    <button onClick={pull} className="flex items-center gap-2 text-sm bg-gradient-to-r from-[#D4AF37]/20 to-yellow-900/20 hover:from-[#D4AF37]/40 hover:to-yellow-900/40 border border-[#D4AF37]/40 text-[#D4AF37] px-4 py-2 rounded-xl transition-all font-bold">
+      🦦 Puxar Capivara (TrackFlow)
+    </button>
+  );
+
+  if (status === 'loading') return (
+    <div className="flex items-center gap-3 bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+      <div className="w-5 h-5 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+      <span className="text-zinc-400 text-sm">Consultando TrackFlow... Aguarde</span>
+    </div>
+  );
+
+  if (status === 'error') return (
+    <div className="bg-red-900/20 border border-red-700/40 rounded-xl p-4 flex items-center justify-between">
+      <span className="text-red-400 text-sm">❌ {error}</span>
+      <button onClick={pull} className="text-xs bg-zinc-800 text-zinc-300 px-3 py-1.5 rounded-lg hover:bg-zinc-700">Tentar novamente</button>
+    </div>
+  );
+
+  if (status === 'done' && data) {
+    const pessoa = data?.consulta || data?.consulta?.[0]?.consulta || {};
+    const cad = pessoa?.cadastral || {};
+    const enderecos: any[] = pessoa?.enderecos || [];
+    const telefones: any[] = pessoa?.telefones || [];
+    const emails: any[] = pessoa?.emails || [];
+    const empregos: any[] = pessoa?.empregos || pessoa?.relacaoEmprego || [];
+    const vinculos: any[] = pessoa?.vinculos || [];
+    const dividas: any[] = pessoa?.dividas || pessoa?.restricoes || [];
+    const protestos: any[] = pessoa?.protestos || [];
+    const processos: any[] = pessoa?.processos || [];
+
+    const sRow = (label: string, val: any) => val ? (
+      <div key={label} className="flex justify-between py-1 border-b border-zinc-800/50 text-sm">
+        <span className="text-zinc-500">{label}</span>
+        <span className="text-white font-semibold text-right max-w-[60%]">{fmt(val)}</span>
+      </div>
+    ) : null;
+
+    return (
+      <div className="space-y-4 mt-2">
+        <div className="flex items-center justify-between">
+          <p className="text-[#D4AF37] font-bold flex items-center gap-2">🦦 Capivara TrackFlow <span className="text-xs text-green-400 bg-green-900/30 px-2 py-0.5 rounded-full">✓ Consultado</span></p>
+          <button onClick={() => setStatus('idle')} className="text-xs text-zinc-500 hover:text-white">Ocultar</button>
+        </div>
+
+        {/* Cadastral */}
+        <div className="bg-black border border-zinc-800 rounded-xl p-4">
+          <p className="text-zinc-400 text-xs font-bold uppercase mb-2">📋 Dados Cadastrais</p>
+          <div className="space-y-0.5">
+            {sRow('Nome', cad.nome)}
+            {sRow('CPF', cad.cpf)}
+            {sRow('Data Nasc.', cad.dataNasc)}
+            {sRow('Idade', cad.idade ? `${cad.idade} anos` : null)}
+            {sRow('Sexo', cad.sexo === 'M' ? 'Masculino' : cad.sexo === 'F' ? 'Feminino' : cad.sexo)}
+            {sRow('Naturalidade', cad.naturalidade)}
+            {sRow('Mãe', cad.mae?.nome)}
+            {sRow('Pai', cad.pai?.nome)}
+            {sRow('Renda Est.', cad.renda)}
+            {sRow('Escolaridade', cad.escolaridade)}
+            {sRow('Classe Social', cad.classeSocial ? `${cad.classeSocial}${cad.subClasseSocial ? ` / ${cad.subClasseSocial}` : ''}` : null)}
+            {sRow('RG', cad.rg?.numero)}
+          </div>
+        </div>
+
+        {/* Endereços */}
+        {enderecos.length > 0 && (
+          <div className="bg-black border border-zinc-800 rounded-xl p-4">
+            <p className="text-zinc-400 text-xs font-bold uppercase mb-2">🏠 Endereços ({enderecos.length})</p>
+            <div className="space-y-2">
+              {enderecos.slice(0, 5).map((e: any, i: number) => (
+                <div key={i} className="bg-zinc-900 rounded-lg p-3 text-sm">
+                  <p className="text-white font-semibold">{e.endereco}{e.numero ? `, ${e.numero}` : ''}{e.complemento ? ` — ${e.complemento}` : ''}</p>
+                  <p className="text-zinc-400">{e.bairro} · {e.cidade}/{e.uf} · CEP {e.cep}</p>
+                  {e.classificacao && <span className={`text-xs px-1.5 py-0.5 rounded mt-1 inline-block font-bold ${e.classificacao === 'A' ? 'bg-green-900/50 text-green-400' : 'bg-zinc-700 text-zinc-400'}`}>{e.classificacao}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Telefones */}
+        {telefones.length > 0 && (
+          <div className="bg-black border border-zinc-800 rounded-xl p-4">
+            <p className="text-zinc-400 text-xs font-bold uppercase mb-2">📞 Telefones ({telefones.length})</p>
+            <div className="grid grid-cols-2 gap-2">
+              {telefones.slice(0, 10).map((t: any, i: number) => (
+                <div key={i} className="bg-zinc-900 rounded-lg p-2 text-sm flex items-center justify-between">
+                  <div>
+                    <p className="text-white font-semibold">{fmtPhone(t.telefone || t.ddd + t.numero)}</p>
+                    <p className="text-zinc-500 text-xs">{t.tipo === 3 ? 'Celular' : t.tipo === 1 ? 'Fixo' : 'Outro'}{t.classificacao ? ` · ${t.classificacao}` : ''}</p>
+                  </div>
+                  <a href={`https://wa.me/55${(t.telefone || t.ddd + t.numero)?.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-green-400 hover:text-green-300 text-xs">💬</a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* E-mails */}
+        {emails.length > 0 && (
+          <div className="bg-black border border-zinc-800 rounded-xl p-4">
+            <p className="text-zinc-400 text-xs font-bold uppercase mb-2">✉️ E-mails ({emails.length})</p>
+            <div className="space-y-1">
+              {emails.slice(0, 6).map((e: any, i: number) => (
+                <p key={i} className="text-white text-sm bg-zinc-900 rounded-lg px-3 py-2">{e.email || e}</p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empregos */}
+        {empregos.length > 0 && (
+          <div className="bg-black border border-zinc-800 rounded-xl p-4">
+            <p className="text-zinc-400 text-xs font-bold uppercase mb-2">💼 Empregos ({empregos.length})</p>
+            <div className="space-y-2">
+              {empregos.slice(0, 5).map((e: any, i: number) => (
+                <div key={i} className="bg-zinc-900 rounded-lg p-3 text-sm">
+                  <p className="text-white font-semibold">{e.razaoSocial || e.empresa || e.nome}</p>
+                  {e.cnpj && <p className="text-zinc-400 text-xs">CNPJ: {e.cnpj}</p>}
+                  {e.cargo && <p className="text-zinc-400 text-xs">Cargo: {e.cargo}</p>}
+                  {e.salario && <p className="text-[#D4AF37] text-xs font-bold">Salário: R$ {Number(e.salario).toLocaleString('pt-BR')}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Dívidas / Restrições */}
+        {dividas.length > 0 && (
+          <div className="bg-red-950/30 border border-red-800/40 rounded-xl p-4">
+            <p className="text-red-400 text-xs font-bold uppercase mb-2">⚠️ Restrições / Dívidas ({dividas.length})</p>
+            <div className="space-y-1">
+              {dividas.slice(0, 5).map((d: any, i: number) => (
+                <div key={i} className="bg-black rounded-lg p-3 text-sm">
+                  <p className="text-white font-semibold">{d.credor || d.empresa || d.nome || 'Restrição'}</p>
+                  {d.valor && <p className="text-red-400 font-bold">R$ {Number(d.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>}
+                  {d.dataOcorrencia && <p className="text-zinc-500 text-xs">{d.dataOcorrencia}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Vínculos */}
+        {vinculos.length > 0 && (
+          <div className="bg-black border border-zinc-800 rounded-xl p-4">
+            <p className="text-zinc-400 text-xs font-bold uppercase mb-2">🔗 Vínculos ({vinculos.length})</p>
+            <div className="space-y-1">
+              {vinculos.slice(0, 5).map((v: any, i: number) => (
+                <div key={i} className="bg-zinc-900 rounded-lg p-2 text-sm">
+                  <p className="text-white">{v.nome || v.razaoSocial}</p>
+                  {v.cpf && <p className="text-zinc-500 text-xs">CPF: {v.cpf}</p>}
+                  {v.tipo && <p className="text-zinc-500 text-xs">{v.tipo}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {protestos.length > 0 && (
+          <div className="bg-red-950/20 border border-red-800/40 rounded-xl p-4">
+            <p className="text-red-400 text-xs font-bold uppercase mb-2">🚨 Protestos ({protestos.length})</p>
+            {protestos.slice(0, 3).map((p: any, i: number) => (
+              <div key={i} className="bg-black rounded-lg p-2 text-sm mb-1">
+                <p className="text-white">{p.cartorio || p.nome}</p>
+                {p.valor && <p className="text-red-400 font-bold">R$ {Number(p.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {processos.length > 0 && (
+          <div className="bg-orange-950/20 border border-orange-800/40 rounded-xl p-4">
+            <p className="text-orange-400 text-xs font-bold uppercase mb-2">⚖️ Processos ({processos.length})</p>
+            {processos.slice(0, 3).map((p: any, i: number) => (
+              <div key={i} className="bg-black rounded-lg p-2 text-sm mb-1">
+                <p className="text-white">{p.numero || p.processo || 'Processo'}</p>
+                {p.vara && <p className="text-zinc-400 text-xs">{p.vara}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+};
+
 const HistoryModal: React.FC<{ customer: any; loading: boolean; onClose: () => void }> = ({ customer, loading, onClose }) => {
   const fmt = (v: number) => `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
   const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '-';
@@ -1547,7 +1806,10 @@ const HistoryModal: React.FC<{ customer: any; loading: boolean; onClose: () => v
             <BarChart2 size={20} /> Histórico Completo
             {customer && <span className="text-zinc-400 font-normal text-base ml-2">— {customer.name}</span>}
           </h3>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white p-1"><X /></button>
+          <div className="flex items-center gap-3">
+            {customer?.cpf && <CapivaraPanel cpf={customer.cpf} />}
+            <button onClick={onClose} className="text-zinc-500 hover:text-white p-1"><X /></button>
+          </div>
         </div>
 
         <div className="p-6 space-y-5">
@@ -1565,7 +1827,18 @@ const HistoryModal: React.FC<{ customer: any; loading: boolean; onClose: () => v
                   <Field label="Telefone" value={customer.phone} />
                   <Field label="E-mail" value={customer.email} />
                   <Field label="Data de Nascimento" value={customer.birthDate} />
-                  <Field label="Instagram" value={customer.instagram} />
+                  {customer.instagram && (
+                    <div>
+                      <p className="text-zinc-500 text-xs">Instagram</p>
+                      <a
+                        href={`https://instagram.com/${customer.instagram.replace(/^@/, '')}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="text-pink-400 hover:text-pink-300 font-semibold text-sm flex items-center gap-1"
+                      >
+                        📸 @{customer.instagram.replace(/^@/, '')}
+                      </a>
+                    </div>
+                  )}
                   <Field label="Renda Mensal" value={customer.monthlyIncome ? fmt(customer.monthlyIncome) : null} />
                   <Field label="Score Interno" value={customer.internalScore} />
                   <Field label="Status" value={customer.status} />
@@ -1762,11 +2035,28 @@ const HistoryModal: React.FC<{ customer: any; loading: boolean; onClose: () => v
 
                               {/* Outros campos */}
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                                {parsed.instagram && <Field label="Instagram" value={parsed.instagram} />}
+                                {parsed.instagram && (
+                                  <div>
+                                    <p className="text-zinc-500 text-xs">Instagram</p>
+                                    <a href={`https://instagram.com/${parsed.instagram.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:text-pink-300 font-semibold text-sm flex items-center gap-1">
+                                      📸 @{parsed.instagram.replace(/^@/, '')}
+                                    </a>
+                                  </div>
+                                )}
                                 {parsed.occupation && <Field label="Ocupação" value={parsed.occupation} />}
                                 {parsed.accountHolderCpf && <Field label="CPF do Titular da Conta" value={parsed.accountHolderCpf} />}
-                                {parsed.location && <Field label="Localização GPS" value={`${parsed.location.latitude?.toFixed(6)}, ${parsed.location.longitude?.toFixed(6)}`} />}
                               </div>
+
+                              {/* Localização com mapa */}
+                              {parsed.location?.latitude && parsed.location?.longitude && (
+                                <div className="flex items-center gap-3">
+                                  <div>
+                                    <p className="text-zinc-500 text-xs">Localização GPS</p>
+                                    <p className="text-zinc-300 text-sm">{parsed.location.latitude.toFixed(6)}, {parsed.location.longitude.toFixed(6)}</p>
+                                  </div>
+                                  <MapPortal lat={parsed.location.latitude} lng={parsed.location.longitude} label={parsed.address || 'Localização capturada'} />
+                                </div>
+                              )}
 
                               {/* Fotos da casa */}
                               {parsed.housePhotos && parsed.housePhotos.length > 0 && (
