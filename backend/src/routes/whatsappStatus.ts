@@ -56,12 +56,20 @@ whatsappStatusRouter.post('/schedule-status', authenticate, requireAdmin, async 
             return;
         }
 
+        const scheduledDate = scheduledAt ? new Date(scheduledAt) : new Date();
+
         const scheduled = await prisma.scheduledStatus.create({
             data: {
                 imageUrl,
                 caption: caption || null,
                 status: 'PENDING',
-                scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date()
+                scheduledAt: scheduledDate,
+                startDate: scheduledDate,
+                selectedDays: [],
+                postTimes: [],
+                recurrence: 'ONCE',
+                postsPerDay: 1,
+                totalDays: 1
             }
         });
 
