@@ -1339,114 +1339,11 @@ export const Customers: React.FC = () => {
 
       {/* History Modal */}
       {historyModalOpen && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in duration-200">
-            <div className="sticky top-0 bg-zinc-900 flex justify-between items-center p-6 border-b border-zinc-800 z-10">
-              <h3 className="text-xl font-bold text-[#D4AF37] flex items-center gap-2">
-                <BarChart2 size={20} /> Histórico Completo
-              </h3>
-              <button onClick={() => setHistoryModalOpen(false)} className="text-zinc-500 hover:text-white"><X /></button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {historyLoading ? (
-                <div className="text-center text-zinc-500 py-12">Carregando histórico...</div>
-              ) : historyCustomer ? (
-                <>
-                  {/* Dados Pessoais */}
-                  <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
-                    <h4 className="text-white font-bold mb-3">👤 Dados do Cliente</h4>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div><p className="text-zinc-500">Nome</p><p className="text-white font-semibold">{historyCustomer.name}</p></div>
-                      <div><p className="text-zinc-500">CPF</p><p className="text-white font-semibold">{historyCustomer.cpf}</p></div>
-                      <div><p className="text-zinc-500">Telefone</p><p className="text-white font-semibold">{historyCustomer.phone}</p></div>
-                      <div><p className="text-zinc-500">E-mail</p><p className="text-white font-semibold break-all">{historyCustomer.email}</p></div>
-                      {historyCustomer.city && <div><p className="text-zinc-500">Cidade</p><p className="text-white font-semibold">{historyCustomer.city}/{historyCustomer.state}</p></div>}
-                      <div><p className="text-zinc-500">Score Interno</p><p className="text-[#D4AF37] font-bold">{historyCustomer.internalScore || 0}</p></div>
-                    </div>
-                  </div>
-
-                  {/* Contratos Ativos */}
-                  {historyCustomer.loans && historyCustomer.loans.length > 0 && (
-                    <div>
-                      <h4 className="text-white font-bold mb-3">📋 Contratos ({historyCustomer.loans.length})</h4>
-                      <div className="space-y-3">
-                        {historyCustomer.loans.map((loan: any) => (
-                          <div key={loan.id} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
-                            <div className="flex items-center justify-between mb-3">
-                              <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                                loan.status === 'ACTIVE' ? 'bg-green-900/30 text-green-400' :
-                                loan.status === 'DEFAULT' ? 'bg-red-900/30 text-red-400' :
-                                loan.status === 'COMPLETED' ? 'bg-blue-900/30 text-blue-400' :
-                                'bg-zinc-800 text-zinc-400'
-                              }`}>{loan.status}</span>
-                              <span className="text-zinc-500 text-xs">{new Date(loan.startDate || loan.createdAt).toLocaleDateString('pt-BR')}</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div><p className="text-zinc-500">Valor</p><p className="text-white font-bold">R$ {(loan.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>
-                              <div><p className="text-zinc-500">Restante</p><p className="text-white">R$ {(loan.remainingAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>
-                            </div>
-                            {loan.installments && loan.installments.length > 0 && (
-                              <div className="mt-3">
-                                <p className="text-zinc-500 text-xs mb-2">Parcelas ({loan.installments.length})</p>
-                                <div className="space-y-1">
-                                  {loan.installments.map((inst: any, idx: number) => (
-                                    <div key={idx} className="flex items-center justify-between bg-black rounded-lg p-2 text-xs">
-                                      <span className="text-zinc-400">{new Date(inst.dueDate).toLocaleDateString('pt-BR')}</span>
-                                      <span className="text-white">R$ {(inst.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                      <span className={`px-2 py-0.5 rounded font-bold ${inst.status === 'PAID' ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}`}>{inst.status}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Solicitações */}
-                  {historyCustomer.loanRequests && historyCustomer.loanRequests.length > 0 && (
-                    <div>
-                      <h4 className="text-white font-bold mb-3">📝 Solicitações ({historyCustomer.loanRequests.length})</h4>
-                      <div className="space-y-3">
-                        {historyCustomer.loanRequests.map((req: any) => (
-                          <div key={req.id} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                                req.status === 'APPROVED' || req.status === 'PENDING_ACCEPTANCE' ? 'bg-green-900/30 text-green-400' :
-                                req.status === 'REJECTED' ? 'bg-red-900/30 text-red-400' :
-                                req.status === 'PENDING' ? 'bg-yellow-900/30 text-yellow-400' :
-                                'bg-zinc-800 text-zinc-400'
-                              }`}>{req.status}</span>
-                              <span className="text-zinc-500 text-xs">{new Date(req.createdAt).toLocaleDateString('pt-BR')}</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div><p className="text-zinc-500">Valor</p><p className="text-white font-bold">R$ {(req.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>
-                              <div><p className="text-zinc-500">Tipo</p><p className="text-white">{req.profileType || '-'}</p></div>
-                              {req.approvedAmount && <div><p className="text-zinc-500">Aprovado</p><p className="text-green-400 font-bold">R$ {req.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>}
-                            </div>
-                            {/* Documentos */}
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {req.selfieUrl && <a href={req.selfieUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded">📷 Selfie</a>}
-                              {req.idCardUrl && <a href={Array.isArray(req.idCardUrl) ? req.idCardUrl[0] : req.idCardUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded">🪪 RG/CNH</a>}
-                              {req.proofOfAddressUrl && <a href={Array.isArray(req.proofOfAddressUrl) ? req.proofOfAddressUrl[0] : req.proofOfAddressUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded">🏠 Comprov. Endereço</a>}
-                              {req.proofIncomeUrl && <a href={Array.isArray(req.proofIncomeUrl) ? req.proofIncomeUrl[0] : req.proofIncomeUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded">💼 Comprov. Renda</a>}
-                              {req.workCardUrl && <a href={Array.isArray(req.workCardUrl) ? req.workCardUrl[0] : req.workCardUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded">📄 Carteira Trabalho</a>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center text-zinc-500 py-12">Nenhum dado encontrado.</div>
-              )}
-            </div>
-          </div>
-        </div>
+        <HistoryModal
+          customer={historyCustomer}
+          loading={historyLoading}
+          onClose={() => setHistoryModalOpen(false)}
+        />
       )}
       {/* ===== MODAL: ONBOARDING VIA WHATSAPP ===== */}
       {onboardingModalOpen && (
@@ -1514,6 +1411,299 @@ export const Customers: React.FC = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// ─── HistoryModal ────────────────────────────────────────────────────────────
+const DocViewer: React.FC<{ url: string; label: string }> = ({ url, label }) => {
+  const [open, setOpen] = React.useState(false);
+  const [imgError, setImgError] = React.useState(false);
+
+  const handleOpen = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setOpen(true);
+    setImgError(false);
+  };
+
+  return (
+    <>
+      <button
+        onClick={handleOpen}
+        className="flex items-center gap-1 text-xs bg-zinc-800 hover:bg-[#D4AF37]/20 hover:text-[#D4AF37] border border-zinc-700 hover:border-[#D4AF37]/40 text-zinc-300 px-3 py-1.5 rounded-lg transition-colors"
+      >
+        <span>🔍</span> {label}
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[100] p-4" onClick={() => setOpen(false)}>
+          <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-white font-bold">{label}</p>
+              <div className="flex gap-2">
+                <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg">
+                  ↗ Abrir original
+                </a>
+                <button onClick={() => setOpen(false)} className="text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg px-3 py-1.5 text-xs">
+                  ✕ Fechar
+                </button>
+              </div>
+            </div>
+            <div className="bg-zinc-900 rounded-xl overflow-hidden flex-1 flex items-center justify-center min-h-[400px]">
+              {!imgError ? (
+                <img
+                  src={url}
+                  alt={label}
+                  className="max-w-full max-h-[75vh] object-contain rounded-lg"
+                  onError={() => setImgError(true)}
+                />
+              ) : (
+                <iframe
+                  src={url}
+                  className="w-full h-[75vh] rounded-lg"
+                  title={label}
+                  onError={() => {}}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+const Field: React.FC<{ label: string; value?: string | number | null }> = ({ label, value }) => {
+  if (!value && value !== 0) return null;
+  return (
+    <div>
+      <p className="text-zinc-500 text-xs">{label}</p>
+      <p className="text-white font-semibold text-sm">{value}</p>
+    </div>
+  );
+};
+
+const SectionCard: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+    <h4 className="text-white font-bold mb-3 text-sm">{title}</h4>
+    {children}
+  </div>
+);
+
+const HistoryModal: React.FC<{ customer: any; loading: boolean; onClose: () => void }> = ({ customer, loading, onClose }) => {
+  const fmt = (v: number) => `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '-';
+
+  const statusColor = (s: string) => {
+    if (['APPROVED', 'PENDING_ACCEPTANCE', 'ACTIVE'].includes(s)) return 'bg-green-900/30 text-green-400';
+    if (['REJECTED', 'CANCELLED'].includes(s)) return 'bg-red-900/30 text-red-400';
+    if (s === 'PENDING') return 'bg-yellow-900/30 text-yellow-400';
+    if (s === 'PAUSED') return 'bg-zinc-700 text-zinc-300';
+    return 'bg-blue-900/30 text-blue-400';
+  };
+
+  const getUrl = (v: string | string[] | null | undefined) => {
+    if (!v) return null;
+    return Array.isArray(v) ? v[0] : v;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-start justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-4xl shadow-2xl my-4">
+        <div className="sticky top-0 bg-zinc-900 flex justify-between items-center p-6 border-b border-zinc-800 z-10 rounded-t-2xl">
+          <h3 className="text-xl font-bold text-[#D4AF37] flex items-center gap-2">
+            <BarChart2 size={20} /> Histórico Completo
+            {customer && <span className="text-zinc-400 font-normal text-base ml-2">— {customer.name}</span>}
+          </h3>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white p-1"><X /></button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {loading ? (
+            <div className="text-center text-zinc-500 py-16">Carregando histórico...</div>
+          ) : !customer ? (
+            <div className="text-center text-zinc-500 py-16">Nenhum dado encontrado.</div>
+          ) : (
+            <>
+              {/* ── Dados Pessoais ── */}
+              <SectionCard title="👤 Dados Pessoais">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                  <Field label="Nome" value={customer.name} />
+                  <Field label="CPF" value={customer.cpf} />
+                  <Field label="Telefone" value={customer.phone} />
+                  <Field label="E-mail" value={customer.email} />
+                  <Field label="Data de Nascimento" value={customer.birthDate} />
+                  <Field label="Instagram" value={customer.instagram} />
+                  <Field label="Renda Mensal" value={customer.monthlyIncome ? fmt(customer.monthlyIncome) : null} />
+                  <Field label="Score Interno" value={customer.internalScore} />
+                  <Field label="Status" value={customer.status} />
+                </div>
+              </SectionCard>
+
+              {/* ── Endereço ── */}
+              {(customer.address || customer.city) && (
+                <SectionCard title="🏠 Endereço">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                    <Field label="Endereço" value={customer.address} />
+                    <Field label="Bairro" value={customer.neighborhood} />
+                    <Field label="Cidade / UF" value={customer.city ? `${customer.city}/${customer.state}` : null} />
+                    <Field label="CEP" value={customer.zipCode} />
+                  </div>
+                </SectionCard>
+              )}
+
+              {/* ── Contratos ── */}
+              {customer.loans && customer.loans.length > 0 && (
+                <div>
+                  <h4 className="text-white font-bold mb-3">📋 Contratos ({customer.loans.length})</h4>
+                  <div className="space-y-3">
+                    {customer.loans.map((loan: any) => (
+                      <div key={loan.id} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${statusColor(loan.status)}`}>{loan.status}</span>
+                          <span className="text-zinc-500 text-xs">{fmtDate(loan.startDate || loan.createdAt)}</span>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm mb-3">
+                          <Field label="Valor" value={fmt(loan.amount)} />
+                          <Field label="Restante" value={fmt(loan.remainingAmount)} />
+                          <Field label="Parcelas" value={loan.installments?.length} />
+                          <Field label="Taxa Mensal" value={loan.monthlyRate ? `${loan.monthlyRate}%` : null} />
+                        </div>
+                        {loan.installments && loan.installments.length > 0 && (
+                          <div>
+                            <p className="text-zinc-500 text-xs mb-2">Parcelas</p>
+                            <div className="space-y-1 max-h-48 overflow-y-auto">
+                              {loan.installments.map((inst: any, idx: number) => (
+                                <div key={idx} className="flex items-center justify-between bg-black rounded-lg p-2 text-xs">
+                                  <span className="text-zinc-400">Parc. {inst.installmentNumber || idx + 1} — {fmtDate(inst.dueDate)}</span>
+                                  <span className="text-white">{fmt(inst.amount)}</span>
+                                  <span className={`px-2 py-0.5 rounded font-bold ${inst.status === 'PAID' ? 'bg-green-900/50 text-green-400' : inst.status === 'CANCELLED' ? 'bg-zinc-700 text-zinc-400' : 'bg-yellow-900/50 text-yellow-400'}`}>{inst.status}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Solicitações ── */}
+              {customer.loanRequests && customer.loanRequests.length > 0 && (
+                <div>
+                  <h4 className="text-white font-bold mb-3">📝 Solicitações ({customer.loanRequests.length})</h4>
+                  <div className="space-y-4">
+                    {customer.loanRequests.map((req: any) => (
+                      <div key={req.id} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-4">
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${statusColor(req.status)}`}>{req.status}</span>
+                          <span className="text-zinc-500 text-xs">{fmtDate(req.createdAt)}</span>
+                        </div>
+
+                        {/* Dados da Solicitação */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                          <Field label="Valor Solicitado" value={fmt(req.amount)} />
+                          <Field label="Valor Aprovado" value={req.approvedAmount ? fmt(req.approvedAmount) : null} />
+                          <Field label="Parcelas" value={req.installments} />
+                          <Field label="Tipo de Perfil" value={req.profileType} />
+                          <Field label="Vencimento Preferido" value={req.preferredDueDay ? `Dia ${req.preferredDueDay}` : null} />
+                          <Field label="Renda Mensal" value={req.monthlyIncome ? fmt(req.monthlyIncome) : null} />
+                        </div>
+
+                        {/* Endereço da solicitação */}
+                        {(req.address || req.city) && (
+                          <div>
+                            <p className="text-zinc-500 text-xs mb-1 font-semibold uppercase">Endereço</p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                              <Field label="Endereço" value={req.address} />
+                              <Field label="Bairro" value={req.neighborhood} />
+                              <Field label="Cidade / UF" value={req.city ? `${req.city}/${req.state}` : null} />
+                              <Field label="CEP" value={req.zipCode} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Dados de Emprego */}
+                        {(req.companyName || req.companyProfession) && (
+                          <div>
+                            <p className="text-zinc-500 text-xs mb-1 font-semibold uppercase">Emprego</p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                              <Field label="Empresa" value={req.companyName} />
+                              <Field label="Profissão" value={req.companyProfession} />
+                              <Field label="Renda na Empresa" value={req.companyIncome ? fmt(req.companyIncome) : null} />
+                              <Field label="Trabalha Desde" value={req.companyWorkSince} />
+                              <Field label="Dia de Pagamento" value={req.companyPaymentDay ? `Dia ${req.companyPaymentDay}` : null} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Dados Bancários / PIX */}
+                        {(req.pixKey || req.bankName) && (
+                          <div>
+                            <p className="text-zinc-500 text-xs mb-1 font-semibold uppercase">Dados Bancários / PIX</p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                              <Field label="Chave PIX" value={req.pixKey} />
+                              <Field label="Tipo de Chave" value={req.pixKeyType} />
+                              <Field label="Banco" value={req.bankName} />
+                              <Field label="Agência" value={req.bankAgency} />
+                              <Field label="Conta" value={req.bankAccount} />
+                              <Field label="Tipo de Conta" value={req.bankAccountType} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Contatos de Referência */}
+                        {(req.fatherPhone || req.motherPhone || req.spousePhone) && (
+                          <div>
+                            <p className="text-zinc-500 text-xs mb-1 font-semibold uppercase">Contatos de Referência</p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                              <Field label="Pai / Responsável" value={req.fatherPhone ? `${req.fatherPhone}${req.fatherPhoneRelationship ? ` (${req.fatherPhoneRelationship})` : ''}` : null} />
+                              <Field label="Mãe / Responsável" value={req.motherPhone ? `${req.motherPhone}${req.motherPhoneRelationship ? ` (${req.motherPhoneRelationship})` : ''}` : null} />
+                              <Field label="Cônjuge" value={req.spousePhone ? `${req.spousePhone}${req.spousePhoneRelationship ? ` (${req.spousePhoneRelationship})` : ''}` : null} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Documentos */}
+                        {(req.selfieUrl || req.idCardUrl || req.idCardBackUrl || req.proofOfAddressUrl || req.proofIncomeUrl || req.workCardUrl || req.vehicleUrl || req.videoSelfieUrl || req.videoHouseUrl || req.videoVehicleUrl || req.supplementalDocUrl || req.signatureUrl) && (
+                          <div>
+                            <p className="text-zinc-500 text-xs mb-2 font-semibold uppercase">Documentos</p>
+                            <div className="flex flex-wrap gap-2">
+                              {req.selfieUrl && <DocViewer url={getUrl(req.selfieUrl)!} label="📷 Selfie" />}
+                              {req.idCardUrl && <DocViewer url={getUrl(req.idCardUrl)!} label="🪪 RG/CNH Frente" />}
+                              {req.idCardBackUrl && <DocViewer url={getUrl(req.idCardBackUrl)!} label="🪪 RG/CNH Verso" />}
+                              {req.proofOfAddressUrl && <DocViewer url={getUrl(req.proofOfAddressUrl)!} label="🏠 Comp. Endereço" />}
+                              {req.proofIncomeUrl && <DocViewer url={getUrl(req.proofIncomeUrl)!} label="💼 Comp. Renda" />}
+                              {req.workCardUrl && <DocViewer url={getUrl(req.workCardUrl)!} label="📄 Carteira de Trabalho" />}
+                              {req.vehicleUrl && <DocViewer url={getUrl(req.vehicleUrl)!} label="🚗 Veículo" />}
+                              {req.videoSelfieUrl && <DocViewer url={getUrl(req.videoSelfieUrl)!} label="🎥 Vídeo Selfie" />}
+                              {req.videoHouseUrl && <DocViewer url={getUrl(req.videoHouseUrl)!} label="🏠 Vídeo Residência" />}
+                              {req.videoVehicleUrl && <DocViewer url={getUrl(req.videoVehicleUrl)!} label="🚗 Vídeo Veículo" />}
+                              {req.supplementalDocUrl && <DocViewer url={getUrl(req.supplementalDocUrl)!} label="📎 Doc. Suplementar" />}
+                              {req.signatureUrl && <DocViewer url={getUrl(req.signatureUrl)!} label="✍️ Assinatura" />}
+                              {req.contractPdfUrl && <a href={req.contractPdfUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs bg-zinc-800 hover:bg-blue-900/30 hover:text-blue-400 border border-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg transition-colors">📑 Contrato PDF</a>}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Observações */}
+                        {req.supplementalDescription && (
+                          <div>
+                            <p className="text-zinc-500 text-xs mb-1 font-semibold uppercase">Observações</p>
+                            <p className="text-zinc-300 text-sm bg-black rounded-lg p-3">{req.supplementalDescription}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
