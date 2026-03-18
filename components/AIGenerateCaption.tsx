@@ -22,32 +22,24 @@ export const AIGenerateCaption: React.FC<Props> = ({ imageBase64, onCaptionGener
 
         setIsLoading(true);
         try {
-            let finalBase64 = imageBase64;
-
-            // Se for URL, converter para Base64
+            // Se for URL do R2, enviar diretamente para o backend (evita CORS)
             if (imageBase64.startsWith('http')) {
-                try {
-                    const response = await fetch(imageBase64);
-                    const blob = await response.blob();
-                    finalBase64 = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result as string);
-                        reader.readAsDataURL(blob);
-                    });
-                } catch (e) {
-                    console.error("Erro ao converter imagem:", e);
-                    addToast("Erro ao processar imagem. Tente fazer upload novamente.", 'error');
-                    setIsLoading(false);
-                    return;
+                const caption = await aiService.generateImageCaptionFromUrl(imageBase64);
+                if (caption) {
+                    onCaptionGenerated(caption);
+                    addToast("Legenda gerada com sucesso! ✨", 'success');
+                } else {
+                    addToast("Não foi possível gerar a legenda.", 'error');
                 }
-            }
-
-            const caption = await aiService.generateImageCaption(finalBase64);
-            if (caption) {
-                onCaptionGenerated(caption);
-                addToast("Legenda gerada com sucesso! ✨", 'success');
             } else {
-                addToast("Não foi possível gerar a legenda.", 'error');
+                // Se já for base64, usar método normal
+                const caption = await aiService.generateImageCaption(imageBase64);
+                if (caption) {
+                    onCaptionGenerated(caption);
+                    addToast("Legenda gerada com sucesso! ✨", 'success');
+                } else {
+                    addToast("Não foi possível gerar a legenda.", 'error');
+                }
             }
         } catch (error) {
             console.error(error);

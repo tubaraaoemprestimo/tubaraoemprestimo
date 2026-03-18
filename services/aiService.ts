@@ -198,12 +198,12 @@ export const aiService = {
 
       const prompt = `
         Atue como um Criador de Conteúdo para Redes Sociais.
-        
+
         Sua tarefa: Analisar a imagem anexada e criar uma legenda PERFEITA para postar no Status do WhatsApp/Stories.
 
         1. Identifique o que acontece na imagem (Cenário, Texto, Pessoas, Emoção).
         2. Crie uma frase curta, impactante e criativa sobre ESSE CONTEÚDO.
-        
+
         Regras:
         - SEJA NATURAL. Não pareça um robô.
         - Use Emojis que combinem com a foto.
@@ -246,6 +246,32 @@ export const aiService = {
     } catch (error) {
       console.error("[aiService] Caption Generation Failed:", error);
       // Fallback message
+      return "Dinheiro rápido no Pix é com a Tubarão Empréstimos! 🦈💸 Chama no direct!";
+    }
+  },
+
+  /**
+   * Generates a caption from an image URL (downloads via backend to avoid CORS)
+   */
+  generateImageCaptionFromUrl: async (imageUrl: string): Promise<string> => {
+    try {
+      console.log("[aiService] Generating caption from URL via backend...");
+
+      const response = await fetch('/api/ai/generate-caption-from-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Backend error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.caption || "Tubarão Empréstimos - Crédito Rápido e Fácil 🦈💰";
+
+    } catch (error) {
+      console.error("[aiService] Caption from URL failed:", error);
       return "Dinheiro rápido no Pix é com a Tubarão Empréstimos! 🦈💸 Chama no direct!";
     }
   },
