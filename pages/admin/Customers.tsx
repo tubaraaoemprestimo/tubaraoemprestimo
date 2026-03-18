@@ -1575,6 +1575,8 @@ const CapivaraPanel: React.FC<{ cpf: string }> = ({ cpf }) => {
   const pull = async () => {
     const clean = cpf.replace(/\D/g, '');
     if (!clean || clean.length !== 11) { setError('CPF inválido'); setStatus('error'); return; }
+    // Validar se é CPF real (não começa com REG_ ou letras)
+    if (cpf.includes('REG_') || /[a-zA-Z]/.test(cpf)) { setError('CPF inválido (cliente cadastrado sem CPF real)'); setStatus('error'); return; }
     setStatus('loading');
     setError('');
     try {
@@ -1612,7 +1614,7 @@ const CapivaraPanel: React.FC<{ cpf: string }> = ({ cpf }) => {
   );
 
   if (status === 'done' && data) {
-    const pessoa = data?.consulta || data?.consulta?.[0]?.consulta || {};
+    const pessoa = data?.data?.consulta || data?.consulta || {};
     const cad = pessoa?.cadastral || {};
     const enderecos: any[] = pessoa?.enderecos || [];
     const telefones: any[] = pessoa?.telefones || [];
@@ -1622,6 +1624,7 @@ const CapivaraPanel: React.FC<{ cpf: string }> = ({ cpf }) => {
     const dividas: any[] = pessoa?.dividas || pessoa?.restricoes || [];
     const protestos: any[] = pessoa?.protestos || [];
     const processos: any[] = pessoa?.processos || [];
+    const fotos: any[] = pessoa?.fotos || [];
 
     const sRow = (label: string, val: any) => val ? (
       <div key={label} className="flex justify-between py-1 border-b border-zinc-800/50 text-sm">
@@ -1636,6 +1639,18 @@ const CapivaraPanel: React.FC<{ cpf: string }> = ({ cpf }) => {
           <p className="text-[#D4AF37] font-bold flex items-center gap-2">🦦 Capivara TrackFlow <span className="text-xs text-green-400 bg-green-900/30 px-2 py-0.5 rounded-full">✓ Consultado</span></p>
           <button onClick={() => setStatus('idle')} className="text-xs text-zinc-500 hover:text-white">Ocultar</button>
         </div>
+
+        {/* Fotos */}
+        {fotos.length > 0 && (
+          <div className="bg-black border border-zinc-800 rounded-xl p-4">
+            <p className="text-zinc-400 text-xs font-bold uppercase mb-2">📸 Fotos ({fotos.length})</p>
+            <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+              {fotos.slice(0, 10).map((f: any, i: number) => (
+                <DocViewer key={i} url={f.url || f.foto || f} label={`Foto ${i + 1}`} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Cadastral */}
         <div className="bg-black border border-zinc-800 rounded-xl p-4">
@@ -1678,8 +1693,11 @@ const CapivaraPanel: React.FC<{ cpf: string }> = ({ cpf }) => {
             <p className="text-zinc-400 text-xs font-bold uppercase mb-2">📞 Telefones ({telefones.length})</p>
             <div className="grid grid-cols-2 gap-2">
               {telefones.slice(0, 10).map((t: any, i: number) => (
-                <div key={i} className="bg-zinc-900 rounded-lg p-2 text-sm flex items-center justify-between">
-                  <div>
+                <div key={i} className="bg-zinc-900 rounded-lg p-2 text-sm flex items-center gap-2">
+                  {t.fotoWhatsapp && (
+                    <img src={t.fotoWhatsapp} alt="WhatsApp" className="w-10 h-10 rounded-full object-cover border border-zinc-700" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  )}
+                  <div className="flex-1">
                     <p className="text-white font-semibold">{fmtPhone(t.telefone || t.ddd + t.numero)}</p>
                     <p className="text-zinc-500 text-xs">{t.tipo === 3 ? 'Celular' : t.tipo === 1 ? 'Fixo' : 'Outro'}{t.classificacao ? ` · ${t.classificacao}` : ''}</p>
                   </div>
