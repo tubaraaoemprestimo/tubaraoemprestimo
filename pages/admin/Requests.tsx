@@ -7,6 +7,7 @@ import { Button } from '../../components/Button';
 import { apiService } from '../../services/apiService';
 import { emailService } from '../../services/emailService';
 import { LoanRequest, LoanStatus } from '../../types';
+import { getApiBaseUrl } from '../../services/runtimeConfig';
 import { ImageViewer } from '../../components/ImageViewer';
 import { useToast } from '../../components/Toast';
 import ConsultaCPFCard from '../../components/ConsultaCPFCard';
@@ -322,7 +323,7 @@ export const Requests: React.FC = () => {
                 adminNotes: contractData.adminNotes || null
             };
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://api.tubaraoemprestimo.com.br'}/api/loan-requests/${selectedRequest.id}/activate-contract`, {
+            const response = await fetch(`${getApiBaseUrl()}/loan-requests/${selectedRequest.id}/activate-contract`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
