@@ -1,6 +1,7 @@
 ﻿
 
 import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { Search, UserCheck, UserX, BarChart2, MessageSquare, Send, X, Download, ShieldAlert, ShieldCheck, Sparkles, DollarSign, Percent, Settings, Calendar, RotateCcw, Calculator, Edit2, Trash2, Gift, Upload, UserPlus, Save, Key, Smartphone } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 import { whatsappService } from '../../services/whatsappService';
@@ -1426,6 +1427,71 @@ const DocViewer: React.FC<{ url: string; label: string }> = ({ url, label }) => 
     setImgError(false);
   };
 
+  const handleClose = () => setOpen(false);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  const overlay = open ? ReactDOM.createPortal(
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.96)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+      onClick={handleClose}
+    >
+      <div
+        style={{ width: '100%', maxWidth: '900px', maxHeight: '95vh', display: 'flex', flexDirection: 'column' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <p style={{ color: '#D4AF37', fontWeight: 700, fontSize: '15px' }}>{label}</p>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: '12px', background: '#27272a', color: '#d4d4d8', padding: '6px 14px', borderRadius: '8px', textDecoration: 'none', border: '1px solid #3f3f46' }}
+              onClick={e => e.stopPropagation()}
+            >
+              ↗ Abrir original
+            </a>
+            <button
+              onClick={handleClose}
+              style={{ fontSize: '12px', background: '#27272a', color: '#a1a1aa', padding: '6px 14px', borderRadius: '8px', border: '1px solid #3f3f46', cursor: 'pointer' }}
+            >
+              ✕ Fechar
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div style={{ background: '#18181b', borderRadius: '12px', overflow: 'hidden', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', maxHeight: 'calc(95vh - 70px)' }}>
+          {!imgError ? (
+            <img
+              src={url}
+              alt={label}
+              style={{ maxWidth: '100%', maxHeight: 'calc(95vh - 80px)', objectFit: 'contain', borderRadius: '8px' }}
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <iframe
+              src={url}
+              style={{ width: '100%', height: 'calc(95vh - 80px)', border: 'none', borderRadius: '8px' }}
+              title={label}
+            />
+          )}
+        </div>
+
+        {/* ESC hint */}
+        <p style={{ color: '#52525b', fontSize: '11px', textAlign: 'center', marginTop: '8px' }}>Clique fora ou pressione ESC para fechar</p>
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
   return (
     <>
       <button
@@ -1434,41 +1500,7 @@ const DocViewer: React.FC<{ url: string; label: string }> = ({ url, label }) => 
       >
         <span>🔍</span> {label}
       </button>
-
-      {open && (
-        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[100] p-4" onClick={() => setOpen(false)}>
-          <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-white font-bold">{label}</p>
-              <div className="flex gap-2">
-                <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg">
-                  ↗ Abrir original
-                </a>
-                <button onClick={() => setOpen(false)} className="text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg px-3 py-1.5 text-xs">
-                  ✕ Fechar
-                </button>
-              </div>
-            </div>
-            <div className="bg-zinc-900 rounded-xl overflow-hidden flex-1 flex items-center justify-center min-h-[400px]">
-              {!imgError ? (
-                <img
-                  src={url}
-                  alt={label}
-                  className="max-w-full max-h-[75vh] object-contain rounded-lg"
-                  onError={() => setImgError(true)}
-                />
-              ) : (
-                <iframe
-                  src={url}
-                  className="w-full h-[75vh] rounded-lg"
-                  title={label}
-                  onError={() => {}}
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {overlay}
     </>
   );
 };
