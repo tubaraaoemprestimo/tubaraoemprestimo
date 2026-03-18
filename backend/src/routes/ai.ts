@@ -23,6 +23,11 @@ aiRouter.post('/generate-caption-from-url', async (req: Request, res: Response) 
     const config = await prisma.aiChatbotConfig.findFirst();
     const apiKey = config?.provider === 'gemini' ? config.geminiApiKey : config?.perplexityApiKey;
 
+    console.log('[AI] Config found:', !!config);
+    console.log('[AI] Provider:', config?.provider);
+    console.log('[AI] API Key exists:', !!apiKey);
+    console.log('[AI] API Key length:', apiKey?.length);
+
     if (!apiKey) {
       console.warn('[AI] No API key configured, using fallback');
       return res.json({
