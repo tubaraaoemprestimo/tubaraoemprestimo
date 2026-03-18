@@ -1688,13 +1688,80 @@ const HistoryModal: React.FC<{ customer: any; loading: boolean; onClose: () => v
                           </div>
                         )}
 
-                        {/* Observações */}
-                        {req.supplementalDescription && (
-                          <div>
-                            <p className="text-zinc-500 text-xs mb-1 font-semibold uppercase">Observações</p>
-                            <p className="text-zinc-300 text-sm bg-black rounded-lg p-3">{req.supplementalDescription}</p>
-                          </div>
-                        )}
+                        {/* Observações / Dados Extras (JSON parseado) */}
+                        {req.supplementalDescription && (() => {
+                          let parsed: any = null;
+                          try { parsed = JSON.parse(req.supplementalDescription); } catch { /* plain text */ }
+
+                          if (!parsed) return (
+                            <div>
+                              <p className="text-zinc-500 text-xs mb-1 font-semibold uppercase">Observações</p>
+                              <p className="text-zinc-300 text-sm bg-black rounded-lg p-3">{req.supplementalDescription}</p>
+                            </div>
+                          );
+
+                          return (
+                            <div className="space-y-3">
+                              <p className="text-zinc-500 text-xs font-semibold uppercase">Dados Adicionais</p>
+
+                              {/* Endereço (do JSON) */}
+                              {(parsed.address || parsed.cep) && (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                                  {parsed.address && <div className="col-span-2"><p className="text-zinc-500 text-xs">Endereço</p><p className="text-white font-semibold">{parsed.address}{parsed.number ? `, nº ${parsed.number}` : ''}</p></div>}
+                                  {parsed.cep && <Field label="CEP" value={parsed.cep} />}
+                                </div>
+                              )}
+
+                              {/* Endereço da empresa */}
+                              {parsed.companyAddress && (
+                                <div>
+                                  <p className="text-zinc-500 text-xs mb-1">Endereço da Empresa</p>
+                                  <p className="text-white text-sm">{parsed.companyAddress.street}, {parsed.companyAddress.number} — {parsed.companyAddress.neighborhood}, {parsed.companyAddress.city}/{parsed.companyAddress.state} — CEP {parsed.companyAddress.cep}</p>
+                                </div>
+                              )}
+
+                              {/* Contatos de confiança */}
+                              {(parsed.contactTrust1Name || parsed.contactTrust2Name) && (
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                  {parsed.contactTrust1Name && <Field label={`Contato Confiança 1 (${parsed.contactTrust1Relationship || ''})`} value={parsed.contactTrust1Name} />}
+                                  {parsed.contactTrust2Name && <Field label={`Contato Confiança 2 (${parsed.contactTrust2Relationship || ''})`} value={parsed.contactTrust2Name} />}
+                                </div>
+                              )}
+
+                              {/* Outros campos */}
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                                {parsed.instagram && <Field label="Instagram" value={parsed.instagram} />}
+                                {parsed.occupation && <Field label="Ocupação" value={parsed.occupation} />}
+                                {parsed.accountHolderCpf && <Field label="CPF do Titular da Conta" value={parsed.accountHolderCpf} />}
+                                {parsed.location && <Field label="Localização GPS" value={`${parsed.location.latitude?.toFixed(6)}, ${parsed.location.longitude?.toFixed(6)}`} />}
+                              </div>
+
+                              {/* Fotos da casa */}
+                              {parsed.housePhotos && parsed.housePhotos.length > 0 && (
+                                <div>
+                                  <p className="text-zinc-500 text-xs mb-2">Fotos da Residência</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {parsed.housePhotos.map((url: string, i: number) => (
+                                      <DocViewer key={i} url={url} label={`🏠 Foto Residência ${i + 1}`} />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Conta de água/luz em nome */}
+                              {parsed.billInName && parsed.billInName.length > 0 && (
+                                <div>
+                                  <p className="text-zinc-500 text-xs mb-2">Conta em Nome (água/luz)</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {parsed.billInName.map((url: string, i: number) => (
+                                      <DocViewer key={i} url={url} label={`📄 Conta em Nome ${i + 1}`} />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>
