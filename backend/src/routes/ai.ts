@@ -32,9 +32,13 @@ aiRouter.post('/generate-caption-from-url', async (req: Request, res: Response) 
 
     // Download image from R2 (no CORS issues on backend)
     console.log('[AI] Downloading image from R2...');
+    console.log('[AI] Image URL:', imageUrl);
     const imageResponse = await axios.get(imageUrl, {
       responseType: 'arraybuffer',
-      timeout: 10000
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'TubaraoBackend/1.0'
+      }
     });
 
     // Convert to base64
