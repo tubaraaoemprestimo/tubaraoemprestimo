@@ -39,7 +39,10 @@ aiRouter.post('/generate-caption-from-url', async (req: Request, res: Response) 
 
     // Convert to base64
     const base64Image = Buffer.from(imageResponse.data, 'binary').toString('base64');
+    const imageSize = Buffer.byteLength(base64Image, 'base64');
     console.log('[AI] Image downloaded and converted to base64');
+    console.log('[AI] Image size:', imageSize, 'bytes');
+    console.log('[AI] MIME type:', imageResponse.headers['content-type']);
 
     // Call Gemini Vision API
     const prompt = `
@@ -82,11 +85,13 @@ aiRouter.post('/generate-caption-from-url', async (req: Request, res: Response) 
       }
     );
 
+    console.log('[AI] Gemini response:', JSON.stringify(geminiResponse.data, null, 2));
+
     if (geminiResponse.data.candidates &&
         geminiResponse.data.candidates[0].content &&
         geminiResponse.data.candidates[0].content.parts) {
       const caption = geminiResponse.data.candidates[0].content.parts[0].text.trim();
-      console.log('[AI] Caption generated successfully');
+      console.log('[AI] Caption generated successfully:', caption);
       return res.json({ caption });
     }
 
@@ -94,6 +99,7 @@ aiRouter.post('/generate-caption-from-url', async (req: Request, res: Response) 
 
   } catch (error: any) {
     console.error('[AI] Caption generation failed:', error.message);
+    console.error('[AI] Full error:', error.response?.data || error);
 
     // Return fallback caption
     return res.json({
