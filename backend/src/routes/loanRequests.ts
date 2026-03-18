@@ -213,6 +213,25 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
             return;
         }
 
+        // Verificar se cliente já tem solicitação ativa (prevenção de duplicatas)
+        const existingRequest = await prisma.loanRequest.findFirst({
+            where: {
+                cpf: data.cpf,
+                status: {
+                    in: ['PENDING', 'WAITING_DOCS', 'PENDING_ACCEPTANCE', 'APPROVED']
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        if (existingRequest) {
+            return res.status(400).json({
+                error: 'Você já possui uma solicitação em andamento',
+                existingRequestId: existingRequest.id,
+                status: existingRequest.status
+            });
+        }
+
         // Busca ou cria customer
         let customer = await prisma.customer.findFirst({
             where: { OR: [{ cpf: data.cpf }, { email: req.user!.email }] }
@@ -1536,6 +1555,28 @@ loanRequestsRouter.put('/:id/accept-counteroffer', async (req: Request, res: Res
             }
         }
 
+        // ====== NOTIFICAR ADMINS DO ACEITE ======
+        try {
+            const admins = await prisma.user.findMany({
+                where: { role: 'ADMIN' }
+            });
+
+            const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+            for (const admin of admins) {
+                await prisma.notification.create({
+                    data: {
+                        customerId: admin.id, // Reutilizar campo customerId para admin
+                        title: '✅ Cliente Aceitou Contraproposta',
+                        message: `${request.clientName} aceitou a contraproposta de ${fmt(request.approvedAmount || 0)}. Ative o contrato agora!`,
+                        type: 'SUCCESS'
+                    }
+                });
+            }
+        } catch (notifErr) {
+            console.error('[LoanRequests] Admin notification error:', notifErr);
+        }
+
         // ====== NOTIFICAÇÕES ======
         const approvedFormatted = (updatedRequest.approvedAmount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -1822,6 +1863,122 @@ loanRequestsRouter.put('/:id/contract', async (req: Request, res: Response) => {
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Erro ao atualizar contrato' });
+    }
+});
+
+// DELETE - Excluir solicitação (soft delete)
+loanRequestsRouter.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+
+        const request = await prisma.loanRequest.findUnique({ where: { id } });
+        if (!request) {
+            return res.status(404).json({ error: 'Solicitação não encontrada' });
+        }
+
+        await prisma.loanRequest.update({
+            where: { id },
+            data: {
+                status: 'CANCELLED',
+                adminNotes: `Cancelado: ${reason || 'Sem motivo especificado'}`
+            }
+        });
+
+        // Notificar cliente
+        if (request.customerId) {
+            await prisma.notification.create({
+                data: {
+                    customerId: request.customerId,
+                    title: 'Solicitação Cancelada',
+                    message: `Sua solicitação foi cancelada. ${reason || 'Entre em contato para mais informações.'}`,
+                    type: 'WARNING'
+                }
+            });
+        }
+
+        // WhatsApp
+        if (request.phone) {
+            await sendWhatsAppMessage(request.phone,
+                `Olá ${request.clientName}, sua solicitação foi cancelada. ${reason || 'Entre em contato para mais informações.'}`
+            );
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao excluir solicitação:', error);
+        res.status(500).json({ error: 'Erro ao excluir solicitação' });
+    }
+});
+
+// PUT - Pausar solicitação
+loanRequestsRouter.put('/:id/pause', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+
+        const request = await prisma.loanRequest.findUnique({ where: { id } });
+        if (!request) {
+            return res.status(404).json({ error: 'Solicitação não encontrada' });
+        }
+
+        await prisma.loanRequest.update({
+            where: { id },
+            data: {
+                status: 'PAUSED',
+                adminNotes: `Pausado (anterior: ${request.status}). Motivo: ${reason || 'N/A'}`
+            }
+        });
+
+        // Notificar cliente
+        if (request.customerId) {
+            await prisma.notification.create({
+                data: {
+                    customerId: request.customerId,
+                    title: 'Solicitação Pausada',
+                    message: `Sua solicitação foi pausada temporariamente. ${reason || ''}`,
+                    type: 'INFO'
+                }
+            });
+        }
+
+        res.json({ success: true, previousStatus: request.status });
+    } catch (error) {
+        console.error('Erro ao pausar solicitação:', error);
+        res.status(500).json({ error: 'Erro ao pausar solicitação' });
+    }
+});
+
+// PUT - Retomar solicitação pausada
+loanRequestsRouter.put('/:id/resume', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        const request = await prisma.loanRequest.findUnique({ where: { id } });
+        if (!request) {
+            return res.status(404).json({ error: 'Solicitação não encontrada' });
+        }
+
+        if (request.status !== 'PAUSED') {
+            return res.status(400).json({ error: 'Solicitação não está pausada' });
+        }
+
+        // Extrair status anterior do adminNotes
+        const match = request.adminNotes?.match(/anterior: (\w+)/);
+        const previousStatus = match ? match[1] : 'PENDING';
+
+        await prisma.loanRequest.update({
+            where: { id },
+            data: {
+                status: previousStatus,
+                adminNotes: `Retomado em ${new Date().toISOString()}`
+            }
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao retomar solicitação:', error);
+        res.status(500).json({ error: 'Erro ao retomar solicitação' });
     }
 });
 

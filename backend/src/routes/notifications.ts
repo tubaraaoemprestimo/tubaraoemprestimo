@@ -126,6 +126,23 @@ notificationsRouter.get('/', async (req: Request, res: Response) => {
     }
 });
 
+// GET /api/notifications/admin - Notificações específicas para admin (usando customerId)
+notificationsRouter.get('/admin', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const notifications = await prisma.notification.findMany({
+            where: {
+                customerId: req.user!.id // Admin recebe notificações no campo customerId
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 50
+        });
+        res.json(notifications);
+    } catch (error) {
+        console.error('Erro ao buscar notificações admin:', error);
+        res.json([]);
+    }
+});
+
 // PUT /api/notifications/:id/read
 notificationsRouter.put('/:id/read', async (req: Request, res: Response) => {
     try {

@@ -11,7 +11,10 @@ export enum LoanStatus {
   RETURNING_PENDING = 'RETURNING_PENDING', // Cliente antigo aguardando aprovação
   PENDING_ACCEPTANCE = 'PENDING_ACCEPTANCE', // Contraproposta aguardando aceite do cliente
   APPROVED = 'APPROVED',
+  ACTIVE = 'ACTIVE',
   REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED', // Cancelado pelo admin
+  PAUSED = 'PAUSED', // Pausado temporariamente
   PAID = 'PAID',
   DEFAULTED = 'DEFAULTED'
 }

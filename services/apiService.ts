@@ -993,6 +993,33 @@ export const apiService = {
         const { data, error } = await api.post('/admin/send-access', payload);
         if (error) throw new Error((error as any).error || 'Erro ao enviar acesso');
         return data;
+    },
+
+    async deleteRequest(id: string, reason: string) {
+        const { data, error } = await api.delete(`/loan-requests/${id}`, { data: { reason } });
+        if (error) throw new Error((error as any).error || 'Erro ao excluir');
+        return data;
+    },
+
+    async pauseRequest(id: string, reason: string) {
+        const { data, error } = await api.put(`/loan-requests/${id}/pause`, { reason });
+        if (error) throw new Error((error as any).error || 'Erro ao pausar');
+        return data;
+    },
+
+    async resumeRequest(id: string) {
+        const { data, error } = await api.put(`/loan-requests/${id}/resume`);
+        if (error) throw new Error((error as any).error || 'Erro ao retomar');
+        return data;
+    },
+
+    async getAdminNotifications() {
+        const { data } = await api.get('/notifications/admin');
+        return data || [];
+    },
+
+    async markNotificationRead(id: string) {
+        await api.put(`/notifications/${id}/read`);
     }
 };
 
