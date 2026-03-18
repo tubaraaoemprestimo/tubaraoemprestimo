@@ -160,7 +160,7 @@ export const CommunicationHub: React.FC = () => {
     };
 
     const handleDeleteTemplate = async (id: string) => {
-        if (!confirm('Excluir template?')) return;
+        
         await api.delete(`/communication/templates/${id}`);
         addToast('Template excluído', 'success');
         loadAllData();
@@ -168,7 +168,7 @@ export const CommunicationHub: React.FC = () => {
 
     // Status handlers
     const handleDeleteStatus = async (id: string) => {
-        if (!confirm('Excluir agendamento?')) return;
+        
         await api.delete(`/communication/scheduled-status/${id}`);
         addToast('Agendamento excluído', 'success');
         loadAllData();
@@ -233,7 +233,6 @@ export const CommunicationHub: React.FC = () => {
     };
 
     const handleDeleteStatus = async (id: string) => {
-        if (!confirm('Excluir status agendado?')) return;
         try {
             await api.delete(`/whatsapp/status/${id}`);
             addToast('Status excluído', 'success');
@@ -244,7 +243,6 @@ export const CommunicationHub: React.FC = () => {
     };
 
     const handlePostStatusNow = async (id: string) => {
-        if (!confirm('Postar este status agora?')) return;
         try {
             const { error } = await api.post(`/whatsapp/post-now/${id}`);
             if (error) throw new Error();
@@ -311,7 +309,7 @@ export const CommunicationHub: React.FC = () => {
   };
 
   const handleDeleteCampaign = async (id: string) => {
-    if (!confirm('Excluir campanha?')) return;
+    
     try {
       await api.delete(`/campaigns/${id}`);
       addToast('Campanha excluída', 'success');
@@ -344,7 +342,7 @@ export const CommunicationHub: React.FC = () => {
   };
 
   const handleDeleteCoupon = async (id: string) => {
-    if (!confirm('Excluir cupom?')) return;
+    
     try {
       await api.delete(`/communication/coupons/${id}`);
       addToast('Cupom excluído', 'success');
