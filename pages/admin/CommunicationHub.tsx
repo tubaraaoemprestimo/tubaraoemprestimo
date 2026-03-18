@@ -232,27 +232,6 @@ export const CommunicationHub: React.FC = () => {
         }
     };
 
-    const handleDeleteStatus = async (id: string) => {
-        try {
-            await api.delete(`/whatsapp/status/${id}`);
-            addToast('Status excluído', 'success');
-            loadAllData();
-        } catch {
-            addToast('Erro ao excluir status', 'error');
-        }
-    };
-
-    const handlePostStatusNow = async (id: string) => {
-        try {
-            const { error } = await api.post(`/whatsapp/post-now/${id}`);
-            if (error) throw new Error();
-            addToast('Status postado com sucesso!', 'success');
-            loadAllData();
-        } catch {
-            addToast('Erro ao postar status', 'error');
-        }
-    };
-
     // Referral handlers
     const handleApproveReferral = async (referral: Referral) => {
         await api.put(`/referrals/${referral.id}`, { status: 'APPROVED', approved_at: new Date().toISOString() });
