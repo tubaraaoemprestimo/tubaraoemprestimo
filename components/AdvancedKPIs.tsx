@@ -473,18 +473,15 @@ const KPICard: React.FC<{
 
     return (
         <div className={`bg-gradient-to-br ${colorMap[color]} border rounded-2xl p-5 hover:scale-[1.02] transition-transform`}>
-            <div className="flex items-start justify-between mb-3">
-                <div className={`p-2 bg-zinc-900/50 rounded-lg ${iconColorMap[color]}`}>
-                    <Icon size={20} />
-                </div>
-                <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full max-w-[130px] truncate ${isPositive ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'
-                    }`}>
-                    <span className="flex-shrink-0">{isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}</span>
-                    <span className="truncate">{trend}</span>
-                </div>
+            <div className={`p-2 bg-zinc-900/50 rounded-lg ${iconColorMap[color]} w-fit mb-3`}>
+                <Icon size={20} />
             </div>
             <p className="text-zinc-400 text-sm mb-1">{title}</p>
-            <p className="text-2xl font-bold text-white">{value}</p>
+            <p className="text-2xl font-bold text-white mb-2">{value}</p>
+            <div className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${isPositive ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>
+                {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                <span>{trend}</span>
+            </div>
         </div>
     );
 };
