@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ReactDOM from 'react-dom';
 import apiService from '../services/apiService';
 import { useToast } from './Toast';
 
@@ -193,6 +194,17 @@ export default function ConsultaCPFCard({ cpf }: ConsultaCPFCardProps) {
                         </div>
                     </Section>
 
+                    {/* Fotos */}
+                    {consulta.fotos && consulta.fotos.length > 0 && (
+                        <Section title="📸 Fotos">
+                            <div className="grid grid-cols-3 gap-3">
+                                {consulta.fotos.map((foto, idx) => (
+                                    <PhotoViewer key={idx} url={foto.foto} label={`Foto ${idx + 1}`} />
+                                ))}
+                            </div>
+                        </Section>
+                    )}
+
                     {/* Situação Financeira */}
                     <Section title="💰 Situação Financeira">
                         <div className="grid grid-cols-2 gap-4">
@@ -384,5 +396,91 @@ function InfoItem({ label, value, highlight = false }: { label: string; value: s
             <p className="text-xs text-zinc-500 mb-1">{label}</p>
             <p className={`text-sm font-semibold ${highlight ? 'text-red-400' : 'text-white'}`}>{value}</p>
         </div>
+    );
+}
+
+function PhotoViewer({ url, label }: { url: string; label: string }) {
+    const [open, setOpen] = useState(false);
+    const [imgError, setImgError] = useState(false);
+
+    const handleOpen = () => setOpen(true);
+    const handleClose = () => setOpen(false);
+
+    const overlay = open ? ReactDOM.createPortal(
+        <div
+            style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 99999,
+                background: 'rgba(0,0,0,0.96)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px'
+            }}
+            onClick={handleClose}
+        >
+            <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+                <button
+                    onClick={handleClose}
+                    style={{
+                        position: 'absolute',
+                        top: '-40px',
+                        right: '0',
+                        background: 'rgba(255,255,255,0.1)',
+                        border: 'none',
+                        color: 'white',
+                        fontSize: '24px',
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
+                >
+                    ×
+                </button>
+                <img
+                    src={url}
+                    alt={label}
+                    style={{
+                        maxWidth: '100%',
+                        maxHeight: '90vh',
+                        objectFit: 'contain',
+                        borderRadius: '8px'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                />
+            </div>
+        </div>,
+        document.body
+    ) : null;
+
+    return (
+        <>
+            <div
+                onClick={handleOpen}
+                className="relative aspect-square bg-black border border-zinc-800 rounded-lg overflow-hidden cursor-pointer hover:border-[#D4AF37] transition-colors group"
+            >
+                {!imgError ? (
+                    <img
+                        src={url}
+                        alt={label}
+                        className="w-full h-full object-cover"
+                        onError={() => setImgError(true)}
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-zinc-600">
+                        <span className="text-4xl">📷</span>
+                    </div>
+                )}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span className="text-white font-bold">🔍 Ver</span>
+                </div>
+            </div>
+            {overlay}
+        </>
     );
 }
