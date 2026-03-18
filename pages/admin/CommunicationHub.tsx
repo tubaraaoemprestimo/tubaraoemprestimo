@@ -967,8 +967,8 @@ export const CommunicationHub: React.FC = () => {
 
 {/* Status Scheduling Modal */}
 {isStatusModalOpen && (
-<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
     <div className="flex justify-between items-center mb-6">
       <h3 className="text-lg font-bold text-[#D4AF37]">Agendar Status WhatsApp</h3>
       <button onClick={() => setIsStatusModalOpen(false)}><X className="text-zinc-500 hover:text-white" /></button>
