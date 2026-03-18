@@ -5,13 +5,16 @@ import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
 import { apiService } from '../../services/apiService';
 import { LoanPackage } from '../../types';
+import { useToast } from '../../components/Toast';
 
 export const Home: React.FC = () => {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [amount, setAmount] = useState<number>(5000);
   const [installments, setInstallments] = useState<number>(12);
   const [packages, setPackages] = useState<LoanPackage[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<LoanPackage | null>(null);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
 
   useEffect(() => {
     apiService.getPackages().then(pkgs => {
@@ -25,6 +28,25 @@ export const Home: React.FC = () => {
     const rate = selectedPackage.interestRate / 100;
     const total = amount * Math.pow(1 + rate, installments);
     return total / installments;
+  };
+
+  const handleRequestLoan = async () => {
+    setCheckingDuplicate(true);
+    try {
+      // Verificar se já tem solicitação pendente
+      const pending = await apiService.getPendingRequest();
+      if (pending) {
+        addToast('Você já tem uma solicitação em análise. Aguarde o retorno.', 'warning');
+        navigate('/client/dashboard');
+        return;
+      }
+      navigate('/wizard');
+    } catch (error) {
+      // Se der erro (ex: não autenticado), redireciona para wizard normalmente
+      navigate('/wizard');
+    } finally {
+      setCheckingDuplicate(false);
+    }
   };
 
   return (
@@ -112,8 +134,12 @@ export const Home: React.FC = () => {
                   <div className="text-4xl font-bold text-white mb-6">
                     R$ {calculateMonthly().toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <Button className="w-full" onClick={() => navigate('/wizard')}>
-                    Solicitar Empréstimo
+                  <Button
+                    className="w-full"
+                    onClick={handleRequestLoan}
+                    disabled={checkingDuplicate}
+                  >
+                    {checkingDuplicate ? 'Verificando...' : 'Solicitar Empréstimo'}
                   </Button>
                 </div>
               </div>

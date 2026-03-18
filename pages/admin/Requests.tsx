@@ -2,7 +2,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Check, X, Eye, Maximize, Layers, Download, Filter, Video, Users, Phone, FileWarning, Send, AlertTriangle, MapPin, FileText, ExternalLink } from 'lucide-react';
+import { Check, X, Eye, Maximize, Layers, Download, Filter, Video, Users, Phone, FileWarning, Send, AlertTriangle, MapPin, FileText, ExternalLink, Trash, Pause, Play, Bell } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { apiService } from '../../services/apiService';
 import { emailService } from '../../services/emailService';
@@ -29,6 +29,17 @@ const PROFILE_TABS = [
     { id: 'MOTO', label: 'Fin. Moto', bg: 'bg-blue-600', text: 'text-white', border: 'border-blue-600', profileTypes: ['MOTO'] },
     { id: 'GARANTIA', label: 'Garantia', bg: 'bg-yellow-500', text: 'text-black', border: 'border-yellow-500', profileTypes: ['GARANTIA', 'GARANTIA_VEICULO'] },
     { id: 'LIMPA_NOME', label: 'Limpa Nome', bg: 'bg-purple-600', text: 'text-white', border: 'border-purple-600', profileTypes: ['LIMPA_NOME'] },
+];
+
+// Abas de status crítico
+const STATUS_TABS = [
+    { id: 'ALL', label: 'Todos', statuses: [] as string[], badge: 'bg-zinc-700' },
+    { id: 'PENDING_ANALYSIS', label: 'Em Análise', statuses: ['PENDING', 'WAITING_DOCS'], badge: 'bg-yellow-600' },
+    { id: 'AWAITING_ACCEPTANCE', label: 'Aguardando Aceite', statuses: ['PENDING_ACCEPTANCE'], badge: 'bg-orange-600' },
+    { id: 'ACCEPTED', label: 'Aceitas', statuses: ['APPROVED'], badge: 'bg-green-600' },
+    { id: 'ACTIVE', label: 'Ativas', statuses: ['ACTIVE'], badge: 'bg-blue-600' },
+    { id: 'PAUSED', label: 'Pausadas', statuses: ['PAUSED'], badge: 'bg-gray-600' },
+    { id: 'REJECTED', label: 'Rejeitadas', statuses: ['REJECTED'], badge: 'bg-red-600' }
 ];
 
 const getProfileBadge = (profileType: string | undefined) => {
@@ -90,14 +101,86 @@ export const Requests: React.FC = () => {
     // Filters
     const [filterStatus, setFilterStatus] = useState<string>('ALL');
     const [filterProfile, setFilterProfile] = useState<string>('ALL');
+    const [filterStatusTab, setFilterStatusTab] = useState<string>('ALL');
+
+    // Delete Modal
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deleteReason, setDeleteReason] = useState('');
+    const [deleting, setDeleting] = useState(false);
+
+    // Notifications
+    const [adminNotifications, setAdminNotifications] = useState<any[]>([]);
+    const [showNotifications, setShowNotifications] = useState(false);
 
     useEffect(() => {
         loadRequests();
+        loadNotifications();
+        const interval = setInterval(loadNotifications, 30000); // Poll a cada 30s
+        return () => clearInterval(interval);
     }, []);
 
     const loadRequests = async () => {
         const data = await apiService.getRequests();
         setRequests(data);
+    };
+
+    const loadNotifications = async () => {
+        try {
+            const notifs = await apiService.getAdminNotifications();
+            setAdminNotifications(notifs);
+        } catch (error) {
+            console.error('Erro ao carregar notificações:', error);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!selectedRequest) return;
+        setDeleting(true);
+        try {
+            await apiService.deleteRequest(selectedRequest.id, deleteReason);
+            addToast('Solicitação excluída', 'success');
+            setIsDeleteModalOpen(false);
+            setDeleteReason('');
+            setSelectedRequest(null);
+            loadRequests();
+        } catch (err: any) {
+            addToast(err.message || 'Erro ao excluir', 'error');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const handlePause = async () => {
+        if (!selectedRequest) return;
+        try {
+            await apiService.pauseRequest(selectedRequest.id, 'Pausado pelo admin');
+            addToast('Solicitação pausada', 'success');
+            setSelectedRequest(null);
+            loadRequests();
+        } catch (err: any) {
+            addToast(err.message || 'Erro ao pausar', 'error');
+        }
+    };
+
+    const handleResume = async () => {
+        if (!selectedRequest) return;
+        try {
+            await apiService.resumeRequest(selectedRequest.id);
+            addToast('Solicitação retomada', 'success');
+            setSelectedRequest(null);
+            loadRequests();
+        } catch (err: any) {
+            addToast(err.message || 'Erro ao retomar', 'error');
+        }
+    };
+
+    const handleNotificationClick = async (notif: any) => {
+        try {
+            await apiService.markNotificationRead(notif.id);
+            loadNotifications();
+        } catch (error) {
+            console.error('Erro ao marcar notificação:', error);
+        }
     };
 
     const handleApprove = async (id: string) => {
@@ -411,7 +494,14 @@ export const Requests: React.FC = () => {
                 if (!tab.profileTypes.includes(req.profileType || '')) return false;
             }
         }
-        // Filtro por status
+        // Filtro por aba de status
+        if (filterStatusTab !== 'ALL') {
+            const statusTab = STATUS_TABS.find(t => t.id === filterStatusTab);
+            if (statusTab && statusTab.statuses.length > 0) {
+                if (!statusTab.statuses.includes(req.status)) return false;
+            }
+        }
+        // Filtro por status individual (dropdown antigo)
         if (filterStatus !== 'ALL' && req.status !== filterStatus) return false;
         return true;
     });
@@ -431,9 +521,72 @@ export const Requests: React.FC = () => {
         <div className="p-4 md:p-8 bg-black min-h-screen text-white">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <h1 className="text-3xl font-bold text-[#D4AF37]">Histórico</h1>
-                <Button onClick={handleExportCSV} variant="secondary" className="w-full md:w-auto bg-zinc-900 border border-zinc-800 hover:border-[#D4AF37]">
-                    <Download size={18} className="mr-2" /> Exportar CSV
-                </Button>
+                <div className="flex gap-3 items-center w-full md:w-auto">
+                    <button
+                        onClick={() => setShowNotifications(!showNotifications)}
+                        className="relative p-2 bg-zinc-900 rounded-lg hover:bg-zinc-800 border border-zinc-800"
+                    >
+                        <Bell size={20} className="text-white" />
+                        {adminNotifications.filter(n => !n.isRead).length > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                                {adminNotifications.filter(n => !n.isRead).length}
+                            </span>
+                        )}
+                    </button>
+                    <Button onClick={handleExportCSV} variant="secondary" className="flex-1 md:flex-none bg-zinc-900 border border-zinc-800 hover:border-[#D4AF37]">
+                        <Download size={18} className="mr-2" /> Exportar CSV
+                    </Button>
+                </div>
+            </div>
+
+            {/* Modal de Notificações */}
+            {showNotifications && (
+                <div className="fixed top-20 right-4 w-96 bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl z-50 max-h-96 overflow-y-auto">
+                    <div className="p-4 border-b border-zinc-800 sticky top-0 bg-zinc-900">
+                        <h3 className="font-bold text-white">Notificações</h3>
+                    </div>
+                    {adminNotifications.length === 0 ? (
+                        <p className="p-4 text-zinc-500 text-center">Nenhuma notificação</p>
+                    ) : (
+                        adminNotifications.map(notif => (
+                            <div
+                                key={notif.id}
+                                className={`p-4 border-b border-zinc-800 cursor-pointer hover:bg-zinc-800 ${
+                                    !notif.isRead ? 'bg-zinc-800/50' : ''
+                                }`}
+                                onClick={() => handleNotificationClick(notif)}
+                            >
+                                <p className="font-bold text-white text-sm">{notif.title}</p>
+                                <p className="text-zinc-400 text-xs mt-1">{notif.message}</p>
+                                <p className="text-zinc-600 text-xs mt-2">{new Date(notif.createdAt).toLocaleString('pt-BR')}</p>
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+
+            {/* Abas de Status Crítico */}
+            <div className="flex gap-2 overflow-x-auto pb-2 mb-4 border-b border-zinc-800 scrollbar-hide">
+                {STATUS_TABS.map(tab => {
+                    const count = requests.filter(r => {
+                        if (tab.statuses.length === 0) return true;
+                        return tab.statuses.includes(r.status);
+                    }).length;
+
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setFilterStatusTab(tab.id)}
+                            className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap transition-all ${
+                                filterStatusTab === tab.id
+                                    ? `${tab.badge} text-white`
+                                    : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
+                            }`}
+                        >
+                            {tab.label} {count > 0 && `(${count})`}
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Guias por Tipo de Serviço */}
@@ -1530,6 +1683,22 @@ export const Requests: React.FC = () => {
                                         </>
                                     )}
                                 </div>
+
+                                {/* Botões de Controle Admin */}
+                                <div className="flex gap-2 mt-4 pt-4 border-t border-zinc-800">
+                                    {selectedRequest.status === 'PAUSED' ? (
+                                        <Button variant="secondary" onClick={handleResume} className="flex-1">
+                                            <Play size={16} className="mr-2" /> Retomar
+                                        </Button>
+                                    ) : (
+                                        <Button variant="secondary" onClick={handlePause} className="flex-1">
+                                            <Pause size={16} className="mr-2" /> Pausar
+                                        </Button>
+                                    )}
+                                    <Button variant="danger" onClick={() => setIsDeleteModalOpen(true)} className="flex-1">
+                                        <Trash size={16} className="mr-2" /> Excluir
+                                    </Button>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1639,6 +1808,31 @@ export const Requests: React.FC = () => {
                                 isLoading={sendingAccess}
                             >
                                 <Send size={16} className="mr-2" /> Enviar Acesso
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {isDeleteModalOpen && selectedRequest && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[70] p-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in duration-200">
+                        <h3 className="text-xl font-bold text-white mb-4">Excluir Solicitação</h3>
+                        <p className="text-zinc-400 mb-4">Esta ação não pode ser desfeita. O cliente será notificado.</p>
+                        <textarea
+                            value={deleteReason}
+                            onChange={e => setDeleteReason(e.target.value)}
+                            placeholder="Motivo da exclusão (opcional)"
+                            className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white mb-4 focus:border-[#D4AF37] outline-none"
+                            rows={3}
+                        />
+                        <div className="flex gap-3">
+                            <Button variant="secondary" onClick={() => { setIsDeleteModalOpen(false); setDeleteReason(''); }} className="flex-1">
+                                Cancelar
+                            </Button>
+                            <Button variant="danger" onClick={handleDelete} disabled={deleting} className="flex-1">
+                                {deleting ? 'Excluindo...' : 'Confirmar Exclusão'}
                             </Button>
                         </div>
                     </div>
