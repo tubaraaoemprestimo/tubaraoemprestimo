@@ -21,7 +21,7 @@ export interface LoanPayment {
 export const paymentService = {
     // Buscar pagamentos de uma solicitação
     getPaymentsByRequest: async (requestId: string): Promise<LoanPayment[]> => {
-        const { data, error } = await api.get<LoanPayment[]>(`/payments?request_id=${requestId}`);
+        const { data, error } = await api.get<LoanPayment[]>(`/payment-receipts?request_id=${requestId}`);
 
         if (error) {
             console.error('Erro ao buscar pagamentos:', error);
@@ -32,7 +32,7 @@ export const paymentService = {
 
     // Buscar todos os pagamentos
     getAllPayments: async (): Promise<LoanPayment[]> => {
-        const { data, error } = await api.get<LoanPayment[]>('/payments');
+        const { data, error } = await api.get<LoanPayment[]>('/payment-receipts');
 
         if (error) {
             console.error('Erro ao buscar pagamentos:', error);
@@ -43,7 +43,7 @@ export const paymentService = {
 
     // Registrar novo pagamento
     createPayment: async (payment: Omit<LoanPayment, 'id' | 'created_at'>): Promise<LoanPayment | null> => {
-        const { data, error } = await api.post<LoanPayment>('/payments', payment);
+        const { data, error } = await api.post<LoanPayment>('/payment-receipts', payment);
 
         if (error) {
             console.error('Erro ao criar pagamento:', error);

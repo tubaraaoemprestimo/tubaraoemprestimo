@@ -115,11 +115,11 @@ export function CollectionAutomationPanel() {
   const loadStats = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/collection-automation/stats');
+      const response = await api.get('/collection-automation/stats');
       setStats(response.data);
 
       // Buscar última execução dos logs
-      const historyResponse = await api.get('/api/collection-automation/history?limit=1');
+      const historyResponse = await api.get('/collection-automation/history?limit=1');
       if (historyResponse.data && historyResponse.data.length > 0) {
         setLastExecution(historyResponse.data[0].executed_at);
       }
@@ -138,7 +138,7 @@ export function CollectionAutomationPanel() {
       setRunning(true);
       addToast('Executando réguas de cobrança...', 'info');
 
-      const response = await api.post('/api/collection-automation/run');
+      const response = await api.post('/collection-automation/run');
 
       if (response.data.success) {
         addToast(`Réguas executadas! ${response.data.stats.totalSent} mensagens enviadas`, 'success');
