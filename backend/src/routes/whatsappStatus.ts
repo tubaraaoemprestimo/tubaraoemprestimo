@@ -16,6 +16,36 @@ async function postStatusToWhatsApp(
     caption?: string | null
 ): Promise<{ success: boolean; error?: string }> {
     try {
+        // Buscar contatos via Evolution API usando conexão direta ao PostgreSQL
+        const { Client } = require('pg');
+        const pgClient = new Client({
+            host: '172.18.0.2',
+            port: 5432,
+            database: 'evolution',
+            user: 'evolution',
+            password: 'evolution123'
+        });
+
+        await pgClient.connect();
+
+        const result = await pgClient.query(`
+            SELECT "remoteJid"
+            FROM "Contact"
+            WHERE "instanceId" = (SELECT id FROM "Instance" WHERE name = $1)
+            AND "remoteJid" LIKE '%@s.whatsapp.net'
+            LIMIT 50
+        `, [config.instanceName]);
+
+        await pgClient.end();
+
+        if (!result.rows || result.rows.length === 0) {
+            console.error('[WhatsApp Status] Nenhum contato encontrado');
+            return { success: false, error: 'Nenhum contato encontrado para enviar status' };
+        }
+
+        const statusJidList = result.rows.map((row: any) => row.remoteJid);
+        console.log('[WhatsApp Status] Contatos encontrados:', statusJidList.length);
+
         // Evolution API endpoint para postar status/stories
         const url = `${config.apiUrl}/message/sendStatus/${config.instanceName}`;
 
@@ -23,11 +53,11 @@ async function postStatusToWhatsApp(
         console.log('[WhatsApp Status] Image URL:', imageUrl);
         console.log('[WhatsApp Status] Caption:', caption);
 
-        await axios.post(url, {
+        const response = await axios.post(url, {
             type: 'image',
             content: imageUrl,
             caption: caption || '',
-            allContacts: true,
+            statusJidList: statusJidList,
             backgroundColor: '#000000',
             font: 1
         }, {
@@ -38,12 +68,21 @@ async function postStatusToWhatsApp(
             timeout: 60000
         });
 
+        console.log('[WhatsApp Status] ✅ Status postado com sucesso!');
+        console.log('[WhatsApp Status] Response:', JSON.stringify(response.data, null, 2));
         return { success: true };
     } catch (error: any) {
         const errorMsg = error.response?.data?.message || error.message || 'Erro desconhecido ao postar status';
-        console.error('[WhatsApp Status] Erro ao postar:', errorMsg);
-        console.error('[WhatsApp Status] Full error:', JSON.stringify(error.response?.data, null, 2) || error.message);
+        console.error('[WhatsApp Status] ❌ Erro ao postar:', errorMsg);
+        console.error('[WhatsApp Status] Error code:', error.code);
         console.error('[WhatsApp Status] Status code:', error.response?.status);
+        console.error('[WhatsApp Status] Full error:', JSON.stringify(error.response?.data, null, 2) || error.message);
+
+        // Log específico para timeout
+        if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+            console.error('[WhatsApp Status] ⏱️ TIMEOUT após 60 segundos');
+        }
+
         return { success: false, error: errorMsg };
     }
 }

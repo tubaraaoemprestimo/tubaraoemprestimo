@@ -1820,9 +1820,8 @@ loanRequestsRouter.put('/:id/supplemental-upload', async (req: Request, res: Res
                 customerId: null,
                 customerEmail: null,
                 title: '📄 Documentos Adicionais Enviados',
-                message: `${loanRequest.clientName} enviou os documentos solicitados. Clique para revisar.`,
+                message: `${loanRequest.clientName} enviou os documentos solicitados. ID: ${id}`,
                 type: 'DOCS_UPLOADED',
-                metadata: JSON.stringify({ requestId: id }),
                 isRead: false
             }
         });
