@@ -30,53 +30,23 @@ export function MetodoTubarao() {
   // ============================
   // QUIZ STATE
   // ============================
-  const [quizTemplate, setQuizTemplate] = useState<any>({
-    step1: {
-      title: 'Sua Experiência',
-      questions: [
-        { key: 'npsScore', label: 'Nota do curso (0-10)', type: 'scale', visible: true },
-        { key: 'wouldRecommend', label: 'Recomendaria?', type: 'choice', options: ['Sim', 'Talvez', 'Não'], visible: true },
-        { key: 'whatCaughtAttention', label: 'O que mais chamou atenção?', type: 'text', visible: true },
-      ]
-    },
-    step2: {
-      title: 'Transformação',
-      questions: [
-        { key: 'situationBefore', label: 'Situação antes do curso', type: 'choice', options: ['Endividado', 'Apertado', 'Estável', 'Confortável'], visible: true },
-        { key: 'clarityNow', label: 'Clareza depois do curso', type: 'choice', options: ['Muito mais claro', 'Um pouco mais claro', 'Igual', 'Mais confuso'], visible: true },
-      ]
-    },
-    step3: {
-      title: 'Intenção',
-      questions: [
-        { key: 'interestMotos', label: 'Interesse em motos?', type: 'choice', options: ['Sim', 'Talvez', 'Não'], visible: true },
-        { key: 'interestCredit', label: 'Interesse em crédito?', type: 'choice', options: ['Sim', 'Talvez', 'Não'], visible: true },
-      ]
-    },
-    step4: {
-      title: 'Qualificação',
-      questions: [
-        { key: 'wouldStartSteps', label: 'Começaria os passos?', type: 'choice', options: ['Sim', 'Talvez', 'Não'], visible: true },
-        { key: 'investmentAmount', label: 'Quanto pode investir?', type: 'choice', options: ['Até 500', '500-1k', '1k-3k', '+3k'], visible: true },
-      ]
-    },
-    step5: {
-      title: 'Mentoria',
-      questions: [
-        { key: 'interestOnlineMentorship', label: 'Interesse mentoria online?', type: 'choice', options: ['Sim', 'Talvez', 'Não'], visible: true },
-        { key: 'interestPresentialMentorship', label: 'Interesse mentoria presencial?', type: 'choice', options: ['Sim', 'Talvez', 'Não'], visible: true },
-      ]
-    },
-    step6: {
-      title: 'Contato',
-      questions: [
-        { key: 'fullName', label: 'Nome completo *', type: 'text', visible: true },
-        { key: 'whatsapp', label: 'WhatsApp *', type: 'text', visible: true },
-        { key: 'city', label: 'Cidade', type: 'text', visible: true },
-        { key: 'state', label: 'Estado', type: 'text', visible: true },
-        { key: 'suggestions', label: 'Sugestões (opcional)', type: 'text', visible: true },
-      ]
-    }
+  const [quizQuestions, setQuizQuestions] = useState<any[]>([]);
+  const [scoringRules, setScoringRules] = useState<any[]>([]);
+  const [editingQuestion, setEditingQuestion] = useState<any | null>(null);
+  const [editingRule, setEditingRule] = useState<any | null>(null);
+  const [questionForm, setQuestionForm] = useState({
+    step: 1,
+    question: '',
+    type: 'choice' as 'scale' | 'choice' | 'text',
+    options: [''],
+    weight: 10,
+    category: 'experience',
+    order: 1
+  });
+  const [ruleForm, setRuleForm] = useState({
+    condition: '',
+    points: 0,
+    description: ''
   });
 
   const [whatsappTemplates, setWhatsappTemplates] = useState({
@@ -128,7 +98,13 @@ export function MetodoTubarao() {
           break;
         }
         case 'quiz': {
-          const templates = await apiService.getWhatsappTemplates();
+          const [questions, rules, templates] = await Promise.all([
+            apiService.getQuizQuestions(),
+            apiService.getScoringRules(),
+            apiService.getWhatsappTemplates()
+          ]);
+          setQuizQuestions(questions || []);
+          setScoringRules(rules || []);
           if (templates && (templates.HOT || templates.WARM || templates.COLD)) {
             setWhatsappTemplates(prev => ({
               HOT: templates.HOT || prev.HOT,
@@ -254,6 +230,117 @@ export function MetodoTubarao() {
     } catch (err: any) {
       addToast(err.message, 'error');
     }
+  };
+
+  // ============================
+  // QUIZ HANDLERS
+  // ============================
+
+  const loadQuizData = async () => {
+    try {
+      const [questions, rules] = await Promise.all([
+        apiService.getQuizQuestions(),
+        apiService.getScoringRules()
+      ]);
+      setQuizQuestions(questions);
+      setScoringRules(rules);
+    } catch (err: any) {
+      addToast(err.message, 'error');
+    }
+  };
+
+  const handleSaveQuestion = async () => {
+    try {
+      if (editingQuestion) {
+        await apiService.updateQuizQuestion(editingQuestion.id, questionForm);
+        addToast('Pergunta atualizada!', 'success');
+      } else {
+        await apiService.createQuizQuestion(questionForm);
+        addToast('Pergunta criada!', 'success');
+      }
+      resetQuestionForm();
+      loadQuizData();
+    } catch (err: any) {
+      addToast(err.message, 'error');
+    }
+  };
+
+  const handleDeleteQuestion = async (id: string) => {
+    if (!confirm('Excluir esta pergunta?')) return;
+    try {
+      await apiService.deleteQuizQuestion(id);
+      addToast('Pergunta excluída!', 'success');
+      loadQuizData();
+    } catch (err: any) {
+      addToast(err.message, 'error');
+    }
+  };
+
+  const handleSaveRule = async () => {
+    try {
+      if (editingRule) {
+        await apiService.updateScoringRule(editingRule.id, ruleForm);
+        addToast('Regra atualizada!', 'success');
+      } else {
+        await apiService.createScoringRule(ruleForm);
+        addToast('Regra criada!', 'success');
+      }
+      resetRuleForm();
+      loadQuizData();
+    } catch (err: any) {
+      addToast(err.message, 'error');
+    }
+  };
+
+  const handleDeleteRule = async (id: string) => {
+    if (!confirm('Excluir esta regra?')) return;
+    try {
+      await apiService.deleteScoringRule(id);
+      addToast('Regra excluída!', 'success');
+      loadQuizData();
+    } catch (err: any) {
+      addToast(err.message, 'error');
+    }
+  };
+
+  const resetQuestionForm = () => {
+    setQuestionForm({
+      step: 1,
+      question: '',
+      type: 'choice',
+      options: [''],
+      weight: 10,
+      category: 'experience',
+      order: 1
+    });
+    setEditingQuestion(null);
+  };
+
+  const resetRuleForm = () => {
+    setRuleForm({
+      condition: '',
+      points: 0,
+      description: ''
+    });
+    setEditingRule(null);
+  };
+
+  const addOption = () => {
+    setQuestionForm({
+      ...questionForm,
+      options: [...(questionForm.options || []), '']
+    });
+  };
+
+  const updateOption = (index: number, value: string) => {
+    const newOptions = [...(questionForm.options || [])];
+    newOptions[index] = value;
+    setQuestionForm({ ...questionForm, options: newOptions });
+  };
+
+  const removeOption = (index: number) => {
+    const newOptions = questionForm.options?.filter((_, i) => i !== index);
+    setQuestionForm({ ...questionForm, options: newOptions });
   };
 
   // ============================
@@ -522,134 +609,358 @@ export function MetodoTubarao() {
 
             {/* ==================== QUIZ & SCORING TAB ==================== */}
             {activeTab === 'quiz' && (
-              <div>
-                <h2 className="text-2xl font-bold mb-6">❓ Quiz & Lead Scoring</h2>
+              <div className="grid grid-cols-2 gap-6">
+                {/* LEFT COLUMN - Questions Management */}
+                <div>
+                  <h2 className="text-2xl font-bold mb-6">❓ Gerenciar Perguntas do Quiz</h2>
 
-                {/* Quiz Steps Preview */}
-                <div className="grid gap-4 mb-8">
-                  {Object.entries(quizTemplate).map(([stepKey, stepData]: any) => (
-                    <div key={stepKey} className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold text-white">
-                          {stepKey.replace('step', 'Passo ')} — {stepData.title}
-                        </h3>
+                  {/* Question Form */}
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 mb-6">
+                    <h3 className="text-lg font-bold text-white mb-4">
+                      {editingQuestion ? '✏️ Editar Pergunta' : '➕ Nova Pergunta'}
+                    </h3>
+
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-zinc-400 text-sm mb-2">Passo (1-6)</label>
+                          <input
+                            type="number"
+                            value={questionForm.step}
+                            onChange={e => setQuestionForm({ ...questionForm, step: parseInt(e.target.value) })}
+                            className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                            min="1"
+                            max="6"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-zinc-400 text-sm mb-2">Tipo</label>
+                          <select
+                            value={questionForm.type}
+                            onChange={e => setQuestionForm({ ...questionForm, type: e.target.value as any })}
+                            className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                          >
+                            <option value="scale">Escala (0-10)</option>
+                            <option value="choice">Múltipla Escolha</option>
+                            <option value="text">Texto Livre</option>
+                          </select>
+                        </div>
                       </div>
-                      <div className="space-y-3">
-                        {stepData.questions.map((q: any, i: number) => (
-                          <div key={i} className="flex items-center gap-4 bg-black border border-zinc-700 rounded-lg p-4">
-                            <div className="flex-1">
-                              <p className="text-white font-bold text-sm mb-1">{q.label}</p>
-                              <div className="flex gap-2 text-xs text-zinc-500">
-                                <span>Tipo: {q.type}</span>
-                                {q.options && (
-                                  <>
-                                    <span>•</span>
-                                    <span>Opções: {q.options.join(', ')}</span>
-                                  </>
-                                )}
-                              </div>
+
+                      <div>
+                        <label className="block text-zinc-400 text-sm mb-2">Pergunta</label>
+                        <textarea
+                          value={questionForm.question}
+                          onChange={e => setQuestionForm({ ...questionForm, question: e.target.value })}
+                          className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                          rows={3}
+                          placeholder="Digite a pergunta..."
+                        />
+                      </div>
+
+                      {questionForm.type === 'choice' && (
+                        <div>
+                          <label className="block text-zinc-400 text-sm mb-2">Opções</label>
+                          {questionForm.options?.map((option, index) => (
+                            <div key={index} className="flex gap-2 mb-2">
+                              <input
+                                type="text"
+                                value={option}
+                                onChange={e => updateOption(index, e.target.value)}
+                                placeholder={`Opção ${index + 1}`}
+                                className="flex-1 bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                              />
+                              <button
+                                onClick={() => removeOption(index)}
+                                className="text-red-400 hover:text-red-300 px-3"
+                              >
+                                <X size={20} />
+                              </button>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                          ))}
+                          <Button variant="secondary" onClick={addOption} size="sm">
+                            <Plus size={16} className="mr-2" /> Adicionar Opção
+                          </Button>
+                        </div>
+                      )}
 
-                {/* Lead Scoring Thresholds */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 mb-8">
-                  <h3 className="text-xl font-bold text-white mb-4">🎯 Regras de Lead Scoring</h3>
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="space-y-3">
-                      <h4 className="text-zinc-400 font-bold text-sm uppercase">Pontuação por Resposta</h4>
-                      {[
-                        { label: 'NPS 8-10', points: '+30' },
-                        { label: 'NPS 6-7', points: '+15' },
-                        { label: 'Recomendaria (Sim)', points: '+20' },
-                        { label: 'Quer mentoria', points: '+40 ⚠️ CRÍTICO' },
-                        { label: 'Investimento +3k', points: '+30 ⚠️ CRÍTICO' },
-                        { label: 'Investimento 1k-3k', points: '+25' },
-                        { label: 'Começaria (Sim)', points: '+15' },
-                        { label: 'Interesse produtos', points: '+10' },
-                        { label: 'Clareza total', points: '+10' },
-                        { label: 'Situação financeira ruim', points: '+5' },
-                      ].map((rule, i) => (
-                        <div key={i} className="flex items-center justify-between bg-black border border-zinc-700 rounded-lg px-4 py-3">
-                          <span className="text-white text-sm">{rule.label}</span>
-                          <span className="text-[#D4AF37] font-bold text-sm">{rule.points}</span>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-zinc-400 text-sm mb-2">Peso (Pontos)</label>
+                          <input
+                            type="number"
+                            value={questionForm.weight}
+                            onChange={e => setQuestionForm({ ...questionForm, weight: parseInt(e.target.value) })}
+                            className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                          />
                         </div>
-                      ))}
-                    </div>
-                    <div className="space-y-3">
-                      <h4 className="text-zinc-400 font-bold text-sm uppercase">Classificação Final</h4>
-                      <div className="bg-red-900/20 border border-red-600 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-white font-bold">🔥 QUENTE (HOT)</span>
-                          <span className="text-red-400 font-bold">Score ≥ 80</span>
+                        <div>
+                          <label className="block text-zinc-400 text-sm mb-2">Categoria</label>
+                          <select
+                            value={questionForm.category}
+                            onChange={e => setQuestionForm({ ...questionForm, category: e.target.value })}
+                            className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                          >
+                            <option value="experience">Experiência</option>
+                            <option value="transformation">Transformação</option>
+                            <option value="intention">Intenção</option>
+                            <option value="qualification">Qualificação</option>
+                            <option value="sales">Venda Direta</option>
+                            <option value="contact">Contato</option>
+                          </select>
                         </div>
-                        <p className="text-zinc-400 text-sm">OU quer mentoria + investimento alto</p>
-                        <p className="text-red-400 text-xs mt-2 font-bold">→ Notifica admin + Dispara WhatsApp em 3min</p>
                       </div>
-                      <div className="bg-orange-900/20 border border-orange-600 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-white font-bold">⚠️ MORNO (WARM)</span>
-                          <span className="text-orange-400 font-bold">Score 50-79</span>
-                        </div>
-                        <p className="text-zinc-400 text-sm">Interessado, precisa de nutrição</p>
-                        <p className="text-orange-400 text-xs mt-2 font-bold">→ Dispara WhatsApp em 3min</p>
-                      </div>
-                      <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-white font-bold">❄️ FRIO (COLD)</span>
-                          <span className="text-blue-400 font-bold">Score &lt; 50</span>
-                        </div>
-                        <p className="text-zinc-400 text-sm">Sem interesse real</p>
-                        <p className="text-blue-400 text-xs mt-2 font-bold">→ Salvo na base, sem disparo</p>
+
+                      <div className="flex gap-2">
+                        <Button onClick={handleSaveQuestion}>
+                          <Save size={16} className="mr-2" /> Salvar Pergunta
+                        </Button>
+                        {editingQuestion && (
+                          <Button variant="secondary" onClick={resetQuestionForm}>
+                            <X size={16} className="mr-2" /> Cancelar
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
+
+                  {/* Questions List */}
+                  <div className="space-y-4">
+                    {[1, 2, 3, 4, 5, 6].map(step => {
+                      const stepQuestions = quizQuestions.filter(q => q.step === step);
+                      if (stepQuestions.length === 0) return null;
+
+                      return (
+                        <div key={step} className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+                          <h3 className="text-lg font-bold text-white mb-4">Passo {step}</h3>
+                          <div className="space-y-3">
+                            {stepQuestions.map(q => (
+                              <div key={q.id} className="bg-black border border-zinc-700 rounded-lg p-4">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex-1">
+                                    <p className="text-white font-bold mb-1">{q.question}</p>
+                                    <div className="flex gap-2 text-sm">
+                                      <span className="text-zinc-500">Tipo: {q.type}</span>
+                                      <span className="text-zinc-500">•</span>
+                                      <span className="text-[#D4AF37]">Peso: {q.weight} pts</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        setEditingQuestion(q);
+                                        setQuestionForm({
+                                          step: q.step,
+                                          question: q.question,
+                                          type: q.type,
+                                          options: q.options || [''],
+                                          weight: q.weight,
+                                          category: q.category,
+                                          order: q.order || 1
+                                        });
+                                      }}
+                                      className="text-zinc-400 hover:text-white"
+                                    >
+                                      <Edit2 size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteQuestion(q.id)}
+                                      className="text-red-400 hover:text-red-300"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                </div>
+                                {q.options && q.options.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {q.options.map((opt: string, i: number) => (
+                                      <span key={i} className="bg-zinc-800 px-2 py-1 rounded text-xs text-zinc-400">
+                                        {opt}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* WhatsApp Message Templates */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
-                  <h3 className="text-xl font-bold text-white mb-4">📱 Templates de Mensagens WhatsApp</h3>
-                  <p className="text-zinc-500 text-sm mb-6">Use <code className="bg-zinc-800 px-1 rounded">{'{nome}'}</code> para inserir o nome do cliente automaticamente</p>
+                {/* RIGHT COLUMN - Scoring Rules & Templates */}
+                <div>
+                  <h2 className="text-2xl font-bold mb-6">🎯 Lead Scoring & Templates</h2>
 
-                  <div className="space-y-6">
-                    <div>
-                      <label className="block text-red-400 font-bold mb-2">🔥 Lead QUENTE (HOT)</label>
-                      <textarea
-                        value={whatsappTemplates.HOT}
-                        onChange={e => setWhatsappTemplates({ ...whatsappTemplates, HOT: e.target.value })}
-                        className="w-full bg-black border border-red-600 rounded-lg px-4 py-3 text-white"
-                        rows={6}
-                      />
+                  {/* Scoring Rules */}
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 mb-6">
+                    <h3 className="text-lg font-bold text-white mb-4">
+                      {editingRule ? '✏️ Editar Regra' : '➕ Nova Regra de Scoring'}
+                    </h3>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-zinc-400 text-sm mb-2">Condição</label>
+                        <input
+                          type="text"
+                          value={ruleForm.condition}
+                          onChange={e => setRuleForm({ ...ruleForm, condition: e.target.value })}
+                          placeholder="Ex: npsScore >= 8"
+                          className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                        />
+                        <p className="text-zinc-600 text-xs mt-1">
+                          Use: npsScore, wouldRecommend, investmentAmount, etc.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-zinc-400 text-sm mb-2">Pontos</label>
+                        <input
+                          type="number"
+                          value={ruleForm.points}
+                          onChange={e => setRuleForm({ ...ruleForm, points: parseInt(e.target.value) })}
+                          className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-zinc-400 text-sm mb-2">Descrição</label>
+                        <textarea
+                          value={ruleForm.description}
+                          onChange={e => setRuleForm({ ...ruleForm, description: e.target.value })}
+                          placeholder="Ex: NPS excelente (8-10)"
+                          className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                          rows={2}
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button onClick={handleSaveRule}>
+                          <Save size={16} className="mr-2" /> Salvar Regra
+                        </Button>
+                        {editingRule && (
+                          <Button variant="secondary" onClick={resetRuleForm}>
+                            <X size={16} className="mr-2" /> Cancelar
+                          </Button>
+                        )}
+                      </div>
                     </div>
+                  </div>
 
-                    <div>
-                      <label className="block text-orange-400 font-bold mb-2">⚠️ Lead MORNO (WARM)</label>
-                      <textarea
-                        value={whatsappTemplates.WARM}
-                        onChange={e => setWhatsappTemplates({ ...whatsappTemplates, WARM: e.target.value })}
-                        className="w-full bg-black border border-orange-600 rounded-lg px-4 py-3 text-white"
-                        rows={6}
-                      />
+                  {/* Rules List */}
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 mb-6">
+                    <h3 className="text-lg font-bold text-white mb-4">Regras Ativas</h3>
+                    <div className="space-y-3">
+                      {scoringRules.map(rule => (
+                        <div key={rule.id} className="bg-black border border-zinc-700 rounded-lg p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[#D4AF37] font-bold">+{rule.points} pts</span>
+                                <span className="text-zinc-500">•</span>
+                                <code className="text-sm text-zinc-400 bg-zinc-900 px-2 py-1 rounded">
+                                  {rule.condition}
+                                </code>
+                              </div>
+                              <p className="text-white text-sm">{rule.description}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setEditingRule(rule);
+                                  setRuleForm({
+                                    condition: rule.condition,
+                                    points: rule.points,
+                                    description: rule.description
+                                  });
+                                }}
+                                className="text-zinc-400 hover:text-white"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRule(rule.id)}
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
+                  </div>
 
-                    <div>
-                      <label className="block text-blue-400 font-bold mb-2">❄️ Lead FRIO (COLD)</label>
-                      <textarea
-                        value={whatsappTemplates.COLD}
-                        onChange={e => setWhatsappTemplates({ ...whatsappTemplates, COLD: e.target.value })}
-                        className="w-full bg-black border border-blue-600 rounded-lg px-4 py-3 text-white"
-                        rows={4}
-                      />
+                  {/* Scoring Thresholds */}
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 mb-6">
+                    <h3 className="text-lg font-bold text-white mb-4">🎯 Limites de Classificação</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between bg-red-900/20 border border-red-600 rounded-lg p-4">
+                        <div>
+                          <p className="text-white font-bold">🔥 Lead QUENTE (HOT)</p>
+                          <p className="text-zinc-400 text-sm">Score ≥ 80 ou (Mentoria + Investimento Alto)</p>
+                        </div>
+                        <span className="text-2xl font-bold text-red-500">80+</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-orange-900/20 border border-orange-600 rounded-lg p-4">
+                        <div>
+                          <p className="text-white font-bold">⚠️ Lead MORNO (WARM)</p>
+                          <p className="text-zinc-400 text-sm">Score ≥ 50</p>
+                        </div>
+                        <span className="text-2xl font-bold text-orange-500">50-79</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-blue-900/20 border border-blue-600 rounded-lg p-4">
+                        <div>
+                          <p className="text-white font-bold">❄️ Lead FRIO (COLD)</p>
+                          <p className="text-zinc-400 text-sm">Score &lt; 50</p>
+                        </div>
+                        <span className="text-2xl font-bold text-blue-500">0-49</span>
+                      </div>
                     </div>
+                  </div>
 
-                    <Button onClick={handleSaveTemplates} disabled={savingTemplates} className="w-full">
-                      <Save size={20} className="mr-2" />
-                      {savingTemplates ? 'Salvando...' : 'Salvar Templates'}
-                    </Button>
+                  {/* WhatsApp Templates */}
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+                    <h3 className="text-lg font-bold text-white mb-4">📱 Templates WhatsApp</h3>
+                    <p className="text-zinc-500 text-sm mb-4">Use <code className="bg-zinc-800 px-1 rounded">{'{nome}'}</code> para nome do cliente</p>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-red-400 font-bold mb-2 text-sm">🔥 HOT</label>
+                        <textarea
+                          value={whatsappTemplates.HOT}
+                          onChange={e => setWhatsappTemplates({ ...whatsappTemplates, HOT: e.target.value })}
+                          className="w-full bg-black border border-red-600 rounded-lg px-4 py-2 text-white text-sm"
+                          rows={4}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-orange-400 font-bold mb-2 text-sm">⚠️ WARM</label>
+                        <textarea
+                          value={whatsappTemplates.WARM}
+                          onChange={e => setWhatsappTemplates({ ...whatsappTemplates, WARM: e.target.value })}
+                          className="w-full bg-black border border-orange-600 rounded-lg px-4 py-2 text-white text-sm"
+                          rows={4}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-blue-400 font-bold mb-2 text-sm">❄️ COLD</label>
+                        <textarea
+                          value={whatsappTemplates.COLD}
+                          onChange={e => setWhatsappTemplates({ ...whatsappTemplates, COLD: e.target.value })}
+                          className="w-full bg-black border border-blue-600 rounded-lg px-4 py-2 text-white text-sm"
+                          rows={3}
+                        />
+                      </div>
+
+                      <Button onClick={handleSaveTemplates} disabled={savingTemplates} className="w-full">
+                        <Save size={16} className="mr-2" />
+                        {savingTemplates ? 'Salvando...' : 'Salvar Templates'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
