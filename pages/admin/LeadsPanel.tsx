@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, MessageCircle, TrendingUp, Users, Phone, Mail, MapPin, Calendar } from 'lucide-react';
 import { apiService } from '../../services/apiService';
-import { useToast } from '../../hooks/useToast';
+import { useToast } from '../../components/Toast';
 import { Button } from '../../components/Button';
 
 interface Lead {

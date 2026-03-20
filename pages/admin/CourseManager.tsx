@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Book, Plus, Edit2, Trash2, Video, FileText, Save, X } from 'lucide-react';
 import { apiService } from '../../services/apiService';
-import { useToast } from '../../hooks/useToast';
+import { useToast } from '../../components/Toast';
 import { Button } from '../../components/Button';
 
 interface Course {

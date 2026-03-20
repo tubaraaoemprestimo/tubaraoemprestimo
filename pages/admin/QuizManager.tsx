@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { HelpCircle, Plus, Edit2, Trash2, Save, X, TrendingUp, Settings } from 'lucide-react';
 import { apiService } from '../../services/apiService';
-import { useToast } from '../../hooks/useToast';
+import { useToast } from '../../components/Toast';
 import { Button } from '../../components/Button';
 
 interface QuizQuestion {

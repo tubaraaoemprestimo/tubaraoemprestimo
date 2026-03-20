@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Send } from 'lucide-react';
 import { apiService } from '../../services/apiService';
-import { useToast } from '../../hooks/useToast';
+import { useToast } from '../../components/Toast';
 import { Button } from '../../components/Button';
 
 interface QuizData {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Play, Download, MessageCircle, Send, Edit2, Trash2, CheckCircle } from 'lucide-react';
 import { apiService } from '../../services/apiService';
-import { useToast } from '../../hooks/useToast';
+import { useToast } from '../../components/Toast';
 import { Button } from '../../components/Button';
 
 interface Comment {

@@ -5,7 +5,7 @@ import {
   Send, CheckCircle, XCircle, Clock, TrendingUp, Eye, Settings
 } from 'lucide-react';
 import { apiService } from '../../services/apiService';
-import { useToast } from '../../hooks/useToast';
+import { useToast } from '../../components/Toast';
 import { Button } from '../../components/Button';
 
 type ActiveTab = 'courses' | 'quiz' | 'leads' | 'comments' | 'automation';
