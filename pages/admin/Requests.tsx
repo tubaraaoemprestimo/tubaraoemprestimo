@@ -2,7 +2,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Check, X, Eye, Maximize, Layers, Download, Filter, Video, Users, Phone, FileWarning, Send, AlertTriangle, MapPin, FileText, ExternalLink, Trash, Pause, Play, Bell } from 'lucide-react';
+import { Check, X, Eye, Maximize, Layers, Download, Filter, Video, Users, Phone, FileWarning, Send, AlertTriangle, MapPin, FileText, ExternalLink, Trash, Pause, Play, Bell, MessageSquare, CheckSquare, Square, Megaphone } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { apiService } from '../../services/apiService';
 import { emailService } from '../../services/emailService';
@@ -112,6 +112,71 @@ export const Requests: React.FC = () => {
     // Notifications
     const [adminNotifications, setAdminNotifications] = useState<any[]>([]);
     const [showNotifications, setShowNotifications] = useState(false);
+
+    // ── Seleção múltipla & Broadcast ──────────────────────────────────────────
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
+    const [broadcastType, setBroadcastType] = useState<'offer' | 'preapproved' | 'coupon' | 'custom'>('offer');
+    const [broadcastMessage, setBroadcastMessage] = useState('');
+    const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
+
+    const BROADCAST_TEMPLATES = {
+        offer: `Olá, {nome}! 🦈 Temos uma oferta exclusiva pra você! Fale com a gente agora e garanta condições especiais de empréstimo. Não perca essa oportunidade! 💰\n\nTubarão Empréstimos 🦈\nhttps://www.tubaraoemprestimo.com.br/`,
+        preapproved: `Oi, {nome}! 🎉 Seu empréstimo está PRÉ-APROVADO! Entre em contato agora para finalizar e receber seu dinheiro. Condições especiais por tempo limitado!\n\nTubarão Empréstimos 🦈\nhttps://www.tubaraoemprestimo.com.br/`,
+        coupon: `{nome}, surpresa pra você! 🎁 Você ganhou um CUPOM ESPECIAL de desconto nas taxas do seu empréstimo. Use antes que expire! Fale conosco agora.\n\nTubarão Empréstimos 🦈\nhttps://www.tubaraoemprestimo.com.br/`,
+        custom: ''
+    };
+
+    const handleToggleSelect = (id: string) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const handleSelectAll = () => {
+        if (selectedIds.length === filteredRequests.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredRequests.map(r => r.id));
+        }
+    };
+
+    const handleOpenBroadcast = () => {
+        if (selectedIds.length === 0) {
+            addToast('Selecione pelo menos um cliente', 'warning');
+            return;
+        }
+        setBroadcastType('offer');
+        setBroadcastMessage(BROADCAST_TEMPLATES.offer);
+        setIsBroadcastOpen(true);
+    };
+
+    const handleBroadcastTypeChange = (type: typeof broadcastType) => {
+        setBroadcastType(type);
+        if (type !== 'custom') {
+            setBroadcastMessage(BROADCAST_TEMPLATES[type]);
+        } else {
+            setBroadcastMessage('');
+        }
+    };
+
+    const handleSendBroadcast = async () => {
+        if (!broadcastMessage.trim()) {
+            addToast('Digite uma mensagem', 'warning');
+            return;
+        }
+        setIsSendingBroadcast(true);
+        try {
+            const result = await apiService.sendBroadcast(selectedIds, broadcastMessage, broadcastType);
+            addToast(`✅ Disparo iniciado para ${result.total} clientes!`, 'success');
+            setIsBroadcastOpen(false);
+            setSelectedIds([]);
+        } catch (err: any) {
+            addToast(err.message || 'Erro ao enviar', 'error');
+        } finally {
+            setIsSendingBroadcast(false);
+        }
+    };
 
     useEffect(() => {
         loadRequests();
@@ -540,6 +605,13 @@ export const Requests: React.FC = () => {
                     <Button onClick={handleExportCSV} variant="secondary" className="flex-1 md:flex-none bg-zinc-900 border border-zinc-800 hover:border-[#D4AF37]">
                         <Download size={18} className="mr-2" /> Exportar CSV
                     </Button>
+                    <Button
+                        onClick={handleOpenBroadcast}
+                        className="flex-1 md:flex-none bg-gradient-to-r from-[#D4AF37] to-yellow-600 text-black font-bold hover:brightness-110"
+                    >
+                        <Megaphone size={18} className="mr-2" />
+                        {selectedIds.length > 0 ? `Disparar (${selectedIds.length})` : 'Disparo em Massa'}
+                    </Button>
                 </div>
             </div>
 
@@ -644,6 +716,14 @@ export const Requests: React.FC = () => {
                     <table className="w-full text-left">
                         <thead className="bg-zinc-950 text-zinc-400">
                             <tr>
+                                <th className="p-4 w-10">
+                                    <button onClick={handleSelectAll} className="text-zinc-400 hover:text-white">
+                                        {selectedIds.length === filteredRequests.length && filteredRequests.length > 0
+                                            ? <CheckSquare size={18} className="text-[#D4AF37]" />
+                                            : <Square size={18} />
+                                        }
+                                    </button>
+                                </th>
                                 <th className="p-4 font-medium">Cliente</th>
                                 <th className="p-4 font-medium">Tipo</th>
                                 <th className="p-4 font-medium">Valor</th>
@@ -657,12 +737,21 @@ export const Requests: React.FC = () => {
                                 <tr><td colSpan={7} className="p-8 text-center text-zinc-500">Nenhuma solicitação encontrada com este filtro.</td></tr>
                             ) : (
                                 filteredRequests.map((req) => (
-                                    <tr key={req.id} className={`hover:bg-zinc-800/50 transition-colors ${(req.profileType === 'GARANTIA' || req.profileType === 'GARANTIA_VEICULO') ? 'border-l-4 border-l-yellow-500' :
+                                    <tr key={req.id} className={`hover:bg-zinc-800/50 transition-colors ${selectedIds.includes(req.id) ? 'bg-[#D4AF37]/5 border-l-4 border-l-[#D4AF37]' :
+                                        (req.profileType === 'GARANTIA' || req.profileType === 'GARANTIA_VEICULO') ? 'border-l-4 border-l-yellow-500' :
                                         req.profileType === 'MOTO' ? 'border-l-4 border-l-blue-500' :
                                             req.profileType === 'LIMPA_NOME' ? 'border-l-4 border-l-purple-500' :
                                                 req.profileType === 'AUTONOMO' ? 'border-l-4 border-l-green-500' :
                                                     req.profileType === 'CLT' ? 'border-l-4 border-l-gray-500' : ''
                                         }`}>
+                                        <td className="p-4">
+                                            <button onClick={() => handleToggleSelect(req.id)} className="text-zinc-400 hover:text-[#D4AF37]">
+                                                {selectedIds.includes(req.id)
+                                                    ? <CheckSquare size={18} className="text-[#D4AF37]" />
+                                                    : <Square size={18} />
+                                                }
+                                            </button>
+                                        </td>
                                         <td className="p-4">
                                             <div className="font-medium text-white">{req.clientName}</div>
                                             <div className="text-xs text-zinc-500">{req.cpf}</div>
@@ -746,9 +835,17 @@ export const Requests: React.FC = () => {
                         >
                             {/* Header: Nome + Badge */}
                             <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-bold text-white text-base truncate">{req.clientName}</h3>
-                                    <p className="text-xs text-zinc-500">{req.cpf}</p>
+                                <div className="flex items-start gap-2 flex-1 min-w-0">
+                                    <button onClick={() => handleToggleSelect(req.id)} className="mt-1 text-zinc-400 hover:text-[#D4AF37] flex-shrink-0">
+                                        {selectedIds.includes(req.id)
+                                            ? <CheckSquare size={18} className="text-[#D4AF37]" />
+                                            : <Square size={18} />
+                                        }
+                                    </button>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-bold text-white text-base truncate">{req.clientName}</h3>
+                                        <p className="text-xs text-zinc-500">{req.cpf}</p>
+                                    </div>
                                 </div>
                                 {getProfileBadge(req.profileType)}
                             </div>
@@ -1705,6 +1802,115 @@ export const Requests: React.FC = () => {
                                 </div>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Barra flutuante de seleção ─────────────────────────────────── */}
+            {selectedIds.length > 0 && !isBroadcastOpen && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-zinc-900 border border-[#D4AF37] rounded-2xl px-5 py-3 shadow-2xl shadow-black/60 animate-in slide-in-from-bottom duration-200">
+                    <CheckSquare size={20} className="text-[#D4AF37]" />
+                    <span className="text-white font-bold">{selectedIds.length} selecionado{selectedIds.length > 1 ? 's' : ''}</span>
+                    <button onClick={() => setSelectedIds([])} className="text-zinc-500 hover:text-white ml-1">
+                        <X size={16} />
+                    </button>
+                    <div className="w-px h-5 bg-zinc-700" />
+                    <Button onClick={handleOpenBroadcast} className="bg-gradient-to-r from-[#D4AF37] to-yellow-600 text-black font-bold text-sm py-1.5 px-4 hover:brightness-110">
+                        <Megaphone size={15} className="mr-1.5" /> Enviar Mensagem
+                    </Button>
+                </div>
+            )}
+
+            {/* ── Modal de Broadcast ─────────────────────────────────────────── */}
+            {isBroadcastOpen && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[70] p-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-xl p-6 shadow-2xl animate-in zoom-in duration-200">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                    <Megaphone size={22} className="text-[#D4AF37]" /> Disparo em Massa
+                                </h3>
+                                <p className="text-zinc-400 text-sm mt-1">
+                                    Enviando para <span className="text-[#D4AF37] font-bold">{selectedIds.length} cliente{selectedIds.length > 1 ? 's' : ''}</span> via WhatsApp
+                                </p>
+                            </div>
+                            <button onClick={() => setIsBroadcastOpen(false)} className="text-zinc-400 hover:text-white">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        {/* Tipo de mensagem */}
+                        <div className="mb-5">
+                            <label className="block text-sm font-bold text-white mb-3">Tipo de mensagem</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {([
+                                    { id: 'offer', label: '🔥 Oferta Especial', desc: 'Promover condições exclusivas' },
+                                    { id: 'preapproved', label: '✅ Pré-Aprovado', desc: 'Avisar de pré-aprovação' },
+                                    { id: 'coupon', label: '🎁 Cupom', desc: 'Enviar cupom de desconto' },
+                                    { id: 'custom', label: '✏️ Personalizada', desc: 'Escreva sua mensagem' },
+                                ] as const).map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => handleBroadcastTypeChange(opt.id)}
+                                        className={`text-left p-3 rounded-xl border-2 transition-all ${broadcastType === opt.id
+                                            ? 'border-[#D4AF37] bg-[#D4AF37]/10'
+                                            : 'border-zinc-700 bg-zinc-800 hover:border-zinc-500'
+                                        }`}
+                                    >
+                                        <div className="font-bold text-white text-sm">{opt.label}</div>
+                                        <div className="text-zinc-400 text-xs mt-0.5">{opt.desc}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Editor de mensagem */}
+                        <div className="mb-5">
+                            <label className="block text-sm font-bold text-white mb-2">
+                                Mensagem
+                                <span className="text-zinc-500 font-normal ml-2 text-xs">Use {'{nome}'} para personalizar</span>
+                            </label>
+                            <textarea
+                                value={broadcastMessage}
+                                onChange={e => setBroadcastMessage(e.target.value)}
+                                placeholder="Digite sua mensagem..."
+                                className="w-full bg-black border border-zinc-700 focus:border-[#D4AF37] rounded-xl px-4 py-3 text-white text-sm resize-none transition-colors outline-none"
+                                rows={6}
+                            />
+                            <div className="flex justify-between mt-1">
+                                <span className="text-zinc-600 text-xs">{broadcastMessage.length} caracteres</span>
+                                <span className="text-zinc-600 text-xs">{selectedIds.length} destinatário{selectedIds.length > 1 ? 's' : ''}</span>
+                            </div>
+                        </div>
+
+                        {/* Preview */}
+                        {broadcastMessage && (
+                            <div className="mb-5 bg-zinc-800 rounded-xl p-4 border border-zinc-700">
+                                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2 font-medium">Preview</p>
+                                <p className="text-white text-sm whitespace-pre-wrap leading-relaxed">
+                                    {broadcastMessage.replace(/\{nome\}/gi, 'João')}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Ações */}
+                        <div className="flex gap-3">
+                            <Button variant="secondary" onClick={() => setIsBroadcastOpen(false)} className="flex-1">
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={handleSendBroadcast}
+                                disabled={isSendingBroadcast || !broadcastMessage.trim()}
+                                className="flex-1 bg-gradient-to-r from-[#D4AF37] to-yellow-600 text-black font-bold hover:brightness-110 disabled:opacity-50"
+                            >
+                                {isSendingBroadcast ? (
+                                    <><span className="animate-spin mr-2">⏳</span> Enviando...</>
+                                ) : (
+                                    <><Send size={16} className="mr-2" /> Disparar Agora</>
+                                )}
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}

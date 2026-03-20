@@ -1833,6 +1833,66 @@ loanRequestsRouter.put('/:id/supplemental-upload', async (req: Request, res: Res
     }
 });
 
+/**
+ * POST /api/loan-requests/broadcast
+ * Envia mensagem em massa para clientes selecionados (ADMIN ONLY)
+ * Body: { requestIds: string[], message: string, type: string }
+ */
+loanRequestsRouter.post('/broadcast', authenticate, requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const { requestIds, message, type } = req.body;
+
+        if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
+            return res.status(400).json({ error: 'Selecione pelo menos um destinatário' });
+        }
+        if (!message || message.trim().length === 0) {
+            return res.status(400).json({ error: 'Mensagem é obrigatória' });
+        }
+
+        // Buscar dados de telefone e nome dos clientes selecionados
+        const requests = await prisma.loanRequest.findMany({
+            where: { id: { in: requestIds } },
+            select: { id: true, clientName: true, phone: true, status: true }
+        });
+
+        // Responde imediatamente e processa em background
+        res.json({ success: true, total: requests.length, message: 'Disparo iniciado em background' });
+
+        // Processar envios em background com delay entre cada um
+        (async () => {
+            let sent = 0;
+            let failed = 0;
+
+            for (const req of requests) {
+                try {
+                    if (!req.phone) { failed++; continue; }
+
+                    const firstName = req.clientName?.split(' ')[0] || 'Cliente';
+                    const finalMessage = message
+                        .replace(/\{nome\}/gi, firstName)
+                        .replace(/\{name\}/gi, firstName)
+                        .replace(/\{clientName\}/gi, firstName);
+
+                    await sendWhatsAppNotification(req.phone, finalMessage);
+                    sent++;
+
+                    // Delay de 1.5s entre envios para não sobrecarregar a API
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                } catch (e) {
+                    console.error(`[Broadcast] Falha ao enviar para ${req.clientName}:`, e);
+                    failed++;
+                }
+            }
+
+            console.log(`[Broadcast] Concluído: ${sent} enviados, ${failed} falhas. Tipo: ${type}`);
+        })();
+
+    } catch (error) {
+        console.error('Erro no broadcast:', error);
+        res.status(500).json({ error: 'Erro ao iniciar disparo' });
+    }
+});
+
 // PUT /api/loan-requests/:id/contract — Atualizar URL do PDF do contrato
 loanRequestsRouter.put('/:id/contract', async (req: Request, res: Response) => {
     try {

@@ -1277,6 +1277,12 @@ export const apiService = {
         const { data, error } = await api.put(`/comments/${commentId}/admin-notes`, { adminNotes });
         if (error) throw new Error(error.error || 'Erro ao salvar notas');
         return data;
+    },
+
+    async sendBroadcast(requestIds: string[], message: string, type: string) {
+        const { data, error } = await api.post('/loan-requests/broadcast', { requestIds, message, type });
+        if (error) throw new Error(error.error || 'Erro ao enviar disparo');
+        return data;
     }
 };
 
