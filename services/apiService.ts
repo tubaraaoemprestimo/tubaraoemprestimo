@@ -1026,6 +1026,231 @@ export const apiService = {
 
     async markNotificationRead(id: string) {
         await api.put(`/notifications/${id}/read`);
+    },
+
+    // ============= COMMENTS API =============
+
+    async getLessonComments(lessonId: string) {
+        const { data, error } = await api.get(`/comments/lesson/${lessonId}`);
+        if (error) throw new Error(error.error || 'Erro ao carregar comentários');
+        return data;
+    },
+
+    async createComment(lessonId: string, payload: { content: string; parentId?: string }) {
+        const { data, error } = await api.post(`/comments/lesson/${lessonId}`, payload);
+        if (error) throw new Error(error.error || 'Erro ao criar comentário');
+        return data;
+    },
+
+    async updateComment(commentId: string, payload: { content: string }) {
+        const { data, error } = await api.put(`/comments/${commentId}`, payload);
+        if (error) throw new Error(error.error || 'Erro ao atualizar comentário');
+        return data;
+    },
+
+    async deleteComment(commentId: string) {
+        const { data, error } = await api.delete(`/comments/${commentId}`);
+        if (error) throw new Error(error.error || 'Erro ao excluir comentário');
+        return data;
+    },
+
+    async getPendingComments() {
+        const { data, error } = await api.get('/comments/pending');
+        if (error) throw new Error(error.error || 'Erro ao carregar comentários pendentes');
+        return data;
+    },
+
+    // ============= QUIZ API =============
+
+    async submitQuiz(payload: any) {
+        const { data, error } = await api.post('/quiz/submit', payload);
+        if (error) throw new Error(error.error || 'Erro ao enviar quiz');
+        return data;
+    },
+
+    async checkQuizResponse(courseId: string) {
+        const { data, error } = await api.get(`/quiz/check/${courseId}`);
+        if (error) throw new Error(error.error || 'Erro ao verificar quiz');
+        return data;
+    },
+
+    async getLeads(status?: 'HOT' | 'WARM' | 'COLD') {
+        const url = status ? `/quiz/leads?status=${status}` : '/quiz/leads';
+        const { data, error } = await api.get(url);
+        if (error) throw new Error(error.error || 'Erro ao carregar leads');
+        return data;
+    },
+
+    async markLeadContacted(leadId: string, notes: string) {
+        const { data, error } = await api.put(`/quiz/leads/${leadId}/contact`, { notes });
+        if (error) throw new Error(error.error || 'Erro ao marcar lead como contatado');
+        return data;
+    },
+
+    // ============= LESSONS API =============
+
+    async getLesson(lessonId: string) {
+        const { data, error } = await api.get(`/curso/lessons/${lessonId}`);
+        if (error) throw new Error(error.error || 'Erro ao carregar aula');
+        return data;
+    },
+
+    async markLessonComplete(lessonId: string) {
+        const { data, error } = await api.post(`/curso/lessons/${lessonId}/complete`);
+        if (error) throw new Error(error.error || 'Erro ao marcar aula como concluída');
+        return data;
+    },
+
+    // ============= AUTOMATION API =============
+
+    async getAutomationLogs(status?: string) {
+        const url = status ? `/automation/logs?status=${status}` : '/automation/logs';
+        const { data, error } = await api.get(url);
+        if (error) throw new Error(error.error || 'Erro ao carregar logs');
+        return data;
+    },
+
+    async getAutomationStats() {
+        const { data, error } = await api.get('/automation/stats');
+        if (error) throw new Error(error.error || 'Erro ao carregar estatísticas');
+        return data;
+    },
+
+    async retryAutomation(id: string) {
+        const { data, error } = await api.post(`/automation/retry/${id}`);
+        if (error) throw new Error(error.error || 'Erro ao reenviar automação');
+        return data;
+    },
+
+    async testAutomation(phone: string, name: string, leadStatus: string) {
+        const { data, error } = await api.post('/automation/test', { phone, name, leadStatus });
+        if (error) throw new Error(error.error || 'Erro ao enviar teste');
+        return data;
+    },
+
+    // ============= CURSO ADMIN =============
+
+    async getCourses() {
+        // Returns single course object (single-product LMS)
+        const { data, error } = await api.get('/curso/admin/course');
+        if (error) throw new Error(error.error || 'Erro ao carregar cursos');
+        // Backend returns { course } — wrap in array for CourseManager compatibility
+        const course = data?.course || data;
+        return course ? [course] : [];
+    },
+
+    async createCourse(payload: { title: string; description: string; thumbnailUrl?: string }) {
+        // First module creation auto-creates the course
+        const { data, error } = await api.post('/curso/modules', payload);
+        if (error) throw new Error(error.error || 'Erro ao criar curso');
+        return data;
+    },
+
+    async updateCourse(courseId: string, payload: any) {
+        const { data, error } = await api.put(`/curso/admin/course`, payload);
+        if (error) throw new Error(error.error || 'Erro ao atualizar curso');
+        return data;
+    },
+
+    async deleteCourse(_courseId: string) {
+        // Single-product LMS: not supported
+        throw new Error('Operação não suportada no modelo single-course');
+    },
+
+    async createModule(_courseId: string, payload: { title: string; description: string }) {
+        const { data, error } = await api.post('/curso/modules', payload);
+        if (error) throw new Error(error.error || 'Erro ao criar módulo');
+        return data;
+    },
+
+    async updateModule(moduleId: string, payload: any) {
+        const { data, error } = await api.put(`/curso/modules/${moduleId}`, payload);
+        if (error) throw new Error(error.error || 'Erro ao atualizar módulo');
+        return data;
+    },
+
+    async deleteModule(moduleId: string) {
+        const { data, error } = await api.delete(`/curso/modules/${moduleId}`);
+        if (error) throw new Error(error.error || 'Erro ao excluir módulo');
+        return data;
+    },
+
+    async createLesson(moduleId: string, payload: { title: string; description: string; videoUrl: string; duration: number }) {
+        const { data, error } = await api.post('/curso/lessons', { ...payload, moduleId });
+        if (error) throw new Error(error.error || 'Erro ao criar aula');
+        return data;
+    },
+
+    async updateLesson(lessonId: string, payload: any) {
+        const { data, error } = await api.put(`/curso/lessons/${lessonId}`, payload);
+        if (error) throw new Error(error.error || 'Erro ao atualizar aula');
+        return data;
+    },
+
+    async deleteLesson(lessonId: string) {
+        const { data, error } = await api.delete(`/curso/lessons/${lessonId}`);
+        if (error) throw new Error(error.error || 'Erro ao excluir aula');
+        return data;
+    },
+
+    async getWhatsappTemplates() {
+        const { data, error } = await api.get('/automation/templates');
+        if (error) return { HOT: '', WARM: '', COLD: '' };
+        return data;
+    },
+
+    async saveWhatsappTemplates(templates: { HOT: string; WARM: string; COLD: string }) {
+        const { data, error } = await api.put('/automation/templates', templates);
+        if (error) throw new Error(error.error || 'Erro ao salvar templates');
+        return data;
+    },
+
+    async getQuizQuestions() {
+        const { data, error } = await api.get('/quiz/questions');
+        if (error) return [];
+        return data || [];
+    },
+
+    async getScoringRules() {
+        const { data, error } = await api.get('/quiz/scoring-rules');
+        if (error) return [];
+        return data || [];
+    },
+
+    async createQuizQuestion(payload: any) {
+        const { data, error } = await api.post('/quiz/questions', payload);
+        if (error) throw new Error(error.error || 'Erro ao criar pergunta');
+        return data;
+    },
+
+    async updateQuizQuestion(id: string, payload: any) {
+        const { data, error } = await api.put(`/quiz/questions/${id}`, payload);
+        if (error) throw new Error(error.error || 'Erro ao atualizar pergunta');
+        return data;
+    },
+
+    async deleteQuizQuestion(id: string) {
+        const { data, error } = await api.delete(`/quiz/questions/${id}`);
+        if (error) throw new Error(error.error || 'Erro ao excluir pergunta');
+        return data;
+    },
+
+    async createScoringRule(payload: any) {
+        const { data, error } = await api.post('/quiz/scoring-rules', payload);
+        if (error) throw new Error(error.error || 'Erro ao criar regra');
+        return data;
+    },
+
+    async updateScoringRule(id: string, payload: any) {
+        const { data, error } = await api.put(`/quiz/scoring-rules/${id}`, payload);
+        if (error) throw new Error(error.error || 'Erro ao atualizar regra');
+        return data;
+    },
+
+    async deleteScoringRule(id: string) {
+        const { data, error } = await api.delete(`/quiz/scoring-rules/${id}`);
+        if (error) throw new Error(error.error || 'Erro ao excluir regra');
+        return data;
     }
 };
 

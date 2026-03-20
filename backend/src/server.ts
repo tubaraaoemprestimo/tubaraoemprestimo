@@ -45,6 +45,9 @@ import { stripeWebhookRouter } from './routes/webhooks/stripe';
 import trackflowRouter from './routes/trackflow';
 import documentsRouter from './routes/documents';
 import { aiRouter } from './routes/ai';
+import { quizRouter } from './routes/quiz';
+import { commentsRouter } from './routes/comments';
+import { automationRouter } from './routes/automation';
 import { initCronJobs } from './cron/installmentReminders';
 import { startCollectionCron } from './cron/collectionCron';
 
@@ -148,6 +151,9 @@ app.use('/api/checkout', checkoutRouter);
 app.use('/api/trackflow', trackflowRouter);
 app.use('/api/documents', documentsRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api/quiz', quizRouter);
+app.use('/api/comments', commentsRouter);
+app.use('/api/automation', automationRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {

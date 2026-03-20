@@ -635,6 +635,8 @@ model User {
   webauthnCredentials WebAuthnCredential[]
   userProgress        UserProgress[]
   trackflowQueries    TrackFlowQuery[]
+  lessonComments      LessonComment[]
+  quizResponses       QuizResponse[]
 
   @@map("users")
 }
@@ -685,6 +687,7 @@ model Lesson {
   updatedAt       DateTime       @updatedAt @map("updated_at")
   module          Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   progress        UserProgress[]
+  comments        LessonComment[]
 
   @@map("lessons")
   @@index([moduleId])
@@ -998,4 +1001,141 @@ model TrackFlowQuery {
   @@index([userId])
   @@index([apiType])
   @@index([createdAt])
+}
+
+// ============================================
+// BLOCO 1: ENGAJAMENTO NAS AULAS
+// ============================================
+
+model LessonComment {
+  id        String   @id @default(uuid())
+  lessonId  String   @map("lesson_id")
+  userId    String   @map("user_id")
+  content   String   @db.Text
+  parentId  String?  @map("parent_id") // Para respostas (replies)
+  isAdminReply Boolean @default(false) @map("is_admin_reply")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    LessonComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   LessonComment[] @relation("CommentReplies")
+
+  @@map("lesson_comments")
+  @@index([lessonId])
+  @@index([userId])
+  @@index([parentId])
+  @@index([createdAt])
+}
+
+// ============================================
+// BLOCO 2 & 3: QUIZ DE QUALIFICAÇÃO + LEAD SCORING
+// ============================================
+
+model QuizResponse {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  courseId  String   @map("course_id")
+
+  // PASSO 1: Experiência
+  npsScore           Int      @map("nps_score") // 0-10
+  wouldRecommend     String   @map("would_recommend") // Sim/Não/Talvez
+  whatCaughtAttention String? @db.Text @map("what_caught_attention")
+
+  // PASSO 2: Transformação
+  situationBefore    String   @map("situation_before") // Endividado/Apertado/Estável/Bem
+  clarityNow         String   @map("clarity_now") // Muito mais claro/Um pouco/Igual
+
+  // PASSO 3: Intenção
+  interestMotos      String   @map("interest_motos") // Sim/Não/Talvez
+  interestCredit     String   @map("interest_credit") // Sim/Não/Talvez
+
+  // PASSO 4: Qualificação
+  wouldStartSteps    String   @map("would_start_steps") // Sim/Não/Talvez
+  investmentAmount   String   @map("investment_amount") // Até 500/500-1k/1k-3k/+3k
+
+  // PASSO 5: Venda Direta
+  interestOnlineMentorship  String @map("interest_online_mentorship") // Sim/Não/Talvez
+  interestPresentialMentorship String @map("interest_presential_mentorship") // Sim/Não/Talvez
+
+  // PASSO 6: Confirmação de Contato
+  fullName     String   @map("full_name")
+  whatsapp     String
+  city         String?
+  state        String?
+  suggestions  String?  @db.Text
+
+  // LEAD SCORING (calculado automaticamente)
+  leadStatus   String   @map("lead_status") // HOT/WARM/COLD
+  leadScore    Int      @default(0) @map("lead_score") // 0-100
+
+  // Controle
+  notifiedAdmin Boolean  @default(false) @map("notified_admin")
+  contactedAt   DateTime? @map("contacted_at")
+  contactedBy   String?  @map("contacted_by")
+  notes         String?  @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@map("quiz_responses")
+  @@index([userId])
+  @@index([courseId])
+  @@index([leadStatus])
+  @@index([leadScore])
+  @@index([createdAt])
+}
+
+model WhatsAppAutomation {
+  id          String    @id @default(uuid())
+  leadId      String?   @map("lead_id")
+  leadStatus  String    @map("lead_status")
+  clientName  String    @map("client_name")
+  phone       String
+  messageText String    @db.Text @map("message_text")
+  status      String    @default("PENDING")
+  messageId   String?   @map("message_id")
+  error       String?   @db.Text
+  sentAt      DateTime? @map("sent_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("whatsapp_automations")
+  @@index([leadId])
+  @@index([status])
+  @@index([leadStatus])
+  @@index([createdAt])
+}
+
+model QuizQuestion {
+  id        String   @id @default(uuid())
+  step      Int
+  question  String   @db.Text
+  type      String
+  options   Json     @default("[]")
+  weight    Int      @default(10)
+  category  String   @default("experience")
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("quiz_questions")
+  @@index([step])
+}
+
+model ScoringRule {
+  id          String   @id @default(uuid())
+  condition   String   @db.Text
+  points      Int
+  description String   @db.Text
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("scoring_rules")
 }

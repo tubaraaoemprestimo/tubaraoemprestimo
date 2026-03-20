@@ -59,6 +59,7 @@ import FunnelManager from './pages/funil/FunnelManager';
 // Micro-LMS
 import { AcessoCurso } from './pages/client/AcessoCurso';
 import { CursoAdmin } from './pages/admin/CursoAdmin';
+import { MetodoTubarao } from './pages/admin/MetodoTubarao';
 
 // Components
 import { Chatbot } from './components/Chatbot';
@@ -291,8 +292,9 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           ]}
         />
         {/* Curso */}
-        <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Curso</p>
-        <Link to="/admin/curso" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/curso')}`}><BookOpen size={18} /> Método Tubarão</Link>
+        <p className="text-[10px] text-zinc-600 uppercase font-bold px-4 pt-4 pb-1">Método Tubarão</p>
+        <Link to="/admin/curso" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/curso')}`}><BookOpen size={18} /> Conteúdo & Vídeos</Link>
+        <Link to="/admin/metodo-tubarao" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/metodo-tubarao')}`}><TrendingUp size={18} /> Leads & Quiz & Automação</Link>
 
         <Link to="/admin/settings" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/settings')}`}><SettingsIcon size={18} /> Configurações</Link>
       </nav>
@@ -547,6 +549,7 @@ function App() {
             <Route path="/admin/qualification-leads" element={<AdminLayout><QualificationLeadsAdmin /></AdminLayout>} />
             <Route path="/admin/settings" element={<AdminLayout><Settings /></AdminLayout>} />
             <Route path="/admin/curso" element={<AdminLayout><CursoAdmin /></AdminLayout>} />
+            <Route path="/admin/metodo-tubarao" element={<AdminLayout><MetodoTubarao /></AdminLayout>} />
 
             {/* Admin Protected - Hubs Unificados */}
             <Route path="/admin/finance-hub" element={<AdminLayout><FinanceHub /></AdminLayout>} />
