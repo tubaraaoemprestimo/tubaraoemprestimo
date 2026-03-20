@@ -636,6 +636,7 @@ model User {
   userProgress        UserProgress[]
   trackflowQueries    TrackFlowQuery[]
   lessonComments      LessonComment[]
+  commentRatings      CommentRating[]
   quizResponses       QuizResponse[]
 
   @@map("users")
@@ -1008,25 +1009,50 @@ model TrackFlowQuery {
 // ============================================
 
 model LessonComment {
-  id        String   @id @default(uuid())
-  lessonId  String   @map("lesson_id")
-  userId    String   @map("user_id")
-  content   String   @db.Text
-  parentId  String?  @map("parent_id") // Para respostas (replies)
-  isAdminReply Boolean @default(false) @map("is_admin_reply")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  lessonId     String   @map("lesson_id")
+  userId       String   @map("user_id")
+  content      String   @db.Text
+  parentId     String?  @map("parent_id") // Para respostas (replies)
+  isAdminReply Boolean  @default(false) @map("is_admin_reply")
+  rating       Int      @default(0) // Média de avaliações (0-5)
+  ratingCount  Int      @default(0) @map("rating_count") // Total de avaliações
+  priority     Int      @default(0) // Prioridade definida pelo admin (0-10)
+  isPinned     Boolean  @default(false) @map("is_pinned") // Fixar comentário no topo
+  adminNotes   String?  @db.Text @map("admin_notes") // Notas internas do admin
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   parent    LessonComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies   LessonComment[] @relation("CommentReplies")
+  ratings   CommentRating[]
 
   @@map("lesson_comments")
   @@index([lessonId])
   @@index([userId])
   @@index([parentId])
   @@index([createdAt])
+  @@index([rating])
+  @@index([priority])
+  @@index([isPinned])
+}
+
+model CommentRating {
+  id        String   @id @default(uuid())
+  commentId String   @map("comment_id")
+  userId    String   @map("user_id")
+  rating    Int      // 1-5 estrelas
+  createdAt DateTime @default(now()) @map("created_at")
+
+  comment LessonComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@map("comment_ratings")
+  @@index([commentId])
+  @@index([userId])
 }
 
 // ============================================

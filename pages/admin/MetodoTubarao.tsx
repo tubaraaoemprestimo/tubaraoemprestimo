@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   BookOpen, BarChart2, MessageCircle, Users, Phone, MessageSquare,
   Play, FileText, Trash2, Edit2, Plus, Save, X, Upload, RefreshCw,
-  Send, CheckCircle, XCircle, Clock, TrendingUp, Eye, Settings
+  Send, CheckCircle, XCircle, Clock, TrendingUp, Eye, Settings, Star, Pin, AlertCircle
 } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 import { useToast } from '../../components/Toast';
@@ -71,6 +71,9 @@ export function MetodoTubarao() {
   const [pendingComments, setPendingComments] = useState<any[]>([]);
   const [replyContent, setReplyContent] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [selectedComment, setSelectedComment] = useState<any | null>(null);
+  const [commentPriority, setCommentPriority] = useState<number>(0);
+  const [commentNotes, setCommentNotes] = useState<string>('');
 
   // ============================
   // AUTOMATION STATE
@@ -354,6 +357,46 @@ export function MetodoTubarao() {
       addToast('Resposta enviada!', 'success');
       setReplyContent('');
       setReplyingTo(null);
+      loadTabData();
+    } catch (err: any) {
+      addToast(err.message, 'error');
+    }
+  };
+
+  const handleRateComment = async (commentId: string, rating: number) => {
+    try {
+      await apiService.rateComment(commentId, rating);
+      addToast('Avaliação salva!', 'success');
+      loadTabData();
+    } catch (err: any) {
+      addToast(err.message, 'error');
+    }
+  };
+
+  const handleSetPriority = async (commentId: string, priority: number) => {
+    try {
+      await apiService.setCommentPriority(commentId, priority);
+      addToast('Prioridade atualizada!', 'success');
+      loadTabData();
+    } catch (err: any) {
+      addToast(err.message, 'error');
+    }
+  };
+
+  const handlePinComment = async (commentId: string, isPinned: boolean) => {
+    try {
+      await apiService.pinComment(commentId, isPinned);
+      addToast(isPinned ? 'Comentário fixado!' : 'Comentário desfixado!', 'success');
+      loadTabData();
+    } catch (err: any) {
+      addToast(err.message, 'error');
+    }
+  };
+
+  const handleSaveAdminNotes = async (commentId: string, notes: string) => {
+    try {
+      await apiService.setAdminNotes(commentId, notes);
+      addToast('Notas salvas!', 'success');
       loadTabData();
     } catch (err: any) {
       addToast(err.message, 'error');
@@ -1108,11 +1151,60 @@ export function MetodoTubarao() {
                               <span className="text-zinc-500 text-sm">
                                 {comment.lesson?.module?.title} › {comment.lesson?.title}
                               </span>
+                              {comment.isPinned && (
+                                <span className="ml-2 px-2 py-0.5 bg-yellow-600 text-white text-xs rounded-full flex items-center gap-1">
+                                  <Pin size={10} /> Fixado
+                                </span>
+                              )}
+                              {comment.priority > 0 && (
+                                <span className="ml-2 px-2 py-0.5 bg-red-600 text-white text-xs rounded-full flex items-center gap-1">
+                                  <AlertCircle size={10} /> P{comment.priority}
+                                </span>
+                              )}
                             </div>
                             <p className="text-zinc-300 mb-3">{comment.content}</p>
+
+                            {/* Rating Display */}
+                            {comment.rating > 0 && (
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="flex">
+                                  {[1, 2, 3, 4, 5].map(star => (
+                                    <Star
+                                      key={star}
+                                      size={14}
+                                      className={star <= comment.rating ? 'text-yellow-500 fill-yellow-500' : 'text-zinc-600'}
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-zinc-500 text-xs">({comment.ratingCount} avaliações)</span>
+                              </div>
+                            )}
+
                             <p className="text-zinc-600 text-xs mb-4">
                               {new Date(comment.createdAt).toLocaleString('pt-BR')}
                             </p>
+
+                            {/* Admin Controls */}
+                            <div className="flex flex-wrap gap-2 mb-4">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                  setSelectedComment(comment);
+                                  setCommentPriority(comment.priority || 0);
+                                  setCommentNotes(comment.adminNotes || '');
+                                }}
+                              >
+                                <Settings size={14} className="mr-1" /> Gerenciar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => handlePinComment(comment.id, !comment.isPinned)}
+                              >
+                                <Pin size={14} className="mr-1" /> {comment.isPinned ? 'Desafixar' : 'Fixar'}
+                              </Button>
+                            </div>
 
                             {replyingTo === comment.id ? (
                               <div>
@@ -1144,6 +1236,92 @@ export function MetodoTubarao() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Comment Management Modal */}
+                {selectedComment && (
+                  <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl p-6">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-bold text-white">Gerenciar Comentário</h3>
+                        <button onClick={() => setSelectedComment(null)} className="text-zinc-400 hover:text-white">
+                          <X size={24} />
+                        </button>
+                      </div>
+
+                      <div className="space-y-6">
+                        {/* User Rating */}
+                        <div>
+                          <label className="block text-sm font-bold text-white mb-2">Avaliar Comentário</label>
+                          <div className="flex gap-2">
+                            {[1, 2, 3, 4, 5].map(star => (
+                              <button
+                                key={star}
+                                onClick={() => handleRateComment(selectedComment.id, star)}
+                                className="transition-transform hover:scale-110"
+                              >
+                                <Star
+                                  size={32}
+                                  className={star <= (selectedComment.rating || 0) ? 'text-yellow-500 fill-yellow-500' : 'text-zinc-600 hover:text-yellow-500'}
+                                />
+                              </button>
+                            ))}
+                          </div>
+                          {selectedComment.ratingCount > 0 && (
+                            <p className="text-zinc-500 text-sm mt-2">
+                              Média: {selectedComment.rating.toFixed(1)} ({selectedComment.ratingCount} avaliações)
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Priority */}
+                        <div>
+                          <label className="block text-sm font-bold text-white mb-2">
+                            Prioridade (0-10): {commentPriority}
+                          </label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="10"
+                            value={commentPriority}
+                            onChange={e => setCommentPriority(parseInt(e.target.value))}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-xs text-zinc-500 mt-1">
+                            <span>Baixa</span>
+                            <span>Média</span>
+                            <span>Alta</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => handleSetPriority(selectedComment.id, commentPriority)}
+                            className="mt-2"
+                          >
+                            Salvar Prioridade
+                          </Button>
+                        </div>
+
+                        {/* Admin Notes */}
+                        <div>
+                          <label className="block text-sm font-bold text-white mb-2">Notas Internas (Admin)</label>
+                          <textarea
+                            value={commentNotes}
+                            onChange={e => setCommentNotes(e.target.value)}
+                            placeholder="Notas privadas sobre este comentário..."
+                            className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white"
+                            rows={4}
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => handleSaveAdminNotes(selectedComment.id, commentNotes)}
+                            className="mt-2"
+                          >
+                            Salvar Notas
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

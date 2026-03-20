@@ -1251,6 +1251,32 @@ export const apiService = {
         const { data, error } = await api.delete(`/quiz/scoring-rules/${id}`);
         if (error) throw new Error(error.error || 'Erro ao excluir regra');
         return data;
+    },
+
+    // ============= COMMENT RATINGS & MANAGEMENT =============
+
+    async rateComment(commentId: string, rating: number) {
+        const { data, error } = await api.post(`/comments/${commentId}/rate`, { rating });
+        if (error) throw new Error(error.error || 'Erro ao avaliar comentário');
+        return data;
+    },
+
+    async setCommentPriority(commentId: string, priority: number) {
+        const { data, error } = await api.put(`/comments/${commentId}/priority`, { priority });
+        if (error) throw new Error(error.error || 'Erro ao definir prioridade');
+        return data;
+    },
+
+    async pinComment(commentId: string, isPinned: boolean) {
+        const { data, error } = await api.put(`/comments/${commentId}/pin`, { isPinned });
+        if (error) throw new Error(error.error || 'Erro ao fixar comentário');
+        return data;
+    },
+
+    async setAdminNotes(commentId: string, adminNotes: string) {
+        const { data, error } = await api.put(`/comments/${commentId}/admin-notes`, { adminNotes });
+        if (error) throw new Error(error.error || 'Erro ao salvar notas');
+        return data;
     }
 };
 

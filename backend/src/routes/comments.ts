@@ -263,4 +263,147 @@ commentsRouter.get('/pending', requireAuth, async (req: Request, res: Response) 
   }
 });
 
+/**
+ * POST /api/comments/:id/rate
+ * Avaliar um comentário (1-5 estrelas)
+ */
+commentsRouter.post('/:id/rate', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { rating } = req.body;
+    const userId = req.user!.id;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Avaliação deve ser entre 1 e 5' });
+    }
+
+    // Verificar se comentário existe
+    const comment = await prisma.lessonComment.findUnique({ where: { id } });
+    if (!comment) {
+      return res.status(404).json({ error: 'Comentário não encontrado' });
+    }
+
+    // Criar ou atualizar avaliação
+    await prisma.commentRating.upsert({
+      where: {
+        commentId_userId: {
+          commentId: id,
+          userId
+        }
+      },
+      create: {
+        commentId: id,
+        userId,
+        rating
+      },
+      update: {
+        rating
+      }
+    });
+
+    // Recalcular média de avaliações
+    const ratings = await prisma.commentRating.findMany({
+      where: { commentId: id }
+    });
+
+    const avgRating = ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
+
+    await prisma.lessonComment.update({
+      where: { id },
+      data: {
+        rating: Math.round(avgRating * 10) / 10, // Arredondar para 1 casa decimal
+        ratingCount: ratings.length
+      }
+    });
+
+    res.json({ success: true, avgRating, ratingCount: ratings.length });
+
+  } catch (error) {
+    console.error('Erro ao avaliar comentário:', error);
+    res.status(500).json({ error: 'Erro ao avaliar comentário' });
+  }
+});
+
+/**
+ * PUT /api/comments/:id/priority
+ * Definir prioridade de um comentário (ADMIN ONLY)
+ */
+commentsRouter.put('/:id/priority', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (req.user!.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    const { id } = req.params;
+    const { priority } = req.body;
+
+    if (priority < 0 || priority > 10) {
+      return res.status(400).json({ error: 'Prioridade deve ser entre 0 e 10' });
+    }
+
+    await prisma.lessonComment.update({
+      where: { id },
+      data: { priority }
+    });
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Erro ao definir prioridade:', error);
+    res.status(500).json({ error: 'Erro ao definir prioridade' });
+  }
+});
+
+/**
+ * PUT /api/comments/:id/pin
+ * Fixar/desafixar comentário (ADMIN ONLY)
+ */
+commentsRouter.put('/:id/pin', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (req.user!.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    const { id } = req.params;
+    const { isPinned } = req.body;
+
+    await prisma.lessonComment.update({
+      where: { id },
+      data: { isPinned }
+    });
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Erro ao fixar comentário:', error);
+    res.status(500).json({ error: 'Erro ao fixar comentário' });
+  }
+});
+
+/**
+ * PUT /api/comments/:id/admin-notes
+ * Adicionar notas internas do admin (ADMIN ONLY)
+ */
+commentsRouter.put('/:id/admin-notes', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (req.user!.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    const { id } = req.params;
+    const { adminNotes } = req.body;
+
+    await prisma.lessonComment.update({
+      where: { id },
+      data: { adminNotes }
+    });
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Erro ao salvar notas:', error);
+    res.status(500).json({ error: 'Erro ao salvar notas' });
+  }
+});
+
 export { commentsRouter };
