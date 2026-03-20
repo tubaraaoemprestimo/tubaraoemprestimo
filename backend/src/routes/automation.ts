@@ -10,7 +10,7 @@ const automationRouter = Router();
  * GET /api/automation/logs
  * Lista logs de automação WhatsApp (ADMIN ONLY)
  */
-automationRouter.get('/logs', requireAdmin, async (req: Request, res: Response) => {
+automationRouter.get('/logs', authenticate, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { leadStatus, status, startDate, endDate } = req.query;
 
@@ -33,7 +33,7 @@ automationRouter.get('/logs', requireAdmin, async (req: Request, res: Response) 
  * GET /api/automation/stats
  * Estatísticas de automação (ADMIN ONLY)
  */
-automationRouter.get('/stats', requireAdmin, async (req: Request, res: Response) => {
+automationRouter.get('/stats', authenticate, requireAdmin, async (req: Request, res: Response) => {
   try {
     const stats = await getAutomationStats();
     res.json(stats);
@@ -48,7 +48,7 @@ automationRouter.get('/stats', requireAdmin, async (req: Request, res: Response)
  * GET /api/automation/failed
  * Lista automações falhadas (ADMIN ONLY)
  */
-automationRouter.get('/failed', requireAdmin, async (req: Request, res: Response) => {
+automationRouter.get('/failed', authenticate, requireAdmin, async (req: Request, res: Response) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
     const failed = await getFailedAutomations(limit);
@@ -64,7 +64,7 @@ automationRouter.get('/failed', requireAdmin, async (req: Request, res: Response
  * POST /api/automation/retry/:id
  * Reenviar automação falhada (ADMIN ONLY)
  */
-automationRouter.post('/retry/:id', requireAdmin, async (req: Request, res: Response) => {
+automationRouter.post('/retry/:id', authenticate, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -100,7 +100,7 @@ automationRouter.post('/retry/:id', requireAdmin, async (req: Request, res: Resp
  * POST /api/automation/test
  * Testar envio de mensagem (ADMIN ONLY)
  */
-automationRouter.post('/test', requireAdmin, async (req: Request, res: Response) => {
+automationRouter.post('/test', authenticate, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { phone, name, leadStatus } = req.body;
 
@@ -131,7 +131,7 @@ automationRouter.post('/test', requireAdmin, async (req: Request, res: Response)
  * GET /api/automation/templates
  * Retorna templates de mensagem WhatsApp (ADMIN ONLY)
  */
-automationRouter.get('/templates', requireAdmin, async (_req: Request, res: Response) => {
+automationRouter.get('/templates', authenticate, requireAdmin, async (_req: Request, res: Response) => {
   try {
     const keys = ['whatsapp_template_hot', 'whatsapp_template_warm', 'whatsapp_template_cold'];
     const settings = await prisma.systemSetting.findMany({ where: { key: { in: keys } } });
@@ -153,7 +153,7 @@ automationRouter.get('/templates', requireAdmin, async (_req: Request, res: Resp
  * PUT /api/automation/templates
  * Salva templates de mensagem WhatsApp (ADMIN ONLY)
  */
-automationRouter.put('/templates', requireAdmin, async (req: Request, res: Response) => {
+automationRouter.put('/templates', authenticate, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { HOT, WARM, COLD } = req.body as { HOT: string; WARM: string; COLD: string };
 
