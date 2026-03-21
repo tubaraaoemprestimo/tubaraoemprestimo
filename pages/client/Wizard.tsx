@@ -204,6 +204,7 @@ export const Wizard: React.FC = () => {
   // Refs para auto-scroll
   const returningClientSectionRef = useRef<HTMLDivElement>(null);
   const referralSectionRef = useRef<HTMLDivElement>(null);
+  const stepTopRef = useRef<HTMLDivElement>(null);
 
   // Handler interativo: seleciona perfil e rola a página para mostrar próxima ação
   const handleProfileSelect = (profileId: ProfileType) => {
@@ -1064,10 +1065,18 @@ export const Wizard: React.FC = () => {
 
     // Avançar para próximo step - usando tamanho dinâmico
     const maxStep = steps.length;
-    if (currentStep < maxStep) setCurrentStep(c => c + 1);
+    if (currentStep < maxStep) {
+      setCurrentStep(c => c + 1);
+      setTimeout(() => stepTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    }
   };
 
-  const handleBack = () => { if (currentStep > 1) setCurrentStep(c => c - 1); };
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(c => c - 1);
+      setTimeout(() => stepTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    }
+  };
 
   // Função para converter base64/dataURL para File
   const dataURLtoFile = (dataurl: string, filename: string): File | null => {
@@ -1625,21 +1634,38 @@ export const Wizard: React.FC = () => {
 
       <div className="max-w-xl mx-auto px-4 pt-6">
         {/* Progress */}
-        <div className="flex justify-between mb-8 relative">
-          <div className="absolute top-1/2 left-0 w-full h-0.5 bg-zinc-800 -z-10 -translate-y-1/2"></div>
-          {steps.map((step) => {
-            const Icon = step.icon;
-            const isActive = step.id === currentStep;
-            const isCompleted = step.id < currentStep;
-            return (
-              <div key={step.id} className="bg-black px-1 z-10">
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#D4AF37] text-black scale-110' : isCompleted ? 'bg-zinc-800 text-[#D4AF37] border border-[#D4AF37]' : 'bg-zinc-900 text-zinc-600 border border-zinc-800'
-                  }`}>
-                  {isCompleted ? <Check size={16} /> : <Icon size={16} />}
+        <div ref={stepTopRef} className="mb-6">
+          {/* Título do step atual */}
+          <div className="text-center mb-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Etapa {currentStep} de {steps.length}</p>
+            <h3 className="text-lg font-bold text-white">{steps[currentStep - 1]?.title}</h3>
+          </div>
+
+          {/* Barra de progresso preenchida */}
+          <div className="w-full h-2 bg-zinc-800 rounded-full mb-4 overflow-hidden">
+            <div
+              className="h-2 bg-[#D4AF37] rounded-full transition-all duration-500"
+              style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
+            />
+          </div>
+
+          {/* Ícones dos steps */}
+          <div className="flex justify-between relative">
+            <div className="absolute top-1/2 left-0 w-full h-0.5 bg-zinc-800 -z-10 -translate-y-1/2"></div>
+            {steps.map((step) => {
+              const Icon = step.icon;
+              const isActive = step.id === currentStep;
+              const isCompleted = step.id < currentStep;
+              return (
+                <div key={step.id} className="bg-black px-1 z-10 flex flex-col items-center gap-1">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#D4AF37] text-black scale-110 shadow-lg shadow-[#D4AF37]/40' : isCompleted ? 'bg-zinc-800 text-[#D4AF37] border border-[#D4AF37]' : 'bg-zinc-900 text-zinc-600 border border-zinc-800'
+                    }`}>
+                    {isCompleted ? <Check size={16} /> : <Icon size={16} />}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
 
         <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
@@ -2860,20 +2886,23 @@ export const Wizard: React.FC = () => {
                     {/* Referências / Pessoas Próximas */}
                     {profileType !== 'LIMPA_NOME' && (
                       <div className="pt-4 border-t border-zinc-800 space-y-4">
-                        <h3 className="text-sm font-bold text-[#D4AF37]">Referências (Pessoas Próximas)</h3>
-                        <p className="text-xs text-zinc-500">Informe 2 contatos de pessoas próximas para referência.</p>
-                        <div className="grid grid-cols-3 gap-3">
-                          <Input label="Nome da Referência 1" name="contactTrust1Name" value={formData.contactTrust1Name} onChange={handleChange} placeholder="Nome completo" />
-                          <Input label="WhatsApp Referência 1" name="contactTrust1" value={formData.contactTrust1} onChange={handleChange} placeholder="(99) 99999-9999" />
+                        <h3 className="text-sm font-bold text-[#D4AF37]">👥 Referências (2 pessoas próximas)</h3>
+                        <p className="text-xs text-zinc-500">Informe 2 pessoas que te conhecem bem e que podemos contatar.</p>
+
+                        {/* Referência 1 */}
+                        <div className="bg-zinc-900/60 border border-zinc-700 rounded-2xl p-4 space-y-3">
+                          <p className="text-xs font-bold text-[#D4AF37] uppercase tracking-wide">Referência 1</p>
+                          <Input label="Nome completo" name="contactTrust1Name" value={formData.contactTrust1Name} onChange={handleChange} placeholder="Ex: Maria da Silva" />
+                          <Input label="WhatsApp (com DDD)" name="contactTrust1" value={formData.contactTrust1} onChange={handleChange} placeholder="(99) 99999-9999" />
                           <div>
-                            <label className="text-sm text-zinc-400 font-medium block mb-1">Parentesco</label>
+                            <label className="text-xs text-zinc-400 font-medium block mb-1.5 ml-1">Grau de parentesco</label>
                             <select name="contactTrust1Relationship" value={formData.contactTrust1Relationship} onChange={handleChange as any}
-                              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-[#D4AF37] outline-none">
-                              <option value="">Selecione</option>
+                              className="w-full bg-black border border-zinc-700 rounded-lg px-3 py-3 text-white text-sm focus:border-[#D4AF37] outline-none">
+                              <option value="">Selecione o grau de parentesco</option>
                               <option value="pai">Pai</option>
                               <option value="mae">Mãe</option>
                               <option value="irmao">Irmão(ã)</option>
-                              <option value="conjuge">Cônjuge</option>
+                              <option value="conjuge">Cônjuge / Companheiro(a)</option>
                               <option value="filho">Filho(a)</option>
                               <option value="tio">Tio(a)</option>
                               <option value="primo">Primo(a)</option>
@@ -2884,18 +2913,21 @@ export const Wizard: React.FC = () => {
                             </select>
                           </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          <Input label="Nome da Referência 2" name="contactTrust2Name" value={formData.contactTrust2Name} onChange={handleChange} placeholder="Nome completo" />
-                          <Input label="WhatsApp Referência 2" name="contactTrust2" value={formData.contactTrust2} onChange={handleChange} placeholder="(99) 99999-9999" />
+
+                        {/* Referência 2 */}
+                        <div className="bg-zinc-900/60 border border-zinc-700 rounded-2xl p-4 space-y-3">
+                          <p className="text-xs font-bold text-[#D4AF37] uppercase tracking-wide">Referência 2</p>
+                          <Input label="Nome completo" name="contactTrust2Name" value={formData.contactTrust2Name} onChange={handleChange} placeholder="Ex: João Carlos" />
+                          <Input label="WhatsApp (com DDD)" name="contactTrust2" value={formData.contactTrust2} onChange={handleChange} placeholder="(99) 99999-9999" />
                           <div>
-                            <label className="text-sm text-zinc-400 font-medium block mb-1">Parentesco</label>
+                            <label className="text-xs text-zinc-400 font-medium block mb-1.5 ml-1">Grau de parentesco</label>
                             <select name="contactTrust2Relationship" value={formData.contactTrust2Relationship} onChange={handleChange as any}
-                              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-[#D4AF37] outline-none">
-                              <option value="">Selecione</option>
+                              className="w-full bg-black border border-zinc-700 rounded-lg px-3 py-3 text-white text-sm focus:border-[#D4AF37] outline-none">
+                              <option value="">Selecione o grau de parentesco</option>
                               <option value="pai">Pai</option>
                               <option value="mae">Mãe</option>
                               <option value="irmao">Irmão(ã)</option>
-                              <option value="conjuge">Cônjuge</option>
+                              <option value="conjuge">Cônjuge / Companheiro(a)</option>
                               <option value="filho">Filho(a)</option>
                               <option value="tio">Tio(a)</option>
                               <option value="primo">Primo(a)</option>
@@ -3500,24 +3532,46 @@ export const Wizard: React.FC = () => {
         </div>
 
         {/* Buttons */}
-        <div className="fixed bottom-0 left-0 w-full p-4 bg-black/90 border-t border-zinc-900 flex gap-4 z-40 backdrop-blur-md">
-          {currentStep > 1 && <Button onClick={handleBack} variant="secondary" className="flex-1">Voltar</Button>}
-          {currentStep < steps.length ? (
-            <Button onClick={handleNext} disabled={!canProceedOnCurrentStep} className="flex-1 font-bold text-lg">
-              {currentStep === 1 ? 'Começar Simulação' : 'Continuar'}
-            </Button>
-          ) : (
-            <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-lg shadow-lg shadow-green-900/20" isLoading={loading}
-              disabled={
-                profileType === 'INVESTIDOR' ? false :
-                profileType === 'LIMPA_NOME' ? !formData.signature :
-                (!formData.signature || !formData.declarationAccepted)
-              }>
-              {profileType === 'INVESTIDOR' ? 'QUERO SER INVESTIDOR' :
-                profileType === 'LIMPA_NOME' ? 'SOLICITAR SERVIÇO' :
-                  profileType === 'MOTO' ? 'SOLICITAR FINANCIAMENTO' : 'SOLICITAR MEU EMPRÉSTIMO'}
-            </Button>
-          )}
+        <div className="fixed bottom-0 left-0 w-full z-40 bg-black/95 backdrop-blur-md border-t border-zinc-800">
+          {/* Mini barra de progresso no topo dos botões */}
+          <div className="w-full h-1 bg-zinc-800">
+            <div
+              className="h-1 bg-[#D4AF37] transition-all duration-500"
+              style={{ width: `${((currentStep - 1) / Math.max(steps.length - 1, 1)) * 100}%` }}
+            />
+          </div>
+          <div className="p-4 flex gap-3">
+            {currentStep > 1 && (
+              <Button onClick={handleBack} variant="secondary" className="w-24 shrink-0 font-bold">
+                ← Voltar
+              </Button>
+            )}
+            {currentStep < steps.length ? (
+              <Button
+                onClick={handleNext}
+                disabled={!canProceedOnCurrentStep}
+                className="flex-1 font-bold text-base py-4 rounded-2xl"
+              >
+                {currentStep === 1 ? '🚀 Começar' : 'Continuar →'}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSubmit}
+                className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-base py-4 rounded-2xl shadow-lg shadow-green-900/30"
+                isLoading={loading}
+                disabled={
+                  profileType === 'INVESTIDOR' ? false :
+                  profileType === 'LIMPA_NOME' ? !formData.signature :
+                  (!formData.signature || !formData.declarationAccepted)
+                }
+              >
+                {loading ? 'Enviando...' :
+                  profileType === 'INVESTIDOR' ? '✅ QUERO SER INVESTIDOR' :
+                  profileType === 'LIMPA_NOME' ? '✅ SOLICITAR SERVIÇO' :
+                  profileType === 'MOTO' ? '✅ SOLICITAR FINANCIAMENTO' : '✅ SOLICITAR MEU EMPRÉSTIMO'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>
