@@ -296,6 +296,16 @@ export const apiService = {
             companyWorkSince: req.companyWorkSince,
             companyIncome: req.companyIncome,
             companyPaymentDay: req.companyPaymentDay,
+            // Montar supplementalInfo que o admin usa para exibir docs solicitados/enviados
+            // Só existe se admin solicitou doc (supplementalRequestedAt é setado pelo endpoint /supplemental)
+            supplementalInfo: req.supplementalRequestedAt
+                ? {
+                    description: req.supplementalDescription || '',
+                    docUrl: req.supplementalDocUrl || null,
+                    requestedAt: req.supplementalRequestedAt || null,
+                    uploadedAt: req.supplementalUploadedAt || null,
+                }
+                : (req.supplementalInfo || null),
         }));
     },
 
