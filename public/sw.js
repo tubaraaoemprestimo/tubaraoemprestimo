@@ -5,7 +5,7 @@
  * ============================================
  */
 
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const CACHE_STATIC = `tubarao-static-${CACHE_VERSION}`;
 const CACHE_DYNAMIC = `tubarao-dynamic-${CACHE_VERSION}`;
 const CACHE_IMAGES = `tubarao-images-${CACHE_VERSION}`;
@@ -290,24 +290,56 @@ self.addEventListener('push', (event) => {
     }
   }
 
-  const options = {
-    body,
-    icon: '/icon-192.png',
-    badge: '/badge-72.png',
-    image: '/icon-512.png',
-    vibrate: [200, 100, 200],
-    tag: 'tubarao-' + Date.now(),
-    renotify: false,
-    requireInteraction: true,
-    actions: [
-      { action: 'open', title: '📋 Ver' },
-      { action: 'close', title: 'Fechar' }
-    ],
-    data: extraData
-  };
+  const GROUP_TAG = 'tubarao-inbox';
 
   event.waitUntil(
-    self.registration.showNotification(title, options)
+    self.registration.getNotifications({ tag: GROUP_TAG }).then((existing) => {
+      const count = existing.length;
+
+      // Fecha o grupo anterior para recriar atualizado
+      existing.forEach((n) => n.close());
+
+      if (count === 0) {
+        // Primeira notificação — exibe individualmente
+        return self.registration.showNotification(title, {
+          body,
+          icon: '/icon-192.png',
+          badge: '/badge-72.png',
+          vibrate: [200, 100, 200],
+          tag: GROUP_TAG,
+          renotify: true,
+          requireInteraction: true,
+          actions: [
+            { action: 'open', title: '📋 Ver' },
+            { action: 'close', title: 'Fechar' }
+          ],
+          data: { ...extraData, messages: [{ title, body }] }
+        });
+      }
+
+      // Já tem notificações — agrupa no estilo inbox
+      const prevMessages = existing[0]?.data?.messages || [];
+      const messages = [...prevMessages, { title, body }];
+      const total = messages.length;
+
+      // Linhas de preview (estilo inbox do Android)
+      const lines = messages.slice(-5).map((m) => `${m.title}: ${m.body}`);
+
+      return self.registration.showNotification('🦈 Tubarão Empréstimos', {
+        body: `${total} novas notificações`,
+        icon: '/icon-192.png',
+        badge: '/badge-72.png',
+        vibrate: [200, 100, 200],
+        tag: GROUP_TAG,
+        renotify: true,
+        requireInteraction: true,
+        actions: [
+          { action: 'open', title: `📋 Ver todas (${total})` },
+          { action: 'close', title: 'Fechar' }
+        ],
+        data: { messages, isGroup: true }
+      });
+    })
   );
 });
 
