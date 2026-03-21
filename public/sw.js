@@ -5,7 +5,7 @@
  * ============================================
  */
 
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE_STATIC = `tubarao-static-${CACHE_VERSION}`;
 const CACHE_DYNAMIC = `tubarao-dynamic-${CACHE_VERSION}`;
 const CACHE_IMAGES = `tubarao-images-${CACHE_VERSION}`;
@@ -16,7 +16,10 @@ const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './Logo.png'
+  './Logo.png',
+  './icon-192.png',
+  './icon-512.png',
+  './badge-72.png'
 ];
 
 // Padrões de URL para diferentes estratégias de cache
@@ -272,45 +275,39 @@ async function syncForms() {
 self.addEventListener('push', (event) => {
   console.log('[SW] Push received');
 
-  let data = {
-    title: 'Tubarão Empréstimos',
-    body: 'Nova atualização!',
-    icon: '/Logo.png',
-    badge: '/Logo.png'
-  };
+  let title = 'Tubarão Empréstimos 🦈';
+  let body = 'Nova atualização!';
+  let extraData = {};
 
   if (event.data) {
     try {
       const payload = event.data.json();
-      data = {
-        title: payload.title || payload.notification?.title || data.title,
-        body: payload.body || payload.notification?.body || data.body,
-        icon: payload.icon || payload.notification?.icon || data.icon,
-        badge: data.badge,
-        data: payload.data || {}
-      };
+      title = payload.title || payload.notification?.title || title;
+      body = payload.body || payload.notification?.body || body;
+      extraData = payload.data || {};
     } catch (e) {
-      data.body = event.data.text();
+      body = event.data.text();
     }
   }
 
   const options = {
-    body: data.body,
-    icon: data.icon,
-    badge: data.badge,
+    body,
+    icon: '/icon-192.png',
+    badge: '/badge-72.png',
+    image: '/icon-512.png',
     vibrate: [200, 100, 200],
-    tag: 'tubarao-notification',
-    renotify: true,
+    tag: 'tubarao-' + Date.now(),
+    renotify: false,
     requireInteraction: true,
     actions: [
-      { action: 'open', title: 'Abrir' },
+      { action: 'open', title: '📋 Ver' },
       { action: 'close', title: 'Fechar' }
     ],
-    data: data.data
+    data: extraData
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title, options)
+    self.registration.showNotification(title, options)
   );
 });
 
