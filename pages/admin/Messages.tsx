@@ -336,14 +336,17 @@ export const MessagesPage: React.FC = () => {
             {/* Mass Message Modal */}
             {isMassModalOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-6">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: 'calc(100vh - 2rem)' }}>
+                        {/* Header fixo */}
+                        <div className="flex justify-between items-center px-6 py-4 border-b border-zinc-800 shrink-0">
                             <h2 className="text-xl font-bold text-[#D4AF37]">Disparo em Massa</h2>
                             <button onClick={() => setIsMassModalOpen(false)} className="text-zinc-500 hover:text-white">
                                 <X size={24} />
                             </button>
                         </div>
-                        <div className="space-y-6">
+
+                        {/* Conteúdo rolável */}
+                        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                             <div>
                                 <label className="block text-sm text-zinc-400 mb-2">Usar Template</label>
                                 <select
@@ -364,14 +367,16 @@ export const MessagesPage: React.FC = () => {
                                     <textarea
                                         value={massMessageData.customMessage}
                                         onChange={(e) => setMassMessageData({ ...massMessageData, customMessage: e.target.value })}
-                                        className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none h-32 resize-none"
+                                        className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none h-28 resize-none"
                                     />
                                 </div>
                             )}
 
                             <div>
                                 <div className="flex items-center justify-between mb-2">
-                                    <label className="text-sm text-zinc-400">Destinatários</label>
+                                    <label className="text-sm text-zinc-400">
+                                        Destinatários <span className="text-zinc-600">({massMessageData.selectedCustomers.length} selecionado{massMessageData.selectedCustomers.length !== 1 ? 's' : ''})</span>
+                                    </label>
                                     <div className="flex gap-2">
                                         <select
                                             value={massMessageData.filterStatus}
@@ -395,7 +400,7 @@ export const MessagesPage: React.FC = () => {
                                         </button>
                                     </div>
                                 </div>
-                                <div className="bg-black border border-zinc-700 rounded-lg max-h-48 overflow-y-auto">
+                                <div className="bg-black border border-zinc-700 rounded-lg overflow-y-auto" style={{ maxHeight: '200px' }}>
                                     {filteredCustomers.map(customer => (
                                         <label
                                             key={customer.id}
@@ -414,21 +419,21 @@ export const MessagesPage: React.FC = () => {
                                                 }}
                                                 className="w-4 h-4 accent-[#D4AF37]"
                                             />
-                                            <div className="flex-1">
-                                                <p className="text-white text-sm">{customer.name}</p>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-white text-sm truncate">{customer.name}</p>
                                                 <p className="text-xs text-zinc-500">{customer.phone}</p>
                                             </div>
                                             {customer.totalDebt > 0 && (
-                                                <span className="text-xs text-red-400">R$ {customer.totalDebt.toLocaleString()}</span>
+                                                <span className="text-xs text-red-400 shrink-0">R$ {customer.totalDebt.toLocaleString()}</span>
                                             )}
                                         </label>
                                     ))}
                                 </div>
-                                <p className="text-xs text-zinc-500 mt-2">
-                                    {massMessageData.selectedCustomers.length} selecionado(s)
-                                </p>
                             </div>
+                        </div>
 
+                        {/* Footer fixo */}
+                        <div className="px-6 py-4 border-t border-zinc-800 shrink-0">
                             <Button onClick={handleSendMassMessage} className="w-full">
                                 <PlayCircle size={18} /> Enviar para {massMessageData.selectedCustomers.length} destinatário(s)
                             </Button>
