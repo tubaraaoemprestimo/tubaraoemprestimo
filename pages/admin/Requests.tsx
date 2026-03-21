@@ -2492,69 +2492,62 @@ const VideoCard = ({ title, url }: { title: string, url: string }) => {
 const DocCard = ({ title, urls, isSignature, onView }: { title: string, urls: string[], isSignature?: boolean, onView: () => void }) => {
     const [imgError, setImgError] = React.useState(false);
 
-    // Validar URL
     const firstUrl = urls.length > 0 ? urls[0] : '';
-    const isValidUrl = firstUrl && (firstUrl.startsWith('http://') || firstUrl.startsWith('https://'));
+    const isValidUrl = !!(firstUrl && (firstUrl.startsWith('http://') || firstUrl.startsWith('https://')));
 
-    // Detectar PDF: extensão, padrão no nome, ou título
-    const isPdf = firstUrl && (
+    const isPdf = !!(firstUrl && (
         firstUrl.toLowerCase().includes('.pdf') ||
         firstUrl.toLowerCase().includes('work_card') ||
         firstUrl.toLowerCase().includes('work-card') ||
         title.toLowerCase().includes('carteira') ||
         title.toLowerCase().includes('ctps')
-    );
+    ));
 
-    // Renderização de arquivo sem extensão conhecida (supp_doc, upload sem extensão)
-    const hasNoExtension = firstUrl && !firstUrl.match(/\.(jpg|jpeg|png|gif|webp|pdf|mp4|mov)(\?|$)/i);
+    // Arquivo sem extensão conhecida (supp_doc, etc.) → trata como "documento"
+    const hasNoExtension = !!(firstUrl && !firstUrl.match(/\.(jpg|jpeg|png|gif|webp|pdf|mp4|mov)(\?|$)/i));
+    const showAsDoc = isPdf || hasNoExtension || imgError;
+
+    // Todos arquivos válidos são clicáveis para abrir no viewer interno
+    const canView = isValidUrl && urls.length > 0;
 
     return (
         <div className="space-y-2 group">
             <p className="text-xs text-zinc-400 pl-1">{title}</p>
-            <div className={`rounded-xl border border-zinc-800 bg-black overflow-hidden relative ${isSignature ? 'h-24 bg-white/5' : 'aspect-[4/3]'}`}>
+            <div
+                className={`rounded-xl border bg-black overflow-hidden relative transition-all duration-200
+                    ${isSignature ? 'h-24 bg-white/5' : 'aspect-[4/3]'}
+                    ${canView ? 'border-zinc-800 hover:border-[#D4AF37]/60 cursor-pointer' : 'border-zinc-800'}`}
+                onClick={canView ? onView : undefined}
+                title={canView ? `Clique para visualizar: ${title}` : undefined}
+            >
                 {!isValidUrl && firstUrl ? (
-                    <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-4 bg-red-900/20 border-2 border-red-600">
-                        <AlertTriangle size={48} className="text-red-400" />
-                        <div className="text-center space-y-2">
-                            <p className="font-bold text-sm text-red-400">⚠️ Erro de Upload: Caminho Inválido</p>
-                            <p className="text-xs text-red-300">O arquivo não foi enviado corretamente.</p>
-                            <p className="text-[10px] text-zinc-400 font-mono bg-black p-2 rounded break-all max-w-full">{firstUrl}</p>
-                        </div>
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4 bg-red-900/20">
+                        <AlertTriangle size={36} className="text-red-400" />
+                        <p className="text-xs text-red-300 text-center">Caminho inválido</p>
+                        <p className="text-[10px] text-zinc-500 font-mono break-all text-center px-2">{firstUrl}</p>
                     </div>
                 ) : urls.length > 0 ? (
-                    isPdf ? (
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-4 bg-zinc-900">
-                            <FileText size={48} className="text-red-500" />
-                            <p className="text-xs text-zinc-400 text-center font-bold">Documento PDF</p>
-                            <a href={firstUrl} target="_blank" rel="noopener noreferrer"
-                                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-bold transition-all shadow-lg"
-                                onClick={(e) => e.stopPropagation()}>
-                                <ExternalLink size={14} /> Abrir PDF
-                            </a>
-                        </div>
-                    ) : imgError || hasNoExtension ? (
-                        // Fallback para arquivos sem extensão ou que não carregam como imagem
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-4 bg-zinc-900">
-                            <FileText size={40} className="text-[#D4AF37]" />
-                            <p className="text-xs text-zinc-400 text-center font-bold">Documento Enviado</p>
-                            <p className="text-[10px] text-zinc-600 text-center break-all px-2">{firstUrl.split('/').pop()?.substring(0, 40)}</p>
-                            <div className="flex gap-2">
-                                <a href={firstUrl} target="_blank" rel="noopener noreferrer"
-                                    className="flex items-center gap-1 px-3 py-2 bg-[#D4AF37] hover:bg-yellow-500 text-black rounded-lg text-xs font-bold transition-all"
-                                    onClick={(e) => e.stopPropagation()}>
-                                    <ExternalLink size={12} /> Abrir
-                                </a>
-                                <a href={firstUrl} download
-                                    className="flex items-center gap-1 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg text-xs font-bold transition-all"
-                                    onClick={(e) => e.stopPropagation()}>
-                                    <Download size={12} /> Baixar
-                                </a>
+                    showAsDoc ? (
+                        /* Documento (PDF ou sem extensão) */
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4 bg-zinc-950">
+                            <div className={`p-3 rounded-xl ${isPdf ? 'bg-red-900/30' : 'bg-[#D4AF37]/10'}`}>
+                                <FileText size={32} className={isPdf ? 'text-red-400' : 'text-[#D4AF37]'} />
                             </div>
+                            <p className="text-xs text-zinc-300 font-bold text-center">
+                                {isPdf ? 'Documento PDF' : 'Documento Enviado'}
+                            </p>
+                            <p className="text-[10px] text-zinc-600 text-center px-2 line-clamp-2">
+                                {firstUrl.split('/').pop()?.substring(0, 35)}
+                            </p>
+                            <span className="text-[10px] text-[#D4AF37] font-bold mt-1 flex items-center gap-1">
+                                <Maximize size={10} /> Clique para abrir
+                            </span>
                         </div>
                     ) : (
+                        /* Imagem */
                         <img
                             src={firstUrl}
-                            className={`w-full h-full ${isSignature ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100`}
+                            className={`w-full h-full ${isSignature ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100`}
                             alt={title}
                             onError={() => setImgError(true)}
                         />
@@ -2563,16 +2556,19 @@ const DocCard = ({ title, urls, isSignature, onView }: { title: string, urls: st
                     <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">Pendente</div>
                 )}
 
-                {/* Multi-page badge */}
+                {/* Badge múltiplos */}
                 {urls.length > 1 && (
-                    <div className="absolute top-2 right-2 bg-black/70 border border-zinc-700 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
+                    <div className="absolute top-2 right-2 bg-black/80 border border-zinc-700 text-white text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
                         <Layers size={10} className="text-[#D4AF37]" /> +{urls.length - 1}
                     </div>
                 )}
 
-                {urls.length > 0 && !isPdf && !imgError && !hasNoExtension && isValidUrl && (
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer" onClick={onView}>
-                        <Button size="sm" variant="secondary" className="shadow-xl"><Maximize size={14} className="mr-1" /> Ampliar</Button>
+                {/* Overlay hover para imagens */}
+                {canView && !showAsDoc && (
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <div className="flex items-center gap-2 bg-black/80 border border-[#D4AF37]/60 text-[#D4AF37] text-xs font-bold px-3 py-2 rounded-lg shadow-xl">
+                            <Maximize size={14} /> Visualizar
+                        </div>
                     </div>
                 )}
             </div>
