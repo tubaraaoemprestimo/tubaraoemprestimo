@@ -242,24 +242,31 @@ export const Requests: React.FC = () => {
 
     const handleNotificationClick = async (notif: any) => {
         try {
-            // Marcar como lida
-            await apiService.markNotificationRead(notif.id);
-            loadNotifications();
+            // Marcar como lida (não bloqueia o fluxo)
+            apiService.markNotificationRead(notif.id).then(() => loadNotifications()).catch(() => {});
             setShowNotifications(false);
 
-            // Se tem requestId, abrir a solicitação correspondente
             const reqId = notif.requestId || notif.request_id;
-            if (reqId) {
-                // Recarregar lista atualizada do banco
-                const freshData = await apiService.getRequests();
-                setRequests(freshData);
-                // Encontrar e abrir a solicitação
-                const target = freshData.find((r: any) => r.id === reqId);
-                if (target) {
-                    setSelectedRequest(target);
-                } else {
-                    addToast('Solicitação não encontrada na lista atual', 'warning');
-                }
+            if (!reqId) {
+                // Sem requestId — apenas fecha o painel
+                return;
+            }
+
+            // Resetar TODOS os filtros para garantir que a solicitação apareça
+            setFilterProfile('ALL');
+            setFilterStatusTab('ALL');
+            setFilterStatus('ALL');
+
+            // Recarregar lista fresca do banco
+            const freshData = await apiService.getRequests();
+            setRequests(freshData);
+
+            // Encontrar a solicitação pelo ID
+            const target = freshData.find((r: any) => r.id === reqId);
+            if (target) {
+                setSelectedRequest(target);
+            } else {
+                addToast('Solicitação não encontrada', 'warning');
             }
         } catch (error) {
             console.error('Erro ao processar notificação:', error);
@@ -634,28 +641,58 @@ export const Requests: React.FC = () => {
 
             {/* Modal de Notificações */}
             {showNotifications && (
-                <div className="fixed top-20 right-4 w-96 bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl z-50 max-h-96 overflow-y-auto">
-                    <div className="p-4 border-b border-zinc-800 sticky top-0 bg-zinc-900">
-                        <h3 className="font-bold text-white">Notificações</h3>
+                <>
+                    {/* Overlay para fechar ao clicar fora */}
+                    <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+                    <div className="fixed top-20 right-4 w-96 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 flex flex-col" style={{ maxHeight: '480px' }}>
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
+                            <h3 className="font-bold text-white">Notificações</h3>
+                            {adminNotifications.filter(n => !n.isRead).length > 0 && (
+                                <span className="text-xs text-zinc-400">
+                                    {adminNotifications.filter(n => !n.isRead).length} não lidas
+                                </span>
+                            )}
+                        </div>
+                        <div className="overflow-y-auto flex-1">
+                            {adminNotifications.length === 0 ? (
+                                <p className="p-6 text-zinc-500 text-center text-sm">Nenhuma notificação</p>
+                            ) : (
+                                adminNotifications.map(notif => {
+                                    const hasLink = !!(notif.requestId || notif.request_id);
+                                    return (
+                                        <div
+                                            key={notif.id}
+                                            className={`px-4 py-3 border-b border-zinc-800/60 transition-colors ${
+                                                hasLink ? 'cursor-pointer hover:bg-zinc-800' : 'cursor-default'
+                                            } ${!notif.isRead ? 'bg-zinc-800/40' : ''}`}
+                                            onClick={() => handleNotificationClick(notif)}
+                                        >
+                                            <div className="flex items-start gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`font-semibold text-sm truncate ${!notif.isRead ? 'text-white' : 'text-zinc-300'}`}>
+                                                        {notif.title}
+                                                    </p>
+                                                    <p className="text-zinc-400 text-xs mt-0.5 line-clamp-2">{notif.message}</p>
+                                                    <div className="flex items-center gap-2 mt-1.5">
+                                                        <p className="text-zinc-600 text-[10px]">
+                                                            {new Date(notif.createdAt || notif.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                                        </p>
+                                                        {hasLink && (
+                                                            <span className="text-[10px] text-[#D4AF37] font-bold">VER SOLICITAÇÃO →</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {!notif.isRead && (
+                                                    <div className="w-2 h-2 rounded-full bg-[#D4AF37] shrink-0 mt-1" />
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
                     </div>
-                    {adminNotifications.length === 0 ? (
-                        <p className="p-4 text-zinc-500 text-center">Nenhuma notificação</p>
-                    ) : (
-                        adminNotifications.map(notif => (
-                            <div
-                                key={notif.id}
-                                className={`p-4 border-b border-zinc-800 cursor-pointer hover:bg-zinc-800 ${
-                                    !notif.isRead ? 'bg-zinc-800/50' : ''
-                                }`}
-                                onClick={() => handleNotificationClick(notif)}
-                            >
-                                <p className="font-bold text-white text-sm">{notif.title}</p>
-                                <p className="text-zinc-400 text-xs mt-1">{notif.message}</p>
-                                <p className="text-zinc-600 text-xs mt-2">{new Date(notif.createdAt).toLocaleString('pt-BR')}</p>
-                            </div>
-                        ))
-                    )}
-                </div>
+                </>
             )}
 
             {/* Abas de Status Crítico */}

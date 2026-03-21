@@ -535,7 +535,8 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 data: {
                     title: isMoto ? '🏍️ Nova Solicitação - Financiamento Moto' : isInvestidor ? '💰 Nova Solicitação - Investidor' : '📋 Nova Solicitação de Empréstimo',
                     message: `${data.clientName || req.user!.name} solicitou ${descricaoResumida} (${typeLabel})`,
-                    type: 'INFO'
+                    type: 'INFO',
+                    requestId: request.id
                 }
             }).catch(() => { });
         } catch (notifErr) {
@@ -1147,14 +1148,21 @@ loanRequestsRouter.post('/:id/activate-contract', requireAdmin, async (req: Requ
             sendWhatsAppNotification(request.phone, waMsg);
         }
 
-        // Notificação para admins
+        // Push para o cliente
+        if (request.userId) {
+            sendPushToUser(request.userId, '💰 Contrato Ativado', `Seu empréstimo de ${amountFormatted} foi liberado!`).catch(() => { });
+        }
+
+        // Notificação para admins (InApp + Push)
         await prisma.notification.create({
             data: {
                 title: '✅ Contrato Ativado',
                 message: `Contrato de ${request.clientName} (${amountFormatted}) foi ativado com sucesso.`,
-                type: 'SUCCESS'
+                type: 'SUCCESS',
+                requestId: id
             }
         }).catch(() => { });
+        sendPushToRole('ADMIN', '✅ Contrato Ativado', `${request.clientName} — ${amountFormatted}`).catch(() => { });
 
         // ====== GERAR CONTRATO AUTOMATICAMENTE ======
         try {
@@ -1571,10 +1579,11 @@ loanRequestsRouter.put('/:id/accept-counteroffer', async (req: Request, res: Res
             for (const admin of admins) {
                 await prisma.notification.create({
                     data: {
-                        customerId: admin.id, // Reutilizar campo customerId para admin
+                        customerId: admin.id,
                         title: '✅ Cliente Aceitou Contraproposta',
                         message: `${request.clientName} aceitou a contraproposta de ${fmt(request.approvedAmount || 0)}. Ative o contrato agora!`,
-                        type: 'SUCCESS'
+                        type: 'SUCCESS',
+                        requestId: id
                     }
                 });
             }
@@ -1644,8 +1653,29 @@ loanRequestsRouter.put('/:id/accept-counteroffer', async (req: Request, res: Res
             }).catch(() => { });
         }
 
-        // 🔥 NOTIFICAR ADMIN que cliente aceitou
-        await sendPushToRole('ADMIN', '✅ Contraproposta Aceita', `${updatedRequest.clientName} aceitou ${approvedFormatted}`).catch(() => { });
+        // Push para o cliente
+        if (updatedRequest.userId) {
+            sendPushToUser(updatedRequest.userId, '✅ Contrato Aceito!', `Seu contrato de ${approvedFormatted} foi aceito! Aguarde a liberação.`).catch(() => { });
+        }
+
+        // NOTIFICAR ADMIN — Push + Email + WhatsApp
+        await sendPushToRole('ADMIN', '✅ Contraproposta Aceita', `${updatedRequest.clientName} aceitou ${approvedFormatted}. Ative o contrato!`).catch(() => { });
+        try {
+            const adminEmail = await prisma.systemSetting.findFirst({ where: { key: 'admin_email' } });
+            if (adminEmail?.value) {
+                emailService.send(
+                    adminEmail.value,
+                    '✅ Cliente Aceitou Contraproposta — Ação Necessária',
+                    brandedEmailHtml(`<h2 style="color:#4CAF50;">✅ Contraproposta Aceita!</h2><p><strong>${updatedRequest.clientName}</strong> aceitou a contraproposta de <strong>${approvedFormatted}</strong>.</p><p>Acesse o painel para ativar o contrato agora!</p>`)
+                ).catch(() => { });
+            }
+            const adminPhone = await prisma.systemSetting.findFirst({ where: { key: 'admin_phone' } });
+            if (adminPhone?.value) {
+                sendWhatsAppNotification(adminPhone.value,
+                    `✅ *CONTRAPROPOSTA ACEITA!*\n\n${updatedRequest.clientName} aceitou ${approvedFormatted}.\n\nAcesse o painel e ative o contrato agora!\n\n_Tubarão Empréstimos 🦈_`
+                );
+            }
+        } catch (_e) { /* não bloquear */ }
 
         res.json({ success: true, request: updatedRequest });
     } catch (error: any) {
@@ -1816,10 +1846,9 @@ loanRequestsRouter.put('/:id/supplemental-upload', async (req: Request, res: Res
             }
         });
 
-        // Notificar admin que documentos foram enviados
+        // Notificar admin — Push + InApp
         await sendPushToRole('ADMIN', '📄 Documentos Adicionais Enviados', `${loanRequest.clientName} enviou os documentos solicitados`);
 
-        // Criar notificação no banco para admin (com requestId para redirecionamento)
         await prisma.notification.create({
             data: {
                 customerId: null,
@@ -1831,6 +1860,24 @@ loanRequestsRouter.put('/:id/supplemental-upload', async (req: Request, res: Res
                 requestId: id
             }
         });
+
+        // Email + WhatsApp para admin (se configurado)
+        try {
+            const adminSettings = await prisma.systemSetting.findFirst({ where: { key: 'admin_phone' } });
+            if (adminSettings?.value) {
+                sendWhatsAppNotification(adminSettings.value,
+                    `📄 *Documentos Enviados*\n\n${loanRequest.clientName} enviou os documentos adicionais solicitados.\n\nAcesse o painel para analisar.\n\n_Tubarão Empréstimos 🦈_`
+                );
+            }
+            const adminEmail = await prisma.systemSetting.findFirst({ where: { key: 'admin_email' } });
+            if (adminEmail?.value) {
+                emailService.send(
+                    adminEmail.value,
+                    '📄 Documentos Adicionais Enviados — Tubarão Empréstimos',
+                    brandedEmailHtml(`<h2>📄 Documentos Enviados</h2><p><strong>${loanRequest.clientName}</strong> enviou os documentos adicionais solicitados.</p><p>Acesse o painel para analisar a solicitação.</p>`)
+                ).catch(() => { });
+            }
+        } catch (_e) { /* não bloquear */ }
 
         res.json({ success: true, request: updated });
     } catch (error) {

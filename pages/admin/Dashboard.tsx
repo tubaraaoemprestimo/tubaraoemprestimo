@@ -27,6 +27,10 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    // Registrar Push Notifications para admin
+    import('../../services/webPushService').then(({ webPushService }) => {
+      webPushService.subscribe();
+    }).catch(() => {});
   }, []);
 
   const loadData = async () => {
