@@ -106,11 +106,16 @@ function normalizeDocField(value: any): string | null {
 function validateRequestByProfile(data: any): string | null {
     const profile = data.profileType as string | undefined;
 
-    // Validar referências obrigatórias
-    if (!data.reference1Name || !data.reference1Phone) {
+    // Validar referências obrigatórias (aceitar ambos os nomes de campo: frontend usa contactTrust1Name/contactTrust1)
+    const ref1Name = data.reference1Name || data.contactTrust1Name;
+    const ref1Phone = data.reference1Phone || data.contactTrust1;
+    const ref2Name = data.reference2Name || data.contactTrust2Name;
+    const ref2Phone = data.reference2Phone || data.contactTrust2;
+
+    if (!ref1Name || !ref1Phone) {
         return 'Referência 1 (nome e telefone) é obrigatória.';
     }
-    if (!data.reference2Name || !data.reference2Phone) {
+    if (!ref2Name || !ref2Phone) {
         return 'Referência 2 (nome e telefone) é obrigatória.';
     }
 
@@ -354,11 +359,11 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 fatherPhoneRelationship: data.fatherPhoneRelationship || null,
                 motherPhoneRelationship: data.motherPhoneRelationship || null,
                 spousePhoneRelationship: data.spousePhoneRelationship || null,
-                // Referências pessoais
-                reference1Name: data.reference1Name || null,
-                reference1Phone: data.reference1Phone || null,
-                reference2Name: data.reference2Name || null,
-                reference2Phone: data.reference2Phone || null,
+                // Referências pessoais (aceitar ambos os formatos: reference1Name ou contactTrust1Name)
+                reference1Name: data.reference1Name || data.contactTrust1Name || null,
+                reference1Phone: data.reference1Phone || data.contactTrust1 || null,
+                reference2Name: data.reference2Name || data.contactTrust2Name || null,
+                reference2Phone: data.reference2Phone || data.contactTrust2 || null,
                 // Novos campos - Dados profissionais
                 companyAddress: data.companyAddress || null,
                 companyProfession: data.companyProfession || null,
@@ -1814,15 +1819,16 @@ loanRequestsRouter.put('/:id/supplemental-upload', async (req: Request, res: Res
         // Notificar admin que documentos foram enviados
         await sendPushToRole('ADMIN', '📄 Documentos Adicionais Enviados', `${loanRequest.clientName} enviou os documentos solicitados`);
 
-        // Criar notificação no banco para admin
+        // Criar notificação no banco para admin (com requestId para redirecionamento)
         await prisma.notification.create({
             data: {
                 customerId: null,
                 customerEmail: null,
                 title: '📄 Documentos Adicionais Enviados',
-                message: `${loanRequest.clientName} enviou os documentos solicitados. ID: ${id}`,
+                message: `${loanRequest.clientName} enviou os documentos solicitados.`,
                 type: 'DOCS_UPLOADED',
-                isRead: false
+                isRead: false,
+                requestId: id
             }
         });
 

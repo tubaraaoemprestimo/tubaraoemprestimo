@@ -105,7 +105,7 @@ notificationsRouter.get('/', async (req: Request, res: Response) => {
         }
 
         const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-        const sql = `SELECT id, title, message, type, is_read, created_at, customer_email FROM notifications ${where} ORDER BY created_at DESC LIMIT ${Number.isFinite(limit) ? limit : 50}`;
+        const sql = `SELECT id, title, message, type, is_read, created_at, customer_email, request_id FROM notifications ${where} ORDER BY created_at DESC LIMIT ${Number.isFinite(limit) ? limit : 50}`;
         const rows: any[] = await prisma.$queryRawUnsafe(sql);
 
         const payload = (rows || []).map((n: any) => ({
@@ -114,9 +114,12 @@ notificationsRouter.get('/', async (req: Request, res: Response) => {
             message: n.message,
             type: n.type,
             is_read: n.is_read,
+            isRead: n.is_read,
             read: n.is_read,
             created_at: n.created_at,
+            createdAt: n.created_at,
             customer_email: n.customer_email,
+            requestId: n.request_id,
             for_role: n.customer_email ? 'CLIENT' : 'ADMIN'
         }));
 
@@ -126,16 +129,29 @@ notificationsRouter.get('/', async (req: Request, res: Response) => {
     }
 });
 
-// GET /api/notifications/admin - Notificações específicas para admin (usando customerId)
+// GET /api/notifications/admin - Notificações específicas para admin
 notificationsRouter.get('/admin', requireAdmin, async (req: Request, res: Response) => {
     try {
-        const notifications = await prisma.notification.findMany({
-            where: {
-                customerId: req.user!.id // Admin recebe notificações no campo customerId
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 50
-        });
+        const limit = Math.min(Number(req.query.limit || 50), 200);
+        // Busca notificações sem customer_email (são as notificações globais de admin)
+        const rows: any[] = await prisma.$queryRawUnsafe(
+            `SELECT id, title, message, type, is_read, created_at, customer_email, request_id
+             FROM notifications
+             WHERE customer_email IS NULL
+             ORDER BY created_at DESC
+             LIMIT ${Number.isFinite(limit) ? limit : 50}`
+        );
+        const notifications = (rows || []).map((n: any) => ({
+            id: n.id,
+            title: n.title,
+            message: n.message,
+            type: n.type,
+            isRead: n.is_read,
+            is_read: n.is_read,
+            createdAt: n.created_at,
+            created_at: n.created_at,
+            requestId: n.request_id,
+        }));
         res.json(notifications);
     } catch (error) {
         console.error('Erro ao buscar notificações admin:', error);

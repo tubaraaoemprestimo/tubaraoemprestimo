@@ -341,6 +341,7 @@ model LoanRequest {
   loan                    Loan?
   partnerCommissions      PartnerCommission[] @relation("PartnerCommissionLoanRequest")
   collateralItems         Json?     @map("collateral_items")
+  notifications           Notification[]
 
   @@map("loan_requests")
 }
@@ -425,15 +426,17 @@ model NotificationLog {
 }
 
 model Notification {
-  id            String    @id @default(uuid())
-  customerEmail String?   @map("customer_email")
+  id            String       @id @default(uuid())
+  customerEmail String?      @map("customer_email")
   title         String
   message       String
-  type          String    @default("INFO")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  customerId    String?   @map("customer_id")
-  isRead        Boolean   @default(false) @map("is_read")
-  customer      Customer? @relation(fields: [customerId], references: [id])
+  type          String       @default("INFO")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  customerId    String?      @map("customer_id")
+  isRead        Boolean      @default(false) @map("is_read")
+  requestId     String?      @map("request_id")
+  customer      Customer?    @relation(fields: [customerId], references: [id])
+  loanRequest   LoanRequest? @relation(fields: [requestId], references: [id])
 
   @@map("notifications")
 }

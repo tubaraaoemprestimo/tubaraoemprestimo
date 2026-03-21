@@ -242,10 +242,27 @@ export const Requests: React.FC = () => {
 
     const handleNotificationClick = async (notif: any) => {
         try {
+            // Marcar como lida
             await apiService.markNotificationRead(notif.id);
             loadNotifications();
+            setShowNotifications(false);
+
+            // Se tem requestId, abrir a solicitação correspondente
+            const reqId = notif.requestId || notif.request_id;
+            if (reqId) {
+                // Recarregar lista atualizada do banco
+                const freshData = await apiService.getRequests();
+                setRequests(freshData);
+                // Encontrar e abrir a solicitação
+                const target = freshData.find((r: any) => r.id === reqId);
+                if (target) {
+                    setSelectedRequest(target);
+                } else {
+                    addToast('Solicitação não encontrada na lista atual', 'warning');
+                }
+            }
         } catch (error) {
-            console.error('Erro ao marcar notificação:', error);
+            console.error('Erro ao processar notificação:', error);
         }
     };
 
