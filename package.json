@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "demo": "VITE_DEMO_MODE=true vite",
-    "build:demo": "VITE_DEMO_MODE=true vite build --outDir dist-demo"
+    "demo": "cross-env VITE_DEMO_MODE=true vite",
+    "build:demo": "cross-env VITE_DEMO_MODE=true vite build --outDir dist-demo"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",
@@ -34,6 +34,7 @@
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.24",
+    "cross-env": "^10.1.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.8.2",

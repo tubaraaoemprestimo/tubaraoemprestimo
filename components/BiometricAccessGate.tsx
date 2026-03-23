@@ -27,6 +27,12 @@ export const BiometricAccessGate: React.FC<BiometricAccessGateProps> = ({ childr
   const navigate = useNavigate();
   const user = useMemo(() => apiService.auth.getUser(), []);
 
+  // DEMO MODE: bypass biometria completamente
+  const IS_DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
+  if (IS_DEMO) {
+    return <>{children}</>;
+  }
+
   const [verifying, setVerifying] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
