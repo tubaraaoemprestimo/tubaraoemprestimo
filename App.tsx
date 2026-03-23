@@ -85,6 +85,11 @@ import { PermissionGate } from './components/PermissionGate';
 import { BiometricAccessGate } from './components/BiometricAccessGate';
 import { locationTrackingService } from './services/locationTrackingService';
 
+// Demo Mode
+const IS_DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
+// DemoBar e seedDemoData são importados de forma lazy — não aumentam o bundle de produção
+const DemoBar = IS_DEMO ? React.lazy(() => import('./components/DemoBar').then(m => ({ default: m.DemoBar }))) : null;
+
 // --- Expandable Menu Item ---
 interface ExpandableMenuProps {
   icon: React.ReactNode;
@@ -464,8 +469,15 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
+    // Demo Mode: semear dados iniciais
+    if (IS_DEMO) {
+      import('./services/demoSeed').then(({ seedDemoData }) => seedDemoData()).catch(() => {});
+    }
+
     // Try to initialize push notifications
-    firebasePushService.init().catch(console.error);
+    if (!IS_DEMO) {
+      firebasePushService.init().catch(console.error);
+    }
 
     // Initialize theme service
     themeService.init().catch(console.error);
@@ -564,6 +576,11 @@ function App() {
             <Route path="/admin/score" element={<AdminLayout><ScorePage /></AdminLayout>} />
             <Route path="/admin/documents" element={<AdminLayout><DocumentsPage /></AdminLayout>} />
           </Routes>
+          {IS_DEMO && DemoBar && (
+            <React.Suspense fallback={null}>
+              <DemoBar />
+            </React.Suspense>
+          )}
         </Router>
       </ToastProvider>
     </BrandProvider>

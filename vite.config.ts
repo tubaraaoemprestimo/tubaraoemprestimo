@@ -17,6 +17,12 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        // Demo mode: troca apiClient pelo mock em build-time.
+        // VITE_DEMO_MODE=true → toda chamada de rede vai para o mockApiClient.
+        ...(env.VITE_DEMO_MODE === 'true' && {
+          './apiClient': path.resolve(__dirname, 'services/mockApiClient.ts'),
+          '../apiClient': path.resolve(__dirname, 'services/mockApiClient.ts'),
+        }),
       }
     },
     optimizeDeps: {
