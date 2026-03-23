@@ -54,6 +54,7 @@ async function handleRequest(method: string, url: string, body?: any): Promise<a
   // ── AUTH ──────────────────────────────────────────────────────────────────
 
   if (method === 'POST' && url === '/auth/login') {
+    console.log('[DEMO Mock] Login interceptado:', body);
     const { identifier = '', email = '', password } = body || {};
     const loginEmail = identifier || email;
     const isAdmin = loginEmail.includes('admin') || loginEmail.includes('gerente');
@@ -70,6 +71,7 @@ async function handleRequest(method: string, url: string, body?: any): Promise<a
     // Salva no localStorage no formato esperado pelo apiService
     localStorage.setItem('tubarao_user', JSON.stringify(user));
     localStorage.setItem('tubarao_auth', JSON.stringify({ accessToken: token, refreshToken: token }));
+    console.log('[DEMO Mock] Login bem-sucedido:', user);
     return { user, accessToken: token, refreshToken: token };
   }
 
@@ -546,3 +548,5 @@ function fileToBase64(file: File): Promise<string> {
 // ─── Export ───────────────────────────────────────────────────────────────────
 
 export const api = new MockApiClient();
+
+console.log('[DEMO] MockApiClient carregado — todas as chamadas HTTP são simuladas localmente');

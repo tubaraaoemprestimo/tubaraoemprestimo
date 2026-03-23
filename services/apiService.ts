@@ -2,7 +2,15 @@
 // Todas as funções têm a MESMA interface do supabaseService
 // mas usam a API REST (apiClient) ao invés do Supabase direto
 
-import { api } from './apiClient';
+import { api as realApi } from './apiClient';
+import { api as mockApi } from './mockApiClient';
+
+// Tree-shaking: o Vite vai remover o branch não usado no build
+export const api = import.meta.env.VITE_DEMO_MODE === 'true' ? mockApi : realApi;
+
+if (import.meta.env.VITE_DEMO_MODE === 'true') {
+  console.log('[apiService] 🎭 MODO DEMO ATIVO — Mock API carregado');
+}
 
 // ============= CONSTANTES =============
 
