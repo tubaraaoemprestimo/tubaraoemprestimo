@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste DEMO Login - Tubarão Empréstimos</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #000;
+      color: #fff;
+    }
+    .test-section {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .test-section h2 {
+      color: #D4AF37;
+      margin-top: 0;
+    }
+    button {
+      background: #D4AF37;
+      color: #000;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    button:hover {
+      background: #FFF176;
+    }
+    .log {
+      background: #0a0a0a;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 10px;
+      margin-top: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .success { color: #4ade80; }
+    .error { color: #f87171; }
+    .info { color: #60a5fa; }
+    .warning { color: #fbbf24; }
+  </style>
+</head>
+<body>
+  <h1>🦈 Teste DEMO - Tubarão Empréstimos</h1>
+
+  <div class="test-section">
+    <h2>1. Verificação de Ambiente</h2>
+    <button onclick="checkEnvironment()">Verificar Ambiente DEMO</button>
+    <div id="env-log" class="log"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>2. Teste de Login Admin</h2>
+    <button onclick="testAdminLogin()">Login Admin (admin@demo.tubarao.com)</button>
+    <div id="admin-log" class="log"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>3. Teste de Login Cliente</h2>
+    <button onclick="testClientLogin()">Login Cliente (cliente@demo.tubarao.com)</button>
+    <div id="client-log" class="log"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>4. Verificação de Stores</h2>
+    <button onclick="checkStores()">Verificar Zustand Stores</button>
+    <button onclick="checkSeedData()">Verificar Dados Seed</button>
+    <div id="stores-log" class="log"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>5. Teste de Mock API</h2>
+    <button onclick="testMockAPI()">Testar Mock API Client</button>
+    <div id="api-log" class="log"></div>
+  </div>
+
+  <script>
+    const APP_URL = 'http://localhost:3002';
+
+    function log(elementId, message, type = 'info') {
+      const el = document.getElementById(elementId);
+      const timestamp = new Date().toLocaleTimeString();
+      const className = type;
+      el.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function clearLog(elementId) {
+      document.getElementById(elementId).innerHTML = '';
+    }
+
+    async function checkEnvironment() {
+      clearLog('env-log');
+      log('env-log', '🔍 Verificando ambiente DEMO...', 'info');
+
+      try {
+        // Verificar se app está rodando
+        const response = await fetch(APP_URL);
+        if (response.ok) {
+          log('env-log', '✅ App rodando em ' + APP_URL, 'success');
+        }
+
+        // Verificar localStorage
+        const demoStores = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key.startsWith('demo-')) {
+            demoStores.push(key);
+          }
+        }
+
+        if (demoStores.length > 0) {
+          log('env-log', `✅ Encontrados ${demoStores.length} stores DEMO: ${demoStores.join(', ')}`, 'success');
+        } else {
+          log('env-log', '⚠️ Nenhum store DEMO encontrado (será criado no primeiro acesso)', 'warning');
+        }
+
+        // Verificar se VITE_DEMO_MODE está ativo
+        log('env-log', '📋 Abra o console do navegador e procure por "[DEMO]" ou "[apiService] 🎭 MODO DEMO ATIVO"', 'info');
+        log('env-log', '✅ Verificação concluída', 'success');
+
+      } catch (error) {
+        log('env-log', '❌ Erro: ' + error.message, 'error');
+      }
+    }
+
+    async function testAdminLogin() {
+      clearLog('admin-log');
+      log('admin-log', '🔐 Testando login ADMIN...', 'info');
+      log('admin-log', 'Email: admin@demo.tubarao.com', 'info');
+      log('admin-log', 'Senha: demo123', 'info');
+      log('admin-log', '', 'info');
+      log('admin-log', '📋 INSTRUÇÕES:', 'warning');
+      log('admin-log', '1. Abra ' + APP_URL + ' em outra aba', 'info');
+      log('admin-log', '2. Digite: admin@demo.tubarao.com / demo123', 'info');
+      log('admin-log', '3. Clique em ENTRAR', 'info');
+      log('admin-log', '4. Deve redirecionar para /admin', 'info');
+      log('admin-log', '5. Verifique o console por mensagens [DEMO Mock]', 'info');
+
+      window.open(APP_URL + '/#/login', '_blank');
+    }
+
+    async function testClientLogin() {
+      clearLog('client-log');
+      log('client-log', '🔐 Testando login CLIENTE...', 'info');
+      log('client-log', 'Email: cliente@demo.tubarao.com', 'info');
+      log('client-log', 'Senha: demo123', 'info');
+      log('client-log', '', 'info');
+      log('client-log', '📋 INSTRUÇÕES:', 'warning');
+      log('client-log', '1. Abra ' + APP_URL + ' em outra aba', 'info');
+      log('client-log', '2. Digite: cliente@demo.tubarao.com / demo123', 'info');
+      log('client-log', '3. Clique em ENTRAR', 'info');
+      log('client-log', '4. Deve redirecionar para /client/dashboard', 'info');
+      log('client-log', '5. Verifique o console por mensagens [DEMO Mock]', 'info');
+
+      window.open(APP_URL + '/#/login', '_blank');
+    }
+
+    function checkStores() {
+      clearLog('stores-log');
+      log('stores-log', '📦 Verificando Zustand Stores...', 'info');
+
+      const stores = {
+        'demo-requests': 'Solicitações de Empréstimo',
+        'demo-auth': 'Autenticação',
+        'demo-settings': 'Configurações',
+        'demo-course': 'Método Tubarão'
+      };
+
+      for (const [key, name] of Object.entries(stores)) {
+        const data = localStorage.getItem(key);
+        if (data) {
+          try {
+            const parsed = JSON.parse(data);
+            const stateKey = Object.keys(parsed.state || {})[0];
+            const stateData = parsed.state?.[stateKey];
+
+            if (stateData) {
+              if (Array.isArray(stateData)) {
+                log('stores-log', `✅ ${name} (${key}): ${stateData.length} itens`, 'success');
+              } else if (typeof stateData === 'object') {
+                const keys = Object.keys(stateData);
+                log('stores-log', `✅ ${name} (${key}): ${keys.length} propriedades`, 'success');
+              } else {
+                log('stores-log', `✅ ${name} (${key}): OK`, 'success');
+              }
+            } else {
+              log('stores-log', `⚠️ ${name} (${key}): vazio`, 'warning');
+            }
+          } catch (e) {
+            log('stores-log', `❌ ${name} (${key}): erro ao parsear`, 'error');
+          }
+        } else {
+          log('stores-log', `⚠️ ${name} (${key}): não encontrado`, 'warning');
+        }
+      }
+    }
+
+    function checkSeedData() {
+      clearLog('stores-log');
+      log('stores-log', '🌱 Verificando dados SEED...', 'info');
+
+      const requestsData = localStorage.getItem('demo-requests');
+      if (requestsData) {
+        try {
+          const parsed = JSON.parse(requestsData);
+          const requests = parsed.state?.requests || [];
+
+          log('stores-log', `📊 Total de solicitações: ${requests.length}`, 'info');
+
+          const byStatus = {};
+          requests.forEach(r => {
+            byStatus[r.status] = (byStatus[r.status] || 0) + 1;
+          });
+
+          for (const [status, count] of Object.entries(byStatus)) {
+            log('stores-log', `  • ${status}: ${count}`, 'info');
+          }
+
+          if (requests.length >= 8) {
+            log('stores-log', '✅ Dados seed carregados corretamente', 'success');
+          } else {
+            log('stores-log', '⚠️ Menos solicitações que o esperado (8)', 'warning');
+          }
+        } catch (e) {
+          log('stores-log', '❌ Erro ao verificar seed: ' + e.message, 'error');
+        }
+      } else {
+        log('stores-log', '⚠️ Store demo-requests não encontrado', 'warning');
+        log('stores-log', 'Acesse o app primeiro para criar os stores', 'info');
+      }
+    }
+
+    async function testMockAPI() {
+      clearLog('api-log');
+      log('api-log', '🔌 Testando Mock API Client...', 'info');
+      log('api-log', '', 'info');
+      log('api-log', '📋 VERIFICAÇÕES NO CONSOLE:', 'warning');
+      log('api-log', '1. Abra o DevTools (F12)', 'info');
+      log('api-log', '2. Vá para a aba Console', 'info');
+      log('api-log', '3. Procure por:', 'info');
+      log('api-log', '   • "[apiService] 🎭 MODO DEMO ATIVO"', 'success');
+      log('api-log', '   • "[DEMO Mock] Login interceptado"', 'success');
+      log('api-log', '   • "[DEMO] MockApiClient carregado"', 'success');
+      log('api-log', '', 'info');
+      log('api-log', '4. Vá para a aba Network', 'info');
+      log('api-log', '5. Faça login', 'info');
+      log('api-log', '6. NÃO deve aparecer chamadas HTTP para backend', 'warning');
+      log('api-log', '   (apenas arquivos estáticos: JS, CSS, etc)', 'info');
+    }
+
+    // Auto-check ao carregar
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        checkEnvironment();
+      }, 500);
+    });
+  </script>
+</body>
+</html>

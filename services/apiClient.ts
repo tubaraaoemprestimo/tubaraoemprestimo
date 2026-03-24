@@ -158,4 +158,25 @@ class ApiClient {
     }
 }
 
-export const api = new ApiClient();
+const _realApi = new ApiClient();
+
+// Em DEMO, redireciona todos os imports de apiClient para o mock
+// Isso cobre todos os 15+ arquivos que fazem `import { api } from './apiClient'`
+const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
+
+let _mockApi: any = null;
+
+if (IS_DEMO_MODE) {
+  // Import síncrono — possível pois mockApiClient não importa apiClient (sem circular)
+  import('./mockApiClient').then((mod) => { _mockApi = mod.api; });
+}
+
+export const api: ApiClient = IS_DEMO_MODE
+  ? new Proxy({} as any, {
+      get(_t, prop) {
+        if (_mockApi) return (_mockApi as any)[prop];
+        // Fallback enquanto mock carrega (primeira render): retorna função que retorna vazio seguro
+        return async () => ({ data: null, error: null });
+      }
+    })
+  : _realApi;

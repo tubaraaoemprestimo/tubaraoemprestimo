@@ -204,7 +204,7 @@ export const useCourseStore = create<CourseState>()(
       setModules: (modules) => set({ modules }),
       setProgress: (lessonId, pct) =>
         set((s) => ({ progress: { ...s.progress, [lessonId]: pct } })),
-      resetCourse: () => set({ progress: {} }),
+      resetCourse: () => set({ modules: [], progress: {} }),
     }),
     { name: 'demo-course' }
   )

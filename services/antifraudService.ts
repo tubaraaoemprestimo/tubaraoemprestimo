@@ -5,6 +5,8 @@
 
 import { api } from './apiClient';
 
+const IS_DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
+
 export interface DeviceFingerprint {
     ip: string;
     userAgent: string;
@@ -397,6 +399,7 @@ export const antifraudService = {
         userId?: string,
         additionalData?: any
     ): Promise<RiskData | null> {
+        if (IS_DEMO) return null;
         try {
             const sessionId = this.getSessionId();
             const [fingerprint, ip] = await Promise.all([
@@ -668,6 +671,7 @@ export const antifraudService = {
         canRetryAt?: string;
         message?: string;
     }> {
+        if (IS_DEMO) return { blocked: false, daysRemaining: 0 };
         try {
             // Limpa o CPF (mantém apenas números)
             const cleanCpf = cpf.replace(/\D/g, '');
@@ -707,6 +711,7 @@ export const antifraudService = {
      * Verifica e valida o dispositivo atual no backend
      */
     async checkDevice(): Promise<{ allowed: boolean; message?: string }> {
+        if (IS_DEMO) return { allowed: true };
         try {
             const fingerprint = await this.collectFingerprint();
             // Create a consistent fingerprint string

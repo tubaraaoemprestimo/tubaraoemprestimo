@@ -146,6 +146,12 @@ const IOSInstallGuide: React.FC<{ onDone: () => void }> = ({ onDone }) => {
 // PermissionGate principal
 // ──────────────────────────────────────────────────────────────────────────────
 export const PermissionGate: React.FC<PermissionGateProps> = ({ children, requirePermissions = true }) => {
+    // DEMO MODE: bypass permissions completamente
+    const IS_DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
+    if (IS_DEMO) {
+        return <>{children}</>;
+    }
+
     const [locationStatus, setLocationStatus] = useState<PermissionStatus>('pending');
     const [notificationStatus, setNotificationStatus] = useState<PermissionStatus>('pending');
     const [checking, setChecking] = useState(true);

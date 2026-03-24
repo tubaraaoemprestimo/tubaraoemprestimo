@@ -161,9 +161,11 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return isPathMatch && isSearchMatch ? 'text-[#D4AF37] bg-zinc-800' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
   };
   const user = apiService.auth.getUser();
-  const [accessChecked, setAccessChecked] = useState(false);
+  const [accessChecked, setAccessChecked] = useState(IS_DEMO); // Em DEMO, pula verificação
 
   useEffect(() => {
+    if (IS_DEMO) return; // Em DEMO, não verifica managed access (não há backend)
+
     let active = true;
 
     const validateManagedAccess = async () => {
@@ -352,9 +354,11 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
       : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50';
 
   const user = apiService.auth.getUser();
-  const [accessChecked, setAccessChecked] = useState(false);
+  const [accessChecked, setAccessChecked] = useState(IS_DEMO); // Em DEMO, pula verificação
 
   useEffect(() => {
+    if (IS_DEMO) return; // Em DEMO, não verifica managed access (não há backend)
+
     let active = true;
 
     const validateManagedAccess = async () => {

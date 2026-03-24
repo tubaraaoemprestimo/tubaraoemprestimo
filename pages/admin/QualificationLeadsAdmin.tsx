@@ -5,6 +5,7 @@ import {
   DollarSign, Target, Award, AlertCircle, Star, Zap, BarChart3
 } from 'lucide-react';
 import { apiService } from '../../services/apiService';
+import { api } from '../../services/apiClient';
 
 interface Lead {
   id: string;
@@ -67,8 +68,9 @@ export const QualificationLeadsAdmin: React.FC = () => {
       if (tagFilter) params.tags = tagFilter;
       if (searchTerm) params.search = searchTerm;
 
-      const response = await apiService.get('/qualification-leads', { params });
-      setLeads(response.data.leads);
+      const { data: response } = await api.get('/qualification-leads');
+      const leads = Array.isArray(response) ? response : (response as any)?.leads || [];
+      setLeads(leads);
     } catch (error) {
       console.error('Erro ao carregar leads:', error);
     } finally {

@@ -28,7 +28,7 @@ interface TodaySummary {
   paymentsReceivedCount: number;
 }
 
-const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const fmt = (v: number) => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export const TodayFinancialDashboard: React.FC = () => {
   const { addToast } = useToast();
@@ -158,13 +158,13 @@ export const TodayFinancialDashboard: React.FC = () => {
       )}
 
       {/* Em Atraso */}
-      {summary.loansInDefault.length > 0 && (
+      {(summary.loansInDefault ?? []).length > 0 && (
         <div>
           <h3 className="text-sm font-bold text-red-400 mb-3 flex items-center gap-2">
             <AlertTriangle size={14} /> Contratos em Atraso
           </h3>
           <div className="space-y-2">
-            {summary.loansInDefault.slice(0, 10).map(loan => (
+            {(summary.loansInDefault ?? []).slice(0, 10).map(loan => (
               <div key={loan.loanId} className="flex items-center justify-between bg-zinc-900 border border-red-900/40 rounded-lg px-4 py-3">
                 <div>
                   <p className="font-bold text-sm text-white">{loan.customer?.name || '—'}</p>
@@ -191,7 +191,7 @@ export const TodayFinancialDashboard: React.FC = () => {
         </div>
       )}
 
-      {summary.installmentsDueToday.length === 0 && summary.loansInDefault.length === 0 && (
+      {(summary.installmentsDueToday ?? []).length === 0 && (summary.loansInDefault ?? []).length === 0 && (
         <div className="text-center py-4 text-zinc-500 text-sm">
           ✅ Nenhuma ação necessária para hoje
         </div>

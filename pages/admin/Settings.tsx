@@ -501,8 +501,8 @@ export const Settings: React.FC = () => {
                 <div>
                   <h3 className="font-bold text-lg text-white">{pkg.name}</h3>
                   <div className="text-sm text-zinc-400 flex flex-wrap gap-4 mt-1">
-                    <span>R$ {pkg.minValue.toLocaleString()} - {pkg.maxValue.toLocaleString()}</span>
-                    <span className="text-[#D4AF37]">{pkg.interestRate}% a.m.</span>
+                    <span>R$ {(pkg.minValue || 0).toLocaleString()} - {(pkg.maxValue || 0).toLocaleString()}</span>
+                    <span className="text-[#D4AF37]">{pkg.interestRate || 0}% a.m.</span>
                   </div>
                 </div>
                 <div className="flex gap-2">

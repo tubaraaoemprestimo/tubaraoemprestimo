@@ -796,7 +796,7 @@ export const Customers: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-4">
-                      <div className="font-bold text-white">R$ {cust.totalDebt.toLocaleString()}</div>
+                      <div className="font-bold text-white">R$ {(cust.totalDebt ?? 0).toLocaleString()}</div>
                     </td>
                     <td className="p-4">
                       {cust.preApprovedOffer ? (

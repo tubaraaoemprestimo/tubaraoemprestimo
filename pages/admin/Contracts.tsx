@@ -212,7 +212,7 @@ export const Contracts: React.FC = () => {
     return 'Empréstimo';
   };
 
-  const paidCount = (c: Contract) => c.installments.filter(i => i.status === 'PAID').length;
+  const paidCount = (c: Contract) => (c.installments ?? []).filter(i => i.status === 'PAID').length;
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">

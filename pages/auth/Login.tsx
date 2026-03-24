@@ -12,6 +12,7 @@ import { secureStorageService } from '../../services/secureStorageService';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const IS_DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
   const [formData, setFormData] = useState({ identifier: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -49,9 +50,11 @@ export const Login: React.FC = () => {
     };
     checkBiometric();
 
-    // Limpar sessão para fresh login
-    apiService.auth.signOut();
-  }, []);
+    // Limpar sessão para fresh login (skip em DEMO)
+    if (!IS_DEMO) {
+      apiService.auth.signOut();
+    }
+  }, [IS_DEMO]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,27 +69,31 @@ export const Login: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    // Captura localização ANTES de qualquer outra operação
+    // Captura localização ANTES de qualquer outra operação (skip em DEMO)
     let locationData: { latitude: number; longitude: number; accuracy: number } | null = null;
-    try {
-      locationData = await antifraudService.requestLocation();
-      console.log('[Antifraud] Location captured:', locationData);
-    } catch (e) {
-      console.log('[Antifraud] Location request failed or denied', e);
+    if (!IS_DEMO) {
+      try {
+        locationData = await antifraudService.requestLocation();
+        console.log('[Antifraud] Location captured:', locationData);
+      } catch (e) {
+        console.log('[Antifraud] Location request failed or denied', e);
+      }
     }
 
     try {
       const result = await apiService.auth.signIn(creds) as any;
       if (result.user) {
-        // Antifraud Log com localização capturada
-        await antifraudService.logRiskEvent('LOGIN_SUCCESS', result.user.id, {
-          role: result.user.role,
-          method: creds.identifier === 'admin' ? 'PASSWORD_ADMIN' : 'PASSWORD_CLIENT',
-          locationCaptured: locationData
-        });
+        // Antifraud Log com localização capturada (skip em DEMO)
+        if (!IS_DEMO) {
+          await antifraudService.logRiskEvent('LOGIN_SUCCESS', result.user.id, {
+            role: result.user.role,
+            method: creds.identifier === 'admin' ? 'PASSWORD_ADMIN' : 'PASSWORD_CLIENT',
+            locationCaptured: locationData
+          });
+        }
 
-        // Verificação de dispositivo (limite 2 por usuário)
-        if (result.user.role !== 'ADMIN') {
+        // Verificação de dispositivo (limite 2 por usuário) (skip em DEMO)
+        if (!IS_DEMO && result.user.role !== 'ADMIN') {
           const deviceCheck = await antifraudService.checkDevice();
           if (!deviceCheck.allowed) {
             setError(deviceCheck.message || 'Acesso bloqueado por segurança do dispositivo.');
@@ -137,8 +144,10 @@ export const Login: React.FC = () => {
         if (result.user.role === 'ADMIN') {
           navigate('/admin');
         } else {
-          // Salvar localização do cliente após login (background)
-          locationTrackingService.captureAndSave().catch(() => { });
+          // Salvar localização do cliente após login (background) (skip em DEMO)
+          if (!IS_DEMO) {
+            locationTrackingService.captureAndSave().catch(() => { });
+          }
           navigate('/client/dashboard');
         }
       } else {
@@ -149,12 +158,14 @@ export const Login: React.FC = () => {
         if (errCode === 'DEVICE_BLOCKED') {
           setError(errMsg);
         } else {
-          // Antifraud Log - Failed Attempt
-          await antifraudService.logRiskEvent('LOGIN_FAILED', undefined, {
-            identifier: creds.identifier,
-            reason: errMsg || 'Invalid Credentials',
-            locationCaptured: locationData
-          });
+          // Antifraud Log - Failed Attempt (skip em DEMO)
+          if (!IS_DEMO) {
+            await antifraudService.logRiskEvent('LOGIN_FAILED', undefined, {
+              identifier: creds.identifier,
+              reason: errMsg || 'Invalid Credentials',
+              locationCaptured: locationData
+            });
+          }
           setError('Credenciais inválidas.');
         }
       }
@@ -184,18 +195,22 @@ export const Login: React.FC = () => {
     setError(null);
 
     try {
-      await antifraudService.logRiskEvent('BIOMETRIC_CHALLENGE', undefined, {
-        flow: 'LOGIN_BIOMETRIC_BUTTON',
-        stage: 'challenge_started',
-      });
+      if (!IS_DEMO) {
+        await antifraudService.logRiskEvent('BIOMETRIC_CHALLENGE', undefined, {
+          flow: 'LOGIN_BIOMETRIC_BUTTON',
+          stage: 'challenge_started',
+        });
+      }
 
       const result = await biometricService.authenticate();
 
       if (!result.success) {
-        await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
-          flow: 'LOGIN_BIOMETRIC_BUTTON',
-          reason: result.error || 'auth_failed',
-        });
+        if (!IS_DEMO) {
+          await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
+            flow: 'LOGIN_BIOMETRIC_BUTTON',
+            reason: result.error || 'auth_failed',
+          });
+        }
         setIsScanning(false);
         
         // Se erro for "Nenhuma credencial", pedir senha para registrar
@@ -217,10 +232,12 @@ export const Login: React.FC = () => {
       if (secureStorageService.isSupported()) {
         const secureData = await secureStorageService.getSecure(`bio_auth_${result.userId}`, result.userId);
         if (!secureData) {
-          await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
-            flow: 'LOGIN_BIOMETRIC_BUTTON',
-            reason: 'missing_secure_credentials',
-          });
+          if (!IS_DEMO) {
+            await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
+              flow: 'LOGIN_BIOMETRIC_BUTTON',
+              reason: 'missing_secure_credentials',
+            });
+          }
           setIsScanning(false);
           setBiometricNeedsPassword(true);
           setBiometricEmail(result.userEmail || '');
@@ -234,10 +251,12 @@ export const Login: React.FC = () => {
         // Fallback para base64 (navegadores antigos)
         const storedAuth = localStorage.getItem(`bio_auth_${result.userId}`);
         if (!storedAuth) {
-          await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
-            flow: 'LOGIN_BIOMETRIC_BUTTON',
-            reason: 'missing_local_password_cache',
-          });
+          if (!IS_DEMO) {
+            await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
+              flow: 'LOGIN_BIOMETRIC_BUTTON',
+              reason: 'missing_local_password_cache',
+            });
+          }
           setIsScanning(false);
           setBiometricNeedsPassword(true);
           setBiometricEmail(result.userEmail || '');
@@ -253,15 +272,17 @@ export const Login: React.FC = () => {
       const loginResult = await apiService.auth.signIn({ identifier: email, password }) as any;
 
       if (loginResult.user) {
-        await antifraudService.logRiskEvent('LOGIN_SUCCESS', loginResult.user.id, {
-          role: loginResult.user.role,
-          method: 'BIOMETRIC',
-        });
+        if (!IS_DEMO) {
+          await antifraudService.logRiskEvent('LOGIN_SUCCESS', loginResult.user.id, {
+            role: loginResult.user.role,
+            method: 'BIOMETRIC',
+          });
 
-        await antifraudService.logRiskEvent('BIOMETRIC_SUCCESS', loginResult.user.id, {
-          flow: 'LOGIN_BIOMETRIC_BUTTON',
-          source: 'webauthn',
-        });
+          await antifraudService.logRiskEvent('BIOMETRIC_SUCCESS', loginResult.user.id, {
+            flow: 'LOGIN_BIOMETRIC_BUTTON',
+            source: 'webauthn',
+          });
+        }
 
         sessionStorage.setItem(`biometric_verified_${loginResult.user.id}`, new Date().toISOString());
 

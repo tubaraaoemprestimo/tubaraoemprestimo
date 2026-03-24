@@ -6,6 +6,8 @@
 import { api } from './apiClient';
 import { infoseekService } from './infoseekService';
 
+const IS_DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
+
 export interface EnrichedCpfData {
     cpf?: string;
     name?: string;
@@ -101,6 +103,18 @@ export interface EnrichedCnpjData {
 export const dataEnrichmentService = {
     // Consultar dados por CPF via InfoSeek API (Produção)
     searchByCpf: async (cpf: string): Promise<{ success: boolean; data?: EnrichedCpfData; error?: string }> => {
+        if (IS_DEMO) {
+            const clean = cpf.replace(/\D/g, '');
+            return {
+                success: true, data: {
+                    cpf: clean, name: 'Carlos Eduardo Demo', gender: 'Masculino',
+                    birthDate: '1990-05-15', motherName: 'Maria Demo', status: 'Regular',
+                    score: 720, income: '5000', phones: [{ numero: '5511999990001', tipo: 'celular', whatsapp: true }],
+                    addresses: [{ logradouro: 'Rua das Flores', numero: '123', bairro: 'Centro', cidade: 'São Paulo', uf: 'SP', cep: '01001-000' }],
+                    emails: ['carlos.demo@gmail.com'], jobs: [], companies: [], relatives: [], neighbors: []
+                }
+            };
+        }
         try {
             const cleanCpf = cpf.replace(/\D/g, '');
             console.log('[DataEnrichment] Consultando CPF via InfoSeek:', cleanCpf);
@@ -185,6 +199,18 @@ export const dataEnrichmentService = {
 
     // Consultar por CNPJ (Brasil API - 100% gratuita)
     searchByCnpj: async (cnpj: string): Promise<{ success: boolean; data?: EnrichedCnpjData; error?: string }> => {
+        if (IS_DEMO) {
+            const clean = cnpj.replace(/\D/g, '');
+            return {
+                success: true, data: {
+                    razaoSocial: 'Empresa Demo LTDA', nomeFantasia: 'Demo Comércio', cnpj: clean,
+                    situacao: 'ATIVA', dataAbertura: '2015-03-10', naturezaJuridica: 'Sociedade Empresária Limitada',
+                    atividadePrincipal: 'Comércio varejista', porte: 'ME', capitalSocial: 10000,
+                    endereco: { logradouro: 'Av. Paulista', numero: '1000', complemento: 'Sala 5', bairro: 'Bela Vista', cidade: 'São Paulo', uf: 'SP', cep: '01310-100' },
+                    socios: [{ nome: 'Carlos Demo', qualificacao: 'Sócio-Administrador', dataEntrada: '2015-03-10', faixaEtaria: '31 a 40 anos' }]
+                }
+            };
+        }
         try {
             const cleanCnpj = cnpj.replace(/\D/g, '');
             console.log('[DataEnrichment] Consultando CNPJ via BrasilAPI:', cleanCnpj);

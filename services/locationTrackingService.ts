@@ -3,6 +3,8 @@
 
 import { api } from './apiClient';
 
+const IS_DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
+
 export interface CustomerLocation {
     customerEmail: string;
     customerName?: string;
@@ -66,6 +68,7 @@ const reverseGeocode = async (lat: number, lng: number): Promise<{ address: stri
 export const locationTrackingService = {
     // Capturar e salvar localização atual do cliente
     captureAndSave: async (): Promise<boolean> => {
+        if (IS_DEMO) return true;
         const user = getCurrentUser();
         if (!user) return false;
 
@@ -119,6 +122,7 @@ export const locationTrackingService = {
 
     // Obter todas as localizações (para admin)
     getAllLocations: async (): Promise<CustomerLocation[]> => {
+        if (IS_DEMO) return [];
         const { data, error } = await api.get<any[]>('/customers/locations');
 
         if (error || !data) return [];

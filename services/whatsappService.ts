@@ -9,14 +9,22 @@ const cleanUrl = (url: string) => {
     return url.trim().replace(/\/+$/, '');
 };
 
+const IS_DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
+
+/** Simula toast demo sem depender de contexto React */
+const demoToast = (msg: string) =>
+  window.dispatchEvent(new CustomEvent('demo-toast', { detail: { message: msg, type: 'success' } }));
+
 export const whatsappService = {
     // Get connection status and config form local storage
     getConfig: async (): Promise<WhatsappConfig> => {
+        if (IS_DEMO) return { apiUrl: '', apiKey: '', instanceName: 'demo', isConnected: true, phone: '5511999999999' } as any;
         return await apiService.getWhatsappConfig();
     },
 
     // Save new configuration to local storage
     updateConfig: async (config: WhatsappConfig): Promise<boolean> => {
+        if (IS_DEMO) { demoToast('Configuração salva (Demo)'); return true; }
         return await apiService.saveWhatsappConfig(config);
     },
 
@@ -24,6 +32,7 @@ export const whatsappService = {
 
     // Ensure Webhook is Configured
     ensureWebhookConfigured: async (config: WhatsappConfig): Promise<boolean> => {
+        if (IS_DEMO) return true;
         const baseUrl = cleanUrl(config.apiUrl);
         const webhookUrl = getApiBaseUrl() + '/webhook/whatsapp';
 
@@ -62,6 +71,7 @@ export const whatsappService = {
 
     // Check Connection State
     checkConnectionState: async (): Promise<'open' | 'close' | 'connecting' | 'unknown'> => {
+        if (IS_DEMO) return 'open';
         const config = await apiService.getWhatsappConfig();
         if (!config.apiUrl || !config.apiKey || !config.instanceName) return 'unknown';
 
@@ -105,6 +115,7 @@ export const whatsappService = {
 
     // Internal: Create Instance
     createInstance: async (config: WhatsappConfig): Promise<boolean> => {
+        if (IS_DEMO) return true;
         const baseUrl = cleanUrl(config.apiUrl);
         try {
             console.log(`[WhatsApp] Creating instance ${config.instanceName}...`);
@@ -145,6 +156,7 @@ export const whatsappService = {
 
     // Fetch QR Code from Evolution API
     getQrCode: async (): Promise<string | null> => {
+        if (IS_DEMO) return null; // Demo: já "conectado"
         const config = await apiService.getWhatsappConfig();
         if (!config.apiUrl || !config.apiKey || !config.instanceName) {
             throw new Error("Configurações da API incompletas.");
@@ -211,6 +223,7 @@ export const whatsappService = {
 
     // Disconnect instance
     disconnect: async (): Promise<boolean> => {
+        if (IS_DEMO) { demoToast('Desconectado (Demo)'); return true; }
         const config = await apiService.getWhatsappConfig();
         if (!config.apiUrl || !config.apiKey) return false;
 
@@ -238,6 +251,7 @@ export const whatsappService = {
 
     // Send Text Message
     sendMessage: async (phone: string, text: string): Promise<boolean> => {
+        if (IS_DEMO) { demoToast(`📱 WhatsApp enviado para ${phone} (Demo)`); return true; }
         const config = await apiService.getWhatsappConfig();
         if (!config.apiUrl || !config.apiKey) return false;
 
@@ -298,6 +312,7 @@ export const whatsappService = {
 
     // Buscar Contatos da API
     fetchContacts: async (): Promise<any[]> => {
+        if (IS_DEMO) return [];
         const config = await apiService.getWhatsappConfig();
         if (!config.apiUrl || !config.apiKey) return [];
 
