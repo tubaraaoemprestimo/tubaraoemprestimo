@@ -161,16 +161,20 @@ model goals_settings {
 }
 
 model installments {
-  id         String    @id
-  loan_id    String
-  due_date   DateTime
-  amount     Float
-  status     String    @default("OPEN")
-  pix_code   String?
-  proof_url  String?
-  paid_at    DateTime?
-  created_at DateTime  @default(now())
-  loans      loans     @relation(fields: [loan_id], references: [id])
+  id               String    @id
+  loan_id          String
+  due_date         DateTime
+  amount           Float
+  status           String    @default("OPEN")
+  pix_code         String?
+  proof_url        String?
+  paid_at          DateTime?
+  created_at       DateTime  @default(now())
+  // Multa por atraso — R$20/dia acumulado pelo CRON
+  late_fee_amount  Float     @default(0)
+  fine_accumulated Float     @default(0)
+  days_overdue     Int       @default(0)
+  loans            loans     @relation(fields: [loan_id], references: [id])
 }
 
 model loan_packages {
@@ -236,6 +240,21 @@ model loan_requests {
   created_at                DateTime   @default(now())
   updated_at                DateTime
   contract_pdf_url          String?
+  // ── Novos campos Bloco 1 ──────────────────────────────────────────────────
+  // CLT
+  has_more_than_3_months_clt Boolean?  // Confirmação de 3+ meses de vínculo
+  clt_auto_rejected          Boolean   @default(false) // Auto-rejeitado por <3 meses
+  // Garantia (GARANTIA)
+  asset_description          String?   // Descrição do bem em garantia
+  asset_value                Float?    // Valor estimado do bem
+  asset_proof_url            String?   // Comprovante/foto do bem
+  // Capital de Giro (AUTONOMO/Comércio)
+  commerce_terms_accepted    Boolean   @default(false) // Aceite dos termos do comércio
+  // Geofencing
+  geofence_city              String?   // Cidade detectada pelo GPS no momento do cadastro
+  geofence_state             String?   // Estado detectado pelo GPS
+  geofence_blocked           Boolean   @default(false) // Bloqueado por região não permitida
+  // ─────────────────────────────────────────────────────────────────────────
   customers                 customers? @relation(fields: [customer_id], references: [id])
   users                     users?     @relation(fields: [user_id], references: [id])
   loans                     loans?
@@ -251,6 +270,9 @@ model loans {
   status             String         @default("APPROVED")
   start_date         DateTime
   created_at         DateTime       @default(now())
+  // Tipo de cobrança: DAILY (autônomo/comércio) ou MONTHLY (CLT/demais)
+  billing_type       String         @default("MONTHLY")
+  interest_rate      Float          @default(0)
   installments       installments[]
   customers          customers      @relation(fields: [customer_id], references: [id])
   loan_requests      loan_requests  @relation(fields: [request_id], references: [id])
@@ -374,6 +396,16 @@ model system_settings {
   key        String   @unique
   value      String
   updated_at DateTime
+}
+
+// Configuração de geofencing (cidades/estados permitidos para novos cadastros)
+model geofence_settings {
+  id              String   @id @default(cuid())
+  enabled         Boolean  @default(false)
+  allowed_states  String[] @default([]) // ex: ["SP","RJ","MG"]
+  allowed_cities  String[] @default([]) // ex: ["São Paulo","Campinas"]
+  block_message   String   @default("Infelizmente ainda não atendemos sua região. Em breve chegamos até você!")
+  updated_at      DateTime @updatedAt
 }
 
 model temporary_links {

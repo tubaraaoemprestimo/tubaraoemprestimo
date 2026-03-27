@@ -67,6 +67,8 @@ export const Requests: React.FC = () => {
     const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
     const [approvedAmount, setApprovedAmount] = useState('');
     const [approvedInterestRate, setApprovedInterestRate] = useState('');
+    const [approvedBillingType, setApprovedBillingType] = useState<'DAILY' | 'MONTHLY'>('MONTHLY');
+    const [approvedInstallments, setApprovedInstallments] = useState('');
 
     // Contract Activation Modal (FASE 2)
     const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
@@ -297,6 +299,12 @@ export const Requests: React.FC = () => {
         // Pré-preencher com o valor solicitado
         setApprovedAmount(selectedRequest.amount.toString());
         setApprovedInterestRate('');
+        // Preencher billing type baseado no perfil
+        const billingType = selectedRequest.profileType === 'AUTONOMO' ? 'DAILY' : 'MONTHLY';
+        setApprovedBillingType(billingType);
+        // Preencher número de parcelas (do request ou padrão)
+        const installments = selectedRequest.installments ? selectedRequest.installments.toString() : '';
+        setApprovedInstallments(installments);
         setIsApprovalModalOpen(true);
     };
 
@@ -312,12 +320,14 @@ export const Requests: React.FC = () => {
         setProcessing(selectedRequest.id);
         try {
             const rate = approvedInterestRate ? parseFloat(approvedInterestRate) : undefined;
-            await apiService.approveWithCounteroffer(selectedRequest.id, amount, rate);
+            const installments = approvedInstallments ? parseInt(approvedInstallments) : undefined;
+            await apiService.approveWithCounteroffer(selectedRequest.id, amount, rate, approvedBillingType, installments);
 
             setProcessing(null);
             setIsApprovalModalOpen(false);
             setApprovedAmount('');
             setApprovedInterestRate('');
+            setApprovedInstallments('');
             setSelectedRequest(null);
             loadRequests();
             addToast("Contraproposta enviada ao cliente!", 'success');
@@ -747,7 +757,7 @@ export const Requests: React.FC = () => {
             <div className="mb-6">
                 <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2 font-medium">Status:</p>
                 <div className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap scrollbar-hide">
-                    {['ALL', LoanStatus.RETURNING_PENDING, LoanStatus.PENDING, LoanStatus.WAITING_DOCS, LoanStatus.APPROVED, LoanStatus.REJECTED].map((status) => (
+                    {['ALL', LoanStatus.RETURNING_PENDING, LoanStatus.PENDING, LoanStatus.WAITING_DOCS, LoanStatus.APPROVED, 'ACTIVE', LoanStatus.PAUSED, LoanStatus.REJECTED].map((status) => (
                         <button
                             key={status}
                             onClick={() => setFilterStatus(status)}
@@ -758,7 +768,9 @@ export const Requests: React.FC = () => {
                         >
                             {status === 'ALL' ? 'Todos' :
                                 status === LoanStatus.RETURNING_PENDING ? '🔄 Antigo' :
-                                    status === LoanStatus.WAITING_DOCS ? 'Aguardando' : status}
+                                status === LoanStatus.WAITING_DOCS ? 'Aguardando' :
+                                status === 'ACTIVE' ? '🟢 Ativo' :
+                                status === LoanStatus.PAUSED ? '⏸ Pausado' : status}
                         </button>
                     ))}
                 </div>
@@ -1731,7 +1743,148 @@ export const Requests: React.FC = () => {
                                                     </div>
                                                 )}
 
-                                                {/* Dados da Garantia */}
+                                                {/* Dados Específicos do Perfil (Bloco 1) */}
+
+                                                {/* CLT */}
+                                                {selectedRequest.profileType === 'CLT' && extraData.hasMoreThan3MonthsClt !== undefined && (
+                                                    <div className="bg-gray-800/30 border border-gray-600/40 p-4 rounded-xl">
+                                                        <h3 className="text-gray-400 font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                            🏢 Dados CLT
+                                                        </h3>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                <p className="text-xs text-zinc-500">Mais de 3 meses de registro?</p>
+                                                                <p className={`font-bold ${extraData.hasMoreThan3MonthsClt ? 'text-green-400' : 'text-red-400'}`}>
+                                                                    {extraData.hasMoreThan3MonthsClt ? 'SIM' : 'NÃO'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* AUTONOMO / Comércio */}
+                                                {selectedRequest.profileType === 'AUTONOMO' && (
+                                                    <div className="bg-green-900/20 border border-green-600/40 p-4 rounded-xl">
+                                                        <h3 className="text-green-400 font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                            🏪 Dados do Comércio (Capital de Giro)
+                                                        </h3>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                <p className="text-xs text-zinc-500">Aceitou Termos de Comércio (Pagamento Diário)?</p>
+                                                                <p className={`font-bold ${extraData.commerceTermsAccepted ? 'text-green-400' : 'text-red-400'}`}>
+                                                                    {extraData.commerceTermsAccepted ? 'SIM' : 'NÃO'}
+                                                                </p>
+                                                            </div>
+                                                            {extraData.cnpj && (
+                                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                    <p className="text-xs text-zinc-500">CNPJ</p>
+                                                                    <p className="font-bold text-white">{extraData.cnpj}</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* GARANTIA */}
+                                                {selectedRequest.profileType === 'GARANTIA' && (
+                                                    <div className="bg-yellow-900/20 border border-yellow-600/40 p-4 rounded-xl">
+                                                        <h3 className="text-yellow-400 font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                            🔒 Garantia do Empréstimo
+                                                        </h3>
+
+                                                        {/* Single Asset Fields (if present) */}
+                                                        {(extraData.assetDescription || extraData.assetValue) && (
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                    <p className="text-xs text-zinc-500">Descrição do Bem</p>
+                                                                    <p className="font-bold text-white">{extraData.assetDescription || 'N/A'}</p>
+                                                                </div>
+                                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                    <p className="text-xs text-zinc-500">Valor Avaliado</p>
+                                                                    <p className="font-bold text-white">R$ {extraData.assetValue?.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0,00'}</p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Multiple Collateral Items */}
+                                                        {extraData.collateralItems && extraData.collateralItems.length > 0 && (
+                                                            <div className="space-y-4 mt-4">
+                                                                <p className="text-xs text-zinc-400 font-bold uppercase">Itens em Garantia ({extraData.collateralItems.length})</p>
+                                                                {extraData.collateralItems.map((item: any, idx: number) => (
+                                                                    <div key={idx} className="bg-black border border-zinc-700 rounded-lg p-4">
+                                                                        <div className="flex justify-between mb-3">
+                                                                            <span className="font-bold text-[#D4AF37]">Item {idx + 1}: {item.type}</span>
+                                                                            <span className="text-green-400 font-bold">R$ {parseFloat(item.estimatedValue || '0').toLocaleString('pt-BR')}</span>
+                                                                        </div>
+                                                                        <p className="text-sm text-zinc-300 mb-2">{item.description}</p>
+                                                                        <p className="text-xs text-zinc-500 mb-3">Condição: {item.condition}</p>
+
+                                                                        <div className="flex flex-wrap gap-2">
+                                                                            {item.photos && item.photos.length > 0 && (
+                                                                                <button
+                                                                                    onClick={() => setViewingImage({ urls: item.photos, title: `Fotos: ${item.type}` })}
+                                                                                    className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-md text-white transition-colors"
+                                                                                >
+                                                                                    📷 Ver Fotos ({item.photos.length})
+                                                                                </button>
+                                                                            )}
+                                                                            {item.invoiceUrl && (
+                                                                                <button
+                                                                                    onClick={() => setViewingImage({ urls: [item.invoiceUrl], title: `Nota Fiscal: ${item.type}` })}
+                                                                                    className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-md text-white transition-colors"
+                                                                                >
+                                                                                    🧾 Ver Nota Fiscal
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* MOTO */}
+                                                {selectedRequest.profileType === 'MOTO' && (
+                                                    <div className="bg-blue-900/20 border border-blue-600/40 p-4 rounded-xl">
+                                                        <h3 className="text-blue-400 font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                            🏍️ Dados do Financiamento
+                                                        </h3>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                            {extraData.motoModel && (
+                                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                    <p className="text-xs text-zinc-500">Modelo Escolhido</p>
+                                                                    <p className="font-bold text-white">{extraData.motoModel}</p>
+                                                                </div>
+                                                            )}
+                                                            {extraData.motoColor && (
+                                                                <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                    <p className="text-xs text-zinc-500">Cor Desejada</p>
+                                                                    <p className="font-bold text-white">{extraData.motoColor}</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* LIMPA NOME */}
+                                                {selectedRequest.profileType === 'LIMPA_NOME' && (
+                                                    <div className="bg-purple-900/20 border border-purple-600/40 p-4 rounded-xl">
+                                                        <h3 className="text-purple-400 font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                            🧹 Limpa Nome
+                                                        </h3>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                            <div className="bg-black p-3 rounded-lg border border-zinc-800">
+                                                                <p className="text-xs text-zinc-500">Contrato Assinado?</p>
+                                                                <p className={`font-bold ${extraData.limpaNomeContractSigned ? 'text-green-400' : 'text-red-400'}`}>
+                                                                    {extraData.limpaNomeContractSigned ? 'SIM' : 'NÃO'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Dados da Garantia (Legado) */}
                                                 {extraData.guarantee && (
                                                     <div className="bg-yellow-900/20 border border-yellow-600/40 p-4 rounded-xl">
                                                         <h3 className="text-yellow-400 font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -2190,6 +2343,78 @@ export const Requests: React.FC = () => {
                             />
                             <p className="text-xs text-zinc-500 mt-2">
                                 Se informado, será salvo junto à contraproposta para uso na ativação do contrato.
+                            </p>
+                        </div>
+
+                        {/* Frequência de Pagamento */}
+                        <div className="mb-4 md:mb-6">
+                            <label className="block text-sm font-bold text-white mb-2">
+                                📅 Frequência de Pagamento
+                            </label>
+                            <select
+                                value={approvedBillingType}
+                                onChange={(e) => setApprovedBillingType(e.target.value as 'DAILY' | 'MONTHLY')}
+                                className="w-full bg-black border border-zinc-700 rounded-xl p-3 md:p-4 text-white focus:border-[#D4AF37] outline-none"
+                            >
+                                <option value="MONTHLY">Mensal (CLT, Garantia, Moto, Limpa Nome)</option>
+                                <option value="DAILY">Diária (Comércio/Autônomo)</option>
+                            </select>
+                            <p className="text-xs text-zinc-500 mt-2">
+                                Define como as parcelas serão geradas. Diária gera uma parcela por dia útil (seg–sáb).
+                            </p>
+                        </div>
+
+                        {/* Número de Parcelas */}
+                        <div className="mb-4 md:mb-6">
+                            <label className="block text-sm font-bold text-white mb-2">
+                                🔢 Número de Parcelas
+                            </label>
+                            <input
+                                type="number"
+                                min="1"
+                                value={approvedInstallments}
+                                onChange={(e) => setApprovedInstallments(e.target.value)}
+                                className="w-full bg-black border border-zinc-700 rounded-xl p-3 md:p-4 text-white text-xl md:text-2xl font-bold focus:border-[#D4AF37] outline-none"
+                                placeholder="Ex: 12"
+                            />
+                            <p className="text-xs text-zinc-500 mt-2">
+                                Quantidade total de parcelas/diárias. Pode diferir da solicitação original.
+                            </p>
+                        </div>
+
+                        {/* Frequência de Pagamento */}
+                        <div className="mb-4 md:mb-6">
+                            <label className="block text-sm font-bold text-white mb-2">
+                                📅 Frequência de Pagamento
+                            </label>
+                            <select
+                                value={approvedBillingType}
+                                onChange={(e) => setApprovedBillingType(e.target.value as 'DAILY' | 'MONTHLY')}
+                                className="w-full bg-black border border-zinc-700 rounded-xl p-3 md:p-4 text-white focus:border-[#D4AF37] outline-none"
+                            >
+                                <option value="MONTHLY">Mensal (CLT, Garantia, Moto, Limpa Nome)</option>
+                                <option value="DAILY">Diária (Comércio/Autônomo)</option>
+                            </select>
+                            <p className="text-xs text-zinc-500 mt-2">
+                                Define como as parcelas serão geradas. Diária gera uma parcela por dia útil (seg–sáb).
+                            </p>
+                        </div>
+
+                        {/* Número de Parcelas */}
+                        <div className="mb-4 md:mb-6">
+                            <label className="block text-sm font-bold text-white mb-2">
+                                🔢 Número de Parcelas
+                            </label>
+                            <input
+                                type="number"
+                                min="1"
+                                value={approvedInstallments}
+                                onChange={(e) => setApprovedInstallments(e.target.value)}
+                                className="w-full bg-black border border-zinc-700 rounded-xl p-3 md:p-4 text-white text-xl md:text-2xl font-bold focus:border-[#D4AF37] outline-none"
+                                placeholder="Ex: 12"
+                            />
+                            <p className="text-xs text-zinc-500 mt-2">
+                                Quantidade total de parcelas/diárias. Pode diferir da solicitação original.
                             </p>
                         </div>
 

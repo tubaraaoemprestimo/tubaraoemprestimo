@@ -16,7 +16,23 @@ export const Settings: React.FC = () => {
   const { addToast } = useToast();
   const { settings: brandSettings, updateSettings: updateBrand, resetSettings: resetBrand } = useBrand();
 
-  const [activeTab, setActiveTab] = useState<'FINANCIAL' | 'AUTOMATION' | 'INTEGRATION' | 'BRANDING' | 'GOALS' | 'TEMA' | 'PAYMENTS'>('FINANCIAL');
+  const [activeTab, setActiveTab] = useState<'FINANCIAL' | 'AUTOMATION' | 'INTEGRATION' | 'BRANDING' | 'GOALS' | 'TEMA' | 'PAYMENTS' | 'GEOFENCING'>('FINANCIAL');
+
+  // Geofencing State
+  const [geofence, setGeofence] = useState<{
+    enabled: boolean;
+    allowedStates: string[];
+    allowedCities: string[];
+    blockMessage: string;
+  }>({
+    enabled: false,
+    allowedStates: [],
+    allowedCities: [],
+    blockMessage: 'Infelizmente ainda não atendemos sua região. Em breve, expandiremos nossa cobertura!'
+  });
+  const [loadingGeofence, setLoadingGeofence] = useState(false);
+  const [newStateInput, setNewStateInput] = useState('');
+  const [newCityInput, setNewCityInput] = useState('');
 
   // Financial State
   const [settings, setSettings] = useState<SystemSettings>({ monthlyInterestRate: 0, lateFeeRate: 0 });
@@ -77,6 +93,19 @@ export const Settings: React.FC = () => {
     setWaConfig(waData);
     setGoals(goalsData);
 
+    // Load geofence settings
+    try {
+      const geo = await apiService.get('/installments/geofence-settings');
+      if (geo) {
+        setGeofence({
+          enabled: geo.enabled ?? false,
+          allowedStates: geo.allowedStates ?? geo.allowed_states ?? [],
+          allowedCities: geo.allowedCities ?? geo.allowed_cities ?? [],
+          blockMessage: geo.blockMessage ?? geo.block_message ?? 'Infelizmente ainda não atendemos sua região.',
+        });
+      }
+    } catch { /* ignore */ }
+
     // Initial status check if data exists
     if (waData.apiUrl && waData.apiKey) {
       checkWaStatus();
@@ -117,6 +146,45 @@ export const Settings: React.FC = () => {
       setWaConfig(prev => ({ ...prev, isConnected: false }));
     }
     return status;
+  };
+
+  // --- Geofencing Handlers ---
+  const handleSaveGeofence = async () => {
+    setLoadingGeofence(true);
+    try {
+      await apiService.put('/installments/geofence-settings', {
+        enabled: geofence.enabled,
+        allowedStates: geofence.allowedStates,
+        allowedCities: geofence.allowedCities,
+        blockMessage: geofence.blockMessage,
+      });
+      addToast('Configurações de geofencing salvas!', 'success');
+    } catch (e) {
+      addToast('Erro ao salvar configurações de região.', 'error');
+    }
+    setLoadingGeofence(false);
+  };
+
+  const addState = () => {
+    const val = newStateInput.trim().toUpperCase();
+    if (!val || geofence.allowedStates.includes(val)) return;
+    setGeofence(prev => ({ ...prev, allowedStates: [...prev.allowedStates, val] }));
+    setNewStateInput('');
+  };
+
+  const removeState = (state: string) => {
+    setGeofence(prev => ({ ...prev, allowedStates: prev.allowedStates.filter(s => s !== state) }));
+  };
+
+  const addCity = () => {
+    const val = newCityInput.trim();
+    if (!val || geofence.allowedCities.includes(val)) return;
+    setGeofence(prev => ({ ...prev, allowedCities: [...prev.allowedCities, val] }));
+    setNewCityInput('');
+  };
+
+  const removeCity = (city: string) => {
+    setGeofence(prev => ({ ...prev, allowedCities: prev.allowedCities.filter(c => c !== city) }));
   };
 
   // --- Financial Handlers ---
@@ -1130,6 +1198,145 @@ export const Settings: React.FC = () => {
     );
   };
 
+  const renderGeofencingTab = () => {
+    return (
+      <div className="space-y-6">
+        {/* Enable/Disable Toggle */}
+        <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-xl border border-zinc-800">
+          <div>
+            <h3 className="text-lg font-bold text-white">Geolocalização Ativa</h3>
+            <p className="text-sm text-zinc-400">Ativar/desativar restrição por região</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={geofence.enabled}
+              onChange={(e) => setGeofence({...geofence, enabled: e.target.checked})}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#D4AF37]"></div>
+          </label>
+        </div>
+
+        {/* Allowed States */}
+        <div className="p-4 bg-zinc-900 rounded-xl border border-zinc-800">
+          <h3 className="text-lg font-bold text-white mb-2">Estados Permitidos (UF)</h3>
+          <p className="text-sm text-zinc-400 mb-4">Lista de estados onde o empréstimo pode ser contratado</p>
+
+          <div className="flex gap-2 mb-4">
+            <input
+              type="text"
+              placeholder="Ex: SP"
+              value={newStateInput}
+              onChange={(e) => setNewStateInput(e.target.value.toUpperCase())}
+              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white uppercase"
+              maxLength={2}
+            />
+            <button
+              onClick={() => {
+                if (newStateInput && newStateInput.length === 2 && !geofence.allowedStates.includes(newStateInput)) {
+                  setGeofence({...geofence, allowedStates: [...geofence.allowedStates, newStateInput]});
+                  setNewStateInput('');
+                }
+              }}
+              className="bg-[#D4AF37] text-black px-4 py-2 rounded-lg font-bold hover:bg-[#B8963A]"
+            >
+              Adicionar
+            </button>
+          </div>
+
+          {geofence.allowedStates.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {geofence.allowedStates.map((state) => (
+                <span key={state} className="bg-zinc-800 border border-zinc-700 px-3 py-1 rounded-full text-sm text-white flex items-center gap-2">
+                  {state}
+                  <button
+                    onClick={() => setGeofence({...geofence, allowedStates: geofence.allowedStates.filter(s => s !== state)})}
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-zinc-500 italic">Nenhum estado configurado (todos permitidos se geolocalização ativa)</p>
+          )}
+        </div>
+
+        {/* Allowed Cities */}
+        <div className="p-4 bg-zinc-900 rounded-xl border border-zinc-800">
+          <h3 className="text-lg font-bold text-white mb-2">Cidades Permitidas</h3>
+          <p className="text-sm text-zinc-400 mb-4">Lista de cidades específicas (opcional — se vazia, todos os municípios dos estados permitidos são aceitos)</p>
+
+          <div className="flex gap-2 mb-4">
+            <input
+              type="text"
+              placeholder="Ex: São Paulo"
+              value={newCityInput}
+              onChange={(e) => setNewCityInput(e.target.value)}
+              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white"
+            />
+            <button
+              onClick={() => {
+                if (newCityInput && !geofence.allowedCities.includes(newCityInput)) {
+                  setGeofence({...geofence, allowedCities: [...geofence.allowedCities, newCityInput]});
+                  setNewCityInput('');
+                }
+              }}
+              className="bg-[#D4AF37] text-black px-4 py-2 rounded-lg font-bold hover:bg-[#B8963A]"
+            >
+              Adicionar
+            </button>
+          </div>
+
+          {geofence.allowedCities.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {geofence.allowedCities.map((city) => (
+                <span key={city} className="bg-zinc-800 border border-zinc-700 px-3 py-1 rounded-full text-sm text-white flex items-center gap-2">
+                  {city}
+                  <button
+                    onClick={() => setGeofence({...geofence, allowedCities: geofence.allowedCities.filter(c => c !== city)})}
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-zinc-500 italic">Nenhuma cidade configurada</p>
+          )}
+        </div>
+
+        {/* Block Message */}
+        <div className="p-4 bg-zinc-900 rounded-xl border border-zinc-800">
+          <h3 className="text-lg font-bold text-white mb-2">Mensagem de Bloqueio</h3>
+          <p className="text-sm text-zinc-400 mb-4">Mensagem exibida quando o cliente está fora da área de atendimento</p>
+
+          <textarea
+            value={geofence.blockMessage}
+            onChange={(e) => setGeofence({...geofence, blockMessage: e.target.value})}
+            rows={3}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white"
+          />
+        </div>
+
+        {/* Save Button */}
+        <div className="flex justify-end">
+          <button
+            onClick={handleSaveGeofence}
+            disabled={loadingGeofence}
+            className="bg-[#D4AF37] text-black px-6 py-3 rounded-lg font-bold hover:bg-[#B8963A] disabled:opacity-50"
+          >
+            {loadingGeofence ? 'Salvando...' : 'Salvar Configurações'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+
   return (
     <div className="p-4 md:p-8 bg-black min-h-screen text-white pb-32">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -1139,7 +1346,7 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-8 bg-zinc-900/50 p-1 rounded-xl w-fit border border-zinc-800">
-        {['FINANCIAL', 'GOALS', 'AUTOMATION', 'INTEGRATION', 'BRANDING', 'TEMA', 'PAYMENTS'].map((tab) => (
+        {['FINANCIAL', 'GOALS', 'AUTOMATION', 'INTEGRATION', 'BRANDING', 'TEMA', 'PAYMENTS', 'GEOFENCING'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab as any)}
@@ -1154,7 +1361,8 @@ export const Settings: React.FC = () => {
                   tab === 'INTEGRATION' ? 'Integrações' :
                     tab === 'BRANDING' ? 'Identidade Visual' :
                       tab === 'TEMA' ? 'Cores' :
-                        tab === 'PAYMENTS' ? 'Pagamentos' : tab}
+                        tab === 'PAYMENTS' ? 'Pagamentos' :
+                          tab === 'GEOFENCING' ? '📍 Região' : tab}
           </button>
         ))}
       </div>
@@ -1166,6 +1374,7 @@ export const Settings: React.FC = () => {
       {activeTab === 'BRANDING' && renderBrandingTab()}
       {activeTab === 'TEMA' && renderThemeTab()}
       {activeTab === 'PAYMENTS' && <PIXSettings settings={settings} onUpdate={loadData} />}
+      {activeTab === 'GEOFENCING' && renderGeofencingTab()}
 
       {/* Modals */}
       {isPkgModalOpen && (
