@@ -232,6 +232,8 @@ async function handleRequest(method: string, url: string, body?: any): Promise<a
       status: 'PENDING_ACCEPTANCE',
       approvedAmount: body?.approvedAmount,
       interestRate: body?.interestRate,
+      billingType: body?.billingType,
+      installments: body?.installments,
     });
     toastSimulated('📱 Contraproposta enviada ao cliente via WhatsApp!');
     return { success: true };
@@ -1492,6 +1494,25 @@ async function handleRequest(method: string, url: string, body?: any): Promise<a
 
   if (method === 'POST' || method === 'PUT' || method === 'DELETE' || method === 'PATCH') {
     return { success: true };
+  }
+
+  // ── INSTALLMENTS / CRON / GEOFENCING (DEMO stubs) ────────────────────────────
+
+  if (method === 'GET' && match(url, /\/installments\/overdue/)) {
+    // No demo: nenhuma parcela em atraso (tabela vazia)
+    return [];
+  }
+
+  if (method === 'PUT' && match(url, /\/installments\/[^/]+\/late-fee/)) {
+    return { success: true };
+  }
+
+  if (method === 'GET' && match(url, /\/installments\/geofence-settings/)) {
+    return { enabled: false, allowedStates: [], allowedCities: [], blockMessage: '' };
+  }
+
+  if (method === 'PUT' && match(url, /\/installments\/geofence-settings/)) {
+    return { ...body, id: 'default' };
   }
 
   // ── CATCH-ALL GET → empty array (evita crash em .map() ou .length) ────────────

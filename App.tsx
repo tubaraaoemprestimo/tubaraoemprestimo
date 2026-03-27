@@ -84,6 +84,7 @@ import { themeService } from './services/themeService';
 import { PermissionGate } from './components/PermissionGate';
 import { BiometricAccessGate } from './components/BiometricAccessGate';
 import { locationTrackingService } from './services/locationTrackingService';
+import { startDebtCollectionCron, stopDebtCollectionCron } from './services/debtCollectionCronService';
 
 // Demo Mode
 const IS_DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
@@ -481,6 +482,17 @@ function App() {
     // Try to initialize push notifications
     if (!IS_DEMO) {
       firebasePushService.init().catch(console.error);
+
+      // Iniciar CRON de cobrança omnichannel se usuário for admin
+      const storedUser = localStorage.getItem('tubarao_user');
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          if (parsedUser?.role === 'ADMIN') {
+            startDebtCollectionCron();
+          }
+        } catch { /* ignore */ }
+      }
     }
 
     // Initialize theme service
@@ -500,7 +512,10 @@ function App() {
       }
     }, 5 * 60 * 1000);
 
-    return () => clearInterval(locationInterval);
+    return () => {
+      clearInterval(locationInterval);
+      if (!IS_DEMO) stopDebtCollectionCron();
+    };
   }, []);
 
   useEffect(() => {

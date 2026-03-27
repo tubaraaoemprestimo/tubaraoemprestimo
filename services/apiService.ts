@@ -93,6 +93,18 @@ function normalizeEmail(email: string): string {
 
 export const apiService = {
 
+    // ============= GENERIC METHODS =============
+    async get(endpoint: string) {
+        const { data, error } = await api.get(endpoint);
+        if (error) throw new Error(error.error || 'Erro na requisição');
+        return data;
+    },
+    async put(endpoint: string, body: any) {
+        const { data, error } = await api.put(endpoint, body);
+        if (error) throw new Error(error.error || 'Erro na requisição');
+        return data;
+    },
+
     // ============= SYSTEM =============
 
     async resetSystem() {
@@ -479,8 +491,8 @@ export const apiService = {
         return data;
     },
 
-    async approveWithCounteroffer(id: string, approvedAmount: number, interestRate?: number) {
-        const { data, error } = await api.put(`/loan-requests/${id}/approve-with-counteroffer`, { approvedAmount, interestRate });
+    async approveWithCounteroffer(id: string, approvedAmount: number, interestRate?: number, billingType?: string, installments?: number) {
+        const { data, error } = await api.put(`/loan-requests/${id}/approve-with-counteroffer`, { approvedAmount, interestRate, billingType, installments });
         if (error) throw new Error(error.error || 'Erro ao aprovar com contraproposta');
         return data;
     },

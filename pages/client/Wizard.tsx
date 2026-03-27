@@ -328,7 +328,16 @@ export const Wizard: React.FC = () => {
     motoColor: '',
     // Declaração de veracidade
     declarationAccepted: false,
+    commerceTermsAccepted: false,
+    hasMoreThan3MonthsClt: null as boolean | null,
+    // GARANTIA asset fields
+    assetDescription: '',
+    assetValue: 0,
+    assetProofUrl: '',
   });
+
+  // Geofencing state
+  const [geofenceSettings, setGeofenceSettings] = useState<{enabled:boolean, allowedStates:string[], allowedCities:string[], blockMessage:string} | null>(null);
 
   // Carregar configurações REAIS do banco e registrar visita (antifraude)
   useEffect(() => {
@@ -348,6 +357,8 @@ export const Wizard: React.FC = () => {
         return;
       }
 
+      const geo = await apiService.get('/installments/geofence-settings').catch(() => null);
+      if (geo) setGeofenceSettings(geo);
       const data = await loanSettingsService.getSettings();
       setSettings(data);
       setLoadingSettings(false);
@@ -396,6 +407,17 @@ export const Wizard: React.FC = () => {
     // LIMPA_NOME step 4: assinatura obrigatória
     if (profileType === 'LIMPA_NOME' && currentStep === 4) {
       return !!formData.signature;
+    }
+    // GARANTIA step 4: todos os itens devem ter tipo, descrição, valor e foto
+    if (profileType === 'GARANTIA' && currentStep === 4) {
+      if (collateralItems.length === 0) return false;
+      for (const item of collateralItems) {
+        if (!item.type) return false;
+        if (!item.description.trim()) return false;
+        if (!item.estimatedValue.trim()) return false;
+        if (item.photos.length === 0) return false;
+      }
+      return true;
     }
     // Step de documentos (vídeos obrigatórios)
     const docsStep = profileType === 'GARANTIA' ? 6 : 5;
@@ -740,9 +762,53 @@ export const Wizard: React.FC = () => {
 
     // STEP TERMOS - Dinâmico (Step 3 para CLT/AUTONOMO/GARANTIA, Step 2 para MOTO/LIMPA_NOME)
     const termsStep = (profileType === 'MOTO' || profileType === 'LIMPA_NOME') ? 2 : 3;
-    if (currentStep === termsStep && !termsAccepted) {
-      addToast("Aceite os termos para continuar.", 'warning');
-      return;
+
+    if (currentStep === termsStep) {
+      if (profileType === 'CLT') {
+        if (formData.hasMoreThan3MonthsClt === null) {
+          addToast("Responda se possui mais de 3 meses de registro CLT.", 'warning');
+          return;
+        }
+        if (formData.hasMoreThan3MonthsClt === false) {
+          addToast("Infelizmente não atendemos CLT com menos de 3 meses de vínculo.", 'error');
+          try {
+            await apiService.submitRequest({
+              profileType,
+              amount: getAmount(),
+              installments: getInstallments(),
+              ...formData,
+              ...assetData,
+              status: 'REJECTED',
+              cltAutoRejected: true
+            });
+          } catch (e) {
+            console.error(e);
+          }
+          navigate('/client/dashboard');
+          return;
+        }
+      }
+
+      if (profileType === 'AUTONOMO' && !formData.commerceTermsAccepted) {
+        addToast("Você precisa declarar ciência das condições do Empréstimo para Comércio.", 'warning');
+        return;
+      }
+
+      // Prepare GARANTIA asset fields from first collateral item if applicable
+      const assetData: { assetDescription?: string; assetValue?: number; assetProofUrl?: string } = {};
+      if (profileType === 'GARANTIA' && collateralItems.length > 0) {
+        const firstItem = collateralItems[0];
+        assetData.assetDescription = firstItem.description || '';
+        assetData.assetValue = parseFloat(firstItem.estimatedValue) || 0;
+        // For single-asset compatibility, use first photo as proof URL if exists
+        assetData.assetProofUrl = firstItem.photos.length > 0 ? firstItem.photos[0] : '';
+      }
+
+
+      if (!termsAccepted) {
+        addToast("Aceite os termos para continuar.", 'warning');
+        return;
+      }
     }
 
     // STEP DADOS - Dinâmico (Step 4 para CLT/AUTONOMO, Step 3 para MOTO/LIMPA_NOME, Step 5 para GARANTIA)
@@ -1021,6 +1087,14 @@ export const Wizard: React.FC = () => {
         if (locationData) {
           setFormData(prev => ({ ...prev, location: locationData }));
           addToast("Localização capturada com sucesso!", 'success');
+          
+          // BLOCK 1: Geofence Check
+          if (geofenceSettings?.enabled) {
+            // Reverse geocoding placeholder (ideally done in antifraud/google maps)
+            // As we only have lat/lng here, we assume backend does the actual block or we do a simple check.
+            // For now, we trust the backend will block it, but let's pass it to formData
+          }
+          
         } else {
           addToast("Permita o acesso à localização para continuar.", 'error');
           return; // NÃO permite avançar sem localização
@@ -1387,6 +1461,54 @@ export const Wizard: React.FC = () => {
         addToast("Sua solicitação será analisada manualmente.", 'info');
       }
 
+      // GEOFENCING: Bloquear submissão se região não permitida
+      if (geofenceSettings?.enabled) {
+        // Esta validação deveria ser feita no backend com GPS real
+        // Por enquanto, simular com localização do formulário se disponível
+        // Na implementação real, o backend verificaria a localização do IP/GPS
+        const userLat = formData.latitude;
+        const userLng = formData.longitude;
+        if (userLat !== null && userLng !== null) {
+          // TODO: Implementar reverse geocoding ou chamada ao backend para validar região
+          // Por enquanto, apenas permitir se houver coordenadas (modo permissivo para demo)
+          console.log('[GEOFENCE] Coordenadas do usuário:', userLat, userLng);
+          // Em produção: chamar API de validação de região ou fazer reverse geocoding
+          // Se bloqueado, mostrar toast e retornar
+          // if (!isLocationAllowed(userLat, userLng, geofenceSettings)) {
+          //   addToast(geofenceSettings.blockMessage || 'Região não atendida', 'error');
+          //   return;
+          // }
+        } else {
+          // Se não tem coordenadas, permitir (pode ser desktop sem GPS)
+          // Em produção, exigiria coordenadas ou validação por IP
+          console.log('[GEOFENCE] Sem coordenadas disponíveis - permitindo submissão');
+        }
+      }
+
+      // GEOFENCING: Bloquear submissão se região não permitida
+      if (geofenceSettings?.enabled) {
+        // Esta validação deveria ser feita no backend com GPS real
+        // Por enquanto, simular com localização do formulário se disponível
+        // Na implementação real, o backend verificaria a localização do IP/GPS
+        const userLat = formData.latitude;
+        const userLng = formData.longitude;
+        if (userLat !== null && userLng !== null) {
+          // TODO: Implementar reverse geocoding ou chamada ao backend para validar região
+          // Por enquanto, apenas permitir se houver coordenadas (modo permissivo para demo)
+          console.log('[GEOFENCE] Coordenadas do usuário:', userLat, userLng);
+          // Em produção: chamar API de validação de região ou fazer reverse geocoding
+          // Se bloqueado, mostrar toast e retornar
+          // if (!isLocationAllowed(userLat, userLng, geofenceSettings)) {
+          //   addToast(geofenceSettings.blockMessage || 'Região não atendida', 'error');
+          //   return;
+          // }
+        } else {
+          // Se não tem coordenadas, permitir (pode ser desktop sem GPS)
+          // Em produção, exigiria coordenadas ou validação por IP
+          console.log('[GEOFENCE] Sem coordenadas disponíveis - permitindo submissão');
+        }
+      }
+
       // Submeter o pedido
       // Marcar contrato como assinado para LIMPA_NOME
       if (profileType === 'LIMPA_NOME') {
@@ -1418,6 +1540,13 @@ export const Wizard: React.FC = () => {
         hasGuarantee: needsGuarantee,
         guarantee: uploadedGuarantee,
         collateralItems: uploadedCollateralItems,
+        // Block 1 extra fields
+        hasMoreThan3MonthsClt: formData.hasMoreThan3MonthsClt,
+        commerceTermsAccepted: formData.commerceTermsAccepted,
+        // GARANTIA single-asset fields
+        assetDescription: formData.assetDescription || undefined,
+        assetValue: formData.assetValue || undefined,
+        assetProofUrl: formData.assetProofUrl || undefined,
         // Cliente recorrente
         isReturningClient: isReturningClient === 'sim',
         returningClientNote: isReturningClient === 'sim' ? returningClientNote : '',
@@ -2537,6 +2666,28 @@ export const Wizard: React.FC = () => {
                     </ul>
                   </div>
 
+                  {/* CLT: Confirmação de 3+ meses de vínculo (OBRIGATÓRIO) */}
+                  <div className="bg-amber-900/30 border-2 border-amber-500 rounded-xl p-4 space-y-3">
+                    <p className="text-white font-bold text-sm">⏰ Você possui mais de 3 meses de registro CLT ativo?</p>
+                    <p className="text-xs text-zinc-400">Serão aceitos apenas clientes com <strong>mínimo 3 meses</strong> de vínculo empregatício ativo. Solicitações com menos de 3 meses serão <strong className="text-red-400">rejeitadas automaticamente</strong>.</p>
+                    <div className="flex gap-4">
+                      <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${formData.hasMoreThan3MonthsClt === true ? 'border-green-500 bg-green-900/30 text-green-400' : 'border-zinc-700 bg-zinc-800/50 text-zinc-400 hover:border-zinc-600'}`}>
+                        <input type="radio" name="clt3months" checked={formData.hasMoreThan3MonthsClt === true} onChange={() => setFormData(prev => ({ ...prev, hasMoreThan3MonthsClt: true }))} className="hidden" />
+                        ✅ Sim, mais de 3 meses
+                      </label>
+                      <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${formData.hasMoreThan3MonthsClt === false ? 'border-red-500 bg-red-900/30 text-red-400' : 'border-zinc-700 bg-zinc-800/50 text-zinc-400 hover:border-zinc-600'}`}>
+                        <input type="radio" name="clt3months" checked={formData.hasMoreThan3MonthsClt === false} onChange={() => setFormData(prev => ({ ...prev, hasMoreThan3MonthsClt: false }))} className="hidden" />
+                        ❌ Não, menos de 3 meses
+                      </label>
+                    </div>
+                    {formData.hasMoreThan3MonthsClt === false && (
+                      <div className="bg-red-900/40 border border-red-500 rounded-lg p-3 text-center">
+                        <p className="text-red-400 font-bold text-sm">🚫 Infelizmente não atendemos CLT com menos de 3 meses de vínculo.</p>
+                        <p className="text-xs text-zinc-400 mt-1">Sua solicitação será rejeitada automaticamente.</p>
+                      </div>
+                    )}
+                  </div>
+
                   <label className="flex items-start gap-4 p-4 bg-blue-900/30 border-2 border-blue-500 rounded-xl cursor-pointer">
                     <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-blue-500 w-6 h-6" />
                     <div>
@@ -2581,6 +2732,19 @@ export const Wizard: React.FC = () => {
                         <span className="text-sm text-zinc-300">{doc}</span>
                       </div>
                     ))}
+                  </div>
+
+                  {/* AUTONOMO: Checkbox obrigatório - Ciência Capital de Giro */}
+                  <div className="bg-yellow-900/30 border-2 border-yellow-500 rounded-xl p-4">
+                    <label className="flex items-start gap-4 cursor-pointer">
+                      <input type="checkbox" checked={formData.commerceTermsAccepted} onChange={(e) => setFormData(prev => ({ ...prev, commerceTermsAccepted: e.target.checked }))} className="mt-1 accent-yellow-500 w-6 h-6" />
+                      <div>
+                        <span className="text-yellow-400 font-bold text-sm">☑️ DECLARO CIÊNCIA — EMPRÉSTIMO PARA COMÉRCIO</span>
+                        <p className="text-xs text-zinc-400 mt-2">
+                          Declaro que este empréstimo será utilizado <strong>exclusivamente como Capital de Giro para meu comércio/negócio</strong>; que a cobrança é <strong>diária (segunda a sábado)</strong>; que domingos e feriados <strong>NÃO possuem cobrança diária</strong>, mas em caso de inadimplência <strong className="text-red-400">a multa de R$ 20,00/dia acumula em dias corridos (inclusive domingos)</strong>; que a análise inclui visita ao estabelecimento; e que informações falsas sobre o comércio resultarão em <strong className="text-red-400">cancelamento imediato e cobrança antecipada da totalidade</strong>.
+                        </p>
+                      </div>
+                    </label>
                   </div>
 
                   <label className="flex items-start gap-4 p-4 bg-red-900/30 border-2 border-red-500 rounded-xl cursor-pointer">
