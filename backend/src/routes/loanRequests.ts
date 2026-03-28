@@ -146,8 +146,8 @@ function validateRequestByProfile(data: any): string | null {
             return 'Assinatura obrigatória.';
         }
 
-        // Vídeo selfie obrigatório
-        if (!data.videoSelfieUrl && !data.videoSelfie) {
+        // Vídeo selfie obrigatório (não obrigatório para MOTO — wizard MOTO não tem step de vídeo)
+        if (profile !== 'MOTO' && !data.videoSelfieUrl && !data.videoSelfie) {
             return 'Vídeo de aceite (videoSelfie) obrigatório.';
         }
     }
