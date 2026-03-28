@@ -16,10 +16,13 @@ export interface DemoLoanRequest {
   cpf: string;
   phone: string;
   email: string;
-  amount: number;
-  approvedAmount?: number;
-  interestRate?: number;
-  installments?: number;
+  amount: number; // valor solicitado
+  requestedAmount?: number; // preservado
+  approvedAmount?: number; // valor aprovado (contraproposta)
+  approvedAt?: string;
+  approvedById?: string;
+  interestRate?: number; // taxa mensal
+  installments?: number; // quantidade de parcelas/diárias
   profileType: 'CLT' | 'AUTONOMO' | 'MOTO' | 'GARANTIA' | 'LIMPA_NOME' | 'INVESTIDOR';
   status: 'PENDING' | 'WAITING_DOCS' | 'PENDING_ACCEPTANCE' | 'APPROVED' | 'ACTIVE' | 'REJECTED' | 'PAUSED' | 'CANCELLED';
   createdAt: string;
@@ -48,6 +51,38 @@ export interface DemoLoanRequest {
   activatedAt?: string;
   userId?: string;
   customerId?: string;
+
+  // Counter-offer flags
+  counterOfferAccepted?: boolean;
+  counterOfferAcceptedAt?: string;
+
+  // Bloco 1 – campos de perfil (armazenados em colunas ou extraData)
+  hasMoreThan3MonthsClt?: boolean;
+  cltAutoRejected?: boolean;
+  commerceTermsAccepted?: boolean;
+
+  // GARANTIA – principal (single-asset) usado no form submit
+  assetDescription?: string;
+  assetValue?: number;
+  assetProofUrl?: string;
+
+  // GARANTIA – itens múltiplos (usado apenas na view admin)
+  collateralItems?: any[];
+
+  // MOTO
+  motoModel?: string;
+  motoColor?: string;
+
+  // LIMPA_NOME
+  limpaNomeContractSigned?: boolean;
+
+  // Geofencing
+  geofenceCity?: string;
+  geofenceState?: string;
+  geofenceBlocked?: boolean;
+
+  // Método Tubarão (curso)
+  // Pode ser armazenado como JSON string fora do loan_requests
 }
 
 export interface DemoUser {

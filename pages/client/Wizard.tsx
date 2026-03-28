@@ -328,7 +328,17 @@ export const Wizard: React.FC = () => {
     motoColor: '',
     // Declaração de veracidade
     declarationAccepted: false,
+    commerceTermsAccepted: false,
+    autonomoPaymentDays: '30',
+    hasMoreThan3MonthsClt: null as boolean | null,
+    // GARANTIA asset fields
+    assetDescription: '',
+    assetValue: 0,
+    assetProofUrl: '',
   });
+
+  // Geofencing state
+  const [geofenceSettings, setGeofenceSettings] = useState<{enabled:boolean, allowedStates:string[], allowedCities:string[], blockMessage:string} | null>(null);
 
   // Carregar configurações REAIS do banco e registrar visita (antifraude)
   useEffect(() => {
@@ -348,6 +358,8 @@ export const Wizard: React.FC = () => {
         return;
       }
 
+      const geo = await apiService.get('/installments/geofence-settings').catch(() => null);
+      if (geo) setGeofenceSettings(geo);
       const data = await loanSettingsService.getSettings();
       setSettings(data);
       setLoadingSettings(false);
@@ -397,6 +409,17 @@ export const Wizard: React.FC = () => {
     if (profileType === 'LIMPA_NOME' && currentStep === 4) {
       return !!formData.signature;
     }
+    // GARANTIA step 4: todos os itens devem ter tipo, descrição, valor e foto
+    if (profileType === 'GARANTIA' && currentStep === 4) {
+      if (collateralItems.length === 0) return false;
+      for (const item of collateralItems) {
+        if (!item.type) return false;
+        if (!item.description.trim()) return false;
+        if (!item.estimatedValue.trim()) return false;
+        if (item.photos.length === 0) return false;
+      }
+      return true;
+    }
     // Step de documentos (vídeos obrigatórios)
     const docsStep = profileType === 'GARANTIA' ? 6 : 5;
     if (
@@ -416,9 +439,23 @@ export const Wizard: React.FC = () => {
     return loanSettingsService.calculateTotal(getAmount(), settings.interestRateMonthly);
   };
 
+  const getAutonomoPaymentDays = () => {
+    const parsedDays = parseInt(String(formData.autonomoPaymentDays || '').trim(), 10);
+    if (Number.isFinite(parsedDays) && parsedDays > 0) return parsedDays;
+    return 30;
+  };
+
+  const getInstallments = () => {
+    if (!settings) return 0;
+    if (profileType === 'AUTONOMO') {
+      return getAutonomoPaymentDays();
+    }
+    return settings.defaultInstallments;
+  };
+
   const calculateInstallment = () => {
     if (!settings) return 0;
-    return loanSettingsService.calculateInstallment(getAmount(), settings.defaultInstallments, settings.interestRateMonthly);
+    return loanSettingsService.calculateInstallment(getAmount(), getInstallments(), settings.interestRateMonthly);
   };
 
   // Validação CPF
@@ -740,9 +777,60 @@ export const Wizard: React.FC = () => {
 
     // STEP TERMOS - Dinâmico (Step 3 para CLT/AUTONOMO/GARANTIA, Step 2 para MOTO/LIMPA_NOME)
     const termsStep = (profileType === 'MOTO' || profileType === 'LIMPA_NOME') ? 2 : 3;
-    if (currentStep === termsStep && !termsAccepted) {
-      addToast("Aceite os termos para continuar.", 'warning');
-      return;
+
+    if (currentStep === termsStep) {
+      if (profileType === 'CLT') {
+        if (formData.hasMoreThan3MonthsClt === null) {
+          addToast("Responda se possui mais de 3 meses de registro CLT.", 'warning');
+          return;
+        }
+        if (formData.hasMoreThan3MonthsClt === false) {
+          addToast("Infelizmente não atendemos CLT com menos de 3 meses de vínculo.", 'error');
+          try {
+            await apiService.submitRequest({
+              profileType,
+              amount: getAmount(),
+              installments: getInstallments(),
+              ...formData,
+              ...assetData,
+              status: 'REJECTED',
+              cltAutoRejected: true
+            });
+          } catch (e) {
+            console.error(e);
+          }
+          navigate('/client/dashboard');
+          return;
+        }
+      }
+
+      if (profileType === 'AUTONOMO') {
+        const parsedDays = parseInt(String(formData.autonomoPaymentDays || '').trim(), 10);
+        if (parsedDays !== 20 && parsedDays !== 30) {
+          addToast("Selecione o prazo de pagamento: 20 ou 30 dias.", 'warning');
+          return;
+        }
+        if (!formData.commerceTermsAccepted) {
+          addToast("Você precisa declarar ciência das condições do Empréstimo para Comércio.", 'warning');
+          return;
+        }
+      }
+
+      // Prepare GARANTIA asset fields from first collateral item if applicable
+      const assetData: { assetDescription?: string; assetValue?: number; assetProofUrl?: string } = {};
+      if (profileType === 'GARANTIA' && collateralItems.length > 0) {
+        const firstItem = collateralItems[0];
+        assetData.assetDescription = firstItem.description || '';
+        assetData.assetValue = parseFloat(firstItem.estimatedValue) || 0;
+        // For single-asset compatibility, use first photo as proof URL if exists
+        assetData.assetProofUrl = firstItem.photos.length > 0 ? firstItem.photos[0] : '';
+      }
+
+
+      if (!termsAccepted) {
+        addToast("Aceite os termos para continuar.", 'warning');
+        return;
+      }
     }
 
     // STEP DADOS - Dinâmico (Step 4 para CLT/AUTONOMO, Step 3 para MOTO/LIMPA_NOME, Step 5 para GARANTIA)
@@ -1021,6 +1109,14 @@ export const Wizard: React.FC = () => {
         if (locationData) {
           setFormData(prev => ({ ...prev, location: locationData }));
           addToast("Localização capturada com sucesso!", 'success');
+          
+          // BLOCK 1: Geofence Check
+          if (geofenceSettings?.enabled) {
+            // Reverse geocoding placeholder (ideally done in antifraud/google maps)
+            // As we only have lat/lng here, we assume backend does the actual block or we do a simple check.
+            // For now, we trust the backend will block it, but let's pass it to formData
+          }
+          
         } else {
           addToast("Permita o acesso à localização para continuar.", 'error');
           return; // NÃO permite avançar sem localização
@@ -1154,7 +1250,8 @@ export const Wizard: React.FC = () => {
 
       if (!file) {
         console.error('Falha ao converter URL para file');
-        return dataUrl;
+        // Nunca retornar blob: URL — seria salva inválida no banco
+        return '';
       }
 
       const filePath = `loan_documents/${formData.cpf.replace(/\D/g, '')}/${file.name}`;
@@ -1387,6 +1484,54 @@ export const Wizard: React.FC = () => {
         addToast("Sua solicitação será analisada manualmente.", 'info');
       }
 
+      // GEOFENCING: Bloquear submissão se região não permitida
+      if (geofenceSettings?.enabled) {
+        // Esta validação deveria ser feita no backend com GPS real
+        // Por enquanto, simular com localização do formulário se disponível
+        // Na implementação real, o backend verificaria a localização do IP/GPS
+        const userLat = formData.latitude;
+        const userLng = formData.longitude;
+        if (userLat !== null && userLng !== null) {
+          // TODO: Implementar reverse geocoding ou chamada ao backend para validar região
+          // Por enquanto, apenas permitir se houver coordenadas (modo permissivo para demo)
+          console.log('[GEOFENCE] Coordenadas do usuário:', userLat, userLng);
+          // Em produção: chamar API de validação de região ou fazer reverse geocoding
+          // Se bloqueado, mostrar toast e retornar
+          // if (!isLocationAllowed(userLat, userLng, geofenceSettings)) {
+          //   addToast(geofenceSettings.blockMessage || 'Região não atendida', 'error');
+          //   return;
+          // }
+        } else {
+          // Se não tem coordenadas, permitir (pode ser desktop sem GPS)
+          // Em produção, exigiria coordenadas ou validação por IP
+          console.log('[GEOFENCE] Sem coordenadas disponíveis - permitindo submissão');
+        }
+      }
+
+      // GEOFENCING: Bloquear submissão se região não permitida
+      if (geofenceSettings?.enabled) {
+        // Esta validação deveria ser feita no backend com GPS real
+        // Por enquanto, simular com localização do formulário se disponível
+        // Na implementação real, o backend verificaria a localização do IP/GPS
+        const userLat = formData.latitude;
+        const userLng = formData.longitude;
+        if (userLat !== null && userLng !== null) {
+          // TODO: Implementar reverse geocoding ou chamada ao backend para validar região
+          // Por enquanto, apenas permitir se houver coordenadas (modo permissivo para demo)
+          console.log('[GEOFENCE] Coordenadas do usuário:', userLat, userLng);
+          // Em produção: chamar API de validação de região ou fazer reverse geocoding
+          // Se bloqueado, mostrar toast e retornar
+          // if (!isLocationAllowed(userLat, userLng, geofenceSettings)) {
+          //   addToast(geofenceSettings.blockMessage || 'Região não atendida', 'error');
+          //   return;
+          // }
+        } else {
+          // Se não tem coordenadas, permitir (pode ser desktop sem GPS)
+          // Em produção, exigiria coordenadas ou validação por IP
+          console.log('[GEOFENCE] Sem coordenadas disponíveis - permitindo submissão');
+        }
+      }
+
       // Submeter o pedido
       // Marcar contrato como assinado para LIMPA_NOME
       if (profileType === 'LIMPA_NOME') {
@@ -1408,7 +1553,8 @@ export const Wizard: React.FC = () => {
 
         // Valores por tipo de serviço
         amount: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 21996 : getAmount(),
-        installments: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 36 : settings.defaultInstallments,
+        installments: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 36 : getInstallments(),
+        companyPaymentDay: profileType === 'AUTONOMO' ? getAutonomoPaymentDays() : undefined,
         totalAmount: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 29396 : calculateTotal(),
         installmentValue: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 611 : calculateInstallment(),
         interestRate: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 0 : settings.interestRateMonthly,
@@ -1418,6 +1564,13 @@ export const Wizard: React.FC = () => {
         hasGuarantee: needsGuarantee,
         guarantee: uploadedGuarantee,
         collateralItems: uploadedCollateralItems,
+        // Block 1 extra fields
+        hasMoreThan3MonthsClt: formData.hasMoreThan3MonthsClt,
+        commerceTermsAccepted: formData.commerceTermsAccepted,
+        // GARANTIA single-asset fields
+        assetDescription: formData.assetDescription || undefined,
+        assetValue: formData.assetValue || undefined,
+        assetProofUrl: formData.assetProofUrl || undefined,
         // Cliente recorrente
         isReturningClient: isReturningClient === 'sim',
         returningClientNote: isReturningClient === 'sim' ? returningClientNote : '',
@@ -1445,7 +1598,7 @@ export const Wizard: React.FC = () => {
               phone: formData.phone,
               email: formData.email,
               amount: profileType === 'MOTO' ? 21996 : getAmount(),
-              installments: profileType === 'MOTO' ? 36 : settings.defaultInstallments,
+              installments: profileType === 'MOTO' ? 36 : getInstallments(),
               installmentValue: profileType === 'MOTO' ? 611 : calculateInstallment(),
               interestRate: profileType === 'MOTO' ? 0 : settings.interestRateMonthly,
               totalAmount: profileType === 'MOTO' ? 29396 : calculateTotal(),
@@ -2537,6 +2690,28 @@ export const Wizard: React.FC = () => {
                     </ul>
                   </div>
 
+                  {/* CLT: Confirmação de 3+ meses de vínculo (OBRIGATÓRIO) */}
+                  <div className="bg-amber-900/30 border-2 border-amber-500 rounded-xl p-4 space-y-3">
+                    <p className="text-white font-bold text-sm">⏰ Você possui mais de 3 meses de registro CLT ativo?</p>
+                    <p className="text-xs text-zinc-400">Serão aceitos apenas clientes com <strong>mínimo 3 meses</strong> de vínculo empregatício ativo. Solicitações com menos de 3 meses serão <strong className="text-red-400">rejeitadas automaticamente</strong>.</p>
+                    <div className="flex gap-4">
+                      <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${formData.hasMoreThan3MonthsClt === true ? 'border-green-500 bg-green-900/30 text-green-400' : 'border-zinc-700 bg-zinc-800/50 text-zinc-400 hover:border-zinc-600'}`}>
+                        <input type="radio" name="clt3months" checked={formData.hasMoreThan3MonthsClt === true} onChange={() => setFormData(prev => ({ ...prev, hasMoreThan3MonthsClt: true }))} className="hidden" />
+                        ✅ Sim, mais de 3 meses
+                      </label>
+                      <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${formData.hasMoreThan3MonthsClt === false ? 'border-red-500 bg-red-900/30 text-red-400' : 'border-zinc-700 bg-zinc-800/50 text-zinc-400 hover:border-zinc-600'}`}>
+                        <input type="radio" name="clt3months" checked={formData.hasMoreThan3MonthsClt === false} onChange={() => setFormData(prev => ({ ...prev, hasMoreThan3MonthsClt: false }))} className="hidden" />
+                        ❌ Não, menos de 3 meses
+                      </label>
+                    </div>
+                    {formData.hasMoreThan3MonthsClt === false && (
+                      <div className="bg-red-900/40 border border-red-500 rounded-lg p-3 text-center">
+                        <p className="text-red-400 font-bold text-sm">🚫 Infelizmente não atendemos CLT com menos de 3 meses de vínculo.</p>
+                        <p className="text-xs text-zinc-400 mt-1">Sua solicitação será rejeitada automaticamente.</p>
+                      </div>
+                    )}
+                  </div>
+
                   <label className="flex items-start gap-4 p-4 bg-blue-900/30 border-2 border-blue-500 rounded-xl cursor-pointer">
                     <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-blue-500 w-6 h-6" />
                     <div>
@@ -2557,12 +2732,90 @@ export const Wizard: React.FC = () => {
                     <ul className="text-sm text-zinc-300 space-y-2">
                       <li>• <strong>Finalidade:</strong> Capital de giro para comércio</li>
                       <li>• <strong>Modalidade:</strong> Pagamento diário</li>
-                      <li>• <strong>Prazo:</strong> 30 (trinta) diárias</li>
+                      <li>• <strong>Prazo:</strong> {getAutonomoPaymentDays()} diárias</li>
                       <li>• <strong>Juros:</strong> 30% ao mês</li>
                       <li>• <strong>Dias de cobrança:</strong> Segunda a Sábado (feriados inclusos)</li>
                       <li>• <strong className="text-yellow-400">Domingos:</strong> Sem cobrança diária</li>
                     </ul>
                   </div>
+
+                  {/* Seleção de prazo — botões fixos 20 / 30 dias com preview da diária */}
+                  {(() => {
+                    const valorBase = customAmount ? parseFloat(customAmount) : selectedAmount;
+                    const validValor = (!valorBase || isNaN(valorBase)) ? 0 : valorBase;
+                    const taxaMensal = (Number(settings?.interestRateMonthly) || 30) / 100;
+                    const juros = validValor * taxaMensal;
+                    const totalComJuros = validValor + juros;
+                    const diasSelecionados = parseInt(formData.autonomoPaymentDays || '30', 10) || 30;
+                    const diaria = diasSelecionados > 0 && validValor > 0 ? totalComJuros / diasSelecionados : 0;
+                    const fmtR = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    return (
+                      <div className="bg-zinc-950 border-2 border-[#D4AF37]/50 rounded-2xl p-5 space-y-4">
+                        <label className="block text-sm font-bold text-[#D4AF37]">
+                          🗓️ Em quantos dias você vai quitar? *
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[20, 30].map(dias => {
+                            const diariaDias = validValor > 0 ? totalComJuros / dias : 0;
+                            const selecionado = diasSelecionados === dias;
+                            return (
+                              <button
+                                key={dias}
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, autonomoPaymentDays: String(dias) }))}
+                                className={`relative p-4 rounded-xl border-2 text-left transition-all ${
+                                  selecionado
+                                    ? 'border-[#D4AF37] bg-[#D4AF37]/10 shadow-lg shadow-yellow-500/10'
+                                    : 'border-zinc-700 bg-zinc-900 hover:border-zinc-500'
+                                }`}
+                              >
+                                {selecionado && (
+                                  <span className="absolute top-2 right-2 w-5 h-5 bg-[#D4AF37] rounded-full flex items-center justify-center text-black text-xs font-black">✓</span>
+                                )}
+                                <p className="text-2xl font-black text-white">{dias} dias</p>
+                                <p className="text-xs text-zinc-400 mt-0.5">diárias</p>
+                                {validValor > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-zinc-700">
+                                    <p className="text-xs text-zinc-500">Valor da diária</p>
+                                    <p className={`text-lg font-black ${selecionado ? 'text-[#D4AF37]' : 'text-zinc-300'}`}>
+                                      R$ {fmtR(diariaDias)}
+                                    </p>
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {/* Resumo em tempo real */}
+                        {validValor > 0 && (
+                          <div className="bg-black rounded-xl p-4 border border-zinc-800 space-y-2">
+                            <p className="text-xs text-zinc-500 uppercase tracking-wider font-bold">Resumo do seu plano</p>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              <div>
+                                <p className="text-zinc-500 text-xs">Capital</p>
+                                <p className="font-bold text-white">R$ {fmtR(validValor)}</p>
+                              </div>
+                              <div>
+                                <p className="text-zinc-500 text-xs">Juros ({(taxaMensal * 100).toFixed(0)}% mês)</p>
+                                <p className="font-bold text-orange-400">R$ {fmtR(juros)}</p>
+                              </div>
+                              <div>
+                                <p className="text-zinc-500 text-xs">Total a pagar</p>
+                                <p className="font-bold text-yellow-400">R$ {fmtR(totalComJuros)}</p>
+                              </div>
+                              <div>
+                                <p className="text-zinc-500 text-xs">Diária ({diasSelecionados} dias)</p>
+                                <p className="font-black text-[#D4AF37] text-base">R$ {fmtR(diaria)}</p>
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-zinc-600 pt-1">
+                              = (R$ {fmtR(validValor)} + R$ {fmtR(juros)}) ÷ {diasSelecionados} dias
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4">
                     <h3 className="font-bold text-red-400 mb-3">🚨 MULTA E JUROS POR ATRASO</h3>
@@ -2583,12 +2836,25 @@ export const Wizard: React.FC = () => {
                     ))}
                   </div>
 
+                  {/* AUTONOMO: Checkbox obrigatório - Ciência Capital de Giro */}
+                  <div className="bg-yellow-900/30 border-2 border-yellow-500 rounded-xl p-4">
+                    <label className="flex items-start gap-4 cursor-pointer">
+                      <input type="checkbox" checked={formData.commerceTermsAccepted} onChange={(e) => setFormData(prev => ({ ...prev, commerceTermsAccepted: e.target.checked }))} className="mt-1 accent-yellow-500 w-6 h-6" />
+                      <div>
+                        <span className="text-yellow-400 font-bold text-sm">☑️ DECLARO CIÊNCIA — EMPRÉSTIMO PARA COMÉRCIO</span>
+                        <p className="text-xs text-zinc-400 mt-2">
+                          Declaro que este empréstimo será utilizado <strong>exclusivamente como Capital de Giro para meu comércio/negócio</strong>; que a cobrança é <strong>diária (segunda a sábado)</strong>; que domingos e feriados <strong>NÃO possuem cobrança diária</strong>, mas em caso de inadimplência <strong className="text-red-400">a multa de R$ 20,00/dia acumula em dias corridos (inclusive domingos)</strong>; que a análise inclui visita ao estabelecimento; e que informações falsas sobre o comércio resultarão em <strong className="text-red-400">cancelamento imediato e cobrança antecipada da totalidade</strong>.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+
                   <label className="flex items-start gap-4 p-4 bg-red-900/30 border-2 border-red-500 rounded-xl cursor-pointer">
                     <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-1 accent-red-500 w-6 h-6" />
                     <div>
                       <span className="text-white font-bold">☑️ Declaro que li e compreendi</span>
                       <p className="text-xs text-zinc-400 mt-1">
-                        As condições do Empréstimo para Comerciante (Capital de Giro), incluindo análise do comércio, pagamento em <strong>30 diárias</strong>, juros de <strong className="text-red-400">30% ao mês</strong>, cobrança de segunda a sábado (feriados inclusos), sem cobrança aos domingos, e que em caso de inadimplência o domingo será contado para juros e multa de <strong className="text-red-400">R$ 20,00 por dia</strong> de atraso, de forma cumulativa.
+                        As condições do Empréstimo para Comerciante (Capital de Giro), incluindo análise do comércio, pagamento em <strong>{getAutonomoPaymentDays()} diárias</strong>, juros de <strong className="text-red-400">30% ao mês</strong>, cobrança de segunda a sábado (feriados inclusos), sem cobrança aos domingos, e que em caso de inadimplência o domingo será contado para juros e multa de <strong className="text-red-400">R$ 20,00 por dia</strong> de atraso, de forma cumulativa.
                       </p>
                     </div>
                   </label>
@@ -3478,6 +3744,18 @@ export const Wizard: React.FC = () => {
                       <h3 className="font-bold text-red-400 text-xs uppercase">TERMO DE FINANCIAMENTO (OBRIGATÓRIO)</h3>
                       <p className="text-xs text-zinc-400">Ao assinar, declaro que li e concordo com todas as condições do financiamento próprio, incluindo busca e apreensão em caso de inadimplência e transferência somente após a 36ª prestação.</p>
                     </div>
+
+                    {/* DECLARAÇÃO DE VERACIDADE - OBRIGATÓRIA */}
+                    <label className="flex items-start gap-3 p-4 bg-yellow-900/20 border-2 border-yellow-600/50 rounded-xl cursor-pointer hover:border-[#D4AF37] transition-all">
+                      <input type="checkbox" checked={formData.declarationAccepted} onChange={(e) => setFormData({ ...formData, declarationAccepted: e.target.checked })}
+                        className="w-6 h-6 mt-0.5 accent-yellow-500 shrink-0" />
+                      <div>
+                        <span className="text-white font-bold text-sm">📜 DECLARAÇÃO DE VERACIDADE</span>
+                        <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                          Declaro que <strong className="text-white">TODAS</strong> as informações fornecidas neste formulário são <strong className="text-white">verdadeiras e corretas</strong>, incluindo dados pessoais, profissionais e documentos. Estou ciente de que a <strong className="text-red-400">falsidade ideológica</strong> configura crime previsto no Art. 299 do Código Penal.
+                        </p>
+                      </div>
+                    </label>
 
                     <div className="space-y-2">
                       <h3 className="font-bold text-[#D4AF37]">Sua Assinatura (OBRIGATÓRIO)</h3>

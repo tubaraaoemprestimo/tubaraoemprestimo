@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   FileText, Search, X, ChevronDown, ChevronUp, Eye, DollarSign,
-  Edit2, CheckCircle, Clock, AlertTriangle, RefreshCw, Save, Upload
+  Edit2, CheckCircle, Clock, AlertTriangle, RefreshCw, Save, Upload,
+  Filter, Hourglass, CheckCircle2, XCircle, Image, ExternalLink
 } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 import { Button } from '../../components/Button';
@@ -12,9 +13,19 @@ interface ContractInstallment {
   id: string;
   dueDate: string;
   amount: number;
-  status: 'OPEN' | 'PAID' | 'LATE';
+  status: 'OPEN' | 'PAID' | 'LATE' | 'AWAITING_CONFIRMATION';
   paidAt?: string;
   proofUrl?: string;
+}
+
+interface PendingProof {
+  installmentId: string;
+  loanId: string;
+  amount: number;
+  dueDate: string;
+  proofUrl: string;
+  submittedAt: string;
+  customer: { id: string; name: string; phone: string; cpf: string } | null;
 }
 
 interface Contract {
@@ -67,6 +78,28 @@ const FREQ_LABELS: Record<string, string> = {
   MONTHLY: 'Mensal',
 };
 
+// Badges de modalidade — cores específicas por profileType
+const PROFILE_BADGE: Record<string, { label: string; color: string }> = {
+  AUTONOMO:         { label: '🏪 Comércio/Giro',    color: 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40' },
+  CLT:              { label: '🏢 CLT',               color: 'bg-blue-500/20 text-blue-300 border border-blue-500/40' },
+  GARANTIA:         { label: '🔒 Garantia',          color: 'bg-green-500/20 text-green-300 border border-green-500/40' },
+  GARANTIA_VEICULO: { label: '🚗 Garantia Veículo',  color: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' },
+  LIMPA_NOME:       { label: '✨ Limpa Nome',        color: 'bg-purple-500/20 text-purple-300 border border-purple-500/40' },
+  MOTO:             { label: '🏍️ Moto',              color: 'bg-orange-500/20 text-orange-300 border border-orange-500/40' },
+  INVESTIDOR:       { label: '📈 Investidor',        color: 'bg-pink-500/20 text-pink-300 border border-pink-500/40' },
+};
+
+// Filtros de modalidade
+const MODALITY_FILTERS = [
+  { value: 'ALL',       label: 'Todas' },
+  { value: 'AUTONOMO',  label: '🏪 Comércio' },
+  { value: 'CLT',       label: '🏢 CLT' },
+  { value: 'GARANTIA',  label: '🔒 Garantia' },
+  { value: 'LIMPA_NOME',label: '✨ Limpa Nome' },
+  { value: 'MOTO',      label: '🏍️ Moto' },
+  { value: 'INVESTIDOR',label: '📈 Investidor' },
+];
+
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
 
@@ -77,6 +110,7 @@ export const Contracts: React.FC = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
+  const [modalityFilter, setModalityFilter] = useState('ALL');
 
   // Detail modal
   const [selected, setSelected] = useState<Contract | null>(null);
@@ -95,6 +129,13 @@ export const Contracts: React.FC = () => {
   const [registering, setRegistering] = useState(false);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
+  // Comprovantes pendentes (AWAITING_CONFIRMATION)
+  const [pendingProofs, setPendingProofs] = useState<PendingProof[]>([]);
+  const [loadingProofs, setLoadingProofs] = useState(false);
+  const [proofPreview, setProofPreview] = useState<PendingProof | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [processingProof, setProcessingProof] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     const data = await apiService.getAdminLoans({
@@ -106,10 +147,66 @@ export const Contracts: React.FC = () => {
     setLoading(false);
   }, [statusFilter, typeFilter, search]);
 
+  const loadPendingProofs = useCallback(async () => {
+    setLoadingProofs(true);
+    try {
+      const data = await apiService.getPendingProofs();
+      setPendingProofs(data);
+    } catch {
+      // silently fail
+    } finally {
+      setLoadingProofs(false);
+    }
+  }, []);
+
+  const handleConfirmProof = async (proof: PendingProof) => {
+    setProcessingProof(true);
+    try {
+      await apiService.confirmProof(proof.loanId, proof.installmentId);
+      addToast('Pagamento confirmado com sucesso!', 'success');
+      setProofPreview(null);
+      loadPendingProofs();
+      load();
+    } catch (err: any) {
+      addToast(err.message || 'Erro ao confirmar', 'error');
+    } finally {
+      setProcessingProof(false);
+    }
+  };
+
+  const handleRejectProof = async (proof: PendingProof) => {
+    setProcessingProof(true);
+    try {
+      await apiService.rejectProof(proof.loanId, proof.installmentId, rejectReason || undefined);
+      addToast('Comprovante rejeitado.', 'info');
+      setProofPreview(null);
+      setRejectReason('');
+      loadPendingProofs();
+    } catch (err: any) {
+      addToast(err.message || 'Erro ao rejeitar', 'error');
+    } finally {
+      setProcessingProof(false);
+    }
+  };
+
+  // Filtro de modalidade aplicado no frontend (profileType vem do loanRequest)
+  const filteredContracts = useMemo(() => {
+    if (modalityFilter === 'ALL') return contracts;
+    return contracts.filter(c => {
+      const pt = c.loanRequest?.profileType;
+      if (modalityFilter === 'GARANTIA') return pt === 'GARANTIA' || pt === 'GARANTIA_VEICULO';
+      return pt === modalityFilter;
+    });
+  }, [contracts, modalityFilter]);
+
   useEffect(() => {
     const t = setTimeout(load, 300);
     return () => clearTimeout(t);
   }, [load]);
+
+  useEffect(() => {
+    loadPendingProofs();
+  }, [loadPendingProofs]);
 
   const openDetails = async (c: Contract) => {
     const details = await apiService.getAdminLoanDetails(c.id);
@@ -206,10 +303,12 @@ export const Contracts: React.FC = () => {
     }
   };
 
-  const getContractType = (c: Contract) => {
-    if (c.isService) return 'Limpa Nome';
-    if (c.isInvestment) return 'Investidor';
-    return 'Empréstimo';
+  const getProfileBadge = (c: Contract) => {
+    const pt = c.loanRequest?.profileType;
+    if (pt && PROFILE_BADGE[pt]) return PROFILE_BADGE[pt];
+    if (c.isService) return PROFILE_BADGE['LIMPA_NOME'];
+    if (c.isInvestment) return PROFILE_BADGE['INVESTIDOR'];
+    return { label: '💼 Empréstimo', color: 'bg-zinc-700/60 text-zinc-300 border border-zinc-600/40' };
   };
 
   const paidCount = (c: Contract) => (c.installments ?? []).filter(i => i.status === 'PAID').length;
@@ -222,7 +321,10 @@ export const Contracts: React.FC = () => {
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <FileText className="text-[#D4AF37]" /> Contratos
           </h1>
-          <p className="text-zinc-400 text-sm mt-1">{contracts.length} contrato(s) encontrado(s)</p>
+          <p className="text-zinc-400 text-sm mt-1">
+            {filteredContracts.length} contrato(s) exibido(s)
+            {modalityFilter !== 'ALL' && <span className="ml-1 text-yellow-400">· filtrando por {MODALITY_FILTERS.find(f => f.value === modalityFilter)?.label}</span>}
+          </p>
         </div>
         <button onClick={load} className="flex items-center gap-2 text-zinc-400 hover:text-white text-sm">
           <RefreshCw size={16} /> Atualizar
@@ -267,26 +369,109 @@ export const Contracts: React.FC = () => {
         </div>
       </div>
 
+      {/* Filtro de Modalidade — linha separada com destaque */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="flex items-center gap-1 text-xs text-zinc-500 shrink-0">
+          <Filter size={12} /> Modalidade:
+        </span>
+        {MODALITY_FILTERS.map(f => (
+          <button
+            key={f.value}
+            onClick={() => setModalityFilter(f.value)}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+              modalityFilter === f.value
+                ? 'bg-[#D4AF37] text-black shadow-md shadow-yellow-500/20'
+                : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-600'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+        {modalityFilter !== 'ALL' && (
+          <span className="text-xs text-zinc-500 ml-2">
+            {filteredContracts.length} contrato(s)
+          </span>
+        )}
+      </div>
+
+      {/* ===== SEÇÃO: Comprovantes Aguardando Validação ===== */}
+      {(loadingProofs || pendingProofs.length > 0) && (
+        <div className="bg-amber-950/20 border border-amber-700/40 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-amber-400 flex items-center gap-2">
+              <Hourglass size={18} />
+              Comprovantes Aguardando Validação
+              {pendingProofs.length > 0 && (
+                <span className="bg-amber-500 text-black text-xs font-black px-2 py-0.5 rounded-full">{pendingProofs.length}</span>
+              )}
+            </h2>
+            <button onClick={loadPendingProofs} className="text-zinc-500 hover:text-white text-xs flex items-center gap-1">
+              <RefreshCw size={12} /> Atualizar
+            </button>
+          </div>
+
+          {loadingProofs ? (
+            <p className="text-zinc-500 text-sm">Carregando...</p>
+          ) : (
+            <div className="space-y-2">
+              {pendingProofs.map(proof => (
+                <div key={proof.installmentId} className="bg-zinc-950 border border-amber-700/30 rounded-lg p-3 flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-white text-sm">{proof.customer?.name || '—'}</p>
+                    <p className="text-xs text-zinc-500">{proof.customer?.cpf} · {proof.customer?.phone}</p>
+                    <p className="text-xs text-zinc-400 mt-1">
+                      Parcela de <span className="text-amber-400 font-bold">{fmt(proof.amount)}</span>
+                      · Vence {fmtDate(proof.dueDate)}
+                      · Enviado {fmtDate(proof.submittedAt)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {proof.proofUrl && (
+                      <a href={proof.proofUrl} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1 px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs text-zinc-300 transition-colors">
+                        <Image size={12} /> Ver
+                      </a>
+                    )}
+                    <button
+                      onClick={() => { setProofPreview(proof); setRejectReason(''); }}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-amber-900/40 hover:bg-amber-900/70 border border-amber-600/40 rounded-lg text-xs text-amber-300 font-bold transition-colors"
+                    >
+                      Analisar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Table */}
       {loading ? (
         <div className="text-center py-12 text-zinc-500">Carregando...</div>
-      ) : contracts.length === 0 ? (
-        <div className="text-center py-12 text-zinc-500">Nenhum contrato encontrado</div>
+      ) : filteredContracts.length === 0 ? (
+        <div className="text-center py-12 text-zinc-500">
+          {modalityFilter !== 'ALL' ? `Nenhum contrato de ${MODALITY_FILTERS.find(f => f.value === modalityFilter)?.label} encontrado` : 'Nenhum contrato encontrado'}
+        </div>
       ) : (
         <div className="space-y-2">
-          {contracts.map(c => {
+          {filteredContracts.map(c => {
             const status = STATUS_LABELS[c.status] || { label: c.status, color: 'bg-zinc-700 text-zinc-300' };
             const paid = paidCount(c);
             const total = c.totalInstallments || c.installmentsCount;
+            const profileBadge = getProfileBadge(c);
             return (
-              <div key={c.id} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition-colors">
+              <div key={c.id} className={`bg-zinc-950 border rounded-xl p-4 hover:border-zinc-600 transition-colors ${c.loanRequest?.profileType === 'AUTONOMO' ? 'border-yellow-800/40 hover:border-yellow-700/60' : 'border-zinc-800'}`}>
                 <div className="flex flex-col md:flex-row md:items-center gap-3">
                   {/* Cliente */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-bold text-white truncate">{c.customer?.name || '—'}</p>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${status.color}`}>{status.label}</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">{getContractType(c)}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${profileBadge.color}`}>{profileBadge.label}</span>
+                      {c.paymentFrequency === 'DAILY' && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-900/30 text-yellow-400 border border-yellow-600/30 font-semibold">⚡ Diário</span>
+                      )}
                     </div>
                     <p className="text-xs text-zinc-500 mt-0.5">{c.customer?.cpf} · {c.customer?.phone}</p>
                   </div>
@@ -423,6 +608,16 @@ export const Contracts: React.FC = () => {
                         <div className="flex items-center gap-2">
                           {inst.status === 'PAID' ? (
                             <CheckCircle size={16} className="text-green-400" />
+                          ) : inst.status === 'AWAITING_CONFIRMATION' ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-amber-400 flex items-center gap-1"><Hourglass size={12} /> Aguardando</span>
+                              {inst.proofUrl && (
+                                <a href={inst.proofUrl} target="_blank" rel="noopener noreferrer"
+                                  className="text-xs text-zinc-400 hover:text-white underline flex items-center gap-1">
+                                  <ExternalLink size={10} /> Comprovante
+                                </a>
+                              )}
+                            </div>
                           ) : (
                             <button
                               onClick={() => { setDetailsOpen(false); openPayment(selected, inst); }}
@@ -492,6 +687,80 @@ export const Contracts: React.FC = () => {
                 <Button onClick={handleSaveEdit} disabled={saving} className="flex-1">
                   <Save size={16} /> {saving ? 'Salvando...' : 'Salvar'}
                 </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL ANALISAR COMPROVANTE ===== */}
+      {proofPreview && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-950 border border-amber-700/40 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-zinc-800">
+              <h2 className="font-bold text-lg flex items-center gap-2 text-amber-400">
+                <Hourglass size={18} /> Validar Comprovante
+              </h2>
+              <button onClick={() => setProofPreview(null)} className="text-zinc-400 hover:text-white"><X size={20} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Cliente */}
+              <div className="bg-zinc-900 p-3 rounded-lg">
+                <p className="text-xs text-zinc-500">Cliente</p>
+                <p className="font-bold text-white">{proofPreview.customer?.name || '—'}</p>
+                <p className="text-sm text-zinc-400">{proofPreview.customer?.cpf} · {proofPreview.customer?.phone}</p>
+                <p className="text-sm text-amber-400 font-bold mt-1">Parcela de {fmt(proofPreview.amount)} — Vence {fmtDate(proofPreview.dueDate)}</p>
+              </div>
+
+              {/* Preview da imagem */}
+              {proofPreview.proofUrl ? (
+                proofPreview.proofUrl.startsWith('data:image') || proofPreview.proofUrl.match(/\.(jpg|jpeg|png|gif|webp)/i) ? (
+                  <div className="rounded-xl overflow-hidden border border-zinc-700">
+                    <img src={proofPreview.proofUrl} alt="Comprovante" className="w-full max-h-80 object-contain bg-black" />
+                  </div>
+                ) : (
+                  <a href={proofPreview.proofUrl} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-3 bg-zinc-900 border border-zinc-700 rounded-lg p-4 hover:border-zinc-500 transition-colors">
+                    <FileText size={32} className="text-red-400 shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold text-white">Abrir Comprovante</p>
+                      <p className="text-xs text-zinc-500">Clique para visualizar o arquivo</p>
+                    </div>
+                    <ExternalLink size={16} className="text-zinc-500 ml-auto" />
+                  </a>
+                )
+              ) : (
+                <p className="text-zinc-500 text-sm text-center py-4">Sem comprovante anexado</p>
+              )}
+
+              {/* Campo para motivo de rejeição */}
+              <div>
+                <label className="block text-sm font-bold mb-1 text-zinc-300">Motivo da Rejeição (opcional)</label>
+                <input
+                  type="text"
+                  value={rejectReason}
+                  onChange={e => setRejectReason(e.target.value)}
+                  className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white focus:border-red-500 outline-none text-sm"
+                  placeholder="Ex: Imagem ilegível, valor incorreto..."
+                />
+              </div>
+
+              {/* Botões */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  onClick={() => handleRejectProof(proofPreview)}
+                  disabled={processingProof}
+                  className="flex items-center justify-center gap-2 py-3 rounded-xl bg-red-900/30 border border-red-700/50 hover:border-red-500 text-red-400 font-bold text-sm transition-all disabled:opacity-50"
+                >
+                  <XCircle size={18} /> {processingProof ? '...' : 'Rejeitar'}
+                </button>
+                <button
+                  onClick={() => handleConfirmProof(proofPreview)}
+                  disabled={processingProof}
+                  className="flex items-center justify-center gap-2 py-3 rounded-xl bg-green-900/30 border border-green-700/50 hover:border-green-500 text-green-400 font-bold text-sm transition-all disabled:opacity-50"
+                >
+                  <CheckCircle2 size={18} /> {processingProof ? '...' : 'Confirmar Pago'}
+                </button>
               </div>
             </div>
           </div>

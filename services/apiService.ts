@@ -93,6 +93,18 @@ function normalizeEmail(email: string): string {
 
 export const apiService = {
 
+    // ============= GENERIC METHODS =============
+    async get(endpoint: string) {
+        const { data, error } = await api.get(endpoint);
+        if (error) throw new Error(error.error || 'Erro na requisição');
+        return data;
+    },
+    async put(endpoint: string, body: any) {
+        const { data, error } = await api.put(endpoint, body);
+        if (error) throw new Error(error.error || 'Erro na requisição');
+        return data;
+    },
+
     // ============= SYSTEM =============
 
     async resetSystem() {
@@ -343,6 +355,16 @@ export const apiService = {
             uploadedData.accountHolder = uploadedData.accountHolderName;
         }
 
+        // AUTONOMO: sincronizar dias de pagamento com campo persistido no backend
+        if (uploadedData.profileType === 'AUTONOMO') {
+            const paymentDaysRaw = uploadedData.companyPaymentDay ?? uploadedData.autonomoPaymentDays ?? uploadedData.installments;
+            const paymentDays = parseInt(String(paymentDaysRaw ?? '').trim(), 10);
+            if (Number.isFinite(paymentDays) && paymentDays > 0) {
+                uploadedData.companyPaymentDay = paymentDays;
+                uploadedData.installments = paymentDays;
+            }
+        }
+
         // 2. Campos de documentos (arquivo)
         const docFieldMap: Record<string, string> = {
             selfie: 'selfieUrl',
@@ -479,8 +501,8 @@ export const apiService = {
         return data;
     },
 
-    async approveWithCounteroffer(id: string, approvedAmount: number, interestRate?: number) {
-        const { data, error } = await api.put(`/loan-requests/${id}/approve-with-counteroffer`, { approvedAmount, interestRate });
+    async approveWithCounteroffer(id: string, approvedAmount: number, interestRate?: number, billingType?: string, installments?: number) {
+        const { data, error } = await api.put(`/loan-requests/${id}/approve-with-counteroffer`, { approvedAmount, interestRate, billingType, installments });
         if (error) throw new Error(error.error || 'Erro ao aprovar com contraproposta');
         return data;
     },
@@ -509,8 +531,13 @@ export const apiService = {
         return data;
     },
 
-    async updateLoanRequestValues(id: string, amount: number, installments: number) {
-        const { data, error } = await api.put(`/loan-requests/${id}/values`, { amount, installments });
+    async updateLoanRequestValues(id: string, amount: number, installments: number, companyPaymentDay?: number) {
+        const payload: any = { amount, installments };
+        if (typeof companyPaymentDay === 'number' && Number.isFinite(companyPaymentDay) && companyPaymentDay > 0) {
+            payload.companyPaymentDay = companyPaymentDay;
+        }
+
+        const { data, error } = await api.put(`/loan-requests/${id}/values`, payload);
         if (error) throw new Error(error.error || 'Erro ao atualizar valores');
         return data;
     },
@@ -604,6 +631,24 @@ export const apiService = {
     async registerManualPayment(loanId: string, payload: any) {
         const { data, error } = await api.post(`/loans/${loanId}/manual-payment`, payload);
         if (error) throw new Error(error.error || 'Erro ao registrar pagamento');
+        return data;
+    },
+
+    async getPendingProofs() {
+        const { data, error } = await api.get('/loans/admin/pending-proofs');
+        if (error) return [];
+        return data || [];
+    },
+
+    async confirmProof(loanId: string, installmentId: string) {
+        const { data, error } = await api.post(`/loans/${loanId}/installments/${installmentId}/confirm-proof`, {});
+        if (error) throw new Error(error.error || 'Erro ao confirmar pagamento');
+        return data;
+    },
+
+    async rejectProof(loanId: string, installmentId: string, reason?: string) {
+        const { data, error } = await api.post(`/loans/${loanId}/installments/${installmentId}/reject-proof`, { reason });
+        if (error) throw new Error(error.error || 'Erro ao rejeitar comprovante');
         return data;
     },
 

@@ -73,6 +73,7 @@ export interface LoanRequest {
   // Campos AUTONOMO
   autonomoCnpj?: string;
   autonomoBusinessAddress?: string;
+  companyPaymentDay?: number;
 
   // Localização GPS
   locationLatitude?: number;
