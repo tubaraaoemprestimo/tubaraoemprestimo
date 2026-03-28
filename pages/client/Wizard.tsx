@@ -3643,6 +3643,18 @@ export const Wizard: React.FC = () => {
                       <p className="text-xs text-zinc-400">Ao assinar, declaro que li e concordo com todas as condições do financiamento próprio, incluindo busca e apreensão em caso de inadimplência e transferência somente após a 36ª prestação.</p>
                     </div>
 
+                    {/* DECLARAÇÃO DE VERACIDADE - OBRIGATÓRIA */}
+                    <label className="flex items-start gap-3 p-4 bg-yellow-900/20 border-2 border-yellow-600/50 rounded-xl cursor-pointer hover:border-[#D4AF37] transition-all">
+                      <input type="checkbox" checked={formData.declarationAccepted} onChange={(e) => setFormData({ ...formData, declarationAccepted: e.target.checked })}
+                        className="w-6 h-6 mt-0.5 accent-yellow-500 shrink-0" />
+                      <div>
+                        <span className="text-white font-bold text-sm">📜 DECLARAÇÃO DE VERACIDADE</span>
+                        <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                          Declaro que <strong className="text-white">TODAS</strong> as informações fornecidas neste formulário são <strong className="text-white">verdadeiras e corretas</strong>, incluindo dados pessoais, profissionais e documentos. Estou ciente de que a <strong className="text-red-400">falsidade ideológica</strong> configura crime previsto no Art. 299 do Código Penal.
+                        </p>
+                      </div>
+                    </label>
+
                     <div className="space-y-2">
                       <h3 className="font-bold text-[#D4AF37]">Sua Assinatura (OBRIGATÓRIO)</h3>
                       <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-3">
