@@ -1744,10 +1744,19 @@ loanRequestsRouter.put('/:id/reject', requireAdmin, async (req: Request, res: Re
 // PUT /api/loan-requests/:id/values — Atualizar valores
 loanRequestsRouter.put('/:id/values', requireAdmin, async (req: Request, res: Response) => {
     try {
-        const { amount, installments } = req.body;
+        const { amount, installments, companyPaymentDay } = req.body;
+        const dataToUpdate: any = { amount, installments };
+
+        if (companyPaymentDay !== undefined) {
+            const parsedCompanyPaymentDay = parseInt(String(companyPaymentDay), 10);
+            dataToUpdate.companyPaymentDay = Number.isFinite(parsedCompanyPaymentDay) && parsedCompanyPaymentDay > 0
+                ? parsedCompanyPaymentDay
+                : null;
+        }
+
         await prisma.loanRequest.update({
             where: { id: req.params.id as string },
-            data: { amount, installments }
+            data: dataToUpdate
         });
         res.json({ success: true });
     } catch (error) {

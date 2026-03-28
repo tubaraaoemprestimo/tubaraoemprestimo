@@ -69,6 +69,7 @@ export const Requests: React.FC = () => {
     const [approvedInterestRate, setApprovedInterestRate] = useState('');
     const [approvedBillingType, setApprovedBillingType] = useState<'DAILY' | 'MONTHLY'>('MONTHLY');
     const [approvedInstallments, setApprovedInstallments] = useState('');
+    const [approvedCompanyPaymentDay, setApprovedCompanyPaymentDay] = useState('');
 
     // Contract Activation Modal (FASE 2)
     const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
@@ -304,7 +305,9 @@ export const Requests: React.FC = () => {
         setApprovedBillingType(billingType);
         // Preencher número de parcelas (do request ou padrão)
         const installments = selectedRequest.installments ? selectedRequest.installments.toString() : '';
-        setApprovedInstallments(installments);
+        const companyPaymentDays = selectedRequest.companyPaymentDay ? selectedRequest.companyPaymentDay.toString() : installments;
+        setApprovedInstallments(selectedRequest.profileType === 'AUTONOMO' ? companyPaymentDays : installments);
+        setApprovedCompanyPaymentDay(companyPaymentDays);
         setIsApprovalModalOpen(true);
     };
 
@@ -317,17 +320,42 @@ export const Requests: React.FC = () => {
             return;
         }
 
+        const isAutonomo = selectedRequest.profileType === 'AUTONOMO';
+
+        const normalizedInstallments = approvedInstallments ? parseInt(approvedInstallments, 10) : undefined;
+        if (normalizedInstallments !== undefined && (!Number.isFinite(normalizedInstallments) || normalizedInstallments <= 0)) {
+            addToast('Número de parcelas inválido', 'error');
+            return;
+        }
+
+        const normalizedCompanyPaymentDay = approvedCompanyPaymentDay ? parseInt(approvedCompanyPaymentDay, 10) : undefined;
+        if (isAutonomo && (!normalizedCompanyPaymentDay || !Number.isFinite(normalizedCompanyPaymentDay) || normalizedCompanyPaymentDay < 1 || normalizedCompanyPaymentDay > 180)) {
+            addToast('Dias de pagamento inválidos (1 a 180)', 'error');
+            return;
+        }
+
+        const finalInstallments = isAutonomo
+            ? normalizedCompanyPaymentDay
+            : normalizedInstallments;
+
         setProcessing(selectedRequest.id);
         try {
             const rate = approvedInterestRate ? parseFloat(approvedInterestRate) : undefined;
-            const installments = approvedInstallments ? parseInt(approvedInstallments) : undefined;
-            await apiService.approveWithCounteroffer(selectedRequest.id, amount, rate, approvedBillingType, installments);
+            await apiService.approveWithCounteroffer(selectedRequest.id, amount, rate, approvedBillingType, finalInstallments);
+
+            await apiService.updateLoanRequestValues(
+                selectedRequest.id,
+                amount,
+                finalInstallments || selectedRequest.installments,
+                isAutonomo ? normalizedCompanyPaymentDay : undefined
+            );
 
             setProcessing(null);
             setIsApprovalModalOpen(false);
             setApprovedAmount('');
             setApprovedInterestRate('');
             setApprovedInstallments('');
+            setApprovedCompanyPaymentDay('');
             setSelectedRequest(null);
             loadRequests();
             addToast("Contraproposta enviada ao cliente!", 'success');
@@ -1016,16 +1044,36 @@ export const Requests: React.FC = () => {
                                         <Button size="sm" variant="danger" onClick={() => setIsEditing(false)}>Cancelar</Button>
                                         <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={async () => {
                                             const amtNum = parseFloat(editAmount);
-                                            const instNum = parseInt(editInstallments);
+                                            const instNum = parseInt(editInstallments, 10);
+
                                             if (isNaN(amtNum) || amtNum <= 0) {
                                                 addToast('Valor inválido', 'error');
                                                 return;
                                             }
+
+                                            if (selectedRequest.profileType === 'AUTONOMO' && (!Number.isFinite(instNum) || instNum < 1 || instNum > 180)) {
+                                                addToast('Para Comércio, informe dias entre 1 e 180', 'error');
+                                                return;
+                                            }
+
                                             setProcessing('saving');
-                                            const success = await apiService.updateLoanRequestValues(selectedRequest.id, amtNum, instNum || 0);
+                                            const companyPaymentDay = selectedRequest.profileType === 'AUTONOMO' && Number.isFinite(instNum) && instNum > 0
+                                                ? instNum
+                                                : undefined;
+                                            const success = await apiService.updateLoanRequestValues(
+                                                selectedRequest.id,
+                                                amtNum,
+                                                instNum || 0,
+                                                companyPaymentDay
+                                            );
                                             if (success) {
                                                 addToast('Proposta atualizada!', 'success');
-                                                setSelectedRequest({ ...selectedRequest, amount: amtNum, installments: instNum || 0 });
+                                                setSelectedRequest({
+                                                    ...selectedRequest,
+                                                    amount: amtNum,
+                                                    installments: instNum || 0,
+                                                    companyPaymentDay: companyPaymentDay ?? selectedRequest.companyPaymentDay,
+                                                });
                                                 setIsEditing(false);
                                                 loadRequests();
                                             } else {
@@ -2373,7 +2421,12 @@ export const Requests: React.FC = () => {
                                 type="number"
                                 min="1"
                                 value={approvedInstallments}
-                                onChange={(e) => setApprovedInstallments(e.target.value)}
+                                onChange={(e) => {
+                                    setApprovedInstallments(e.target.value);
+                                    if (selectedRequest.profileType === 'AUTONOMO') {
+                                        setApprovedCompanyPaymentDay(e.target.value);
+                                    }
+                                }}
                                 className="w-full bg-black border border-zinc-700 rounded-xl p-3 md:p-4 text-white text-xl md:text-2xl font-bold focus:border-[#D4AF37] outline-none"
                                 placeholder="Ex: 12"
                             />
@@ -2382,41 +2435,28 @@ export const Requests: React.FC = () => {
                             </p>
                         </div>
 
-                        {/* Frequência de Pagamento */}
-                        <div className="mb-4 md:mb-6">
-                            <label className="block text-sm font-bold text-white mb-2">
-                                📅 Frequência de Pagamento
-                            </label>
-                            <select
-                                value={approvedBillingType}
-                                onChange={(e) => setApprovedBillingType(e.target.value as 'DAILY' | 'MONTHLY')}
-                                className="w-full bg-black border border-zinc-700 rounded-xl p-3 md:p-4 text-white focus:border-[#D4AF37] outline-none"
-                            >
-                                <option value="MONTHLY">Mensal (CLT, Garantia, Moto, Limpa Nome)</option>
-                                <option value="DAILY">Diária (Comércio/Autônomo)</option>
-                            </select>
-                            <p className="text-xs text-zinc-500 mt-2">
-                                Define como as parcelas serão geradas. Diária gera uma parcela por dia útil (seg–sáb).
-                            </p>
-                        </div>
-
-                        {/* Número de Parcelas */}
-                        <div className="mb-4 md:mb-6">
-                            <label className="block text-sm font-bold text-white mb-2">
-                                🔢 Número de Parcelas
-                            </label>
-                            <input
-                                type="number"
-                                min="1"
-                                value={approvedInstallments}
-                                onChange={(e) => setApprovedInstallments(e.target.value)}
-                                className="w-full bg-black border border-zinc-700 rounded-xl p-3 md:p-4 text-white text-xl md:text-2xl font-bold focus:border-[#D4AF37] outline-none"
-                                placeholder="Ex: 12"
-                            />
-                            <p className="text-xs text-zinc-500 mt-2">
-                                Quantidade total de parcelas/diárias. Pode diferir da solicitação original.
-                            </p>
-                        </div>
+                        {selectedRequest.profileType === 'AUTONOMO' && (
+                            <div className="mb-4 md:mb-6">
+                                <label className="block text-sm font-bold text-white mb-2">
+                                    🗓️ Dias para pagar (Comércio)
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="180"
+                                    value={approvedCompanyPaymentDay}
+                                    onChange={(e) => {
+                                        setApprovedCompanyPaymentDay(e.target.value);
+                                        setApprovedInstallments(e.target.value);
+                                    }}
+                                    className="w-full bg-black border border-zinc-700 rounded-xl p-3 md:p-4 text-white text-xl md:text-2xl font-bold focus:border-[#D4AF37] outline-none"
+                                    placeholder="Ex: 30"
+                                />
+                                <p className="text-xs text-zinc-500 mt-2">
+                                    O admin pode definir em quantas diárias o cliente vai pagar (1 a 180).
+                                </p>
+                            </div>
+                        )}
 
                         {/* Preview da Contraproposta */}
                         {approvedAmount && parseFloat(approvedAmount) > 0 && (

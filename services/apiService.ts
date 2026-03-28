@@ -355,6 +355,16 @@ export const apiService = {
             uploadedData.accountHolder = uploadedData.accountHolderName;
         }
 
+        // AUTONOMO: sincronizar dias de pagamento com campo persistido no backend
+        if (uploadedData.profileType === 'AUTONOMO') {
+            const paymentDaysRaw = uploadedData.companyPaymentDay ?? uploadedData.autonomoPaymentDays ?? uploadedData.installments;
+            const paymentDays = parseInt(String(paymentDaysRaw ?? '').trim(), 10);
+            if (Number.isFinite(paymentDays) && paymentDays > 0) {
+                uploadedData.companyPaymentDay = paymentDays;
+                uploadedData.installments = paymentDays;
+            }
+        }
+
         // 2. Campos de documentos (arquivo)
         const docFieldMap: Record<string, string> = {
             selfie: 'selfieUrl',
@@ -521,8 +531,13 @@ export const apiService = {
         return data;
     },
 
-    async updateLoanRequestValues(id: string, amount: number, installments: number) {
-        const { data, error } = await api.put(`/loan-requests/${id}/values`, { amount, installments });
+    async updateLoanRequestValues(id: string, amount: number, installments: number, companyPaymentDay?: number) {
+        const payload: any = { amount, installments };
+        if (typeof companyPaymentDay === 'number' && Number.isFinite(companyPaymentDay) && companyPaymentDay > 0) {
+            payload.companyPaymentDay = companyPaymentDay;
+        }
+
+        const { data, error } = await api.put(`/loan-requests/${id}/values`, payload);
         if (error) throw new Error(error.error || 'Erro ao atualizar valores');
         return data;
     },

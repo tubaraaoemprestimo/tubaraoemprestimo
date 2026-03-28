@@ -329,6 +329,7 @@ export const Wizard: React.FC = () => {
     // Declaração de veracidade
     declarationAccepted: false,
     commerceTermsAccepted: false,
+    autonomoPaymentDays: '30',
     hasMoreThan3MonthsClt: null as boolean | null,
     // GARANTIA asset fields
     assetDescription: '',
@@ -438,9 +439,23 @@ export const Wizard: React.FC = () => {
     return loanSettingsService.calculateTotal(getAmount(), settings.interestRateMonthly);
   };
 
+  const getAutonomoPaymentDays = () => {
+    const parsedDays = parseInt(String(formData.autonomoPaymentDays || '').trim(), 10);
+    if (Number.isFinite(parsedDays) && parsedDays > 0) return parsedDays;
+    return 30;
+  };
+
+  const getInstallments = () => {
+    if (!settings) return 0;
+    if (profileType === 'AUTONOMO') {
+      return getAutonomoPaymentDays();
+    }
+    return settings.defaultInstallments;
+  };
+
   const calculateInstallment = () => {
     if (!settings) return 0;
-    return loanSettingsService.calculateInstallment(getAmount(), settings.defaultInstallments, settings.interestRateMonthly);
+    return loanSettingsService.calculateInstallment(getAmount(), getInstallments(), settings.interestRateMonthly);
   };
 
   // Validação CPF
@@ -789,9 +804,16 @@ export const Wizard: React.FC = () => {
         }
       }
 
-      if (profileType === 'AUTONOMO' && !formData.commerceTermsAccepted) {
-        addToast("Você precisa declarar ciência das condições do Empréstimo para Comércio.", 'warning');
-        return;
+      if (profileType === 'AUTONOMO') {
+        const parsedDays = parseInt(String(formData.autonomoPaymentDays || '').trim(), 10);
+        if (!Number.isFinite(parsedDays) || parsedDays < 1 || parsedDays > 180) {
+          addToast("Informe em quantos dias você vai pagar (1 a 180).", 'warning');
+          return;
+        }
+        if (!formData.commerceTermsAccepted) {
+          addToast("Você precisa declarar ciência das condições do Empréstimo para Comércio.", 'warning');
+          return;
+        }
       }
 
       // Prepare GARANTIA asset fields from first collateral item if applicable
@@ -1530,7 +1552,8 @@ export const Wizard: React.FC = () => {
 
         // Valores por tipo de serviço
         amount: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 21996 : getAmount(),
-        installments: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 36 : settings.defaultInstallments,
+        installments: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 36 : getInstallments(),
+        companyPaymentDay: profileType === 'AUTONOMO' ? getAutonomoPaymentDays() : undefined,
         totalAmount: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 29396 : calculateTotal(),
         installmentValue: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 611 : calculateInstallment(),
         interestRate: profileType === 'LIMPA_NOME' ? 0 : profileType === 'MOTO' ? 0 : settings.interestRateMonthly,
@@ -1574,7 +1597,7 @@ export const Wizard: React.FC = () => {
               phone: formData.phone,
               email: formData.email,
               amount: profileType === 'MOTO' ? 21996 : getAmount(),
-              installments: profileType === 'MOTO' ? 36 : settings.defaultInstallments,
+              installments: profileType === 'MOTO' ? 36 : getInstallments(),
               installmentValue: profileType === 'MOTO' ? 611 : calculateInstallment(),
               interestRate: profileType === 'MOTO' ? 0 : settings.interestRateMonthly,
               totalAmount: profileType === 'MOTO' ? 29396 : calculateTotal(),
@@ -2708,11 +2731,28 @@ export const Wizard: React.FC = () => {
                     <ul className="text-sm text-zinc-300 space-y-2">
                       <li>• <strong>Finalidade:</strong> Capital de giro para comércio</li>
                       <li>• <strong>Modalidade:</strong> Pagamento diário</li>
-                      <li>• <strong>Prazo:</strong> 30 (trinta) diárias</li>
+                      <li>• <strong>Prazo:</strong> {getAutonomoPaymentDays()} diárias</li>
                       <li>• <strong>Juros:</strong> 30% ao mês</li>
                       <li>• <strong>Dias de cobrança:</strong> Segunda a Sábado (feriados inclusos)</li>
                       <li>• <strong className="text-yellow-400">Domingos:</strong> Sem cobrança diária</li>
                     </ul>
+                  </div>
+
+                  <div className="bg-zinc-950 border border-[#D4AF37]/40 rounded-xl p-4">
+                    <label className="block text-sm font-bold text-[#D4AF37] mb-2">
+                      Em quantos dias você vai pagar? *
+                    </label>
+                    <input
+                      type="number"
+                      name="autonomoPaymentDays"
+                      min="1"
+                      max="180"
+                      value={formData.autonomoPaymentDays}
+                      onChange={handleChange}
+                      className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white text-lg font-bold focus:border-[#D4AF37] outline-none"
+                      placeholder="Ex: 30"
+                    />
+                    <p className="text-xs text-zinc-500 mt-2">Informe de 1 a 180 dias. Esse prazo ficará visível para análise do admin.</p>
                   </div>
 
                   <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4">
@@ -2752,7 +2792,7 @@ export const Wizard: React.FC = () => {
                     <div>
                       <span className="text-white font-bold">☑️ Declaro que li e compreendi</span>
                       <p className="text-xs text-zinc-400 mt-1">
-                        As condições do Empréstimo para Comerciante (Capital de Giro), incluindo análise do comércio, pagamento em <strong>30 diárias</strong>, juros de <strong className="text-red-400">30% ao mês</strong>, cobrança de segunda a sábado (feriados inclusos), sem cobrança aos domingos, e que em caso de inadimplência o domingo será contado para juros e multa de <strong className="text-red-400">R$ 20,00 por dia</strong> de atraso, de forma cumulativa.
+                        As condições do Empréstimo para Comerciante (Capital de Giro), incluindo análise do comércio, pagamento em <strong>{getAutonomoPaymentDays()} diárias</strong>, juros de <strong className="text-red-400">30% ao mês</strong>, cobrança de segunda a sábado (feriados inclusos), sem cobrança aos domingos, e que em caso de inadimplência o domingo será contado para juros e multa de <strong className="text-red-400">R$ 20,00 por dia</strong> de atraso, de forma cumulativa.
                       </p>
                     </div>
                   </label>
