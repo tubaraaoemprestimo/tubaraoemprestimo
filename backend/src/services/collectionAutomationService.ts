@@ -1,6 +1,16 @@
 import { prisma } from './prisma';
 import { templateService } from './templateService';
 
+/** Busca a chave PIX configurada pelo admin no banco */
+async function getAdminPixKey(): Promise<string> {
+  try {
+    const setting = await prisma.systemSetting.findFirst({ where: { key: 'pixKey' } });
+    return setting?.value || process.env.PIX_KEY || '57.241.795/0001-47';
+  } catch {
+    return process.env.PIX_KEY || '57.241.795/0001-47';
+  }
+}
+
 /**
  * Serviço de Automação de Réguas de Cobrança
  * Dispara automaticamente lembretes e cobranças via Email, WhatsApp e Notificações
@@ -59,7 +69,7 @@ async function processDueIn7Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'PENDING'
+      status: 'OPEN'
     },
     include: {
       loan: {
@@ -89,7 +99,7 @@ async function processDueIn7Days(): Promise<number> {
           nome: customer.name,
           valor: formatCurrency(installment.amount),
           data_vencimento: formatDate(installment.dueDate),
-          pix_key: process.env.PIX_KEY || 'pix@tubarao.com'
+          pix_key: await getAdminPixKey()
         }
       );
 
@@ -120,7 +130,7 @@ async function processDueIn3Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'PENDING'
+      status: 'OPEN'
     },
     include: {
       loan: {
@@ -150,7 +160,7 @@ async function processDueIn3Days(): Promise<number> {
           nome: customer.name,
           valor: formatCurrency(installment.amount),
           data_vencimento: formatDate(installment.dueDate),
-          pix_key: process.env.PIX_KEY || 'pix@tubarao.com'
+          pix_key: await getAdminPixKey()
         }
       );
 
@@ -180,7 +190,7 @@ async function processDueToday(): Promise<number> {
         gte: today,
         lt: tomorrow
       },
-      status: 'PENDING'
+      status: 'OPEN'
     },
     include: {
       loan: {
@@ -210,7 +220,7 @@ async function processDueToday(): Promise<number> {
           nome: customer.name,
           valor: formatCurrency(installment.amount),
           data_vencimento: formatDate(installment.dueDate),
-          pix_key: process.env.PIX_KEY || 'pix@tubarao.com'
+          pix_key: await getAdminPixKey()
         }
       );
 
@@ -241,7 +251,7 @@ async function processOverdue1Day(): Promise<number> {
         gte: yesterday,
         lt: today
       },
-      status: 'PENDING'
+      status: 'OPEN'
     },
     include: {
       loan: {
@@ -271,7 +281,7 @@ async function processOverdue1Day(): Promise<number> {
           nome: customer.name,
           valor: formatCurrency(installment.amount),
           data_vencimento: formatDate(installment.dueDate),
-          pix_key: process.env.PIX_KEY || 'pix@tubarao.com'
+          pix_key: await getAdminPixKey()
         }
       );
 
@@ -302,7 +312,7 @@ async function processOverdue3Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'PENDING'
+      status: 'OPEN'
     },
     include: {
       loan: {
@@ -332,7 +342,7 @@ async function processOverdue3Days(): Promise<number> {
           nome: customer.name,
           valor: formatCurrency(installment.amount),
           data_vencimento: formatDate(installment.dueDate),
-          pix_key: process.env.PIX_KEY || 'pix@tubarao.com'
+          pix_key: await getAdminPixKey()
         }
       );
 
@@ -363,7 +373,7 @@ async function processOverdue7Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'PENDING'
+      status: 'OPEN'
     },
     include: {
       loan: {
@@ -396,7 +406,7 @@ async function processOverdue7Days(): Promise<number> {
           dias_atraso: daysOverdue.toString(),
           valor: formatCurrency(installment.amount),
           valor_com_juros: formatCurrency(overdueAmount),
-          pix_key: process.env.PIX_KEY || 'pix@tubarao.com',
+          pix_key: await getAdminPixKey(),
           telefone_suporte: process.env.SUPPORT_PHONE || '(11) 99999-9999'
         }
       );
@@ -428,7 +438,7 @@ async function processOverdue15Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'PENDING'
+      status: 'OPEN'
     },
     include: {
       loan: {
@@ -459,7 +469,7 @@ async function processOverdue15Days(): Promise<number> {
           nome: customer.name,
           valor: formatCurrency(installment.amount),
           valor_com_juros: formatCurrency(overdueAmount),
-          pix_key: process.env.PIX_KEY || 'pix@tubarao.com',
+          pix_key: await getAdminPixKey(),
           telefone_suporte: process.env.SUPPORT_PHONE || '(11) 99999-9999'
         }
       );
@@ -491,7 +501,7 @@ async function processOverdue30Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'PENDING'
+      status: 'OPEN'
     },
     include: {
       loan: {
@@ -522,7 +532,7 @@ async function processOverdue30Days(): Promise<number> {
           nome: customer.name,
           valor: formatCurrency(installment.amount),
           valor_com_juros: formatCurrency(overdueAmount),
-          pix_key: process.env.PIX_KEY || 'pix@tubarao.com',
+          pix_key: await getAdminPixKey(),
           telefone_suporte: process.env.SUPPORT_PHONE || '(11) 99999-9999'
         }
       );
@@ -558,6 +568,9 @@ export async function runCollectionAutomation(): Promise<CollectionStats> {
   };
 
   try {
+    // 0. MULTA CUMULATIVA R$20/dia — atualiza saldo devedor ANTES dos disparos
+    await applyDailyLateFees();
+
     // Lembretes de vencimento
     stats.dueIn7Days = await processDueIn7Days();
     stats.dueIn3Days = await processDueIn3Days();
@@ -597,3 +610,75 @@ export async function runCollectionAutomation(): Promise<CollectionStats> {
 export const collectionAutomationService = {
   runCollectionAutomation
 };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MULTA CUMULATIVA R$20/DIA — Atualiza saldo devedor das parcelas em atraso
+// Roda diariamente pelo cron ANTES dos disparos de notificação
+// Regra do Domingo: multa acumula em dias CORRIDOS (inclusive domingo)
+// ══════════════════════════════════════════════════════════════════════════════
+
+const LATE_FEE_DAILY = 20; // R$20 por dia corrido de atraso
+
+/**
+ * Calcula dias de atraso em dias corridos (inclusive domingos).
+ */
+function calcDaysOverdue(dueDate: Date, today: Date): number {
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+  const ref = new Date(today);
+  ref.setHours(0, 0, 0, 0);
+  if (ref <= due) return 0;
+  return Math.floor((ref.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Atualiza lateFeeAmount e daysOverdue de TODAS as parcelas OPEN vencidas.
+ * Chamado diariamente pelo cron ANTES do envio de notificações.
+ * Retorna quantidade de parcelas atualizadas.
+ */
+export async function applyDailyLateFees(): Promise<number> {
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+
+  // Busca todas parcelas OPEN com vencimento até hoje
+  const overdueInstallments = await prisma.installment.findMany({
+    where: {
+      status: 'OPEN',
+      dueDate: { lte: today },
+    },
+    select: {
+      id: true,
+      dueDate: true,
+      amount: true,
+    },
+  });
+
+  console.log(`[CollectionAutomation] 💰 Aplicando multa em ${overdueInstallments.length} parcela(s) em atraso`);
+
+  let updated = 0;
+  const now = new Date();
+
+  for (const inst of overdueInstallments) {
+    const daysOverdue = calcDaysOverdue(inst.dueDate, now);
+    if (daysOverdue === 0) continue;
+
+    const fineAccumulated = +(daysOverdue * LATE_FEE_DAILY).toFixed(2);
+
+    try {
+      await prisma.installment.update({
+        where: { id: inst.id },
+        data: {
+          daysOverdue,
+          lateFeeAmount: fineAccumulated,
+          fineAccumulated,
+        } as any,
+      });
+      updated++;
+    } catch (err) {
+      console.error(`[CollectionAutomation] Erro ao atualizar multa parcela ${inst.id}:`, err);
+    }
+  }
+
+  console.log(`[CollectionAutomation] ✅ Multa aplicada em ${updated} parcela(s). R$ ${LATE_FEE_DAILY}/dia`);
+  return updated;
+}

@@ -20,7 +20,7 @@ paymentReceiptsRouter.post('/', async (req: Request, res: Response) => {
 
         const installment = await prisma.installment.findUnique({
             where: { id: installmentId },
-            include: { loans: { include: { customers: true } } }
+            include: { loan: { include: { customer: true } } }
         });
 
         if (!installment) {
@@ -28,7 +28,7 @@ paymentReceiptsRouter.post('/', async (req: Request, res: Response) => {
             return;
         }
 
-        const customer = installment.loans?.customers;
+        const customer = installment.loan?.customer;
         if (!customer) {
             res.status(404).json({ error: 'Cliente não encontrado' });
             return;
@@ -130,7 +130,7 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
         // Atualizar remainingAmount do loan
         const loan = await prisma.loan.findUnique({
             where: { id: installment.loanId },
-            include: { installments: true, customers: true }
+            include: { installments: true, customer: true }
         });
 
         if (loan) {

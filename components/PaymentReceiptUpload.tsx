@@ -100,14 +100,10 @@ export const PaymentReceiptUpload: React.FC<PaymentReceiptUploadProps> = ({
             // O componente original fazia insert na tabela 'payment_receipts'.
             // Vamos assumir que existe ou criar POST /finance/receipts.
 
-            const { error: dbError } = await api.post('/finance/receipts', {
+            const { error: dbError } = await api.post('/payment-receipts', {
                 installmentId,
-                loanId,
-                customerId,
-                customerName,
                 amount,
                 receiptUrl,
-                receiptType: file.type.startsWith('image/') ? 'IMAGE' : 'PDF'
             });
 
             if (dbError) {
