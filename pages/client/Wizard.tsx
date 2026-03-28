@@ -806,8 +806,8 @@ export const Wizard: React.FC = () => {
 
       if (profileType === 'AUTONOMO') {
         const parsedDays = parseInt(String(formData.autonomoPaymentDays || '').trim(), 10);
-        if (!Number.isFinite(parsedDays) || parsedDays < 1 || parsedDays > 180) {
-          addToast("Informe em quantos dias você vai pagar (1 a 180).", 'warning');
+        if (parsedDays !== 20 && parsedDays !== 30) {
+          addToast("Selecione o prazo de pagamento: 20 ou 30 dias.", 'warning');
           return;
         }
         if (!formData.commerceTermsAccepted) {
@@ -2738,22 +2738,83 @@ export const Wizard: React.FC = () => {
                     </ul>
                   </div>
 
-                  <div className="bg-zinc-950 border border-[#D4AF37]/40 rounded-xl p-4">
-                    <label className="block text-sm font-bold text-[#D4AF37] mb-2">
-                      Em quantos dias você vai pagar? *
-                    </label>
-                    <input
-                      type="number"
-                      name="autonomoPaymentDays"
-                      min="1"
-                      max="180"
-                      value={formData.autonomoPaymentDays}
-                      onChange={handleChange}
-                      className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white text-lg font-bold focus:border-[#D4AF37] outline-none"
-                      placeholder="Ex: 30"
-                    />
-                    <p className="text-xs text-zinc-500 mt-2">Informe de 1 a 180 dias. Esse prazo ficará visível para análise do admin.</p>
-                  </div>
+                  {/* Seleção de prazo — botões fixos 20 / 30 dias com preview da diária */}
+                  {(() => {
+                    const valorBase = customAmount ? parseFloat(customAmount) : selectedAmount;
+                    const validValor = (!valorBase || isNaN(valorBase)) ? 0 : valorBase;
+                    const taxaMensal = (Number(settings?.interestRateMonthly) || 30) / 100;
+                    const juros = validValor * taxaMensal;
+                    const totalComJuros = validValor + juros;
+                    const diasSelecionados = parseInt(formData.autonomoPaymentDays || '30', 10) || 30;
+                    const diaria = diasSelecionados > 0 && validValor > 0 ? totalComJuros / diasSelecionados : 0;
+                    const fmtR = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    return (
+                      <div className="bg-zinc-950 border-2 border-[#D4AF37]/50 rounded-2xl p-5 space-y-4">
+                        <label className="block text-sm font-bold text-[#D4AF37]">
+                          🗓️ Em quantos dias você vai quitar? *
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[20, 30].map(dias => {
+                            const diariaDias = validValor > 0 ? totalComJuros / dias : 0;
+                            const selecionado = diasSelecionados === dias;
+                            return (
+                              <button
+                                key={dias}
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, autonomoPaymentDays: String(dias) }))}
+                                className={`relative p-4 rounded-xl border-2 text-left transition-all ${
+                                  selecionado
+                                    ? 'border-[#D4AF37] bg-[#D4AF37]/10 shadow-lg shadow-yellow-500/10'
+                                    : 'border-zinc-700 bg-zinc-900 hover:border-zinc-500'
+                                }`}
+                              >
+                                {selecionado && (
+                                  <span className="absolute top-2 right-2 w-5 h-5 bg-[#D4AF37] rounded-full flex items-center justify-center text-black text-xs font-black">✓</span>
+                                )}
+                                <p className="text-2xl font-black text-white">{dias} dias</p>
+                                <p className="text-xs text-zinc-400 mt-0.5">diárias</p>
+                                {validValor > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-zinc-700">
+                                    <p className="text-xs text-zinc-500">Valor da diária</p>
+                                    <p className={`text-lg font-black ${selecionado ? 'text-[#D4AF37]' : 'text-zinc-300'}`}>
+                                      R$ {fmtR(diariaDias)}
+                                    </p>
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {/* Resumo em tempo real */}
+                        {validValor > 0 && (
+                          <div className="bg-black rounded-xl p-4 border border-zinc-800 space-y-2">
+                            <p className="text-xs text-zinc-500 uppercase tracking-wider font-bold">Resumo do seu plano</p>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              <div>
+                                <p className="text-zinc-500 text-xs">Capital</p>
+                                <p className="font-bold text-white">R$ {fmtR(validValor)}</p>
+                              </div>
+                              <div>
+                                <p className="text-zinc-500 text-xs">Juros ({(taxaMensal * 100).toFixed(0)}% mês)</p>
+                                <p className="font-bold text-orange-400">R$ {fmtR(juros)}</p>
+                              </div>
+                              <div>
+                                <p className="text-zinc-500 text-xs">Total a pagar</p>
+                                <p className="font-bold text-yellow-400">R$ {fmtR(totalComJuros)}</p>
+                              </div>
+                              <div>
+                                <p className="text-zinc-500 text-xs">Diária ({diasSelecionados} dias)</p>
+                                <p className="font-black text-[#D4AF37] text-base">R$ {fmtR(diaria)}</p>
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-zinc-600 pt-1">
+                              = (R$ {fmtR(validValor)} + R$ {fmtR(juros)}) ÷ {diasSelecionados} dias
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <div className="bg-red-900/20 border border-red-600/30 rounded-xl p-4">
                     <h3 className="font-bold text-red-400 mb-3">🚨 MULTA E JUROS POR ATRASO</h3>

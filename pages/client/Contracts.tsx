@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Calendar, DollarSign, CheckCircle2, Clock, AlertCircle, QrCode, FileText, TrendingUp, X, Banknote, CreditCard, Copy, Mail, Loader2, Info } from 'lucide-react';
+import { ChevronLeft, Calendar, DollarSign, CheckCircle2, Clock, AlertCircle, QrCode, FileText, TrendingUp, X, Banknote, CreditCard, Copy, Mail, Loader2, Info, Hourglass } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { PixModal } from '../../components/PixModal';
 import { ReceiptModal } from '../../components/ReceiptModal';
@@ -220,7 +220,7 @@ export const Contracts: React.FC = () => {
                         <h3 className="font-bold text-lg mb-4 pl-2 text-white">Cobranças</h3>
                         <div className="space-y-3">
                            {selectedLoan.installments.map((inst, idx) => (
-                              <div key={inst.id} className={`bg-zinc-900 border rounded-2xl p-5 flex items-center justify-between group hover:border-[#D4AF37]/30 transition-colors ${inst.status === 'LATE' ? 'border-red-800/50' : 'border-zinc-800'}`}>
+                              <div key={inst.id} className={`bg-zinc-900 border rounded-2xl p-5 flex items-center justify-between group hover:border-[#D4AF37]/30 transition-colors ${inst.status === 'LATE' ? 'border-red-800/50' : inst.status === 'AWAITING_CONFIRMATION' ? 'border-amber-700/50 bg-amber-900/5' : 'border-zinc-800'}`}>
                                  <div className="flex items-center gap-4">
                                     <div className={`w-10 h-10 rounded-full border flex items-center justify-center font-bold text-sm ${inst.status === 'LATE' ? 'bg-red-900/20 border-red-800 text-red-400' : 'bg-black border-zinc-800 text-zinc-500'}`}>
                                        {idx + 1}
@@ -257,18 +257,23 @@ export const Contracts: React.FC = () => {
                                              <FileText size={10} /> Comprovante
                                           </button>
                                        </div>
+                                    ) : inst.status === 'AWAITING_CONFIRMATION' ? (
+                                       <div className="flex flex-col items-end gap-2">
+                                          <span className="text-amber-400 flex items-center gap-1 text-xs font-bold"><Hourglass size={14} /> Aguardando</span>
+                                          <span className="text-zinc-500 text-[10px] text-right">Comprovante enviado<br/>aguardando validação</span>
+                                       </div>
                                     ) : inst.status === 'LATE' ? (
                                        <div className="flex flex-col items-end gap-2">
                                           <span className="text-red-500 flex items-center gap-1 text-xs font-bold"><AlertCircle size={14} /> Atrasado</span>
                                           <Button size="sm" variant="danger" onClick={() => handlePay(inst)} className="h-8 text-xs">
-                                             Pagar R$ {getInstallmentAmount(inst).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                             Enviar Comprovante
                                           </Button>
                                        </div>
                                     ) : (
                                        <div className="flex flex-col items-end gap-2">
                                           <span className="text-yellow-500 flex items-center gap-1 text-xs font-bold"><Clock size={14} /> Aberto</span>
                                           <Button size="sm" variant="primary" onClick={() => handlePay(inst)} className="h-8 text-xs bg-shark">
-                                             <QrCode size={14} className="mr-1" /> Pagar
+                                             <QrCode size={14} className="mr-1" /> Enviar PIX
                                           </Button>
                                        </div>
                                     )}

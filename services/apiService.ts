@@ -634,6 +634,24 @@ export const apiService = {
         return data;
     },
 
+    async getPendingProofs() {
+        const { data, error } = await api.get('/loans/admin/pending-proofs');
+        if (error) return [];
+        return data || [];
+    },
+
+    async confirmProof(loanId: string, installmentId: string) {
+        const { data, error } = await api.post(`/loans/${loanId}/installments/${installmentId}/confirm-proof`, {});
+        if (error) throw new Error(error.error || 'Erro ao confirmar pagamento');
+        return data;
+    },
+
+    async rejectProof(loanId: string, installmentId: string, reason?: string) {
+        const { data, error } = await api.post(`/loans/${loanId}/installments/${installmentId}/reject-proof`, { reason });
+        if (error) throw new Error(error.error || 'Erro ao rejeitar comprovante');
+        return data;
+    },
+
     async getTodaySummary() {
         const { data, error } = await api.get('/finance/today-summary');
         if (error) return null;
