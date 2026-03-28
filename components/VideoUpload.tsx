@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Video, Trash2, Upload, CheckCircle, Camera, Loader2, Square, AlertCircle } from 'lucide-react';
+import { apiService } from '../services/apiService';
 
 interface VideoUploadProps {
   label: string;
@@ -25,8 +26,15 @@ const hasMediaRecorderSupport = (): boolean => {
   return typeof MediaRecorder !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function';
 };
 
+// Faz upload do File diretamente para o R2 via apiService e retorna a URL pública
+const uploadVideoFile = async (file: File): Promise<string> => {
+  const url = await apiService.uploadFile('documents', `video/${file.name}`, file);
+  return url || '';
+};
+
 export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRemove, videoUrl, subtitle }) => {
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -67,6 +75,24 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
     });
   };
 
+  // Upload imediato de um File para o R2, chama onUpload com URL final
+  const uploadAndNotify = async (file: File) => {
+    setUploading(true);
+    try {
+      const remoteUrl = await uploadVideoFile(file);
+      if (remoteUrl) {
+        onUpload(remoteUrl);
+      } else {
+        alert('Falha ao enviar o vídeo para o servidor. Verifique sua conexão e tente novamente.');
+      }
+    } catch (err) {
+      console.error('Erro no upload do vídeo:', err);
+      alert('Erro ao enviar o vídeo. Tente novamente.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   // Upload de arquivo da galeria
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -90,8 +116,8 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
         return;
       }
 
-      const url = URL.createObjectURL(file);
-      onUpload(url);
+      // Upload imediato — não guardar blob URL
+      await uploadAndNotify(file);
     } catch {
       alert('Erro ao processar o vídeo.');
     }
@@ -117,8 +143,8 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
         return;
       }
 
-      const url = URL.createObjectURL(file);
-      onUpload(url);
+      // Upload imediato — não guardar blob URL
+      await uploadAndNotify(file);
     } catch {
       alert('Erro ao processar o vídeo.');
     }
@@ -234,13 +260,15 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
       stopAndCleanup();
     };
 
-    mediaRecorder.onstop = () => {
+    mediaRecorder.onstop = async () => {
       if (chunksRef.current.length > 0) {
         const finalMimeType = mediaRecorder.mimeType || mimeType || 'video/webm';
         const blob = new Blob(chunksRef.current, { type: finalMimeType });
         if (blob.size > 0) {
-          const url = URL.createObjectURL(blob);
-          onUpload(url);
+          const ext = finalMimeType.includes('mp4') ? 'mp4' : 'webm';
+          const file = new File([blob], `video_selfie_${Date.now()}.${ext}`, { type: finalMimeType });
+          // Upload imediato — não salvar blob URL
+          await uploadAndNotify(file);
         } else {
           alert('Vídeo vazio. Tente gravar novamente.');
         }
@@ -342,6 +370,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
   };
 
   const canUseInBrowserRecording = hasMediaRecorderSupport() && !isIOS();
+  const isProcessing = loading || uploading;
 
   return (
     <div className="space-y-2">
@@ -367,6 +396,14 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
         </div>
       )}
 
+      {/* Status de upload em progresso */}
+      {uploading && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-900/20 border border-blue-800 text-blue-300 text-sm">
+          <Loader2 size={16} className="animate-spin flex-shrink-0" />
+          Enviando vídeo para o servidor... Aguarde.
+        </div>
+      )}
+
       {/* Input oculto para captura nativa (iOS e fallback) */}
       <input
         type="file"
@@ -378,7 +415,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
       />
 
       {videoUrl ? (
-        // Video Preview
+        // Video Preview — só mostra se for URL http (já no R2)
         <div className="relative rounded-xl overflow-hidden border border-green-700/50 bg-black aspect-video">
           <video
             src={videoUrl}
@@ -418,6 +455,11 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
                     <span className="text-green-400 ml-1">✓</span>
                   )}
                 </span>
+              </>
+            ) : uploading ? (
+              <>
+                <Loader2 size={14} className="text-blue-400 animate-spin flex-shrink-0" />
+                <span className="text-white text-sm">Enviando vídeo...</span>
               </>
             ) : cameraReady ? (
               <>
@@ -495,19 +537,19 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
             />
             <label
               htmlFor={inputId}
-              className={`flex items-center justify-center gap-3 w-full p-4 rounded-xl border-2 border-dashed cursor-pointer transition-all ${loading
+              className={`flex items-center justify-center gap-3 w-full p-4 rounded-xl border-2 border-dashed cursor-pointer transition-all ${isProcessing
                 ? 'border-zinc-700 bg-zinc-900 opacity-50'
                 : 'border-[#D4AF37] bg-zinc-900/50 hover:bg-zinc-800'
                 }`}
             >
-              {loading ? (
+              {isProcessing ? (
                 <Loader2 size={24} className="text-[#D4AF37] animate-spin" />
               ) : (
                 <Upload size={24} className="text-[#D4AF37]" />
               )}
               <div className="text-left">
                 <span className="block text-sm font-bold text-white">
-                  {loading ? "Processando..." : "Enviar Vídeo da Galeria"}
+                  {uploading ? "Enviando para o servidor..." : loading ? "Processando..." : "Enviar Vídeo da Galeria"}
                 </span>
                 <span className="text-xs text-zinc-500">Mínimo: {MIN_RECORDING_TIME} segundos</span>
               </div>
@@ -517,7 +559,8 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
           {/* Record button */}
           <button
             onClick={handleStartRecorder}
-            className="flex items-center justify-center gap-3 w-full p-4 rounded-xl border border-zinc-700 bg-black hover:bg-zinc-900 transition-all cursor-pointer group"
+            disabled={isProcessing}
+            className="flex items-center justify-center gap-3 w-full p-4 rounded-xl border border-zinc-700 bg-black hover:bg-zinc-900 transition-all cursor-pointer group disabled:opacity-50"
           >
             <div className="p-2 bg-zinc-800 rounded-full text-white group-hover:bg-red-600 transition-colors">
               <Camera size={20} />

@@ -1250,7 +1250,8 @@ export const Wizard: React.FC = () => {
 
       if (!file) {
         console.error('Falha ao converter URL para file');
-        return dataUrl;
+        // Nunca retornar blob: URL — seria salva inválida no banco
+        return '';
       }
 
       const filePath = `loan_documents/${formData.cpf.replace(/\D/g, '')}/${file.name}`;
