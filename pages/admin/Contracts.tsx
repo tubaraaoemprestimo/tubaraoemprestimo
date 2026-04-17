@@ -129,6 +129,10 @@ export const Contracts: React.FC = () => {
   const [registering, setRegistering] = useState(false);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
+  // P1: Baixa Manual e Quitação Total
+  const [processingBaixa, setProcessingBaixa] = useState<Set<string>>(new Set());
+  const [settlingAll, setSettlingAll] = useState(false);
+
   // Comprovantes pendentes (AWAITING_CONFIRMATION)
   const [pendingProofs, setPendingProofs] = useState<PendingProof[]>([]);
   const [loadingProofs, setLoadingProofs] = useState(false);
@@ -300,6 +304,60 @@ export const Contracts: React.FC = () => {
       addToast(err.message || 'Erro ao registrar', 'error');
     } finally {
       setRegistering(false);
+    }
+  };
+
+
+  // P1: Handler para Baixa Manual (marca parcela como PAID diretamente)
+  const handleManualMarkPaid = async (inst: ContractInstallment) => {
+    if (!selected) return;
+    if (!window.confirm(`Confirmar baixa manual da parcela ${fmt(inst.amount)}?`)) return;
+    
+    setProcessingBaixa(prev => new Set(prev).add(inst.id));
+    try {
+      await apiService.registerManualPayment(selected.id, {
+        installmentId: inst.id,
+        amount: inst.amount,
+        paymentMethod: 'MANUAL',
+        notes: 'Baixa manual pelo admin'
+      });
+      addToast('Parcela marcada como paga!', 'success');
+      const updated = await apiService.getAdminLoanDetails(selected.id);
+      setSelected(updated);
+      load();
+    } catch (err: any) {
+      addToast(err.message || 'Erro ao dar baixa', 'error');
+    } finally {
+      setProcessingBaixa(prev => {
+        const next = new Set(prev);
+        next.delete(inst.id);
+        return next;
+      });
+    }
+  };
+
+  // P1: Handler para Quitação Total (marca TODAS as parcelas pendentes como PAID)
+  const handleSettleAll = async () => {
+    if (!selected) return;
+    const pending = selected.installments.filter(i => i.status === 'OPEN' || i.status === 'LATE' || i.status === 'AWAITING_CONFIRMATION');
+    if (pending.length === 0) {
+      addToast('Não há parcelas pendentes para quitar', 'info');
+      return;
+    }
+    
+    const totalPending = pending.reduce((sum, i) => sum + i.amount, 0);
+    if (!window.confirm(`Confirmar quitação total de ${pending.length} parcela(s) no valor de ${fmt(totalPending)}?`)) return;
+    
+    setSettlingAll(true);
+    try {
+      await apiService.settleAllInstallments(selected.id);
+      addToast('Contrato quitado com sucesso!', 'success');
+      setDetailsOpen(false);
+      load();
+    } catch (err: any) {
+      addToast(err.message || 'Erro ao quitar contrato', 'error');
+    } finally {
+      setSettlingAll(false);
     }
   };
 
@@ -619,12 +677,21 @@ export const Contracts: React.FC = () => {
                               )}
                             </div>
                           ) : (
-                            <button
-                              onClick={() => { setDetailsOpen(false); openPayment(selected, inst); }}
-                              className="text-xs bg-[#D4AF37] text-black px-3 py-1 rounded-lg font-bold hover:bg-yellow-500 transition-colors"
-                            >
-                              Registrar
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleManualMarkPaid(inst)}
+                                disabled={processingBaixa.has(inst.id)}
+                                className="text-xs bg-green-600 text-white px-3 py-1 rounded-lg font-bold hover:bg-green-700 transition-colors disabled:opacity-50"
+                              >
+                                {processingBaixa.has(inst.id) ? '...' : 'Baixa ✓'}
+                              </button>
+                              <button
+                                onClick={() => { setDetailsOpen(false); openPayment(selected, inst); }}
+                                className="text-xs bg-[#D4AF37] text-black px-3 py-1 rounded-lg font-bold hover:bg-yellow-500 transition-colors"
+                              >
+                                Registrar
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -635,6 +702,15 @@ export const Contracts: React.FC = () => {
 
               <div className="flex gap-3 pt-2">
                 <Button variant="secondary" onClick={() => setDetailsOpen(false)} className="flex-1">Fechar</Button>
+                {selected.installments.some(i => i.status === 'OPEN' || i.status === 'LATE' || i.status === 'AWAITING_CONFIRMATION') && (
+                  <Button 
+                    onClick={handleSettleAll} 
+                    disabled={settlingAll}
+                    className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {settlingAll ? 'Quitando...' : 'Quitação Total 🏁'}
+                  </Button>
+                )}
                 <Button onClick={() => { setDetailsOpen(false); openEdit(selected); }} className="flex-1">
                   <Edit2 size={16} /> Editar Contrato
                 </Button>

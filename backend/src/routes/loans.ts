@@ -140,6 +140,76 @@ loansRouter.post('/:loanId/manual-payment', requireAdmin, async (req: Request, r
     }
 });
 
+// POST /api/loans/:loanId/settle-all — Quitação total (admin)
+loansRouter.post('/:loanId/settle-all', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const { loanId } = req.params;
+
+        const loan = await prisma.loan.findUnique({
+            where: { id: loanId },
+            include: { customer: true, installments: true }
+        });
+        if (!loan) { res.status(404).json({ error: 'Contrato não encontrado' }); return; }
+
+        const pendingInstallments = loan.installments.filter(
+            i => i.status === 'OPEN' || i.status === 'LATE' || i.status === 'AWAITING_CONFIRMATION'
+        );
+
+        if (pendingInstallments.length === 0) {
+            res.status(400).json({ error: 'Não há parcelas pendentes para quitar' });
+            return;
+        }
+
+        const now = new Date();
+        const totalPaid = pendingInstallments.reduce((sum, i) => sum + i.amount, 0);
+
+        // Marcar todas as parcelas pendentes como PAID
+        await prisma.installment.updateMany({
+            where: { id: { in: pendingInstallments.map(i => i.id) } },
+            data: { status: 'PAID', paidAt: now }
+        });
+
+        // Atualizar loan: remainingAmount = 0, status = COMPLETED
+        await prisma.loan.update({
+            where: { id: loanId },
+            data: {
+                remainingAmount: 0,
+                lastPaymentDate: now,
+                status: 'COMPLETED',
+                daysOverdue: 0
+            }
+        });
+
+        // Criar transação de quitação
+        await prisma.transaction.create({
+            data: {
+                type: 'IN',
+                description: `Quitação total — ${loan.customer?.name || String(loanId).substring(0, 8)} (${pendingInstallments.length} parcelas)`,
+                amount: totalPaid,
+                category: 'PAYMENT',
+                date: now
+            }
+        });
+
+        // Notificar cliente via WhatsApp
+        if (loan.customer?.phone) {
+            try {
+                await sendWhatsAppMessage(
+                    loan.customer.phone,
+                    `✅ *Contrato Quitado!*\n\nOlá ${loan.customer.name}, seu contrato foi totalmente quitado.\n\nObrigado por confiar na Tubarão Empréstimos! 🦈`
+                );
+            } catch {
+                // falha no WhatsApp não deve bloquear a quitação
+            }
+        }
+
+        res.json({ success: true, installmentsSettled: pendingInstallments.length, totalPaid });
+    } catch (err) {
+        console.error('[Loans] settle-all error:', err);
+        res.status(500).json({ error: 'Erro ao quitar contrato' });
+    }
+});
+
 // GET /api/loans — Empréstimos do cliente ou todos (admin)
 loansRouter.get('/', async (req: Request, res: Response) => {
     try {

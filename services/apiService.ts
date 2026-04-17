@@ -634,6 +634,12 @@ export const apiService = {
         return data;
     },
 
+    async settleAllInstallments(loanId: string) {
+        const { data, error } = await api.post(`/loans/${loanId}/settle-all`, {});
+        if (error) throw new Error(error.error || 'Erro ao quitar contrato');
+        return data;
+    },
+
     async getPendingProofs() {
         const { data, error } = await api.get('/loans/admin/pending-proofs');
         if (error) return [];
