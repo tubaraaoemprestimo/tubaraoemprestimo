@@ -70,12 +70,14 @@ export const Requests: React.FC = () => {
     const [approvedBillingType, setApprovedBillingType] = useState<'DAILY' | 'MONTHLY'>('MONTHLY');
     const [approvedInstallments, setApprovedInstallments] = useState('');
     const [approvedCompanyPaymentDay, setApprovedCompanyPaymentDay] = useState('');
+    const [fixedInstallmentAmount, setFixedInstallmentAmount] = useState('');
 
     // Contract Activation Modal (FASE 2)
     const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
     const [contractData, setContractData] = useState({
         principalAmount: '',
         dailyInstallmentAmount: '',
+        fixedInstallmentAmount: '',
         totalInstallments: '',
         firstPaymentDate: '',
         pixReceiptUrl: '',
@@ -441,6 +443,7 @@ export const Requests: React.FC = () => {
             const payload = {
                 principalAmount: parseFloat(contractData.principalAmount),
                 dailyInstallmentAmount: contractData.dailyInstallmentAmount ? parseFloat(contractData.dailyInstallmentAmount) : null,
+                fixedInstallmentAmount: contractData.fixedInstallmentAmount ? parseFloat(contractData.fixedInstallmentAmount) : null,
                 totalInstallments: parseInt(contractData.totalInstallments),
                 firstPaymentDate: contractData.firstPaymentDate,
                 pixReceiptUrl: contractData.pixReceiptUrl,
@@ -472,6 +475,7 @@ export const Requests: React.FC = () => {
             setContractData({
                 principalAmount: '',
                 dailyInstallmentAmount: '',
+                fixedInstallmentAmount: '',
                 totalInstallments: '',
                 firstPaymentDate: '',
                 pixReceiptUrl: '',
@@ -2435,6 +2439,25 @@ export const Requests: React.FC = () => {
                             </p>
                         </div>
 
+                        {/* Valor Fixo da Parcela (Opcional) */}
+                        <div className="mb-4 md:mb-6">
+                            <label className="block text-sm font-bold text-white mb-2">
+                                💰 Valor Fixo da Parcela (Opcional)
+                            </label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={fixedInstallmentAmount}
+                                onChange={(e) => setFixedInstallmentAmount(e.target.value)}
+                                className="w-full bg-black border border-zinc-700 rounded-xl p-3 md:p-4 text-white text-xl md:text-2xl font-bold focus:border-[#D4AF37] outline-none"
+                                placeholder="Ex: 616.00"
+                            />
+                            <p className="text-xs text-zinc-500 mt-2">
+                                Se preenchido, todas as parcelas terão este valor fixo (ignora cálculo de juros). Útil para financiamento de moto.
+                            </p>
+                        </div>
+
                         {selectedRequest.profileType === 'AUTONOMO' && (
                             <div className="mb-4 md:mb-6">
                                 <label className="block text-sm font-bold text-white mb-2">
@@ -2578,6 +2601,24 @@ export const Requests: React.FC = () => {
                                     className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
                                     placeholder="Ex: 30"
                                 />
+                            </div>
+
+                            {/* Valor Fixo da Parcela (Opcional) */}
+                            <div>
+                                <label className="block text-sm font-bold text-white mb-2">
+                                    💰 Valor Fixo da Parcela (Opcional)
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={contractData.fixedInstallmentAmount}
+                                    onChange={(e) => setContractData(prev => ({ ...prev, fixedInstallmentAmount: e.target.value }))}
+                                    className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                                    placeholder="Ex: 616.00"
+                                />
+                                <p className="text-xs text-zinc-500 mt-1">
+                                    Se preenchido, todas as parcelas terão este valor fixo (ignora cálculo de juros). Útil para financiamento de moto.
+                                </p>
                             </div>
 
                             {/* Data do Primeiro Pagamento */}

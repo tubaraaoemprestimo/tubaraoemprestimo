@@ -590,8 +590,10 @@ loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: R
                 }
             });
 
-            // Gera parcelas
-            const installmentAmount = request.amount / request.installments;
+            // Gera parcelas (com juros se houver)
+            const interestRate = request.monthlyRate || 0;
+            const totalWithInterest = interestRate > 0 ? request.amount * (1 + interestRate) : request.amount;
+            const installmentAmount = totalWithInterest / request.installments;
             const installments = [];
             for (let i = 1; i <= request.installments; i++) {
                 const dueDate = new Date();
@@ -944,6 +946,7 @@ loanRequestsRouter.post('/:id/activate-contract', requireAdmin, async (req: Requ
         const {
             principalAmount,
             dailyInstallmentAmount,
+            fixedInstallmentAmount,
             totalInstallments,
             firstPaymentDate,
             pixReceiptUrl,
@@ -1069,10 +1072,17 @@ loanRequestsRouter.post('/:id/activate-contract', requireAdmin, async (req: Requ
             data: { nextPaymentDate: nextPayment }
         });
 
-        // Gerar parcelas
-        const installmentAmount = dailyInstallmentAmount
-            ? parseFloat(dailyInstallmentAmount)
-            : parseFloat(principalAmount) / parseInt(totalInstallments);
+        // Gerar parcelas (prioridade: fixedInstallmentAmount > dailyInstallmentAmount > cálculo com juros)
+        let installmentAmount: number;
+        if (fixedInstallmentAmount) {
+            installmentAmount = parseFloat(fixedInstallmentAmount);
+        } else if (dailyInstallmentAmount) {
+            installmentAmount = parseFloat(dailyInstallmentAmount);
+        } else {
+            const rate = interestRate ? parseFloat(interestRate) : 0;
+            const totalWithInterest = rate > 0 ? parseFloat(principalAmount) * (1 + rate) : parseFloat(principalAmount);
+            installmentAmount = totalWithInterest / parseInt(totalInstallments);
+        }
 
         const installments = [];
         for (let i = 1; i <= parseInt(totalInstallments); i++) {
@@ -1447,8 +1457,10 @@ loanRequestsRouter.put('/:id/accept-counteroffer', async (req: Request, res: Res
                 }
             });
 
-            // Gerar parcelas
-            const installmentAmount = updatedRequest.approvedAmount / updatedRequest.installments;
+            // Gerar parcelas (com juros se houver)
+            const interestRate = updatedRequest.monthlyRate || 0;
+            const totalWithInterest = interestRate > 0 ? updatedRequest.approvedAmount * (1 + interestRate) : updatedRequest.approvedAmount;
+            const installmentAmount = totalWithInterest / updatedRequest.installments;
             const installments = [];
             for (let i = 1; i <= updatedRequest.installments; i++) {
                 const dueDate = new Date();

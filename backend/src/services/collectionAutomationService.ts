@@ -69,7 +69,8 @@ async function processDueIn7Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'OPEN'
+      status: 'OPEN',
+      loan: { status: 'ACTIVE' }
     },
     include: {
       loan: {
@@ -130,7 +131,8 @@ async function processDueIn3Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'OPEN'
+      status: 'OPEN',
+      loan: { status: 'ACTIVE' }
     },
     include: {
       loan: {
@@ -190,7 +192,8 @@ async function processDueToday(): Promise<number> {
         gte: today,
         lt: tomorrow
       },
-      status: 'OPEN'
+      status: 'OPEN',
+      loan: { status: 'ACTIVE' }
     },
     include: {
       loan: {
@@ -251,7 +254,8 @@ async function processOverdue1Day(): Promise<number> {
         gte: yesterday,
         lt: today
       },
-      status: 'OPEN'
+      status: 'OPEN',
+      loan: { status: 'ACTIVE' }
     },
     include: {
       loan: {
@@ -312,7 +316,8 @@ async function processOverdue3Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'OPEN'
+      status: 'OPEN',
+      loan: { status: 'ACTIVE' }
     },
     include: {
       loan: {
@@ -373,7 +378,8 @@ async function processOverdue7Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'OPEN'
+      status: 'OPEN',
+      loan: { status: 'ACTIVE' }
     },
     include: {
       loan: {
@@ -438,7 +444,8 @@ async function processOverdue15Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'OPEN'
+      status: 'OPEN',
+      loan: { status: 'ACTIVE' }
     },
     include: {
       loan: {
@@ -501,7 +508,8 @@ async function processOverdue30Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'OPEN'
+      status: 'OPEN',
+      loan: { status: 'ACTIVE' }
     },
     include: {
       loan: {
@@ -644,6 +652,7 @@ export async function applyDailyLateFees(): Promise<number> {
   const overdueInstallments = await prisma.installment.findMany({
     where: {
       status: 'OPEN',
+      loan: { status: 'ACTIVE' },
       dueDate: { lte: today },
     },
     select: {
@@ -671,7 +680,7 @@ export async function applyDailyLateFees(): Promise<number> {
           daysOverdue,
           lateFeeAmount: fineAccumulated,
           fineAccumulated,
-        } as any,
+        },
       });
       updated++;
     } catch (err) {

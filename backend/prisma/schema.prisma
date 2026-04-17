@@ -216,16 +216,19 @@ model GoalsSettings {
 }
 
 model Installment {
-  id        String    @id @default(uuid())
-  loanId    String    @map("loan_id")
-  dueDate   DateTime  @map("due_date")
-  amount    Float
-  status    String    @default("OPEN")
-  pixCode   String?   @map("pix_code")
-  proofUrl  String?   @map("proof_url")
-  paidAt    DateTime? @map("paid_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-  loan      Loan      @relation(fields: [loanId], references: [id])
+  id               String    @id @default(uuid())
+  loanId           String    @map("loan_id")
+  dueDate          DateTime  @map("due_date")
+  amount           Float
+  status           String    @default("OPEN")
+  pixCode          String?   @map("pix_code")
+  proofUrl         String?   @map("proof_url")
+  paidAt           DateTime? @map("paid_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  daysOverdue      Int       @default(0) @map("days_overdue")
+  lateFeeAmount    Float     @default(0) @map("late_fee_amount")
+  fineAccumulated  Float     @default(0) @map("fine_accumulated")
+  loan             Loan      @relation(fields: [loanId], references: [id])
 
   @@map("installments")
 }
