@@ -109,16 +109,20 @@ paymentReceiptsRouter.get('/', async (req: Request, res: Response) => {
             prisma.installment.findMany({ where: { id: { in: installmentIds as string[] } }, select: { id: true, loanId: true, dueDate: true, amount: true } })
         ]);
 
-        const customerMap = new Map(customers.map((c: any) => [c.id, c.name]));
-        const installmentMap = new Map(installments.map((i: any) => [i.id, { loanId: i.loanId, dueDate: i.dueDate, amount: i.amount }]));
+        const customerMap = new Map<string, string>(customers.map((c: any) => [c.id, c.name]));
+        type InstInfo = { loanId: string; dueDate: Date; amount: number };
+        const installmentMap = new Map<string, InstInfo>(installments.map((i: any) => [i.id, { loanId: i.loanId, dueDate: i.dueDate, amount: Number(i.amount) }]));
 
-        const enriched = receipts.map((r: any) => ({
-            ...r,
-            customerName: customerMap.get(r.customerId) || '',
-            loanId: installmentMap.get(r.installmentId)?.loanId || '',
-            installmentDueDate: installmentMap.get(r.installmentId)?.dueDate || null,
-            installmentAmount: installmentMap.get(r.installmentId)?.amount || null
-        }));
+        const enriched = receipts.map((r: any) => {
+            const inst = installmentMap.get(r.installmentId);
+            return {
+                ...r,
+                customerName: customerMap.get(r.customerId) || '',
+                loanId: inst ? inst.loanId : '',
+                installmentDueDate: inst ? inst.dueDate : null,
+                installmentAmount: inst ? inst.amount : null
+            };
+        });
 
         res.json(enriched);
     } catch (error) {
