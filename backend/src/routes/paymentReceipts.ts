@@ -115,15 +115,23 @@ paymentReceiptsRouter.get('/', async (req: Request, res: Response) => {
 
         const enriched = receipts.map((r: any) => {
             const inst = installmentMap.get(r.installmentId);
+            const customerName = customerMap.get(r.customerId) || '';
+
+            // Debug log
+            if (!customerName) {
+                console.log(`[PaymentReceipts] ⚠️ customerName vazio para receipt ${r.id}, customerId: ${r.customerId}`);
+            }
+
             return {
                 ...r,
-                customerName: customerMap.get(r.customerId) || '',
+                customerName,
                 loanId: inst ? inst.loanId : '',
                 installmentDueDate: inst ? inst.dueDate : null,
                 installmentAmount: inst ? inst.amount : null
             };
         });
 
+        console.log(`[PaymentReceipts] GET retornando ${enriched.length} receipts, primeiro customerName: ${enriched[0]?.customerName || 'N/A'}`);
         res.json(enriched);
     } catch (error) {
         res.status(500).json({ error: 'Erro ao buscar comprovantes' });
