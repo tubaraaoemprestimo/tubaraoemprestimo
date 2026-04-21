@@ -1232,7 +1232,7 @@ loanRequestsRouter.post('/:id/activate-contract', requireAdmin, async (req: Requ
 loanRequestsRouter.put('/:id/approve-with-counteroffer', requireAdmin, async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
-        const { approvedAmount, interestRate } = req.body;
+        const { approvedAmount, interestRate, billingType, installments } = req.body;
 
         if (!approvedAmount || approvedAmount <= 0) {
             return res.status(400).json({ error: 'Valor aprovado inválido' });
@@ -1268,6 +1268,16 @@ loanRequestsRouter.put('/:id/approve-with-counteroffer', requireAdmin, async (re
         // Salvar taxa de juros negociada, se informada
         if (interestRate && parseFloat(interestRate) > 0) {
             updateData.monthlyRate = parseFloat(interestRate);
+        }
+
+        // Salvar billingType se informado
+        if (billingType) {
+            updateData.billingType = billingType;
+        }
+
+        // Salvar installments se informado
+        if (installments && parseInt(installments) > 0) {
+            updateData.installments = parseInt(installments);
         }
 
         const request = await prisma.loanRequest.update({
