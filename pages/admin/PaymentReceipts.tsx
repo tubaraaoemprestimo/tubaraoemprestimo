@@ -27,7 +27,7 @@ export const PaymentReceipts: React.FC = () => {
     const loadReceipts = async () => {
         setLoading(true);
         try {
-            const { data } = await api.get(`/finance/receipts?status=${filter}`);
+            const { data } = await api.get(`/payment-receipts${filter !== 'ALL' ? '?status=' + filter : ''}`);
 
             if (data) {
                 setReceipts((data as any[]).map((r: any) => ({
@@ -57,7 +57,7 @@ export const PaymentReceipts: React.FC = () => {
     const handleApprove = async (receipt: PaymentReceipt) => {
         setProcessing(receipt.id);
         try {
-            await api.put(`/finance/receipts/${receipt.id}/approve`, { isDischarge });
+            await api.put(`/payment-receipts/${receipt.id}/approve`, { isDischarge });
 
             // Enviar notificação e atualizar score
             try {
@@ -88,8 +88,8 @@ export const PaymentReceipts: React.FC = () => {
 
         setProcessing(receipt.id);
         try {
-            await api.put(`/finance/receipts/${receipt.id}/reject`, {
-                rejectionReason
+            await api.put(`/payment-receipts/${receipt.id}/reject`, {
+                notes: rejectionReason
             });
 
             addToast('Comprovante rejeitado', 'info');

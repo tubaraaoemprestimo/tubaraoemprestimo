@@ -87,8 +87,10 @@ paymentReceiptsRouter.get('/', async (req: Request, res: Response) => {
             where = { customerId: customer.id };
         }
 
-        if (req.query.status) {
-            where.status = req.query.status;
+        // Filtrar por status (ignorar 'ALL')
+        const statusFilter = req.query.status as string;
+        if (statusFilter && statusFilter !== 'ALL') {
+            where.status = statusFilter;
         }
 
         const receipts = await prisma.paymentReceipt.findMany({
@@ -96,7 +98,29 @@ paymentReceiptsRouter.get('/', async (req: Request, res: Response) => {
             orderBy: { createdAt: 'desc' }
         });
 
-        res.json(receipts);
+        if (receipts.length === 0) { res.json([]); return; }
+
+        // Enriquecer com customerName e loanId (campos não existem no modelo direto)
+        const customerIds = [...new Set(receipts.map((r: any) => r.customerId))];
+        const installmentIds = [...new Set(receipts.map((r: any) => r.installmentId))];
+
+        const [customers, installments] = await Promise.all([
+            prisma.customer.findMany({ where: { id: { in: customerIds as string[] } }, select: { id: true, name: true } }),
+            prisma.installment.findMany({ where: { id: { in: installmentIds as string[] } }, select: { id: true, loanId: true, dueDate: true, amount: true } })
+        ]);
+
+        const customerMap = new Map(customers.map((c: any) => [c.id, c.name]));
+        const installmentMap = new Map(installments.map((i: any) => [i.id, { loanId: i.loanId, dueDate: i.dueDate, amount: i.amount }]));
+
+        const enriched = receipts.map((r: any) => ({
+            ...r,
+            customerName: customerMap.get(r.customerId) || '',
+            loanId: installmentMap.get(r.installmentId)?.loanId || '',
+            installmentDueDate: installmentMap.get(r.installmentId)?.dueDate || null,
+            installmentAmount: installmentMap.get(r.installmentId)?.amount || null
+        }));
+
+        res.json(enriched);
     } catch (error) {
         res.status(500).json({ error: 'Erro ao buscar comprovantes' });
     }
@@ -166,22 +190,20 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
 
                 console.log(`[PaymentReceipts] ✅ Loan ${loan.id} QUITADO (discharge)`);
             } else {
-                // Fluxo normal: calcular saldo devedor
-                const totalLoan = loan.installments.reduce((sum, i) => sum + Number(i.amount), 0);
-                totalPaid = loan.installments
-                    .filter(i => i.status === 'PAID')
-                    .reduce((sum, i) => sum + Number(i.amount), 0);
-                const newRemaining = totalLoan - totalPaid;
+                // Fluxo normal: baixa pelo valor REAL pago (receipt.amount), não pelo valor da parcela
+                const paidAmount = Number(receipt.amount);
+                const newRemaining = Math.max(0, Number(loan.remainingAmount) - paidAmount);
 
                 await prisma.loan.update({
                     where: { id: loan.id },
                     data: {
-                        remainingAmount: Math.max(0, newRemaining),
+                        remainingAmount: newRemaining,
+                        lastPaymentDate: new Date(),
                         status: newRemaining <= 0 ? 'COMPLETED' : loan.status
                     }
                 });
 
-                console.log(`[PaymentReceipts] Loan ${loan.id} updated: remainingAmount = R$ ${newRemaining.toFixed(2)}`);
+                console.log(`[PaymentReceipts] Loan ${loan.id} updated: -R$ ${paidAmount.toFixed(2)} => remainingAmount = R$ ${newRemaining.toFixed(2)}`);
             }
 
             // Criar transação de entrada

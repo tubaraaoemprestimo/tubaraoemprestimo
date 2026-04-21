@@ -85,7 +85,7 @@ export const FinanceHub: React.FC = () => {
             setRequests(requestsData);
 
             // Carregar comprovantes via API
-            const { data: receiptsData } = await api.get('/finance/receipts');
+            const { data: receiptsData } = await api.get('/payment-receipts');
 
             if (receiptsData) {
                 setReceipts((receiptsData as any[]).map((r: any) => ({
@@ -233,7 +233,7 @@ export const FinanceHub: React.FC = () => {
     const handleApproveReceipt = async (receipt: PaymentReceipt) => {
         setProcessing(receipt.id);
         try {
-            await api.put(`/finance/receipts/${receipt.id}/approve`, {});
+            await api.put(`/payment-receipts/${receipt.id}/approve`, { isDischarge: false });
 
             // Criar pagamento automaticamente
             await paymentService.createPayment({
@@ -263,8 +263,8 @@ export const FinanceHub: React.FC = () => {
 
         setProcessing(receipt.id);
         try {
-            await api.put(`/finance/receipts/${receipt.id}/reject`, {
-                rejectionReason
+            await api.put(`/payment-receipts/${receipt.id}/reject`, {
+                notes: rejectionReason
             });
 
             addToast('Comprovante rejeitado', 'info');
