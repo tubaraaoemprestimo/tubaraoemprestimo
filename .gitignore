@@ -46,3 +46,4 @@ nul
 
 # Vídeos grandes (hospedar externamente)
 public/videos/*.mp4
+dist-demo/
