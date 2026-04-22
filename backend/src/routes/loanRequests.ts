@@ -1084,25 +1084,58 @@ loanRequestsRouter.post('/:id/activate-contract', requireAdmin, async (req: Requ
             installmentAmount = totalWithInterest / parseInt(totalInstallments);
         }
 
-        const installments = [];
-        for (let i = 1; i <= parseInt(totalInstallments); i++) {
-            const dueDate = new Date(firstPaymentDate);
-
-            if (paymentFrequency === 'DAILY') {
-                dueDate.setDate(dueDate.getDate() + (i - 1));
-            } else if (paymentFrequency === 'WEEKLY') {
-                dueDate.setDate(dueDate.getDate() + ((i - 1) * 7));
-            } else {
-                dueDate.setMonth(dueDate.getMonth() + (i - 1));
-                if (dueDay) dueDate.setDate(parseInt(dueDay));
+        // Helper: adiciona N dias úteis (seg-sáb) pulando domingos
+        function addBusinessDaysLocal(start: Date, days: number): Date {
+            const result = new Date(start);
+            let added = 0;
+            while (added < days) {
+                result.setDate(result.getDate() + 1);
+                if (result.getDay() !== 0) added++; // 0 = domingo
             }
+            return result;
+        }
 
-            installments.push({
-                loanId: loan.id,
-                dueDate,
-                amount: installmentAmount,
-                status: 'OPEN'
-            });
+        const installments = [];
+        const baseDate = new Date(firstPaymentDate);
+        baseDate.setHours(0, 0, 0, 0);
+
+        if (paymentFrequency === 'DAILY') {
+            // Parcelas DIÁRIAS pulam domingos (Regra do Domingo)
+            // 1ª parcela = firstPaymentDate (já definida pelo admin)
+            // Próximas parcelas = próximo dia útil após a anterior
+            let currentDue = new Date(baseDate);
+            // Se firstPaymentDate cair em domingo, avança para segunda
+            while (currentDue.getDay() === 0) {
+                currentDue.setDate(currentDue.getDate() + 1);
+            }
+            for (let i = 0; i < parseInt(totalInstallments); i++) {
+                installments.push({
+                    loanId: loan.id,
+                    dueDate: new Date(currentDue),
+                    amount: installmentAmount,
+                    status: 'OPEN'
+                });
+                if (i < parseInt(totalInstallments) - 1) {
+                    // Próximo dia útil (pula domingo)
+                    currentDue = addBusinessDaysLocal(currentDue, 1);
+                }
+            }
+        } else {
+            for (let i = 0; i < parseInt(totalInstallments); i++) {
+                const dueDate = new Date(baseDate);
+                if (paymentFrequency === 'WEEKLY') {
+                    dueDate.setDate(dueDate.getDate() + (i * 7));
+                } else {
+                    dueDate.setMonth(dueDate.getMonth() + i);
+                    if (dueDay) dueDate.setDate(parseInt(dueDay));
+                }
+                installments.push({
+                    loanId: loan.id,
+                    dueDate,
+                    amount: installmentAmount,
+                    status: 'OPEN'
+                });
+            }
         }
         await prisma.installment.createMany({ data: installments });
 
@@ -1255,7 +1288,7 @@ loanRequestsRouter.put('/:id/approve-with-counteroffer', requireAdmin, async (re
             requestedAmount, // Preservar valor original
             approvedAmount: parseFloat(approvedAmount),
             approvedAt: new Date(),
-            approvedById: req.user!.id,
+            approvedBy: { connect: { id: req.user!.id } },
             status: needsAcceptance ? 'PENDING_ACCEPTANCE' : 'APPROVED', // Se mesmo valor, já aprova direto
             counterOfferAccepted: !needsAcceptance // Se não precisa aceite, marca como aceito
         };
@@ -1264,21 +1297,16 @@ loanRequestsRouter.put('/:id/approve-with-counteroffer', requireAdmin, async (re
         if (!needsAcceptance) {
             updateData.counterOfferAcceptedAt = new Date();
         }
+        // Sempre salvar billingType e installments na solicitação
+        if (billingType) updateData.billingType = billingType;
+        if (installments !== undefined) updateData.installments = installments;
 
         // Salvar taxa de juros negociada, se informada
         if (interestRate && parseFloat(interestRate) > 0) {
             updateData.monthlyRate = parseFloat(interestRate);
         }
 
-        // Salvar billingType se informado
-        if (billingType) {
-            updateData.billingType = billingType;
-        }
 
-        // Salvar installments se informado
-        if (installments && parseInt(installments) > 0) {
-            updateData.installments = parseInt(installments);
-        }
 
         const request = await prisma.loanRequest.update({
             where: { id },
@@ -1463,7 +1491,8 @@ loanRequestsRouter.put('/:id/accept-counteroffer', async (req: Request, res: Res
                     startDate: new Date(),
                     isService: updatedRequest.profileType === 'LIMPA_NOME',
                     isInvestment: updatedRequest.profileType === 'INVESTIDOR',
-                    isLoan: ['CLT', 'AUTONOMO', 'MOTO', 'GARANTIA'].includes(updatedRequest.profileType || '')
+                    isLoan: ['CLT', 'AUTONOMO', 'MOTO', 'GARANTIA'].includes(updatedRequest.profileType || ''),
+                    billingType: updatedRequest.billingType || (updatedRequest.profileType === 'AUTONOMO' ? 'DAILY' : 'MONTHLY')
                 }
             });
 

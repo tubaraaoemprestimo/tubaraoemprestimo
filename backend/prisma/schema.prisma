@@ -263,6 +263,7 @@ model LoanRequest {
   counterOfferAccepted    Boolean   @default(false) @map("counter_offer_accepted") // Cliente aceitou a contraproposta
   counterOfferAcceptedAt  DateTime? @map("counter_offer_accepted_at") // Data/hora do aceite
   installments            Int       @default(1)
+  billingType             String?   @map("billing_type")
   status                  String    @default("PENDING")
   profileType             String?   @map("profile_type")
   fatherPhone             String?   @map("father_phone")
