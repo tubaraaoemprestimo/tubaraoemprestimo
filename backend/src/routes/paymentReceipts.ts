@@ -48,7 +48,7 @@ paymentReceiptsRouter.post('/', async (req: Request, res: Response) => {
         await prisma.notification.create({
             data: {
                 title: '💳 Comprovante Recebido',
-                message: `${customer.name} enviou comprovante da parcela R$ ${Number(installment.amount).toFixed(2)}`,
+                message: `${customer.name} enviou comprovante de R$ ${Number(receipt.amount).toFixed(2)}`,
                 type: 'INFO'
             }
         }).catch(() => {});
@@ -62,7 +62,7 @@ paymentReceiptsRouter.post('/', async (req: Request, res: Response) => {
             for (const admin of admins) {
                 if (admin.phone) {
                     await sendWhatsAppMessage(admin.phone,
-                        `💳 *Comprovante Recebido*\n\nCliente: ${customer.name}\nValor: R$ ${Number(installment.amount).toFixed(2)}\n\nAcesse o painel para confirmar o pagamento.`
+                        `💳 *Comprovante Recebido*\n\nCliente: ${customer.name}\nValor: R$ ${Number(receipt.amount).toFixed(2)}\n\nAcesse o painel para confirmar o pagamento.`
                     );
                 }
             }
@@ -268,7 +268,7 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
                         email: customer.email,
                         name: customer.name,
                         dischargeHTML,
-                        loanAmount: Number(loan.principalAmount)
+                        loanAmount: Number(receipt.amount)
                     });
 
                     console.log(`[PaymentReceipts] ✅ Quitação gerada e enviada para ${customer.email}`);
@@ -316,7 +316,7 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
                     customerEmail: customer.email,
                     title: isDischarge ? '🎉 Contrato Quitado' : '✅ Pagamento Confirmado',
                     message: isDischarge
-                        ? `Parabéns! Seu contrato foi quitado!`
+                        ? `Parabéns! Seu contrato foi quitado! Total pago: R$ ${Number(receipt.amount).toFixed(2)}`
                         : `Seu pagamento de R$ ${Number(receipt.amount).toFixed(2)} foi confirmado!`,
                     type: 'SUCCESS'
                 }
@@ -325,7 +325,17 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
             // WhatsApp
             if (customer.phone) {
                 const waMsg = isDischarge
-                    ? `🎉 *CONTRATO QUITADO!*\n\nParabéns, ${customer.name.split(' ')[0]}!\n\nSeu contrato foi quitado com sucesso! 🎊\n\nAcesse o app para ver sua declaração de quitação.\n\n_Tubarão Empréstimos 🦈_`
+                    ? `🎉 *CONTRATO QUITADO!*
+
+Parabéns, ${customer.name.split(' ')[0]}!
+
+Seu contrato foi quitado com sucesso! 🎊
+
+💰 *Total pago: R$ ${Number(receipt.amount).toFixed(2)}*
+
+Acesse o app para ver sua declaração de quitação.
+
+_Tubarão Empréstimos 🦈_`
                     : `✅ *Pagamento Confirmado!*\n\nOlá, ${customer.name.split(' ')[0]}!\n\nSeu pagamento de R$ ${Number(receipt.amount).toFixed(2)} foi confirmado.\n\nAcesse o app para ver seu recibo.\n\n_Tubarão Empréstimos 🦈_`;
 
                 sendWhatsAppMessage(customer.phone, waMsg).catch(() => {});
@@ -336,7 +346,7 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
                 sendPushToUser(
                     customer.userId,
                     isDischarge ? '🎉 Contrato Quitado' : '✅ Pagamento Confirmado',
-                    isDischarge ? 'Parabéns! Seu contrato foi quitado!' : `Seu pagamento de R$ ${Number(receipt.amount).toFixed(2)} foi confirmado!`
+                    isDischarge ? `Parabéns! Contrato quitado! Total: R$ ${Number(receipt.amount).toFixed(2)}` : `Seu pagamento de R$ ${Number(receipt.amount).toFixed(2)} foi confirmado!`
                 ).catch(() => {});
             }
         }
