@@ -91,14 +91,14 @@ export const FinanceHub: React.FC = () => {
                 setReceipts((receiptsData as any[]).map((r: any) => ({
                     id: r.id,
                     installmentId: r.installment_id || r.installmentId || '',
-                    loanId: r.loan_id || r.loanId || '',
+                    loanId: r.loan_id || r.loanId || r.loanId || '',
                     customerId: r.customer_id || r.customerId || '',
                     customerName: r.customer_name || r.customerName || '',
                     amount: r.amount,
                     receiptUrl: r.receipt_url || r.receiptUrl || '',
-                    receiptType: r.receipt_type || r.receiptType || '',
+                    receiptType: r.receipt_type || r.receiptType || 'IMAGE',
                     status: r.status,
-                    submittedAt: r.submitted_at || r.submittedAt || '',
+                    submittedAt: r.createdAt || r.created_at || r.submittedAt || r.submitted_at || '',
                     reviewedAt: r.reviewed_at || r.reviewedAt || null,
                     reviewedBy: r.reviewed_by || r.reviewedBy || null,
                     rejectionReason: r.rejection_reason || r.rejectionReason || null
@@ -156,8 +156,8 @@ export const FinanceHub: React.FC = () => {
 
     // KPIs
     const stats = useMemo(() => {
-        const confirmedPayments = payments.filter(p => p.confirmed);
-        const pendingPayments = payments.filter(p => !p.confirmed);
+        const confirmedPayments = payments.filter(p => (p as any).status === 'APPROVED');
+        const pendingPayments = payments.filter(p => (p as any).status === 'PENDING');
         const pendingReceipts = receipts.filter(r => r.status === 'PENDING');
 
         return {
@@ -293,13 +293,13 @@ export const FinanceHub: React.FC = () => {
     };
 
     const filteredPayments = payments.filter(p => {
-        if (paymentFilter === 'pending' && p.confirmed) return false;
-        if (paymentFilter === 'confirmed' && !p.confirmed) return false;
+        const pAny = p as any;
+        const isApproved = pAny.status === 'APPROVED';
+        if (paymentFilter === 'pending' && isApproved) return false;
+        if (paymentFilter === 'confirmed' && !isApproved) return false;
         if (searchTerm) {
-            const request = requests.find(r => r.id === p.request_id);
-            if (!request?.clientName?.toLowerCase().includes(searchTerm.toLowerCase())) {
-                return false;
-            }
+            const name = pAny.customerName || '';
+            if (!name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
         }
         return true;
     });
@@ -319,7 +319,7 @@ export const FinanceHub: React.FC = () => {
 
     const tabs = [
         { id: 'overview', label: 'Visão Geral', icon: <TrendingUp size={18} /> },
-        { id: 'payments', label: 'Pagamentos', icon: <DollarSign size={18} />, badge: payments.filter(p => !p.confirmed).length },
+        { id: 'payments', label: 'Pagamentos', icon: <DollarSign size={18} />, badge: payments.filter(p => (p as any).status === 'PENDING').length },
         { id: 'receipts', label: 'Comprovantes', icon: <Receipt size={18} />, badge: receipts.filter(r => r.status === 'PENDING').length },
         { id: 'ranking', label: 'Ranking', icon: <Trophy size={18} /> },
     ] as const;
@@ -557,30 +557,36 @@ export const FinanceHub: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filteredPayments.map(payment => (
-                                            <tr key={payment.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                                        {filteredPayments.map(payment => {
+                                            const p = payment as any;
+                                            const isApproved = p.status === 'APPROVED';
+                                            const dateStr = p.createdAt || p.created_at || p.payment_date || '';
+                                            const displayDate = dateStr ? new Date(dateStr).toLocaleDateString('pt-BR') : '-';
+                                            const statusLabel = p.status === 'APPROVED' ? 'Aprovado' : p.status === 'REJECTED' ? 'Rejeitado' : 'Pendente';
+                                            return (
+                                            <tr key={p.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
                                                 <td className="p-4">
-                                                    <p className="font-bold text-white">{getRequestName(payment.request_id)}</p>
+                                                    <p className="font-bold text-white">{p.customerName || 'Desconhecido'}</p>
                                                 </td>
                                                 <td className="p-4">
-                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${payment.payment_type === 'JUROS' ? 'bg-yellow-900/30 text-yellow-400' :
-                                                        payment.payment_type === 'PARCELA' ? 'bg-blue-900/30 text-blue-400' :
-                                                            payment.payment_type === 'TOTAL' ? 'bg-green-900/30 text-green-400' :
-                                                                'bg-red-900/30 text-red-400'
-                                                        }`}>
-                                                        {payment.payment_type}
+                                                    <span className="px-2 py-1 rounded text-xs font-bold bg-blue-900/30 text-blue-400">
+                                                        Comprovante
                                                     </span>
                                                 </td>
                                                 <td className="p-4 font-bold text-green-400">
-                                                    R$ {payment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                    R$ {Number(p.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                                 </td>
                                                 <td className="p-4 text-zinc-400">
-                                                    {new Date(payment.payment_date).toLocaleDateString('pt-BR')}
+                                                    {displayDate}
                                                 </td>
                                                 <td className="p-4">
-                                                    {payment.confirmed ? (
+                                                    {isApproved ? (
                                                         <span className="flex items-center gap-1 text-green-400 text-sm">
                                                             <CheckCircle2 size={14} /> Confirmado
+                                                        </span>
+                                                    ) : p.status === 'REJECTED' ? (
+                                                        <span className="flex items-center gap-1 text-red-400 text-sm">
+                                                            <X size={14} /> Rejeitado
                                                         </span>
                                                     ) : (
                                                         <span className="flex items-center gap-1 text-yellow-400 text-sm">
@@ -590,9 +596,9 @@ export const FinanceHub: React.FC = () => {
                                                 </td>
                                                 <td className="p-4 text-right">
                                                     <div className="flex justify-end gap-2">
-                                                        {!payment.confirmed && (
+                                                        {!isApproved && p.status !== 'REJECTED' && (
                                                             <button
-                                                                onClick={() => handleConfirmPayment(payment.id!)}
+                                                                onClick={() => handleConfirmPayment(p.id!)}
                                                                 className="p-2 bg-green-900/30 text-green-400 rounded-lg hover:bg-green-900/50"
                                                                 title="Confirmar"
                                                             >
@@ -600,7 +606,7 @@ export const FinanceHub: React.FC = () => {
                                                             </button>
                                                         )}
                                                         <button
-                                                            onClick={() => handleDeletePayment(payment.id!)}
+                                                            onClick={() => handleDeletePayment(p.id!)}
                                                             className="p-2 bg-red-900/30 text-red-400 rounded-lg hover:bg-red-900/50"
                                                             title="Excluir"
                                                         >
@@ -609,7 +615,7 @@ export const FinanceHub: React.FC = () => {
                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))}
+                                        );})}
                                     </tbody>
                                 </table>
                             </div>
