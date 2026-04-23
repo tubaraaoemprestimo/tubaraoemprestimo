@@ -748,7 +748,7 @@ export const Requests: React.FC = () => {
                     return (
                         <button
                             key={tab.id}
-                            onClick={() => setFilterStatusTab(tab.id)}
+                            onClick={() => { setFilterStatusTab(tab.id); setFilterStatus('ALL'); }}
                             className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap transition-all ${
                                 filterStatusTab === tab.id
                                     ? `${tab.badge} text-white`
@@ -792,7 +792,7 @@ export const Requests: React.FC = () => {
                     {['ALL', LoanStatus.RETURNING_PENDING, LoanStatus.PENDING, LoanStatus.WAITING_DOCS, LoanStatus.APPROVED, 'ACTIVE', LoanStatus.PAUSED, LoanStatus.REJECTED].map((status) => (
                         <button
                             key={status}
-                            onClick={() => setFilterStatus(status)}
+                            onClick={() => { setFilterStatus(status); setFilterStatusTab('ALL'); }}
                             className={`px-3 md:px-4 py-2 rounded-full text-xs font-bold transition-colors border whitespace-nowrap shrink-0 ${filterStatus === status
                                 ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
                                 : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'
