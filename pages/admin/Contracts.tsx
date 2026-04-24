@@ -219,6 +219,7 @@ export const Contracts: React.FC = () => {
   }, [loadPendingProofs]);
 
   const openDetails = async (c: Contract) => {
+    setLoanReceipts([]); // Reset para evitar flash de dados do contrato anterior
     const details = await apiService.getAdminLoanDetails(c.id);
     setSelected(details || c);
     setDetailsOpen(true);
@@ -712,16 +713,20 @@ export const Contracts: React.FC = () => {
               )}
 
               {/* Comprovantes do contrato (PaymentReceipt) */}
-              {loanReceipts.length > 0 && (
-                <div className="bg-amber-900/10 border border-amber-700/30 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
-                      <Image size={16} /> Comprovantes do Cliente
+              <div className="bg-amber-900/10 border border-amber-700/30 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+                    <Image size={16} /> Comprovantes do Cliente
+                    {loanReceipts.filter(r => r.status === 'PENDING').length > 0 && (
                       <span className="bg-amber-500 text-black text-xs font-black px-2 py-0.5 rounded-full">
                         {loanReceipts.filter(r => r.status === 'PENDING').length} pendente(s)
                       </span>
-                    </h3>
-                  </div>
+                    )}
+                  </h3>
+                </div>
+                {loanReceipts.length === 0 ? (
+                  <p className="text-xs text-zinc-500">Nenhum comprovante enviado pelo cliente.</p>
+                ) : (
                   <div className="space-y-2">
                     {loanReceipts.map((r) => (
                       <div key={r.id} className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 flex items-center justify-between gap-3">
@@ -760,8 +765,8 @@ export const Contracts: React.FC = () => {
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Parcelas */}
               <div>
