@@ -982,8 +982,12 @@ export const apiService = {
         return data || [];
     },
 
-    async approvePaymentReceipt(id: string, notes?: string, isDischarge?: boolean) {
-        const { data, error } = await api.put(`/payment-receipts/${id}/approve`, { notes, isDischarge });
+    async approvePaymentReceipt(id: string, opts?: { notes?: string; isDischarge?: boolean; isInterestOnly?: boolean }) {
+        const { data, error } = await api.put(`/payment-receipts/${id}/approve`, {
+            notes: opts?.notes,
+            isDischarge: opts?.isDischarge || false,
+            isInterestOnly: opts?.isInterestOnly || false
+        });
         if (error) throw new Error((error as any).error || 'Erro ao aprovar');
         return data;
     },

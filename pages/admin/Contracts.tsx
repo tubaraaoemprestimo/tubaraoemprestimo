@@ -140,6 +140,12 @@ export const Contracts: React.FC = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [processingProof, setProcessingProof] = useState(false);
 
+  // PaymentReceipts (fluxo novo) do contrato aberto em detalhes
+  const [loanReceipts, setLoanReceipts] = useState<any[]>([]);
+  const [receiptPreview, setReceiptPreview] = useState<any | null>(null);
+  const [approvingReceipt, setApprovingReceipt] = useState(false);
+  const [receiptRejectReason, setReceiptRejectReason] = useState('');
+
   const load = useCallback(async () => {
     setLoading(true);
     const data = await apiService.getAdminLoans({
@@ -217,6 +223,69 @@ export const Contracts: React.FC = () => {
     setSelected(details || c);
     setDetailsOpen(true);
     setExpandedInstallments(false);
+    // Carrega todos os comprovantes (PaymentReceipt) vinculados a este contrato
+    try {
+      const all = await apiService.getPaymentReceipts();
+      const filtered = (all || []).filter((r: any) => r.loanId === c.id);
+      setLoanReceipts(filtered);
+    } catch {
+      setLoanReceipts([]);
+    }
+  };
+
+  const reloadLoanReceipts = useCallback(async () => {
+    if (!selected) return;
+    try {
+      const all = await apiService.getPaymentReceipts();
+      const filtered = (all || []).filter((r: any) => r.loanId === selected.id);
+      setLoanReceipts(filtered);
+    } catch {
+      // ignore
+    }
+  }, [selected]);
+
+  const handleApproveReceiptFromDetails = async (
+    receipt: any,
+    mode: 'INTEREST_ONLY' | 'AMORTIZATION' | 'DISCHARGE'
+  ) => {
+    setApprovingReceipt(true);
+    try {
+      await apiService.approvePaymentReceipt(receipt.id, {
+        isDischarge: mode === 'DISCHARGE',
+        isInterestOnly: mode === 'INTEREST_ONLY'
+      });
+      const msgMap = {
+        INTEREST_ONLY: 'Juros aprovado — principal mantido, próxima parcela de juros gerada.',
+        AMORTIZATION: 'Amortização aprovada — principal abatido.',
+        DISCHARGE: 'Quitação total aprovada — contrato encerrado.'
+      };
+      addToast(msgMap[mode], 'success');
+      setReceiptPreview(null);
+      // Recarrega detalhes + receipts + lista
+      const details = await apiService.getAdminLoanDetails(selected!.id);
+      if (details) setSelected(details);
+      reloadLoanReceipts();
+      load();
+    } catch (err: any) {
+      addToast(err.message || 'Erro ao aprovar comprovante', 'error');
+    } finally {
+      setApprovingReceipt(false);
+    }
+  };
+
+  const handleRejectReceiptFromDetails = async (receipt: any) => {
+    setApprovingReceipt(true);
+    try {
+      await apiService.rejectPaymentReceipt(receipt.id, receiptRejectReason || undefined);
+      addToast('Comprovante rejeitado.', 'info');
+      setReceiptPreview(null);
+      setReceiptRejectReason('');
+      reloadLoanReceipts();
+    } catch (err: any) {
+      addToast(err.message || 'Erro ao rejeitar', 'error');
+    } finally {
+      setApprovingReceipt(false);
+    }
   };
 
   const openEdit = (c: Contract) => {
@@ -642,6 +711,58 @@ export const Contracts: React.FC = () => {
                 </div>
               )}
 
+              {/* Comprovantes do contrato (PaymentReceipt) */}
+              {loanReceipts.length > 0 && (
+                <div className="bg-amber-900/10 border border-amber-700/30 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+                      <Image size={16} /> Comprovantes do Cliente
+                      <span className="bg-amber-500 text-black text-xs font-black px-2 py-0.5 rounded-full">
+                        {loanReceipts.filter(r => r.status === 'PENDING').length} pendente(s)
+                      </span>
+                    </h3>
+                  </div>
+                  <div className="space-y-2">
+                    {loanReceipts.map((r) => (
+                      <div key={r.id} className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                              r.status === 'PENDING' ? 'bg-amber-500/20 text-amber-400' :
+                              r.status === 'APPROVED' ? 'bg-green-500/20 text-green-400' :
+                              'bg-red-500/20 text-red-400'
+                            }`}>
+                              {r.status === 'PENDING' ? '⏳ Pendente' : r.status === 'APPROVED' ? '✓ Aprovado' : '✗ Rejeitado'}
+                            </span>
+                            <span className="text-sm font-bold text-white">{fmt(r.amount)}</span>
+                          </div>
+                          <p className="text-xs text-zinc-500">
+                            Enviado em {fmtDate(r.submittedAt || r.createdAt)}
+                            {r.reviewedAt && ` · Revisado em ${fmtDate(r.reviewedAt)}`}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {r.receiptUrl && (
+                            <a href={r.receiptUrl} target="_blank" rel="noopener noreferrer"
+                              className="text-xs bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1">
+                              <ExternalLink size={12} /> Ver
+                            </a>
+                          )}
+                          {r.status === 'PENDING' && (
+                            <button
+                              onClick={() => { setReceiptPreview(r); setReceiptRejectReason(''); }}
+                              className="text-xs bg-[#D4AF37] text-black px-3 py-1.5 rounded-lg font-bold hover:bg-yellow-500"
+                            >
+                              Aprovar / Rejeitar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Parcelas */}
               <div>
                 <button
@@ -715,6 +836,109 @@ export const Contracts: React.FC = () => {
                   <Edit2 size={16} /> Editar Contrato
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL APROVAR COMPROVANTE (PaymentReceipt do contrato) ===== */}
+      {receiptPreview && (
+        <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-zinc-800 sticky top-0 bg-zinc-950 z-10">
+              <h2 className="font-bold text-lg text-white">Aprovar Comprovante</h2>
+              <button onClick={() => setReceiptPreview(null)} className="text-zinc-400 hover:text-white"><X size={20} /></button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Info */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-zinc-900 p-3 rounded-lg">
+                  <p className="text-xs text-zinc-500">Cliente</p>
+                  <p className="font-bold text-white">{receiptPreview.customerName || selected?.customer?.name || '—'}</p>
+                </div>
+                <div className="bg-zinc-900 p-3 rounded-lg">
+                  <p className="text-xs text-zinc-500">Valor</p>
+                  <p className="font-bold text-[#D4AF37]">{fmt(receiptPreview.amount)}</p>
+                </div>
+              </div>
+
+              {/* Preview do comprovante */}
+              {receiptPreview.receiptUrl && (
+                <div className="bg-black rounded-lg p-2 border border-zinc-800">
+                  {/\.(jpg|jpeg|png|webp|gif)$/i.test(receiptPreview.receiptUrl) ? (
+                    <img
+                      src={receiptPreview.receiptUrl}
+                      alt="Comprovante"
+                      className="w-full max-h-96 object-contain rounded"
+                    />
+                  ) : (
+                    <div className="py-10 text-center">
+                      <FileText size={48} className="mx-auto text-zinc-500 mb-2" />
+                      <a href={receiptPreview.receiptUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-[#D4AF37] hover:underline text-sm">
+                        Abrir comprovante em nova aba ↗
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Aviso - tipo de pagamento */}
+              <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-3 text-xs text-blue-300">
+                <strong>Como aprovar?</strong><br />
+                • <span className="text-yellow-300 font-bold">Juros do Mês</span>: CLT/Garantia. Não abate do capital. Gera nova parcela de juros para o próximo mês.<br />
+                • <span className="text-green-300 font-bold">Amortização</span>: Comércio/Diário. Abate o valor pago do principal.<br />
+                • <span className="text-[#D4AF37] font-bold">Quitação Total</span>: Encerra o contrato (remainingAmount = 0).
+              </div>
+
+              {/* Motivo de rejeição */}
+              <div>
+                <label className="block text-xs font-bold mb-1 text-zinc-400">Motivo (se rejeitar):</label>
+                <input
+                  type="text"
+                  value={receiptRejectReason}
+                  onChange={e => setReceiptRejectReason(e.target.value)}
+                  placeholder="Opcional — ex.: comprovante ilegível"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white"
+                />
+              </div>
+
+              {/* Botões de ação */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  disabled={approvingReceipt}
+                  onClick={() => handleApproveReceiptFromDetails(receiptPreview, 'INTEREST_ONLY')}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-3 rounded-lg font-bold text-sm disabled:opacity-50 transition-colors"
+                >
+                  💰 Somente Juros do Mês
+                </button>
+                <button
+                  disabled={approvingReceipt}
+                  onClick={() => handleApproveReceiptFromDetails(receiptPreview, 'AMORTIZATION')}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-bold text-sm disabled:opacity-50 transition-colors"
+                >
+                  📉 Amortização (Diária)
+                </button>
+                <button
+                  disabled={approvingReceipt}
+                  onClick={() => handleApproveReceiptFromDetails(receiptPreview, 'DISCHARGE')}
+                  className="bg-[#D4AF37] hover:bg-yellow-500 text-black px-4 py-3 rounded-lg font-bold text-sm disabled:opacity-50 transition-colors"
+                >
+                  🏁 Quitação Total
+                </button>
+                <button
+                  disabled={approvingReceipt}
+                  onClick={() => handleRejectReceiptFromDetails(receiptPreview)}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-bold text-sm disabled:opacity-50 transition-colors"
+                >
+                  ✗ Rejeitar
+                </button>
+              </div>
+
+              {approvingReceipt && (
+                <p className="text-center text-xs text-zinc-400 animate-pulse">Processando...</p>
+              )}
             </div>
           </div>
         </div>

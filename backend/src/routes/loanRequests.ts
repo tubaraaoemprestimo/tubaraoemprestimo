@@ -1025,6 +1025,12 @@ loanRequestsRouter.post('/:id/activate-contract', requireAdmin, async (req: Requ
                 data: { nextPaymentDate: nextPayment }
             });
 
+            // ✅ FIX: Atualizar status da LoanRequest para ACTIVE (antes estava faltando neste path)
+            await prisma.loanRequest.update({
+                where: { id },
+                data: { status: 'ACTIVE' }
+            });
+
             return res.json({ success: true, loanId: updatedLoan.id, message: 'Contrato atualizado com sucesso' });
         }
 
