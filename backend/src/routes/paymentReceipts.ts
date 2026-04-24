@@ -141,7 +141,7 @@ paymentReceiptsRouter.get('/', async (req: Request, res: Response) => {
 // PUT /api/payment-receipts/:id/approve — Admin confirma pagamento
 paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: Response) => {
     try {
-        const { isDischarge } = req.body; // Novo: flag de quitação total
+        const { isDischarge, isInterestOnly } = req.body; // flags: quitação total ou só juros
 
         const receipt = await prisma.paymentReceipt.update({
             where: { id: req.params.id as string },
@@ -168,6 +168,16 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
             where: { id: installment.loanId },
             include: { installments: true, customer: true }
         });
+
+        // Buscar o profileType do LoanRequest vinculado
+        let profileType = '';
+        if (loan) {
+            const loanRequest = await prisma.loanRequest.findUnique({
+                where: { id: loan.requestId },
+                select: { profileType: true }
+            });
+            profileType = (loanRequest as any)?.profileType || '';
+        }
 
         if (loan) {
             let totalPaid = 0; // Declarar no escopo superior
@@ -201,8 +211,48 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
                 });
 
                 console.log(`[PaymentReceipts] ✅ Loan ${loan.id} QUITADO (discharge)`);
+            } else if (isInterestOnly || (profileType === 'CLT' || profileType === 'GARANTIA' || profileType === 'GARANTIA_VEICULO')) {
+                // ============================================================
+                // PAGAMENTO DE JUROS (CLT / Garantia) — NÃO abate do principal
+                // O juros é receita mensal recorrente (30% a.m.)
+                // O remainingAmount (saldo devedor) NÃO muda
+                // Gera nova parcela de juros para o próximo mês
+                // ============================================================
+                const paidAmount = Number(receipt.amount);
+
+                await prisma.loan.update({
+                    where: { id: loan.id },
+                    data: {
+                        lastPaymentDate: new Date()
+                        // remainingAmount NÃO MUDA — juros não amortiza o principal
+                    }
+                });
+
+                // Gerar nova parcela de juros para o próximo mês
+                const interestRate = Number(loan.interestRate || 30) / 100; // 30% -> 0.30
+                const nextInterestAmount = Number(loan.principalAmount) * interestRate;
+                const nextDueDate = new Date();
+                nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+                // Manter o mesmo dia do vencimento original
+                if (installment.dueDate) {
+                    nextDueDate.setDate(new Date(installment.dueDate).getDate());
+                }
+
+                await prisma.installment.create({
+                    data: {
+                        loanId: loan.id,
+                        amount: nextInterestAmount,
+                        dueDate: nextDueDate,
+                        status: 'OPEN'
+                    }
+                });
+
+                console.log(`[PaymentReceipts] 💰 Loan ${loan.id} JUROS PAGO: R$ ${paidAmount.toFixed(2)} — principal mantido R$ ${Number(loan.remainingAmount).toFixed(2)} — nova parcela juros R$ ${nextInterestAmount.toFixed(2)} vence ${nextDueDate.toLocaleDateString('pt-BR')}`);
             } else {
-                // Fluxo normal: baixa pelo valor REAL pago (receipt.amount), não pelo valor da parcela
+                // ============================================================
+                // AMORTIZAÇÃO (Comércio/DAILY) — abate do principal
+                // Cada pagamento reduz o remainingAmount
+                // ============================================================
                 const paidAmount = Number(receipt.amount);
                 const newRemaining = Math.max(0, Number(loan.remainingAmount) - paidAmount);
 
@@ -215,7 +265,7 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
                     }
                 });
 
-                console.log(`[PaymentReceipts] Loan ${loan.id} updated: -R$ ${paidAmount.toFixed(2)} => remainingAmount = R$ ${newRemaining.toFixed(2)}`);
+                console.log(`[PaymentReceipts] Loan ${loan.id} AMORTIZAÇÃO: -R$ ${paidAmount.toFixed(2)} => remainingAmount = R$ ${newRemaining.toFixed(2)}`);
             }
 
             // Criar transação de entrada

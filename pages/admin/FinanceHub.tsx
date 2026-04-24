@@ -230,23 +230,35 @@ export const FinanceHub: React.FC = () => {
     };
 
     // Handlers de comprovante
-    const handleApproveReceipt = async (receipt: PaymentReceipt) => {
+    const handleApproveReceipt = async (receipt: PaymentReceipt, options?: { isDischarge?: boolean; isInterestOnly?: boolean }) => {
         setProcessing(receipt.id);
         try {
-            await api.put(`/payment-receipts/${receipt.id}/approve`, { isDischarge: false });
+            await api.put(`/payment-receipts/${receipt.id}/approve`, {
+                isDischarge: options?.isDischarge || false,
+                isInterestOnly: options?.isInterestOnly || false
+            });
 
             // Criar pagamento automaticamente
             await paymentService.createPayment({
                 request_id: receipt.loanId || '',
-                payment_type: 'PARCELA',
+                payment_type: options?.isDischarge ? 'TOTAL' : options?.isInterestOnly ? 'JUROS' : 'PARCELA',
                 amount: receipt.amount,
                 payment_date: new Date().toISOString().split('T')[0],
                 proof_url: receipt.receiptUrl,
                 confirmed: true,
-                notes: `Aprovado via comprovante #${receipt.id}`
+                notes: options?.isDischarge
+                    ? `Quitação total via comprovante #${receipt.id}`
+                    : options?.isInterestOnly
+                        ? `Pagamento de juros via comprovante #${receipt.id}`
+                        : `Aprovado via comprovante #${receipt.id}`
             });
 
-            addToast('🎉 Comprovante aprovado! Pagamento registrado e cliente ganhou pontos!', 'success');
+            const msg = options?.isDischarge
+                ? 'Comprovante aprovado! Contrato QUITADO!'
+                : options?.isInterestOnly
+                    ? 'Comprovante aprovado! Juros registrado (principal mantido).'
+                    : 'Comprovante aprovado! Pagamento registrado.';
+            addToast(msg, 'success');
             setSelectedReceipt(null);
             loadAllData();
         } catch (err) {
@@ -1099,22 +1111,43 @@ export const FinanceHub: React.FC = () => {
                                             />
                                         </div>
 
-                                        <div className="flex gap-4">
-                                            <Button
-                                                variant="danger"
-                                                className="flex-1"
-                                                onClick={() => handleRejectReceipt(selectedReceipt)}
-                                                isLoading={processing === selectedReceipt.id}
-                                            >
-                                                <X size={18} /> Rejeitar
-                                            </Button>
-                                            <Button
-                                                className="flex-1 bg-green-600 hover:bg-green-700"
-                                                onClick={() => handleApproveReceipt(selectedReceipt)}
-                                                isLoading={processing === selectedReceipt.id}
-                                            >
-                                                <Check size={18} /> Aprovar e Registrar Pagamento
-                                            </Button>
+                                        <div className="flex flex-col gap-3">
+                                            <div className="flex gap-3">
+                                                <Button
+                                                    variant="danger"
+                                                    className="flex-1"
+                                                    onClick={() => handleRejectReceipt(selectedReceipt)}
+                                                    isLoading={processing === selectedReceipt.id}
+                                                >
+                                                    <X size={18} /> Rejeitar
+                                                </Button>
+                                                <Button
+                                                    className="flex-1 bg-yellow-600 hover:bg-yellow-700"
+                                                    onClick={() => handleApproveReceipt(selectedReceipt, { isInterestOnly: true })}
+                                                    isLoading={processing === selectedReceipt.id}
+                                                >
+                                                    <Check size={18} /> Aprovar Juros
+                                                </Button>
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <Button
+                                                    className="flex-1 bg-green-600 hover:bg-green-700"
+                                                    onClick={() => handleApproveReceipt(selectedReceipt)}
+                                                    isLoading={processing === selectedReceipt.id}
+                                                >
+                                                    <Check size={18} /> Aprovar Amortização
+                                                </Button>
+                                                <Button
+                                                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                                                    onClick={() => handleApproveReceipt(selectedReceipt, { isDischarge: true })}
+                                                    isLoading={processing === selectedReceipt.id}
+                                                >
+                                                    <Check size={18} /> Quitação Total
+                                                </Button>
+                                            </div>
+                                            <p className="text-xs text-zinc-500 text-center">
+                                                <strong>Juros</strong>: não desconta do capital (CLT/Garantia) | <strong>Amortização</strong>: desconta do capital (Comércio) | <strong>Quitação</strong>: encerra contrato
+                                            </p>
                                         </div>
                                     </div>
                                 )}
