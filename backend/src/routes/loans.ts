@@ -100,8 +100,16 @@ loansRouter.post('/:loanId/manual-payment', requireAdmin, async (req: Request, r
         });
         if (!loan) { res.status(404).json({ error: 'Contrato não encontrado' }); return; }
 
+        // Buscar profileType para decidir se é pagamento de juros (CLT/Garantia) ou amortização (Comércio)
+        const loanRequest = await prisma.loanRequest.findUnique({
+            where: { id: loan.requestId },
+            select: { profileType: true }
+        });
+        const profileType = (loanRequest as any)?.profileType || '';
+        const isInterestOnlyProfile = ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'].includes(profileType);
+
         // Marcar parcela como paga
-        await prisma.installment.update({
+        const paidInstallment = await prisma.installment.update({
             where: { id: installmentId },
             data: {
                 status: 'PAID',
@@ -110,17 +118,48 @@ loansRouter.post('/:loanId/manual-payment', requireAdmin, async (req: Request, r
             }
         });
 
-        // Atualizar remaining_amount e status do loan
-        const newRemaining = Math.max(0, loan.remainingAmount - parseFloat(amount));
-        await prisma.loan.update({
-            where: { id: loanId },
-            data: {
-                remainingAmount: newRemaining,
-                lastPaymentDate: new Date(),
-                status: newRemaining <= 0 ? 'PAID' : loan.status,
-                daysOverdue: 0
+        if (isInterestOnlyProfile) {
+            // CLT / Garantia: pagamento de JUROS — principal NÃO é abatido
+            await prisma.loan.update({
+                where: { id: loanId },
+                data: {
+                    lastPaymentDate: new Date(),
+                    daysOverdue: 0
+                    // remainingAmount NÃO muda — juros não amortiza o principal
+                }
+            });
+
+            // Gerar próxima parcela de juros para o mês seguinte
+            const interestRate = Number(loan.interestRate || 30) / 100;
+            const nextInterestAmount = Number(loan.principalAmount) * interestRate;
+            const nextDueDate = new Date();
+            nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+            if (paidInstallment.dueDate) {
+                nextDueDate.setDate(new Date(paidInstallment.dueDate).getDate());
             }
-        });
+            await prisma.installment.create({
+                data: {
+                    loanId: loan.id,
+                    amount: nextInterestAmount,
+                    dueDate: nextDueDate,
+                    status: 'OPEN'
+                }
+            });
+            console.log(`[Loans] 💰 manual-payment JUROS - Loan ${loanId}: R$ ${amount} juros pago, principal mantido R$ ${Number(loan.remainingAmount).toFixed(2)}, nova parcela R$ ${nextInterestAmount.toFixed(2)} vence ${nextDueDate.toLocaleDateString('pt-BR')}`);
+        } else {
+            // AUTONOMO / MOTO / outros: AMORTIZAÇÃO — abate do principal
+            const newRemaining = Math.max(0, loan.remainingAmount - parseFloat(amount));
+            await prisma.loan.update({
+                where: { id: loanId },
+                data: {
+                    remainingAmount: newRemaining,
+                    lastPaymentDate: new Date(),
+                    status: newRemaining <= 0 ? 'PAID' : loan.status,
+                    daysOverdue: 0
+                }
+            });
+            console.log(`[Loans] 💰 manual-payment AMORTIZAÇÃO - Loan ${loanId}: R$ ${amount} abatido, restante R$ ${newRemaining.toFixed(2)}`);
+        }
 
         // Criar transação
         await prisma.transaction.create({
@@ -253,10 +292,13 @@ loansRouter.put('/:loanId/installments/:installmentId/proof', async (req: Reques
 
         // Atualiza remaining_amount do loan
         const loan = await prisma.loan.findUnique({
-            where: { id: req.params.loanId as string }
-        });
+            where: { id: req.params.loanId as string },
+            include: { loanRequest: { select: { profileType: true } } }
+        } as any);
         if (loan) {
-            const newRemaining = loan.remainingAmount - installment.amount;
+            const profileType = (loan as any).loanRequest?.profileType || '';
+            const isInterestOnly = ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'].includes(profileType);
+            const newRemaining = isInterestOnly ? loan.remainingAmount : loan.remainingAmount - installment.amount;
             await prisma.loan.update({
                 where: { id: loan.id },
                 data: {
