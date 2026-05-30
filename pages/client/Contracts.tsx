@@ -8,6 +8,13 @@ import { apiService } from '../../services/apiService';
 import { Loan, Installment, SystemSettings } from '../../types';
 import { useToast } from '../../components/Toast';
 import { calculateLateInterest, getDaysLate } from '../../utils/lateInterest';
+import {
+   getProfileType,
+   getDisplayMode,
+   countAmortizingPaid,
+   getInterestState,
+   INTEREST_STATE_LABEL,
+} from '../../utils/modalityDisplay';
 
 interface PaymentResult {
    type: string;
@@ -181,10 +188,37 @@ export const Contracts: React.FC = () => {
                                  <p className="text-zinc-500 text-xs mb-1">Restante</p>
                                  <p className="text-xl font-bold text-[#D4AF37]">R$ {selectedLoan.remainingAmount.toLocaleString()}</p>
                               </div>
-                              <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-900">
-                                 <p className="text-zinc-500 text-xs mb-1">Cobranças</p>
-                                 <p className="text-xl font-bold text-white">{selectedLoan.installmentsCount}</p>
-                              </div>
+                              {(() => {
+                                 const mode = getDisplayMode(getProfileType(selectedLoan as any));
+                                 if (mode === 'PARCELAS') {
+                                    const paid = countAmortizingPaid(selectedLoan.installments as any);
+                                    return (
+                                       <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-900">
+                                          <p className="text-zinc-500 text-xs mb-1">Parcelas pagas</p>
+                                          <p className="text-xl font-bold text-white">{paid}/{selectedLoan.installmentsCount}</p>
+                                       </div>
+                                    );
+                                 }
+                                 if (mode === 'SALDO_JUROS') {
+                                    const state = getInterestState(selectedLoan.installments as any);
+                                    const color = state === 'ATRASADO' ? 'text-red-400' : state === 'EM_ABERTO' ? 'text-yellow-400' : 'text-green-400';
+                                    return (
+                                       <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-900">
+                                          <p className="text-zinc-500 text-xs mb-1">Juros do mês</p>
+                                          <p className={`text-xl font-bold ${color}`}>{INTEREST_STATE_LABEL[state]}</p>
+                                       </div>
+                                    );
+                                 }
+                                 // AUTONOMO (diárias) e demais: mostrar quantidade de cobranças em aberto,
+                                 // sem afirmar "N/N pagas" (invariante de UI).
+                                 const openCount = (selectedLoan.installments || []).filter(i => i.status === 'OPEN' || i.status === 'LATE').length;
+                                 return (
+                                    <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-900">
+                                       <p className="text-zinc-500 text-xs mb-1">Cobranças em aberto</p>
+                                       <p className="text-xl font-bold text-white">{openCount}</p>
+                                    </div>
+                                 );
+                              })()}
                            </div>
 
                            {/* ===== BOTÕES DE PAGAMENTO: só para contratos ATIVOS ===== */}

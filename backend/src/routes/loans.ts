@@ -2,17 +2,40 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { sendWhatsAppMessage } from '../services/whatsapp';
+import { computeCharge, resolveMonthlyRate } from '../services/interestEngine';
 
 export const loansRouter = Router();
 loansRouter.use(authenticate);
 
+/**
+ * Normaliza uma taxa que pode estar em percentual (ex.: 30 = 30%) ou já em
+ * fração (ex.: 0.30). Mesma semântica usada em `collectionAutomationService`
+ * para garantir convergência da cascata de taxa entre o cron e esta rota:
+ *  - null/NaN/<= 0 → null (cascata cai para a próxima fonte/default 0.30)
+ *  - valor  > 1    → percentual → /100 (30 → 0.30)
+ *  - valor <= 1    → já é fração (0.30 → 0.30)
+ */
+function normalizeRate(value: number | null | undefined): number | null {
+    if (value == null || !Number.isFinite(value) || value <= 0) return null;
+    return value > 1 ? value / 100 : value;
+}
+
 // GET /api/loans/admin/all — Admin: listar todos os contratos com filtros
 loansRouter.get('/admin/all', requireAdmin, async (req: Request, res: Response) => {
     try {
-        const { status, type, search } = req.query as Record<string, string>;
+        const { status, type, search: rawSearch } = req.query as Record<string, string>;
+        const search = rawSearch?.trim() || '';
+        console.log(`[Loans] admin/all search="${search}" status="${status}" type="${type}"`);
 
         const where: any = {};
-        if (status && status !== 'ALL') where.status = status;
+        // Se há busca, não filtra por status para encontrar em todos os contratos
+        if (!search) {
+            if (status && status !== 'ALL' && status !== 'DEFAULT') where.status = status;
+            if (status === 'DEFAULT') {
+                where.status = { in: ['ACTIVE', 'DEFAULT', 'APPROVED'] };
+                where.installments = { some: { status: { in: ['OPEN', 'LATE'] }, dueDate: { lt: new Date() } } };
+            }
+        }
         if (type === 'LOAN') where.isLoan = true;
         if (type === 'SERVICE') where.isService = true;
         if (type === 'INVESTMENT') where.isInvestment = true;
@@ -21,16 +44,21 @@ loansRouter.get('/admin/all', requireAdmin, async (req: Request, res: Response) 
             where,
             include: {
                 customer: true,
-                installments: { orderBy: { dueDate: 'asc' } }
+                installments: { orderBy: { dueDate: 'asc' } },
+                loanRequest: { select: { profileType: true, monthlyRate: true, contractMonths: true } }
             },
             orderBy: { createdAt: 'desc' }
         });
 
-        // Filtro de busca por nome/CPF do cliente
+        // Filtro de busca por nome/CPF/telefone do cliente (ignora acentos)
+        const normalize = (value?: string | null) => (value || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+        const normalizedSearch = normalize(search);
+        const digitsOnly = search.replace(/\D/g, '');
         const filtered = search
             ? loans.filter(l =>
-                l.customer?.name?.toLowerCase().includes(search.toLowerCase()) ||
-                l.customer?.cpf?.includes(search)
+                normalize(l.customer?.name).includes(normalizedSearch) ||
+                (digitsOnly.length > 0 && (l.customer?.cpf || '').includes(digitsOnly)) ||
+                (digitsOnly.length > 0 && (l.customer?.phone || '').replace(/\D/g, '').includes(digitsOnly))
             )
             : loans;
 
@@ -108,9 +136,17 @@ loansRouter.post('/:loanId/manual-payment', requireAdmin, async (req: Request, r
         const profileType = (loanRequest as any)?.profileType || '';
         const isInterestOnlyProfile = ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'].includes(profileType);
 
-        // Marcar parcela como paga
+        const targetInstallment = await prisma.installment.findFirst({
+            where: {
+                loanId,
+                status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }
+            },
+            orderBy: { dueDate: 'asc' }
+        });
+
+        // Sempre baixa a parcela em aberto mais antiga para não deixar atraso antigo escondido.
         const paidInstallment = await prisma.installment.update({
-            where: { id: installmentId },
+            where: { id: targetInstallment?.id || installmentId },
             data: {
                 status: 'PAID',
                 paidAt: new Date(),
@@ -129,6 +165,12 @@ loansRouter.post('/:loanId/manual-payment', requireAdmin, async (req: Request, r
                 }
             });
 
+            // Marca o registro pago como pagamento de juros de rolagem (não é amortização)
+            await prisma.installment.update({
+                where: { id: paidInstallment.id },
+                data: { isInterestPayment: true }
+            });
+
             // Gerar próxima parcela de juros para o mês seguinte
             const interestRate = Number(loan.interestRate || 30) / 100;
             const nextInterestAmount = Number(loan.principalAmount) * interestRate;
@@ -142,7 +184,8 @@ loansRouter.post('/:loanId/manual-payment', requireAdmin, async (req: Request, r
                     loanId: loan.id,
                     amount: nextInterestAmount,
                     dueDate: nextDueDate,
-                    status: 'OPEN'
+                    status: 'OPEN',
+                    isInterestPayment: true
                 }
             });
             console.log(`[Loans] 💰 manual-payment JUROS - Loan ${loanId}: R$ ${amount} juros pago, principal mantido R$ ${Number(loan.remainingAmount).toFixed(2)}, nova parcela R$ ${nextInterestAmount.toFixed(2)} vence ${nextDueDate.toLocaleDateString('pt-BR')}`);
@@ -194,13 +237,15 @@ loansRouter.post('/:loanId/settle-all', requireAdmin, async (req: Request, res: 
             i => i.status === 'OPEN' || i.status === 'LATE' || i.status === 'AWAITING_CONFIRMATION'
         );
 
-        if (pendingInstallments.length === 0) {
-            res.status(400).json({ error: 'Não há parcelas pendentes para quitar' });
+        if (pendingInstallments.length === 0 && Number(loan.remainingAmount) <= 0) {
+            res.status(400).json({ error: 'Contrato já está quitado' });
             return;
         }
 
         const now = new Date();
-        const totalPaid = pendingInstallments.reduce((sum, i) => sum + i.amount, 0);
+        const totalPaid = pendingInstallments.length > 0
+            ? pendingInstallments.reduce((sum, i) => sum + i.amount, 0)
+            : Number(loan.remainingAmount);
 
         // Marcar todas as parcelas pendentes como PAID
         await prisma.installment.updateMany({
@@ -208,7 +253,7 @@ loansRouter.post('/:loanId/settle-all', requireAdmin, async (req: Request, res: 
             data: { status: 'PAID', paidAt: now }
         });
 
-        // Atualizar loan: remainingAmount = 0, status = COMPLETED
+        // Atualizar loan/request: remainingAmount = 0, status = COMPLETED
         await prisma.loan.update({
             where: { id: loanId },
             data: {
@@ -217,6 +262,10 @@ loansRouter.post('/:loanId/settle-all', requireAdmin, async (req: Request, res: 
                 status: 'COMPLETED',
                 daysOverdue: 0
             }
+        });
+        await prisma.loanRequest.update({
+            where: { id: loan.requestId },
+            data: { status: 'COMPLETED' }
         });
 
         // Criar transação de quitação
@@ -299,6 +348,15 @@ loansRouter.put('/:loanId/installments/:installmentId/proof', async (req: Reques
             const profileType = (loan as any).loanRequest?.profileType || '';
             const isInterestOnly = ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'].includes(profileType);
             const newRemaining = isInterestOnly ? loan.remainingAmount : loan.remainingAmount - installment.amount;
+
+            // Rolagem (CLT/Garantia): marca o registro pago como pagamento de juros (não amortiza)
+            if (isInterestOnly) {
+                await prisma.installment.update({
+                    where: { id: installment.id },
+                    data: { isInterestPayment: true }
+                });
+            }
+
             await prisma.loan.update({
                 where: { id: loan.id },
                 data: {
@@ -350,11 +408,14 @@ loansRouter.put('/:loanId/installments/:installmentId/proof', async (req: Reques
                     });
 
                     if (commission) {
-                        // Contar parcelas pagas do empréstimo
+                        // Contar parcelas pagas do empréstimo (apenas amortizadoras).
+                        // Pagamentos de juros de rolagem (CLT/GARANTIA) NÃO disparam a
+                        // liberação 40/30/30 — só amortizadoras (req. 3.6 / task 3.8).
                         const paidInstallments = await prisma.installment.count({
                             where: {
                                 loanId: loan.id,
-                                status: 'PAID'
+                                status: 'PAID',
+                                isInterestPayment: false
                             }
                         });
 
@@ -470,10 +531,13 @@ loansRouter.post('/:loanId/generate-payment', authenticate, async (req: Request,
             return;
         }
 
-        // 1. Buscar o empréstimo
+        // 1. Buscar o empréstimo (inclui profileType para o engine de juros)
         const loan = await prisma.loan.findUnique({
             where: { id: loanId },
-            include: { installments: true }
+            include: {
+                installments: true,
+                loanRequest: { select: { profileType: true } }
+            }
         });
 
         if (!loan) {
@@ -490,26 +554,64 @@ loansRouter.post('/:loanId/generate-payment', authenticate, async (req: Request,
             return;
         }
 
-        // 2. Buscar taxa de juros do admin
+        // 2. Resolver parâmetros do engine de juros — MESMA forma do cron
+        //    `collectionAutomationService.buildOverdueCharge`, garantindo
+        //    convergência EXATA entre este caminho e o cron (req 2.7).
+        const profileType = loan.loanRequest?.profileType || '';
+
+        // Parcela-alvo = próxima cobrança em aberto (menor dueDate). Define o D
+        // (dias de atraso) e a base, exatamente como o cron faz por parcela.
+        const targetInstallment = (loan.installments || [])
+            .filter((i) => ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'].includes(i.status))
+            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
+
+        // principal = base dos 30% (juros do mês). loanAmount = base dos 7%.
+        const principal = Number(loan.principalAmount ?? loan.amount ?? targetInstallment?.amount ?? 0);
+        const loanAmount = Number(loan.amount ?? principal);
+
+        // daysOverdue: mesma fórmula do cron — floor((now - dueDate)/86400000), min 0.
+        const daysOverdue = targetInstallment
+            ? Math.max(0, Math.floor((Date.now() - new Date(targetInstallment.dueDate).getTime()) / (1000 * 60 * 60 * 24)))
+            : 0;
+
+        // Cascata de taxa (req 2.1): contrato → cliente → SystemSetting → 0.30.
         const interestSetting = await prisma.systemSettings.findFirst({
             where: { key: 'monthlyInterestRate' }
         });
-        const monthlyRate = parseFloat(interestSetting?.value || '30') / 100; // 30% → 0.30
+        const systemSettingRate = normalizeRate(interestSetting?.value != null ? Number(interestSetting.value) : null);
+        const monthlyRate = resolveMonthlyRate({
+            contractRate: normalizeRate(loan.interestRate),
+            customerRate: normalizeRate(customer.lateInterestMonthly ?? customer.monthlyInterestRate),
+            systemSettingRate,
+        });
 
-        // 3. Calcular valores
-        const originalAmount = loan.amount; // Valor emprestado original
+        // 3. Calcular via engine (única fonte de verdade; converge com o cron).
+        const charge = computeCharge({
+            profileType,
+            principal,
+            loanAmount,
+            daysOverdue,
+            base: targetInstallment ? Number(targetInstallment.amount) : principal,
+            dueDate: targetInstallment?.dueDate,
+            today: new Date(), // AUTONOMO: exclusão de domingos da contagem de juros
+            monthlyRate,
+        });
+
+        const originalAmount = loanAmount;            // Valor emprestado original (base dos 7%)
         const remainingAmount = loan.remainingAmount; // Saldo devedor restante
-        const interestAmount = parseFloat((originalAmount * monthlyRate).toFixed(2)); // Juros do mês
+        const interestAmount = parseFloat(charge.jurosMes.toFixed(2)); // Juros do mês (componente de exibição)
 
         let paymentAmount = 0;
         let paymentDescription = '';
 
         if (type === 'interest_only') {
-            paymentAmount = interestAmount;
-            paymentDescription = `Pagamento de Juros Mensal (${(monthlyRate * 100).toFixed(0)}% sobre R$ ${originalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`;
+            // Cobrança do juros do mês (com 7% + R$20/dia quando em atraso) —
+            // idêntico ao valor_com_juros que o cron enviaria para a mesma parcela.
+            paymentAmount = parseFloat(charge.total.toFixed(2));
+            paymentDescription = `Pagamento de Juros Mensal (${(monthlyRate * 100).toFixed(0)}% sobre R$ ${principal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`;
         } else {
-            // Full: saldo devedor restante + juros do mês atual
-            paymentAmount = parseFloat((remainingAmount + interestAmount).toFixed(2));
+            // Full: saldo devedor restante + cobrança do mês (juros + multas).
+            paymentAmount = parseFloat((remainingAmount + charge.total).toFixed(2));
             paymentDescription = `Quitação Total (Saldo R$ ${remainingAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} + Juros R$ ${interestAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`;
         }
 

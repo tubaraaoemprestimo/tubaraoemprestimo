@@ -8,6 +8,13 @@ import {
 import { apiService } from '../../services/apiService';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
+import {
+  getProfileType,
+  getDisplayMode,
+  countAmortizingPaid,
+  getInterestState,
+  INTEREST_STATE_LABEL,
+} from '../../utils/modalityDisplay';
 
 interface ContractInstallment {
   id: string;
@@ -16,6 +23,7 @@ interface ContractInstallment {
   status: 'OPEN' | 'PAID' | 'LATE' | 'AWAITING_CONFIRMATION';
   paidAt?: string;
   proofUrl?: string;
+  isInterestPayment?: boolean;
 }
 
 interface PendingProof {
@@ -200,14 +208,16 @@ export const Contracts: React.FC = () => {
   };
 
   // Filtro de modalidade aplicado no frontend (profileType vem do loanRequest)
+  // Quando há busca, ignora filtro de modalidade para encontrar em todos
   const filteredContracts = useMemo(() => {
+    if (search) return contracts; // busca ativa → mostra tudo que o backend retornou
     if (modalityFilter === 'ALL') return contracts;
     return contracts.filter(c => {
       const pt = c.loanRequest?.profileType;
       if (modalityFilter === 'GARANTIA') return pt === 'GARANTIA' || pt === 'GARANTIA_VEICULO';
       return pt === modalityFilter;
     });
-  }, [contracts, modalityFilter]);
+  }, [contracts, modalityFilter, search]);
 
   useEffect(() => {
     const t = setTimeout(load, 300);
@@ -369,6 +379,7 @@ export const Contracts: React.FC = () => {
       addToast('Pagamento registrado!', 'success');
       setPaymentOpen(false);
       setDetailsOpen(false);
+      setStatusFilter('ACTIVE');
       load();
     } catch (err: any) {
       addToast(err.message || 'Erro ao registrar', 'error');
@@ -394,6 +405,7 @@ export const Contracts: React.FC = () => {
       addToast('Parcela marcada como paga!', 'success');
       const updated = await apiService.getAdminLoanDetails(selected.id);
       setSelected(updated);
+      setStatusFilter(updated.status === 'COMPLETED' || updated.status === 'PAID' ? updated.status : 'ACTIVE');
       load();
     } catch (err: any) {
       addToast(err.message || 'Erro ao dar baixa', 'error');
@@ -423,6 +435,7 @@ export const Contracts: React.FC = () => {
       await apiService.settleAllInstallments(selected.id);
       addToast('Contrato quitado com sucesso!', 'success');
       setDetailsOpen(false);
+      setStatusFilter('COMPLETED');
       load();
     } catch (err: any) {
       addToast(err.message || 'Erro ao quitar contrato', 'error');
@@ -439,7 +452,9 @@ export const Contracts: React.FC = () => {
     return { label: '💼 Empréstimo', color: 'bg-zinc-700/60 text-zinc-300 border border-zinc-600/40' };
   };
 
-  const paidCount = (c: Contract) => (c.installments ?? []).filter(i => i.status === 'PAID').length;
+  // Conta apenas parcelas amortizadoras pagas (exclui pagamentos de juros de rolagem).
+  // Conceitualmente válido só para MOTO — a decisão de exibir é feita por profileType.
+  const paidCount = (c: Contract) => countAmortizingPaid(c.installments);
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
@@ -588,6 +603,7 @@ export const Contracts: React.FC = () => {
             const paid = paidCount(c);
             const total = c.totalInstallments || c.installmentsCount;
             const profileBadge = getProfileBadge(c);
+            const displayMode = getDisplayMode(getProfileType(c));
             return (
               <div key={c.id} className={`bg-zinc-950 border rounded-xl p-4 hover:border-zinc-600 transition-colors ${c.loanRequest?.profileType === 'AUTONOMO' ? 'border-yellow-800/40 hover:border-yellow-700/60' : 'border-zinc-800'}`}>
                 <div className="flex flex-col md:flex-row md:items-center gap-3">
@@ -614,10 +630,31 @@ export const Contracts: React.FC = () => {
                       <p className="text-xs text-zinc-500">Restante</p>
                       <p className={`font-bold ${c.remainingAmount > 0 ? 'text-yellow-400' : 'text-green-400'}`}>{fmt(c.remainingAmount)}</p>
                     </div>
-                    <div>
-                      <p className="text-xs text-zinc-500">Parcelas</p>
-                      <p className="font-bold text-white">{paid}/{total} <span className="text-xs text-zinc-500">pagas</span></p>
-                    </div>
+                    {displayMode === 'PARCELAS' ? (
+                      <div>
+                        <p className="text-xs text-zinc-500">Parcelas</p>
+                        <p className="font-bold text-white">{paid}/{total} <span className="text-xs text-zinc-500">pagas</span></p>
+                      </div>
+                    ) : displayMode === 'SALDO_JUROS' ? (
+                      <div>
+                        <p className="text-xs text-zinc-500">Juros do mês</p>
+                        {(() => {
+                          const state = getInterestState(c.installments);
+                          const color = state === 'ATRASADO' ? 'text-red-400' : state === 'EM_ABERTO' ? 'text-yellow-400' : 'text-green-400';
+                          return <p className={`font-bold ${color}`}>{INTEREST_STATE_LABEL[state]}</p>;
+                        })()}
+                      </div>
+                    ) : displayMode === 'SALDO_DIARIAS' ? (
+                      <div>
+                        <p className="text-xs text-zinc-500">Diárias</p>
+                        <p className="font-bold text-white">{paid}<span className="text-xs text-zinc-500">/{total} pagas</span></p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-xs text-zinc-500">Saldo</p>
+                        <p className={`font-bold ${c.remainingAmount > 0 ? 'text-yellow-400' : 'text-green-400'}`}>{fmt(c.remainingAmount)}</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Vencimento / Atraso */}
@@ -775,7 +812,21 @@ export const Contracts: React.FC = () => {
                   className="flex items-center gap-2 w-full text-left font-bold text-[#D4AF37] mb-3"
                 >
                   {expandedInstallments ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  Parcelas ({paidCount(selected)}/{selected.totalInstallments || selected.installmentsCount} pagas)
+                  {(() => {
+                    const mode = getDisplayMode(getProfileType(selected));
+                    const total = selected.totalInstallments || selected.installmentsCount;
+                    if (mode === 'PARCELAS') {
+                      return <>Parcelas ({paidCount(selected)}/{total} pagas)</>;
+                    }
+                    if (mode === 'SALDO_JUROS') {
+                      const state = getInterestState(selected.installments);
+                      return <>Cobranças · Saldo {fmt(selected.remainingAmount)} · {INTEREST_STATE_LABEL[state]}</>;
+                    }
+                    if (mode === 'SALDO_DIARIAS') {
+                      return <>Diárias ({paidCount(selected)}/{total} pagas) · Saldo {fmt(selected.remainingAmount)}</>;
+                    }
+                    return <>Cobranças · Saldo {fmt(selected.remainingAmount)}</>;
+                  })()}
                 </button>
 
                 {expandedInstallments && (

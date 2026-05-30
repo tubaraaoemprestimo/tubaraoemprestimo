@@ -10,6 +10,13 @@ import { Customer, SystemSettings } from '../../types';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
 import { api } from '../../services/apiClient';
+import {
+  getProfileType,
+  getDisplayMode,
+  countAmortizingPaid,
+  getInterestState,
+  INTEREST_STATE_LABEL,
+} from '../../utils/modalityDisplay';
 
 export const Customers: React.FC = () => {
   const { addToast } = useToast();
@@ -1889,7 +1896,19 @@ const HistoryModal: React.FC<{ customer: any; loading: boolean; onClose: () => v
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm mb-3">
                           <Field label="Valor" value={fmt(loan.amount)} />
                           <Field label="Restante" value={fmt(loan.remainingAmount)} />
-                          <Field label="Parcelas" value={loan.installments?.length} />
+                          {(() => {
+                            const mode = getDisplayMode(getProfileType(loan));
+                            if (mode === 'PARCELAS') {
+                              const paid = countAmortizingPaid(loan.installments);
+                              const total = loan.totalInstallments || loan.installmentsCount || loan.installments?.length;
+                              return <Field label="Parcelas" value={`${paid}/${total ?? '—'} pagas`} />;
+                            }
+                            if (mode === 'SALDO_JUROS') {
+                              return <Field label="Juros do mês" value={INTEREST_STATE_LABEL[getInterestState(loan.installments)]} />;
+                            }
+                            // AUTONOMO / demais: saldo amortizado (sem "N/N pagas")
+                            return <Field label="Saldo" value={fmt(loan.remainingAmount)} />;
+                          })()}
                           <Field label="Taxa Mensal" value={loan.monthlyRate ? `${loan.monthlyRate}%` : null} />
                         </div>
                         {loan.installments && loan.installments.length > 0 && (

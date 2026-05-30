@@ -45,6 +45,33 @@ export function replaceVariables(content: string, variables: TemplateVariables):
 }
 
 /**
+ * Terminologia oficial de cobrança POR MODALIDADE (regra de negócio).
+ *
+ * Bugfix spec "correcao-calculo-juros-parcelas" — Task 3.5.
+ *
+ * Função pura, sem I/O — fonte única da terminologia exibida ao cliente para
+ * manter sistema e WhatsApp coerentes:
+ *  - CLT / GARANTIA / GARANTIA_VEICULO → "pagamento de juros de rolagem"
+ *  - AUTONOMO                          → "diária amortizadora"
+ *  - MOTO                              → "parcela" (única modalidade com parcelas reais)
+ *  - demais/indefinido                 → "cobrança" (neutro, falha-segura)
+ */
+export function getModalityTerminology(profileType?: string | null): { tipo: string; label: string } {
+  const p = (profileType || '').toUpperCase();
+
+  if (['CLT', 'GARANTIA', 'GARANTIA_VEICULO'].includes(p)) {
+    return { tipo: 'JUROS', label: 'pagamento de juros de rolagem' };
+  }
+  if (p === 'AUTONOMO') {
+    return { tipo: 'DIARIA', label: 'diária amortizadora' };
+  }
+  if (p === 'MOTO') {
+    return { tipo: 'PARCELA', label: 'parcela' };
+  }
+  return { tipo: 'COBRANCA', label: 'cobrança' };
+}
+
+/**
  * Busca template por trigger event e canal
  */
 export async function getTemplateByTrigger(
@@ -375,6 +402,7 @@ export async function triggerTemplateMultiple(
 export const templateService = {
   getTemplateByTrigger,
   replaceVariables,
+  getModalityTerminology,
   triggerTemplate,
   triggerTemplateMultiple
 };

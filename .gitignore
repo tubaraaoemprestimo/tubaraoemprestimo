@@ -47,3 +47,10 @@ nul
 # Vídeos grandes (hospedar externamente)
 public/videos/*.mp4
 dist-demo/
+
+# Snapshots e artefatos operacionais do deploy (dados sensiveis de producao)
+server-snapshots/
+backend/scripts/backfill-logs/
+backend/scripts/_*.sh
+backend/scripts/_*.cjs
+*.tar.gz

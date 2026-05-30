@@ -228,6 +228,7 @@ model Installment {
   daysOverdue      Int       @default(0) @map("days_overdue")
   lateFeeAmount    Float     @default(0) @map("late_fee_amount")
   fineAccumulated  Float     @default(0) @map("fine_accumulated")
+  isInterestPayment Boolean  @default(false) @map("is_interest_payment")
   loan             Loan      @relation(fields: [loanId], references: [id])
 
   @@map("installments")

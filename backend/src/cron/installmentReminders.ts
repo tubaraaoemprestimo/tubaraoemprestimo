@@ -3,9 +3,15 @@ import { prisma } from '../services/prisma';
 import { emailService } from '../services/email';
 import { sendWhatsAppMessage } from '../services/whatsapp';
 import { sendPushToUser, sendPushToRole } from '../routes/push';
+import { buildOverdueCharge, getSystemMonthlyRateSetting } from '../services/collectionAutomationService';
+import { getModalityTerminology } from '../services/templateService';
 
 function brDate(d: Date | string) {
   return new Date(d).toLocaleDateString('pt-BR');
+}
+
+function brMoney(value: number): string {
+  return `R$ ${Number(value).toFixed(2)}`;
 }
 
 function brandedHtml(body: string): string {
@@ -175,7 +181,14 @@ export const scheduleLatePaymentDetection = () => {
           status: 'OPEN',
           dueDate: { lt: now }
         },
-        include: { loan: { include: { customer: true } } }
+        include: {
+          loan: {
+            include: {
+              customer: true,
+              loanRequest: { select: { profileType: true } }
+            }
+          }
+        }
       });
 
       if (overdueInstallments.length === 0) {
@@ -184,25 +197,33 @@ export const scheduleLatePaymentDetection = () => {
       }
 
       const pixKey = await getPixKey();
+      // Taxa do sistema lida UMA vez por execução (cascata oficial no engine).
+      const systemSettingRate = await getSystemMonthlyRateSetting();
 
       for (const inst of overdueInstallments) {
         const c = inst.loan?.customer;
         if (!c) continue;
 
         const daysOverdue = Math.floor((Date.now() - new Date(inst.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-        const amtFmt = `R$ ${Number(inst.amount).toFixed(2)}`;
-        const pixInfo = inst.pixCode ? `\n\n📱 *PIX Copia e Cola:*\n${inst.pixCode}` : (pixKey ? `\n\n📱 *Chave PIX:* ${pixKey}` : '');
 
         // Enviar apenas para atrasos de 1, 3, 7, 15, 30 dias (não bombardear diariamente)
         if (![1, 3, 7, 15, 30].includes(daysOverdue)) continue;
+
+        // valor_com_juros vem do interestEngine (mesma fonte do cron de cobrança):
+        // CLT/GARANTIA → juros + 7% + R$20/dia; AUTONOMO → juros mora (s/ domingo) + R$20/dia.
+        const profileType = inst.loan?.loanRequest?.profileType || '';
+        const modalidade = getModalityTerminology(profileType);
+        const charge = buildOverdueCharge(inst, daysOverdue, Number(inst.amount), systemSettingRate);
+        const amtFmt = brMoney(charge.total);
+        const pixInfo = inst.pixCode ? `\n\n📱 *PIX Copia e Cola:*\n${inst.pixCode}` : (pixKey ? `\n\n📱 *Chave PIX:* ${pixKey}` : '');
 
         // Email ao cliente
         if (c.email) {
           const urgency = daysOverdue >= 15 ? '#FF0000' : daysOverdue >= 7 ? '#FF4444' : '#FF6B6B';
           const html = brandedHtml(`
-            <h2 style="color:${urgency};">🚨 Parcela ATRASADA — ${daysOverdue} dia${daysOverdue > 1 ? 's' : ''}</h2>
+            <h2 style="color:${urgency};">🚨 ${modalidade.label.charAt(0).toUpperCase() + modalidade.label.slice(1)} em atraso — ${daysOverdue} dia${daysOverdue > 1 ? 's' : ''}</h2>
             <p>Olá, <strong>${c.name}</strong>!</p>
-            <p>Sua parcela de <strong style="color:${urgency};">${amtFmt}</strong> venceu em <strong>${brDate(inst.dueDate)}</strong> e está com <strong>${daysOverdue} dia${daysOverdue > 1 ? 's' : ''} de atraso</strong>.</p>
+            <p>Seu valor de <strong style="color:${urgency};">${amtFmt}</strong> (já com juros e multa) referente à ${modalidade.label} venceu em <strong>${brDate(inst.dueDate)}</strong> e está com <strong>${daysOverdue} dia${daysOverdue > 1 ? 's' : ''} de atraso</strong>.</p>
             <p style="color:#FF6B6B;"><strong>⚠️ Juros e multas estão sendo aplicados diariamente.</strong></p>
             ${pixKey ? `<div style="background:#111;border:1px solid #333;border-radius:8px;padding:15px;margin:15px 0;">
               <p style="margin:5px 0;color:#ccc;"><strong style="color:#D4AF37;">Chave PIX:</strong> ${pixKey}</p>
@@ -213,19 +234,19 @@ export const scheduleLatePaymentDetection = () => {
               <a href="https://www.tubaraoemprestimo.com.br" style="background:#FF4444;color:#fff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:bold;">Regularizar Agora</a>
             </div>
           `);
-          emailService.send(c.email, `🚨 Parcela ATRASADA (${daysOverdue} dias) — ${amtFmt}`, html).catch(err => console.error('[Cron] Late email failed:', err.message));
+          emailService.send(c.email, `🚨 ${modalidade.label} em atraso (${daysOverdue} dias) — ${amtFmt}`, html).catch(err => console.error('[Cron] Late email failed:', err.message));
         }
 
         // WhatsApp ao cliente
         if (c.phone) {
           sendWhatsAppMessage(c.phone,
-            `🚨 *PARCELA ATRASADA*\n\nOlá, ${c.name.split(' ')[0]}!\n\nSua parcela de *${amtFmt}* venceu em *${brDate(inst.dueDate)}* (${daysOverdue} dia${daysOverdue > 1 ? 's' : ''} de atraso).${pixInfo}\n\n⚠️ Juros e multas estão sendo aplicados.\n\nRegularize pelo app ou entre em contato.\n\n_Tubarão Empréstimos 🦈_`
+            `🚨 *EM ATRASO*\n\nOlá, ${c.name.split(' ')[0]}!\n\nSeu valor de *${amtFmt}* (já com juros e multa) referente à ${modalidade.label} venceu em *${brDate(inst.dueDate)}* (${daysOverdue} dia${daysOverdue > 1 ? 's' : ''} de atraso).${pixInfo}\n\n⚠️ Juros e multas estão sendo aplicados.\n\nRegularize pelo app ou entre em contato.\n\n_Tubarão Empréstimos 🦈_`
           ).catch(err => console.error('[Cron] Late WA failed:', err));
         }
 
         // Push ao cliente
         if (c.userId) {
-          sendPushToUser(c.userId, `🚨 Parcela ATRASADA (${daysOverdue}d)`, `Sua parcela de ${amtFmt} está ${daysOverdue} dia(s) atrasada.`).catch(() => { });
+          sendPushToUser(c.userId, `🚨 Em atraso (${daysOverdue}d)`, `Seu valor de ${amtFmt} está ${daysOverdue} dia(s) em atraso.`).catch(() => { });
         }
 
         // Notificação interna
@@ -233,8 +254,8 @@ export const scheduleLatePaymentDetection = () => {
           data: {
             customerId: c.id,
             customerEmail: c.email,
-            title: `🚨 Parcela ATRASADA — ${daysOverdue} dias`,
-            message: `Parcela de ${amtFmt} vencida em ${brDate(inst.dueDate)}.`,
+            title: `🚨 ${modalidade.label} em atraso — ${daysOverdue} dias`,
+            message: `Valor de ${amtFmt} (com juros e multa) vencido em ${brDate(inst.dueDate)}.`,
             type: 'ALERT'
           }
         }).catch(() => { });

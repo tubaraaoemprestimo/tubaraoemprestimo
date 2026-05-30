@@ -4,6 +4,13 @@
 
 import { LoanRequest, Customer, Loan, Transaction, LoanStatus } from '../types';
 import { apiService } from './apiService';
+import {
+  getProfileType,
+  getDisplayMode,
+  countAmortizingPaid,
+  getInterestState,
+  INTEREST_STATE_LABEL,
+} from '../utils/modalityDisplay';
 
 interface ReportData {
   title: string;
@@ -255,18 +262,34 @@ export const reportService = {
       { key: 'amountFormatted', label: 'Valor Original' },
       { key: 'remainingFormatted', label: 'Saldo Devedor' },
       { key: 'installmentsCount', label: 'Parcelas' },
-      { key: 'paidInstallments', label: 'Pagas' },
+      { key: 'paidInstallments', label: 'Pagas / Saldo' },
       { key: 'statusLabel', label: 'Status' },
       { key: 'startDateFormatted', label: 'Início' }
     ];
 
     const data = loans.map(l => {
-      const paidCount = l.installments.filter(i => i.status === 'PAID').length;
+      // Exibição por modalidade: somente MOTO mostra "X/Y parcelas pagas".
+      // CLT/GARANTIA → saldo + estado do juros (sem contagem); AUTONOMO → saldo.
+      // paidCount exclui pagamentos de juros de rolagem (isInterestPayment).
+      const mode = getDisplayMode(getProfileType(l as any));
+      let paidInstallments: string;
+      if (mode === 'PARCELAS') {
+        const paidCount = countAmortizingPaid(l.installments as any);
+        paidInstallments = `${paidCount}/${l.installmentsCount}`;
+      } else if (mode === 'SALDO_JUROS') {
+        paidInstallments = `Saldo ${formatCurrency(l.remainingAmount)} · ${INTEREST_STATE_LABEL[getInterestState(l.installments as any)]}`;
+      } else if (mode === 'SALDO_DIARIAS') {
+        paidInstallments = `Saldo ${formatCurrency(l.remainingAmount)}`;
+      } else {
+        // Serviço/investimento ou modalidade indeterminada: sem contagem de parcelas.
+        // Invariante de UI: nunca exibir "N/N pagas" fora de MOTO.
+        paidInstallments = `Saldo ${formatCurrency(l.remainingAmount)}`;
+      }
       return {
         ...l,
         amountFormatted: formatCurrency(l.amount),
         remainingFormatted: formatCurrency(l.remainingAmount),
-        paidInstallments: `${paidCount}/${l.installmentsCount}`,
+        paidInstallments,
         statusLabel: getStatusLabel(l.status),
         startDateFormatted: formatDate(l.startDate)
       };

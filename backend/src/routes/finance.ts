@@ -187,10 +187,103 @@ financeRouter.put('/receipts/:id/approve', requireAdmin, async (req: Request, re
         // Mark installment as paid if installment_id exists
         if (data[idx].installment_id) {
             try {
-                await prisma.installment.update({
+                // Marca a parcela como paga (preserva paidAt e proofUrl)
+                const installment = await prisma.installment.update({
                     where: { id: data[idx].installment_id },
-                    data: { status: 'PAID', paidAt: new Date() }
+                    data: {
+                        status: 'PAID',
+                        paidAt: new Date(),
+                        ...(data[idx].receipt_url ? { proofUrl: data[idx].receipt_url } : {})
+                    }
                 });
+
+                // ============================================================
+                // Resolve o profileType do contrato e aplica a MESMA lógica de
+                // rolagem das outras 3 rotas (paymentReceipts.ts /approve,
+                // loans.ts /proof e /manual-payment), para não abater o principal
+                // em pagamentos de juros de CLT/GARANTIA. A baixa/quitação final
+                // permanece sob confirmação do admin (esta rota é o admin aprovando).
+                // ============================================================
+                const loan = await prisma.loan.findUnique({ where: { id: installment.loanId } });
+
+                if (loan) {
+                    // Resolve profileType via LoanRequest (consultado como nas outras rotas)
+                    let profileType = '';
+                    try {
+                        const loanRequest = await prisma.loanRequest.findUnique({
+                            where: { id: loan.requestId },
+                            select: { profileType: true }
+                        });
+                        profileType = (loanRequest as any)?.profileType || '';
+                    } catch { /* profileType indeterminado -> tratado como falha-segura abaixo */ }
+
+                    const { isInterestOnly } = req.body || {};
+                    const isRollover = profileType === 'CLT' || profileType === 'GARANTIA' || profileType === 'GARANTIA_VEICULO';
+                    const paidAmount = Number(data[idx].amount) || 0;
+
+                    if (isInterestOnly || isRollover) {
+                        // ====================================================
+                        // PAGAMENTO DE JUROS (CLT / Garantia) — rolagem NÃO amortiza
+                        // remainingAmount permanece integral; gera nova parcela de juros
+                        // (espelha paymentReceipts.ts /approve)
+                        // ====================================================
+                        await prisma.loan.update({
+                            where: { id: loan.id },
+                            data: { lastPaymentDate: new Date() }
+                            // remainingAmount NÃO muda — juros de rolagem não amortiza o principal
+                        });
+
+                        // Marca o registro pago como pagamento de juros de rolagem (não é amortização)
+                        await prisma.installment.update({
+                            where: { id: installment.id },
+                            data: { isInterestPayment: true }
+                        });
+
+                        // Gera nova parcela de juros para o próximo mês
+                        const interestRate = Number(loan.interestRate || 30) / 100; // 30% -> 0.30
+                        const nextInterestAmount = Number(loan.principalAmount) * interestRate;
+                        const nextDueDate = new Date();
+                        nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+                        if (installment.dueDate) {
+                            nextDueDate.setDate(new Date(installment.dueDate).getDate());
+                        }
+                        await prisma.installment.create({
+                            data: {
+                                loanId: loan.id,
+                                amount: nextInterestAmount,
+                                dueDate: nextDueDate,
+                                status: 'OPEN',
+                                isInterestPayment: true
+                            }
+                        });
+                    } else if (!profileType) {
+                        // ====================================================
+                        // FALHA-SEGURA (req. 2.13): profileType indeterminado/vazio.
+                        // NÃO abater o principal — prefere o caminho seguro de rolagem.
+                        // Apenas registra lastPaymentDate; remainingAmount inalterado.
+                        // Não assume semântica de rolagem (não marca isInterestPayment
+                        // nem gera parcela de juros), pois a modalidade é desconhecida.
+                        // ====================================================
+                        await prisma.loan.update({
+                            where: { id: loan.id },
+                            data: { lastPaymentDate: new Date() }
+                        });
+                    } else {
+                        // ====================================================
+                        // AMORTIZAÇÃO (AUTONOMO/MOTO) — abate do principal normalmente
+                        // Marca COMPLETED quando o saldo zera (comportamento preservado)
+                        // ====================================================
+                        const newRemaining = Math.max(0, Number(loan.remainingAmount) - paidAmount);
+                        await prisma.loan.update({
+                            where: { id: loan.id },
+                            data: {
+                                remainingAmount: newRemaining,
+                                lastPaymentDate: new Date(),
+                                status: newRemaining <= 0 ? 'COMPLETED' : loan.status
+                            }
+                        });
+                    }
+                }
             } catch { /* installment may not exist */ }
         }
 
@@ -356,8 +449,9 @@ financeRouter.get('/today-summary', requireAdmin, async (_req: Request, res: Res
         // Empréstimos em atraso: loans com status ACTIVE/DEFAULT que têm parcelas OPEN vencidas
         const overdueInstallments = await prisma.installment.findMany({
             where: {
-                status: 'OPEN',
-                dueDate: { lt: startOfDay }
+                status: { in: ['OPEN', 'LATE'] },
+                dueDate: { lt: startOfDay },
+                loan: { status: { in: ['ACTIVE', 'DEFAULT', 'APPROVED'] } }
             },
             select: { loanId: true },
             distinct: ['loanId']
@@ -367,12 +461,12 @@ financeRouter.get('/today-summary', requireAdmin, async (_req: Request, res: Res
         const loansInDefault = overdueLoanIds.length > 0 ? await prisma.loan.findMany({
             where: {
                 id: { in: overdueLoanIds },
-                status: { in: ['ACTIVE', 'DEFAULT', 'PAID'] }
+                status: { in: ['ACTIVE', 'DEFAULT', 'APPROVED'] }
             },
             include: {
                 customer: true,
                 installments: {
-                    where: { status: 'OPEN', dueDate: { lt: startOfDay } },
+                    where: { status: { in: ['OPEN', 'LATE'] }, dueDate: { lt: startOfDay } },
                     orderBy: { dueDate: 'asc' },
                     take: 1
                 }

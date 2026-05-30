@@ -201,13 +201,17 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
                     .filter((i: any) => i.status === 'PAID' || i.id === installment.id)
                     .reduce((sum: number, i: any) => sum + Number(i.amount), 0);
 
-                // Marcar loan como quitado
+                // Marcar loan/request como quitado
                 await prisma.loan.update({
                     where: { id: loan.id },
                     data: {
                         remainingAmount: 0,
                         status: 'COMPLETED'
                     }
+                });
+                await prisma.loanRequest.update({
+                    where: { id: loan.requestId },
+                    data: { status: 'COMPLETED' }
                 });
 
                 console.log(`[PaymentReceipts] ✅ Loan ${loan.id} QUITADO (discharge)`);
@@ -228,6 +232,12 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
                     }
                 });
 
+                // Marca o registro pago como pagamento de juros de rolagem (não é amortização)
+                await prisma.installment.update({
+                    where: { id: installment.id },
+                    data: { isInterestPayment: true }
+                });
+
                 // Gerar nova parcela de juros para o próximo mês
                 const interestRate = Number(loan.interestRate || 30) / 100; // 30% -> 0.30
                 const nextInterestAmount = Number(loan.principalAmount) * interestRate;
@@ -243,7 +253,8 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
                         loanId: loan.id,
                         amount: nextInterestAmount,
                         dueDate: nextDueDate,
-                        status: 'OPEN'
+                        status: 'OPEN',
+                        isInterestPayment: true
                     }
                 });
 
