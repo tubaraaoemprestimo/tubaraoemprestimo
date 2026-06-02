@@ -376,6 +376,8 @@ export interface Installment {
   pixCode?: string;
   proofUrl?: string;
   paidAt?: string;
+  lateFeeAmount?: number;
+  totalAmount?: number;
   // Marca técnica de pagamento de juros (rolagem CLT/GARANTIA). Default false no backend.
   // Opcional e backward-compatible: o frontend antigo simplesmente ignora o campo.
   isInterestPayment?: boolean;

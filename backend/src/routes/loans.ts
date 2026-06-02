@@ -330,7 +330,7 @@ loansRouter.get('/', async (req: Request, res: Response) => {
                 orderBy: { createdAt: 'desc' }
             });
         }
-        res.json(loans);
+        res.json(loans.map(withInstallmentTotals));
     } catch (error) {
         res.status(500).json({ error: 'Erro ao buscar empréstimos' });
     }

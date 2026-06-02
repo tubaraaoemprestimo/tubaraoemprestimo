@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Calendar, DollarSign, CheckCircle2, Clock, AlertCircle, QrCode, FileText, TrendingUp, X, Banknote, CreditCard, Copy, Mail, Loader2, Info, Hourglass } from 'lucide-react';
+import { ChevronLeft, Calendar, DollarSign, CheckCircle2, Clock, AlertCircle, QrCode, FileText, X, Banknote, CreditCard, Copy, Mail, Loader2, Info, Hourglass } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { PixModal } from '../../components/PixModal';
 import { ReceiptModal } from '../../components/ReceiptModal';
 import { apiService } from '../../services/apiService';
-import { Loan, Installment, SystemSettings } from '../../types';
+import { Loan, Installment } from '../../types';
 import { useToast } from '../../components/Toast';
-import { calculateLateInterest, getDaysLate } from '../../utils/lateInterest';
 import {
    getProfileType,
    getDisplayMode,
@@ -36,7 +35,6 @@ export const Contracts: React.FC = () => {
    const [loans, setLoans] = useState<Loan[]>([]);
    const [loading, setLoading] = useState(true);
    const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
-   const [settings, setSettings] = useState<SystemSettings | null>(null);
 
    // Modals
    const [paymentModalData, setPaymentModalData] = useState<{ amount: number, installmentId: string, loanId: string } | null>(null);
@@ -50,7 +48,6 @@ export const Contracts: React.FC = () => {
 
    useEffect(() => {
       loadContracts();
-      loadSettings();
    }, []);
 
    const loadContracts = async () => {
@@ -60,17 +57,7 @@ export const Contracts: React.FC = () => {
       setLoading(false);
    };
 
-   const loadSettings = async () => {
-      const data = await apiService.getSettings();
-      setSettings(data);
-   };
-
-   // Calcula valor com juros de atraso
-   const getInstallmentAmount = (inst: Installment) => {
-      if (inst.status !== 'LATE' || !settings) return inst.amount;
-      const result = calculateLateInterest(inst.amount, inst.dueDate, settings);
-      return result.totalAmount;
-   };
+   const getInstallmentAmount = (inst: Installment) => inst.totalAmount ?? (Number(inst.amount || 0) + Number(inst.lateFeeAmount || 0));
 
    const handlePay = (inst: Installment) => {
       if (!selectedLoanId) return;
@@ -260,7 +247,7 @@ export const Contracts: React.FC = () => {
                                        {idx + 1}
                                     </div>
                                     <div>
-                                       {inst.status === 'LATE' && settings ? (
+                                       {Number(inst.lateFeeAmount || 0) > 0 ? (
                                           <>
                                              <div className="font-bold text-red-400">
                                                 R$ {getInstallmentAmount(inst).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -268,13 +255,13 @@ export const Contracts: React.FC = () => {
                                              <div className="text-xs text-zinc-500 line-through">
                                                 R$ {inst.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                              </div>
-                                             <div className="text-xs text-red-400 flex items-center gap-1 mt-1">
-                                                <TrendingUp size={10} /> +{getDaysLate(inst.dueDate)} dias de juros
+                                             <div className="text-xs text-red-400 mt-1">
+                                                Atraso: R$ {Number(inst.lateFeeAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                              </div>
                                           </>
                                        ) : (
                                           <div className="font-bold text-white">
-                                             R$ {inst.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                             R$ {getInstallmentAmount(inst).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                           </div>
                                        )}
                                        <div className="text-xs text-zinc-500 flex items-center gap-1">

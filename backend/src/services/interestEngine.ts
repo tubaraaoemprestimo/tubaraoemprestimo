@@ -21,10 +21,9 @@
  *      jurosMes = principal × rate
  *      D <= 0 → total = jurosMes (sem 7%, sem R$20/dia)
  *      D  > 0 → total = jurosMes + (loanAmount × 7%, uma vez) + (D × R$20)
- *  - AUTONOMO (dívida amortizada em 30 diárias):
- *      jurosMora = principal × rate × (diasJuros / 30), diasJuros = D − domingos
- *      multaDiaria = (politica de domingo) × R$20  [default CORRIDO → D × R$20]
- *      total = base + jurosMora + multaDiaria   (SEM os 7%)
+ *  - AUTONOMO / Comércio (diárias):
+ *      total = base + (D × R$20)
+ *      SEM 7%, SEM juros de mora pró-rata, SEM exclusão de domingo.
  *  - MOTO: parcela fixa → total = base (engine não calcula mora aqui).
  *  - LIMPA_NOME / INVESTIDOR: fora de escopo de mora → total = base.
  */
@@ -276,31 +275,21 @@ export function computeCharge(params: ComputeChargeParams): ChargeBreakdown {
     };
   }
 
-  // ── AUTONOMO: dívida (valor + 30%) amortizada em diárias ──
+  // ── AUTONOMO / Comércio: diária fixa + mora diária. SEM 7%, SEM juros pró-rata. ──
   if (profileType === 'AUTONOMO') {
-    // Domingo não cobra juros (req 2.6): exclui domingos da contagem de juros.
-    // Se dueDate/today não vierem, cai para D sem exclusão (documentado).
-    const sundays = dueDate && today ? countSundaysUTC(dueDate, today) : 0;
-    const diasJuros = Math.max(0, D - sundays);
-    const jurosMora = principal * rate * (diasJuros / 30);
-
-    // Multa diária: por padrão dias corridos (CORRIDO → D); flip opcional para
-    // pular domingos (PULA_DOMINGO → diasJuros). SEM os 7% para AUTONOMO (req 2.5).
-    const fineDays = sundayPolicyForFine === 'PULA_DOMINGO' ? diasJuros : Math.max(0, D);
+    const fineDays = Math.max(0, D);
     const multaDiaria = fineDays * lateFeeDaily;
-
-    const total = resolvedBase + jurosMora + multaDiaria;
+    const total = resolvedBase + multaDiaria;
 
     return {
       base: resolvedBase,
-      jurosMes: jurosMora,
+      jurosMes: 0,
       multa7: 0,
       multaDiaria,
       total,
-      usedRate: rate,
+      usedRate: 0,
       breakdown: [
         { label: 'base', amount: resolvedBase },
-        { label: 'juros_mora', amount: jurosMora },
         { label: 'multa_diaria', amount: multaDiaria },
       ],
     };

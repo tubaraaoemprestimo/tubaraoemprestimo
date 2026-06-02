@@ -219,7 +219,7 @@ async function ensureInterestOnlyOpenInstallments(): Promise<number> {
         loanId: loan.id,
         amount,
         dueDate: getNextMonthlyDueDate(lastInstallment.dueDate),
-        status: 'OPEN',
+        status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
         isInterestPayment: true
       }
     });
@@ -277,7 +277,7 @@ async function processDueIn7Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'OPEN',
+      status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
       loan: { status: 'ACTIVE' }
     },
     include: {
@@ -341,7 +341,7 @@ async function processDueIn3Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'OPEN',
+      status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
       loan: { status: 'ACTIVE' }
     },
     include: {
@@ -404,7 +404,7 @@ async function processDueToday(): Promise<number> {
         gte: today,
         lt: tomorrow
       },
-      status: 'OPEN',
+      status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
       loan: { status: 'ACTIVE' }
     },
     include: {
@@ -468,7 +468,7 @@ async function processOverdue1Day(): Promise<number> {
         gte: yesterday,
         lt: today
       },
-      status: 'OPEN',
+      status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
       loan: { status: 'ACTIVE' }
     },
     include: {
@@ -541,7 +541,7 @@ async function processOverdue3Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'OPEN',
+      status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
       loan: { status: 'ACTIVE' }
     },
     include: {
@@ -614,7 +614,7 @@ async function processOverdue7Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'OPEN',
+      status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
       loan: { status: 'ACTIVE' }
     },
     include: {
@@ -688,7 +688,7 @@ async function processOverdue15Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'OPEN',
+      status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
       loan: { status: 'ACTIVE' }
     },
     include: {
@@ -762,7 +762,7 @@ async function processOverdue30Days(): Promise<number> {
         gte: targetDate,
         lt: nextDay
       },
-      status: 'OPEN',
+      status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
       loan: { status: 'ACTIVE' }
     },
     include: {
@@ -922,7 +922,7 @@ export async function applyDailyLateFees(): Promise<number> {
   // Busca todas parcelas OPEN com vencimento até hoje
   const overdueInstallments = await prisma.installment.findMany({
     where: {
-      status: 'OPEN',
+      status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
       loan: { status: 'ACTIVE' },
       dueDate: { lte: today },
     },
