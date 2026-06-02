@@ -634,6 +634,18 @@ export const apiService = {
         return data;
     },
 
+    async getLoanPayoffBalance(loanId: string) {
+        const { data, error } = await api.get(`/loans/${loanId}/payoff-balance`);
+        if (error) throw new Error(error.error || 'Erro ao calcular saldo');
+        return data?.balance || null;
+    },
+
+    async registerPartialPayment(loanId: string, payload: any) {
+        const { data, error } = await api.post(`/loans/${loanId}/partial-payment`, payload);
+        if (error) throw new Error(error.error || 'Erro ao registrar pagamento parcial');
+        return data;
+    },
+
     async settleAllInstallments(loanId: string) {
         const { data, error } = await api.post(`/loans/${loanId}/settle-all`, {});
         if (error) throw new Error(error.error || 'Erro ao quitar contrato');

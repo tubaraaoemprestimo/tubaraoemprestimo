@@ -3,6 +3,7 @@ import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { sendWhatsAppMessage } from '../services/whatsapp';
 import { computeCharge, resolveMonthlyRate } from '../services/interestEngine';
+import { applyPaymentWaterfall, getLoanPayoffBalance } from '../services/loanPayoffService';
 
 export const loansRouter = Router();
 loansRouter.use(authenticate);
@@ -118,6 +119,108 @@ loansRouter.put('/:loanId/admin-edit', requireAdmin, async (req: Request, res: R
     } catch (err) {
         console.error('[Loans] admin-edit error:', err);
         res.status(500).json({ error: 'Erro ao editar contrato' });
+    }
+});
+
+// GET /api/loans/:loanId/payoff-balance — Saldo devedor transitório (admin)
+loansRouter.get('/:loanId/payoff-balance', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const balance = await getLoanPayoffBalance(String(req.params.loanId));
+        res.json({ success: true, balance });
+    } catch (err: any) {
+        console.error('[Loans] payoff-balance error:', err);
+        res.status(500).json({ error: err.message || 'Erro ao calcular saldo devedor' });
+    }
+});
+
+// POST /api/loans/:loanId/partial-payment — Pagamento avulso com waterfall (multa -> juros -> principal)
+loansRouter.post('/:loanId/partial-payment', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const { loanId } = req.params;
+        const { amount, paymentMethod, receiptUrl, notes } = req.body;
+        const paymentAmount = Number(amount);
+        if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+            res.status(400).json({ error: 'amount deve ser maior que zero' });
+            return;
+        }
+
+        const loan = await prisma.loan.findUnique({
+            where: { id: loanId },
+            include: { customer: true, loanRequest: { select: { profileType: true } } }
+        });
+        if (!loan) { res.status(404).json({ error: 'Contrato não encontrado' }); return; }
+
+        const balance = await getLoanPayoffBalance(String(loanId));
+        const waterfall = applyPaymentWaterfall({
+            paymentAmount,
+            principalBalance: balance.principalBalance,
+            interestBalance: balance.interestBalance,
+            feeBalance: balance.feeBalance,
+        });
+
+        const profileType = loan.loanRequest?.profileType || '';
+        const isRolloverProfile = ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'].includes(profileType);
+        const now = new Date();
+
+        await prisma.$transaction(async (tx: any) => {
+            let remainingFeeReduction = waterfall.appliedToFees;
+            let remainingInterestReduction = waterfall.appliedToInterest;
+            const pendingInstallments = await tx.installment.findMany({
+                where: { id: { in: balance.pendingInstallmentIds } },
+                orderBy: { dueDate: 'asc' },
+            });
+
+            for (const installment of pendingInstallments) {
+                const currentFee = Number(installment.lateFeeAmount || installment.fineAccumulated || 0);
+                const feeApplied = Math.min(remainingFeeReduction, currentFee);
+                remainingFeeReduction = +(remainingFeeReduction - feeApplied).toFixed(2);
+                const nextFee = +(currentFee - feeApplied).toFixed(2);
+
+                const isInterestInstallment = isRolloverProfile || installment.isInterestPayment;
+                const interestApplied = isInterestInstallment ? Math.min(remainingInterestReduction, Number(installment.amount || 0)) : 0;
+                remainingInterestReduction = +(remainingInterestReduction - interestApplied).toFixed(2);
+                const nextAmount = isInterestInstallment
+                    ? +(Number(installment.amount || 0) - interestApplied).toFixed(2)
+                    : Number(installment.amount || 0);
+
+                const shouldClose = isInterestInstallment && nextFee <= 0 && nextAmount <= 0;
+                await tx.installment.update({
+                    where: { id: installment.id },
+                    data: {
+                        lateFeeAmount: nextFee,
+                        fineAccumulated: nextFee,
+                        ...(isInterestInstallment && { amount: nextAmount }),
+                        ...(receiptUrl && { proofUrl: receiptUrl }),
+                        ...(shouldClose && { status: 'PAID', paidAt: now }),
+                    }
+                });
+            }
+
+            await tx.loan.update({
+                where: { id: loanId },
+                data: {
+                    remainingAmount: waterfall.remainingPrincipalBalance,
+                    lastPaymentDate: now,
+                    status: waterfall.remainingTotalBalance <= 0 ? 'COMPLETED' : loan.status,
+                    daysOverdue: waterfall.remainingTotalBalance <= 0 ? 0 : loan.daysOverdue,
+                }
+            });
+
+            await tx.transaction.create({
+                data: {
+                    type: 'IN',
+                    description: `Pagamento parcial contrato:${loanId} method:${paymentMethod || 'NA'} fees:${waterfall.appliedToFees} interest:${waterfall.appliedToInterest} principal:${waterfall.appliedToPrincipal}${notes ? ' | ' + notes : ''}`,
+                    amount: paymentAmount,
+                    category: 'PAYMENT',
+                    date: now
+                }
+            });
+        });
+
+        res.json({ success: true, balanceBefore: balance, waterfall });
+    } catch (err: any) {
+        console.error('[Loans] partial-payment error:', err);
+        res.status(500).json({ error: err.message || 'Erro ao registrar pagamento parcial' });
     }
 });
 

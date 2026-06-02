@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
+import { getLoanPayoffBalance } from '../services/loanPayoffService';
 
 export const financeRouter = Router();
 financeRouter.use(authenticate);
@@ -423,100 +424,110 @@ financeRouter.get('/requests-map', requireAdmin, async (_req: Request, res: Resp
     }
 });
 
-// GET /api/finance/today-summary - Resumo operacional do dia
+// GET /api/finance/today-summary - Guia operacional: quem cobrar hoje
 financeRouter.get('/today-summary', requireAdmin, async (_req: Request, res: Response) => {
     try {
         const today = new Date();
         const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
         const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
 
-        // Parcelas vencendo hoje (OPEN com dueDate = hoje)
-        const installmentsDueToday = await prisma.installment.findMany({
+        const transactionsToday = await prisma.transaction.findMany({
             where: {
-                status: 'OPEN',
-                dueDate: { gte: startOfDay, lte: endOfDay }
-            },
-            include: {
-                loan: {
-                    include: { customer: true }
-                }
-            },
-            orderBy: { dueDate: 'asc' }
+                type: 'IN',
+                category: 'PAYMENT',
+                date: { gte: startOfDay, lte: endOfDay }
+            }
         });
 
-        const totalDueToday = installmentsDueToday.reduce((sum, i) => sum + i.amount, 0);
+        const paidTodayLoanIds = new Set<string>();
+        for (const t of transactionsToday) {
+            const match = String(t.description || '').match(/contrato:([a-zA-Z0-9-]+)/);
+            if (match?.[1]) paidTodayLoanIds.add(match[1]);
+        }
 
-        // Empréstimos em atraso: loans com status ACTIVE/DEFAULT que têm parcelas OPEN vencidas
-        const overdueInstallments = await prisma.installment.findMany({
+        const activeLoans = await prisma.loan.findMany({
             where: {
-                status: { in: ['OPEN', 'LATE'] },
-                dueDate: { lt: startOfDay },
-                loan: { status: { in: ['ACTIVE', 'DEFAULT', 'APPROVED'] } }
-            },
-            select: { loanId: true },
-            distinct: ['loanId']
-        });
-        const overdueLoanIds = overdueInstallments.map(i => i.loanId);
-
-        const loansInDefault = overdueLoanIds.length > 0 ? await prisma.loan.findMany({
-            where: {
-                id: { in: overdueLoanIds },
-                status: { in: ['ACTIVE', 'DEFAULT', 'APPROVED'] }
+                status: { in: ['ACTIVE', 'DEFAULT', 'APPROVED'] },
+                remainingAmount: { gt: 0 }
             },
             include: {
                 customer: true,
+                loanRequest: { select: { profileType: true } },
                 installments: {
-                    where: { status: { in: ['OPEN', 'LATE'] }, dueDate: { lt: startOfDay } },
-                    orderBy: { dueDate: 'asc' },
-                    take: 1
+                    where: { status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] } },
+                    orderBy: { dueDate: 'asc' }
                 }
-            }
-        }) : [];
-
-        // Pagamentos recebidos hoje
-        const paymentsToday = await prisma.installment.findMany({
-            where: {
-                status: 'PAID',
-                paidAt: { gte: startOfDay, lte: endOfDay }
-            }
+            },
+            orderBy: { createdAt: 'desc' }
         });
-        const paymentsReceivedToday = paymentsToday.reduce((sum, i) => sum + i.amount, 0);
+
+        const collectionsDueToday: any[] = [];
+        const overdueCollections: any[] = [];
+
+        for (const loan of activeLoans) {
+            if (paidTodayLoanIds.has(loan.id)) continue;
+
+            const profileType = loan.loanRequest?.profileType || '';
+            const isDaily = profileType === 'AUTONOMO' || loan.paymentFrequency === 'DAILY';
+            const isMonthly = ['CLT', 'GARANTIA', 'GARANTIA_VEICULO', 'LIMPA_NOME'].includes(profileType) || loan.paymentFrequency === 'MONTHLY';
+            const balance = await getLoanPayoffBalance(loan.id);
+            if (!isDaily && balance.cycleChargeBalance <= 0) continue;
+
+            const nextDue = loan.nextPaymentDate
+                ? new Date(loan.nextPaymentDate)
+                : loan.installments[0]?.dueDate
+                    ? new Date(loan.installments[0].dueDate)
+                    : null;
+            if (nextDue) nextDue.setHours(0, 0, 0, 0);
+
+            const dailyChargeBalance = Number(loan.installments[0]?.amount || loan.dailyInstallmentAmount || 0) + Number(loan.installments[0]?.lateFeeAmount || 0);
+            const currentCycleChargeBalance = isDaily ? dailyChargeBalance : balance.cycleChargeBalance;
+            if (isDaily && currentCycleChargeBalance <= 0) continue;
+
+            const base = {
+                loanId: loan.id,
+                amount: loan.amount,
+                remainingAmount: loan.remainingAmount,
+                cycleChargeBalance: currentCycleChargeBalance,
+                totalPayoffBalance: balance.totalPayoffBalance,
+                principalBalance: balance.principalBalance,
+                interestBalance: balance.interestBalance,
+                feeBalance: balance.feeBalance,
+                profileType,
+                paymentFrequency: loan.paymentFrequency,
+                customer: loan.customer ? { id: loan.customer.id, name: loan.customer.name, phone: loan.customer.phone } : null,
+                nextInstallment: loan.installments[0] || null,
+            };
+
+            if (isDaily) {
+                collectionsDueToday.push({ ...base, reason: 'DAILY_COLLECTION', label: 'Cobrança diária pendente', daysOverdue: 0 });
+                continue;
+            }
+
+            if (isMonthly && nextDue && startOfDay >= nextDue) {
+                const daysOverdue = Math.max(0, Math.floor((startOfDay.getTime() - nextDue.getTime()) / (1000 * 60 * 60 * 24)));
+                const item = {
+                    ...base,
+                    reason: daysOverdue === 0 ? 'MONTHLY_DUE_TODAY' : 'MONTHLY_OVERDUE',
+                    label: daysOverdue === 0 ? 'Vence hoje' : 'Em atraso',
+                    daysOverdue,
+                };
+                if (daysOverdue === 0) collectionsDueToday.push(item);
+                else overdueCollections.push(item);
+            }
+        }
+
+        const paymentsReceivedToday = transactionsToday.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+        const totalDueToday = collectionsDueToday.reduce((sum, i) => sum + Number(i.cycleChargeBalance || 0), 0);
 
         res.json({
             totalDueToday,
-            installmentsDueCount: installmentsDueToday.length,
-            installmentsDueToday: installmentsDueToday.map(i => ({
-                installmentId: i.id,
-                loanId: i.loanId,
-                amount: i.amount,
-                dueDate: i.dueDate,
-                customer: i.loan?.customer ? {
-                    id: i.loan.customer.id,
-                    name: i.loan.customer.name,
-                    phone: i.loan.customer.phone
-                } : null
-            })),
-            loansInDefaultCount: loansInDefault.length,
-            loansInDefault: loansInDefault.map(l => {
-                const overdueInst = l.installments[0];
-                const daysOverdue = overdueInst
-                    ? Math.floor((Date.now() - new Date(overdueInst.dueDate).getTime()) / (1000 * 60 * 60 * 24))
-                    : 0;
-                return {
-                    loanId: l.id,
-                    amount: l.amount,
-                    remainingAmount: l.remainingAmount,
-                    daysOverdue,
-                    customer: l.customer ? {
-                        id: l.customer.id,
-                        name: l.customer.name,
-                        phone: l.customer.phone
-                    } : null,
-                    nextInstallment: overdueInst || null
-                };
-            }),
+            installmentsDueCount: collectionsDueToday.length,
+            installmentsDueToday: collectionsDueToday,
+            loansInDefaultCount: overdueCollections.length,
+            loansInDefault: overdueCollections,
             paymentsReceivedToday,
-            paymentsReceivedCount: paymentsToday.length
+            paymentsReceivedCount: transactionsToday.length
         });
     } catch (err) {
         console.error('[Finance] today-summary error:', err);

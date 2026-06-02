@@ -135,8 +135,11 @@ export const Contracts: React.FC = () => {
 
   // Payment modal
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [partialPaymentOpen, setPartialPaymentOpen] = useState(false);
   const [selectedInstallment, setSelectedInstallment] = useState<ContractInstallment | null>(null);
   const [paymentData, setPaymentData] = useState({ amount: '', paymentMethod: 'PIX', receiptUrl: '', notes: '' });
+  const [payoffBalance, setPayoffBalance] = useState<any | null>(null);
+  const [loadingPayoffBalance, setLoadingPayoffBalance] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
@@ -338,6 +341,26 @@ export const Contracts: React.FC = () => {
     setPaymentOpen(true);
   };
 
+  const openPartialPayment = async (c: Contract) => {
+    setSelected(c);
+    setSelectedInstallment(null);
+    setPaymentData({ amount: '', paymentMethod: 'PIX', receiptUrl: '', notes: '' });
+    setPayoffBalance(null);
+    setPartialPaymentOpen(true);
+    setLoadingPayoffBalance(true);
+    try {
+      const balance = await apiService.getLoanPayoffBalance(c.id);
+      setPayoffBalance(balance);
+      if (balance?.cycleChargeBalance > 0) {
+        setPaymentData(d => ({ ...d, amount: String(balance.cycleChargeBalance) }));
+      }
+    } catch (err: any) {
+      addToast(err.message || 'Erro ao calcular saldo', 'error');
+    } finally {
+      setLoadingPayoffBalance(false);
+    }
+  };
+
   const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -386,6 +409,30 @@ export const Contracts: React.FC = () => {
       load();
     } catch (err: any) {
       addToast(err.message || 'Erro ao registrar', 'error');
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleRegisterPartialPayment = async () => {
+    if (!selected) return;
+    if (!paymentData.amount) { addToast('Informe o valor pago', 'warning'); return; }
+    setRegistering(true);
+    try {
+      const result = await apiService.registerPartialPayment(selected.id, {
+        amount: parseFloat(paymentData.amount),
+        paymentMethod: paymentData.paymentMethod,
+        receiptUrl: paymentData.receiptUrl || undefined,
+        notes: paymentData.notes || undefined
+      });
+      const wf = result?.waterfall;
+      addToast(`Pagamento parcial registrado: juros ${fmt(wf?.appliedToInterest || 0)}, multas ${fmt(wf?.appliedToFees || 0)}, principal ${fmt(wf?.appliedToPrincipal || 0)}`, 'success');
+      setPartialPaymentOpen(false);
+      setDetailsOpen(false);
+      setStatusFilter('ACTIVE');
+      load();
+    } catch (err: any) {
+      addToast(err.message || 'Erro ao registrar pagamento parcial', 'error');
     } finally {
       setRegistering(false);
     }
@@ -883,18 +930,21 @@ export const Contracts: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <Button variant="secondary" onClick={() => setDetailsOpen(false)} className="flex-1">Fechar</Button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                <Button variant="secondary" onClick={() => setDetailsOpen(false)} className="w-full">Fechar</Button>
+                <Button onClick={() => openPartialPayment(selected)} className="w-full bg-[#D4AF37] hover:bg-yellow-500 text-black">
+                  <DollarSign size={16} /> Registrar Pagamento Parcial/Avulso
+                </Button>
                 {selected.installments.some(i => i.status === 'OPEN' || i.status === 'LATE' || i.status === 'AWAITING_CONFIRMATION') && (
-                  <Button 
-                    onClick={handleSettleAll} 
+                  <Button
+                    onClick={handleSettleAll}
                     disabled={settlingAll}
-                    className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                    className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50"
                   >
                     {settlingAll ? 'Quitando...' : 'Quitação Total 🏁'}
                   </Button>
                 )}
-                <Button onClick={() => { setDetailsOpen(false); openEdit(selected); }} className="flex-1">
+                <Button onClick={() => { setDetailsOpen(false); openEdit(selected); }} className="w-full">
                   <Edit2 size={16} /> Editar Contrato
                 </Button>
               </div>
@@ -1123,6 +1173,98 @@ export const Contracts: React.FC = () => {
                 >
                   <CheckCircle2 size={18} /> {processingProof ? '...' : 'Confirmar Pago'}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL PAGAMENTO PARCIAL / AVULSO ===== */}
+      {partialPaymentOpen && selected && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-5 border-b border-zinc-800">
+              <h2 className="font-bold text-lg">Registrar Pagamento Parcial/Avulso</h2>
+              <button onClick={() => setPartialPaymentOpen(false)} className="text-zinc-400 hover:text-white"><X size={20} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="bg-zinc-900 p-3 rounded-lg space-y-1">
+                <p className="text-xs text-zinc-500">Cliente</p>
+                <p className="font-bold">{selected.customer?.name}</p>
+                {loadingPayoffBalance ? (
+                  <p className="text-sm text-zinc-500 animate-pulse">Calculando saldo...</p>
+                ) : payoffBalance ? (
+                  <div className="grid grid-cols-2 gap-2 pt-2 text-xs">
+                    <p className="text-zinc-400">Multas: <span className="text-red-400 font-bold">{fmt(payoffBalance.feeBalance || 0)}</span></p>
+                    <p className="text-zinc-400">Juros: <span className="text-yellow-400 font-bold">{fmt(payoffBalance.interestBalance || 0)}</span></p>
+                    <p className="text-zinc-400">Principal: <span className="text-white font-bold">{fmt(payoffBalance.principalBalance || 0)}</span></p>
+                    <p className="text-zinc-400">Total: <span className="text-[#D4AF37] font-bold">{fmt(payoffBalance.totalPayoffBalance || 0)}</span></p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-red-400">Saldo não carregado</p>
+                )}
+              </div>
+
+              <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-3 text-xs text-blue-300">
+                Aplicação automática: multas/mora → juros → principal. Registro fica rastreável em Transaction com contrato:{selected.id}.
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold mb-1">Valor Recebido (R$)</label>
+                <input
+                  type="number"
+                  value={paymentData.amount}
+                  onChange={e => setPaymentData(d => ({ ...d, amount: e.target.value }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white focus:border-[#D4AF37] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold mb-1">Método</label>
+                <select
+                  value={paymentData.paymentMethod}
+                  onChange={e => setPaymentData(d => ({ ...d, paymentMethod: e.target.value }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white focus:border-[#D4AF37] outline-none"
+                >
+                  <option value="PIX">PIX</option>
+                  <option value="DINHEIRO">Dinheiro</option>
+                  <option value="TED">TED/Transferência</option>
+                  <option value="CARTAO">Cartão</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold mb-1">Comprovante (PDF ou Imagem)</label>
+                {!paymentData.receiptUrl ? (
+                  <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-zinc-700 rounded-lg cursor-pointer hover:border-[#D4AF37] transition-colors bg-black">
+                    <Upload size={28} className="text-zinc-500 mb-2" />
+                    <span className="text-sm text-zinc-500">{uploadingReceipt ? 'Carregando...' : 'Clique para anexar PDF ou imagem'}</span>
+                    <input type="file" accept="image/*,application/pdf" onChange={handleReceiptUpload} disabled={uploadingReceipt} className="hidden" />
+                  </label>
+                ) : (
+                  <div className="bg-black border border-zinc-700 rounded-lg p-3 flex items-center justify-between">
+                    <span className="text-sm text-white">Comprovante anexado</span>
+                    <button onClick={() => setPaymentData(d => ({ ...d, receiptUrl: '' }))} className="text-red-400 hover:text-red-300"><X size={18} /></button>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold mb-1">Observações</label>
+                <input
+                  type="text"
+                  value={paymentData.notes}
+                  onChange={e => setPaymentData(d => ({ ...d, notes: e.target.value }))}
+                  className="w-full bg-black border border-zinc-700 rounded-lg px-4 py-2 text-white focus:border-[#D4AF37] outline-none"
+                  placeholder="Ex: Pagamento parcial no balcão"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button variant="secondary" onClick={() => setPartialPaymentOpen(false)} className="flex-1">Cancelar</Button>
+                <Button onClick={handleRegisterPartialPayment} disabled={registering || loadingPayoffBalance} className="flex-1">
+                  <DollarSign size={16} /> {registering ? 'Registrando...' : 'Confirmar'}
+                </Button>
               </div>
             </div>
           </div>

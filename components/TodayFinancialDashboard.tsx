@@ -12,7 +12,10 @@ interface TodaySummary {
     installmentId: string;
     loanId: string;
     amount: number;
-    dueDate: string;
+    cycleChargeBalance?: number;
+    totalPayoffBalance?: number;
+    dueDate?: string;
+    label?: string;
     customer: { id: string; name: string; phone: string } | null;
   }>;
   loansInDefaultCount: number;
@@ -20,7 +23,10 @@ interface TodaySummary {
     loanId: string;
     amount: number;
     remainingAmount: number;
+    cycleChargeBalance?: number;
+    totalPayoffBalance?: number;
     daysOverdue: number;
+    label?: string;
     customer: { id: string; name: string; phone: string } | null;
     nextInstallment: any;
   }>;
@@ -101,7 +107,7 @@ export const TodayFinancialDashboard: React.FC = () => {
         <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <DollarSign size={18} className="text-yellow-400" />
-            <p className="text-xs text-yellow-400 font-bold uppercase">A Receber Hoje</p>
+            <p className="text-xs text-yellow-400 font-bold uppercase">Cobrança Hoje</p>
           </div>
           <p className="text-2xl font-bold text-white">{fmt(summary.totalDueToday)}</p>
           <p className="text-xs text-zinc-500 mt-1">{summary.installmentsDueCount} parcela(s)</p>
