@@ -947,7 +947,7 @@ export async function applyDailyLateFees(): Promise<number> {
 
     const profileType = inst.loan?.loanRequest?.profileType || '';
     const loanAmount = Number(inst.loan?.amount ?? inst.loan?.principalAmount ?? inst.amount);
-    const isMonthlyLoan = ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'].includes(profileType) || inst.loan?.paymentFrequency === 'MONTHLY';
+    const isMonthlyLoan = ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'].includes(profileType) || inst.loan?.paymentFrequency === 'MONTHLY' || inst.isInterestPayment;
     const fineAccumulated = isMonthlyLoan
       ? +((loanAmount * 0.07) + (daysOverdue * LATE_FEE_DAILY)).toFixed(2)
       : +(daysOverdue * LATE_FEE_DAILY).toFixed(2);
