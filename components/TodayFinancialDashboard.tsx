@@ -36,14 +36,23 @@ export const TodayFinancialDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [sendingTo, setSendingTo] = useState<string | null>(null);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     const data = await apiService.getTodaySummary();
     setSummary(data);
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const interval = setInterval(() => load(true), 30000);
+    const onFocus = () => load(true);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
 
   const sendReminder = async (phone: string, name: string, amount: number, type: 'due' | 'overdue', daysOverdue?: number) => {
     if (!phone) { addToast('Cliente sem telefone cadastrado', 'warning'); return; }

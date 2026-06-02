@@ -239,8 +239,10 @@ export const scheduleLatePaymentDetection = () => {
 
         // WhatsApp ao cliente
         if (c.phone) {
+          const baseFmt = brMoney(Number(inst.amount));
+          const multaFmt = brMoney(charge.multa7 + charge.multaDiaria);
           sendWhatsAppMessage(c.phone,
-            `🚨 *EM ATRASO*\n\nOlá, ${c.name.split(' ')[0]}!\n\nSeu valor de *${amtFmt}* (já com juros e multa) referente à ${modalidade.label} venceu em *${brDate(inst.dueDate)}* (${daysOverdue} dia${daysOverdue > 1 ? 's' : ''} de atraso).${pixInfo}\n\n⚠️ Juros e multas estão sendo aplicados.\n\nRegularize pelo app ou entre em contato.\n\n_Tubarão Empréstimos 🦈_`
+            `🚨 *EM ATRASO*\n\nOlá, ${c.name.split(' ')[0]}!\n\nSua ${modalidade.label} de *${baseFmt}* venceu em *${brDate(inst.dueDate)}* (${daysOverdue} dia${daysOverdue > 1 ? 's' : ''} de atraso).\n\nJuros/multa de atraso hoje: *${multaFmt}*\nValor atualizado para pagamento hoje: *${amtFmt}*.${pixInfo}\n\n⚠️ Juros e multas estão sendo aplicados.\n\nRegularize pelo app ou entre em contato.\n\n_Tubarão Empréstimos 🦈_`
           ).catch(err => console.error('[Cron] Late WA failed:', err));
         }
 

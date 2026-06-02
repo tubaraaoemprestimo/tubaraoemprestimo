@@ -294,6 +294,7 @@ export const Requests: React.FC = () => {
         setProcessing(null);
         setSelectedRequest(null);
         loadRequests();
+        setFilterStatusTab('ACCEPTED'); // Auto-navegar para aba Aceitas
         addToast("Solicitação aprovada e saldo liberado.", 'success');
     };
 
@@ -360,6 +361,7 @@ export const Requests: React.FC = () => {
             setApprovedCompanyPaymentDay('');
             setSelectedRequest(null);
             loadRequests();
+            setFilterStatusTab('AWAITING_ACCEPTANCE'); // Auto-navegar para aba Aguardando Aceite
             addToast("Contraproposta enviada ao cliente!", 'success');
         } catch (error) {
             setProcessing(null);
@@ -486,6 +488,7 @@ export const Requests: React.FC = () => {
             });
             setSelectedRequest(null);
             loadRequests();
+            setFilterStatusTab('ACTIVE'); // Auto-navegar para aba Ativas
             addToast('✅ Contrato ativado com sucesso!', 'success');
         } catch (error: any) {
             setProcessing(null);
@@ -509,6 +512,7 @@ export const Requests: React.FC = () => {
         setProcessing(null);
         setSelectedRequest(null);
         loadRequests();
+        setFilterStatusTab('REJECTED'); // Auto-navegar para aba Rejeitadas
         addToast("Solicitação reprovada.", 'info');
     };
 
@@ -532,6 +536,7 @@ export const Requests: React.FC = () => {
         setDocRequestDesc('');
         setSelectedRequest(null);
         loadRequests();
+        setFilterStatusTab('PENDING_ANALYSIS'); // Permanecer em Em Análise (docs pendentes)
         addToast("Solicitação de documento enviada ao cliente.", 'success');
     };
 

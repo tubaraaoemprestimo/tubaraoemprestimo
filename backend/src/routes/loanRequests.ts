@@ -224,7 +224,11 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 cpf: data.cpf,
                 status: {
                     in: ['PENDING', 'WAITING_DOCS', 'PENDING_ACCEPTANCE', 'APPROVED']
-                }
+                },
+                OR: [
+                    { loan: null },
+                    { loan: { status: { in: ['ACTIVE', 'APPROVED', 'DEFAULT', 'PAUSED'] } } }
+                ]
             },
             orderBy: { createdAt: 'desc' }
         });

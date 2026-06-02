@@ -24,6 +24,8 @@ interface ContractInstallment {
   paidAt?: string;
   proofUrl?: string;
   isInterestPayment?: boolean;
+  lateFeeAmount?: number;
+  totalAmount?: number;
 }
 
 interface PendingProof {
@@ -109,6 +111,7 @@ const MODALITY_FILTERS = [
 ];
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const installmentTotal = (inst: ContractInstallment) => inst.totalAmount ?? (Number(inst.amount || 0) + Number(inst.lateFeeAmount || 0));
 const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
 
 export const Contracts: React.FC = () => {
@@ -331,7 +334,7 @@ export const Contracts: React.FC = () => {
   const openPayment = (c: Contract, inst: ContractInstallment) => {
     setSelected(c);
     setSelectedInstallment(inst);
-    setPaymentData({ amount: String(inst.amount), paymentMethod: 'PIX', receiptUrl: '', notes: '' });
+    setPaymentData({ amount: String(installmentTotal(inst)), paymentMethod: 'PIX', receiptUrl: '', notes: '' });
     setPaymentOpen(true);
   };
 
@@ -834,7 +837,10 @@ export const Contracts: React.FC = () => {
                     {selected.installments.map((inst, idx) => (
                       <div key={inst.id} className={`flex items-center justify-between p-3 rounded-lg border ${inst.status === 'PAID' ? 'border-green-800 bg-green-900/10' : 'border-zinc-800 bg-zinc-900'}`}>
                         <div>
-                          <p className="text-sm font-bold">#{idx + 1} — {fmt(inst.amount)}</p>
+                          <p className="text-sm font-bold">#{idx + 1} — {fmt(installmentTotal(inst))}</p>
+                          {Number(inst.lateFeeAmount || 0) > 0 && (
+                            <p className="text-xs text-red-400">Base {fmt(inst.amount)} + atraso {fmt(Number(inst.lateFeeAmount || 0))}</p>
+                          )}
                           <p className="text-xs text-zinc-500">
                             Vence: {fmtDate(inst.dueDate)}
                             {inst.paidAt && ` · Pago em: ${fmtDate(inst.paidAt)}`}
@@ -1135,7 +1141,7 @@ export const Contracts: React.FC = () => {
               <div className="bg-zinc-900 p-3 rounded-lg">
                 <p className="text-xs text-zinc-500">Cliente</p>
                 <p className="font-bold">{selected.customer?.name}</p>
-                <p className="text-sm text-[#D4AF37]">Parcela de {fmt(selectedInstallment.amount)} · Vence {fmtDate(selectedInstallment.dueDate)}</p>
+                <p className="text-sm text-[#D4AF37]">Parcela de {fmt(installmentTotal(selectedInstallment))} · Vence {fmtDate(selectedInstallment.dueDate)}</p>
               </div>
 
               <div>

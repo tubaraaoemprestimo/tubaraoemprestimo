@@ -484,10 +484,16 @@ async function processOverdue1Day(): Promise<number> {
 
   console.log(`[CollectionAutomation] Encontradas ${installments.length} parcelas com 1 dia de atraso`);
 
+  const systemSettingRate = await getSystemMonthlyRateSetting();
+  const sundayFinePolicy = await getSundayPolicyForFineSetting();
+
   let sent = 0;
   for (const installment of installments) {
     try {
       const customer = installment.loan.customer;
+      const daysOverdue = Math.max(1, calcDaysOverdue(installment.dueDate, new Date()));
+      const collectionContext = getCollectionContext(installment);
+      const charge = buildOverdueCharge(installment, daysOverdue, collectionContext.chargeAmount, systemSettingRate, sundayFinePolicy);
 
       await templateService.triggerTemplate(
         'INSTALLMENT_OVERDUE_1_DAY',
@@ -499,7 +505,10 @@ async function processOverdue1Day(): Promise<number> {
         },
         {
           nome: customer.name,
-          ...getCollectionContext(installment),
+          dias_atraso: daysOverdue.toString(),
+          ...collectionContext,
+          valor_com_juros: formatCurrency(charge.total),
+          ...buildChargeTemplateVars(charge),
           data_vencimento: formatDate(installment.dueDate),
           pix_key: await getAdminPixKey()
         }
@@ -548,10 +557,16 @@ async function processOverdue3Days(): Promise<number> {
 
   console.log(`[CollectionAutomation] Encontradas ${installments.length} parcelas com 3 dias de atraso`);
 
+  const systemSettingRate = await getSystemMonthlyRateSetting();
+  const sundayFinePolicy = await getSundayPolicyForFineSetting();
+
   let sent = 0;
   for (const installment of installments) {
     try {
       const customer = installment.loan.customer;
+      const daysOverdue = Math.max(3, calcDaysOverdue(installment.dueDate, new Date()));
+      const collectionContext = getCollectionContext(installment);
+      const charge = buildOverdueCharge(installment, daysOverdue, collectionContext.chargeAmount, systemSettingRate, sundayFinePolicy);
 
       await templateService.triggerTemplate(
         'INSTALLMENT_OVERDUE_3_DAYS',
@@ -563,7 +578,10 @@ async function processOverdue3Days(): Promise<number> {
         },
         {
           nome: customer.name,
-          ...getCollectionContext(installment),
+          dias_atraso: daysOverdue.toString(),
+          ...collectionContext,
+          valor_com_juros: formatCurrency(charge.total),
+          ...buildChargeTemplateVars(charge),
           data_vencimento: formatDate(installment.dueDate),
           pix_key: await getAdminPixKey()
         }
@@ -908,10 +926,13 @@ export async function applyDailyLateFees(): Promise<number> {
       loan: { status: 'ACTIVE' },
       dueDate: { lte: today },
     },
-    select: {
-      id: true,
-      dueDate: true,
-      amount: true,
+    include: {
+      loan: {
+        include: {
+          customer: true,
+          loanRequest: { select: { profileType: true } }
+        }
+      }
     },
   });
 
@@ -924,7 +945,12 @@ export async function applyDailyLateFees(): Promise<number> {
     const daysOverdue = calcDaysOverdue(inst.dueDate, now);
     if (daysOverdue === 0) continue;
 
-    const fineAccumulated = +(daysOverdue * LATE_FEE_DAILY).toFixed(2);
+    const profileType = inst.loan?.loanRequest?.profileType || '';
+    const loanAmount = Number(inst.loan?.amount ?? inst.loan?.principalAmount ?? inst.amount);
+    const isMonthlyLoan = ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'].includes(profileType) || inst.loan?.paymentFrequency === 'MONTHLY';
+    const fineAccumulated = isMonthlyLoan
+      ? +((loanAmount * 0.07) + (daysOverdue * LATE_FEE_DAILY)).toFixed(2)
+      : +(daysOverdue * LATE_FEE_DAILY).toFixed(2);
 
     try {
       await prisma.installment.update({

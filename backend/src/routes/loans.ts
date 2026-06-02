@@ -20,6 +20,16 @@ function normalizeRate(value: number | null | undefined): number | null {
     return value > 1 ? value / 100 : value;
 }
 
+function withInstallmentTotals<T extends { installments?: any[] }>(loan: T): T {
+    return {
+        ...loan,
+        installments: (loan.installments || []).map((inst) => ({
+            ...inst,
+            totalAmount: Number(inst.amount || 0) + Number(inst.lateFeeAmount || 0),
+        })),
+    };
+}
+
 // GET /api/loans/admin/all — Admin: listar todos os contratos com filtros
 loansRouter.get('/admin/all', requireAdmin, async (req: Request, res: Response) => {
     try {
@@ -62,7 +72,7 @@ loansRouter.get('/admin/all', requireAdmin, async (req: Request, res: Response) 
             )
             : loans;
 
-        res.json(filtered);
+        res.json(filtered.map(withInstallmentTotals));
     } catch (err) {
         console.error('[Loans] admin/all error:', err);
         res.status(500).json({ error: 'Erro ao listar contratos' });
@@ -82,7 +92,7 @@ loansRouter.get('/:loanId/admin-details', requireAdmin, async (req: Request, res
             }
         });
         if (!loan) { res.status(404).json({ error: 'Contrato não encontrado' }); return; }
-        res.json(loan);
+        res.json(withInstallmentTotals(loan));
     } catch (err) {
         console.error('[Loans] admin-details error:', err);
         res.status(500).json({ error: 'Erro ao buscar detalhes' });
