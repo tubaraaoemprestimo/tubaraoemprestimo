@@ -21,14 +21,67 @@ function normalizeRate(value: number | null | undefined): number | null {
     return value > 1 ? value / 100 : value;
 }
 
-function withInstallmentTotals<T extends { installments?: any[] }>(loan: T): T {
+async function withInstallmentTotals<T extends { installments?: any[]; loanRequest?: any; customer?: any; interestRate?: number; principalAmount?: number; amount?: number }>(loan: T): Promise<T> {
+    const profileType = loan.loanRequest?.profileType || '';
+    const interestSetting = await prisma.systemSettings.findFirst({ where: { key: 'monthlyInterestRate' } });
+    const systemSettingRate = normalizeRate(interestSetting?.value != null ? Number(interestSetting.value) : null);
+    const monthlyRate = resolveMonthlyRate({
+        contractRate: normalizeRate(loan.interestRate),
+        customerRate: normalizeRate(loan.customer?.lateInterestMonthly ?? loan.customer?.monthlyInterestRate),
+        systemSettingRate,
+    });
+    const today = new Date();
+
     return {
         ...loan,
-        installments: (loan.installments || []).map((inst) => ({
-            ...inst,
-            totalAmount: Number(inst.amount || 0) + Number(inst.lateFeeAmount || 0),
-        })),
+        installments: (loan.installments || []).map((inst) => {
+            const amount = Number(inst.amount || 0);
+            const persistedFee = Number(inst.lateFeeAmount || inst.fineAccumulated || 0);
+            const dueDate = inst.dueDate ? new Date(inst.dueDate) : null;
+            const daysOverdue = dueDate && ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'].includes(inst.status)
+                ? Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)))
+                : 0;
+
+            if (daysOverdue <= 0) {
+                return {
+                    ...inst,
+                    baseAmount: amount,
+                    lateFeeAmount: persistedFee,
+                    dynamicLateFeeAmount: persistedFee,
+                    totalAmount: amount + persistedFee,
+                    daysOverdue: Number(inst.daysOverdue || 0),
+                };
+            }
+
+            const charge = computeCharge({
+                profileType,
+                principal: Number(loan.principalAmount ?? loan.amount ?? amount),
+                loanAmount: Number(loan.amount ?? loan.principalAmount ?? amount),
+                daysOverdue,
+                base: amount,
+                dueDate: inst.dueDate,
+                today,
+                monthlyRate,
+            });
+            const totalAmount = Number(charge.total.toFixed(2));
+            const dynamicFee = Number(Math.max(0, totalAmount - amount).toFixed(2));
+
+            return {
+                ...inst,
+                baseAmount: amount,
+                lateFeeAmount: dynamicFee,
+                fineAccumulated: dynamicFee,
+                dynamicLateFeeAmount: dynamicFee,
+                totalAmount,
+                daysOverdue,
+                chargeBreakdown: charge.breakdown,
+            };
+        }),
     };
+}
+
+async function withInstallmentTotalsList<T extends { installments?: any[]; loanRequest?: any; customer?: any; interestRate?: number; principalAmount?: number; amount?: number }>(loans: T[]): Promise<T[]> {
+    return Promise.all(loans.map((loan) => withInstallmentTotals(loan)));
 }
 
 // GET /api/loans/admin/all — Admin: listar todos os contratos com filtros
@@ -73,7 +126,7 @@ loansRouter.get('/admin/all', requireAdmin, async (req: Request, res: Response) 
             )
             : loans;
 
-        res.json(filtered.map(withInstallmentTotals));
+        res.json(await withInstallmentTotalsList(filtered));
     } catch (err) {
         console.error('[Loans] admin/all error:', err);
         res.status(500).json({ error: 'Erro ao listar contratos' });
@@ -93,7 +146,7 @@ loansRouter.get('/:loanId/admin-details', requireAdmin, async (req: Request, res
             }
         });
         if (!loan) { res.status(404).json({ error: 'Contrato não encontrado' }); return; }
-        res.json(withInstallmentTotals(loan));
+        res.json(await withInstallmentTotals(loan));
     } catch (err) {
         console.error('[Loans] admin-details error:', err);
         res.status(500).json({ error: 'Erro ao buscar detalhes' });
@@ -417,7 +470,7 @@ loansRouter.get('/', async (req: Request, res: Response) => {
         let loans;
         if (req.user!.role === 'ADMIN') {
             loans = await prisma.loan.findMany({
-                include: { customer: true, installments: true },
+                include: { customer: true, installments: true, loanRequest: { select: { profileType: true, monthlyRate: true, contractMonths: true } } },
                 orderBy: { createdAt: 'desc' }
             });
         } else {
@@ -429,11 +482,15 @@ loansRouter.get('/', async (req: Request, res: Response) => {
 
             loans = await prisma.loan.findMany({
                 where: { customerId: customer.id },
-                include: { installments: true },
+                include: {
+                    customer: true,
+                    installments: true,
+                    loanRequest: { select: { profileType: true, monthlyRate: true, contractMonths: true } }
+                },
                 orderBy: { createdAt: 'desc' }
             });
         }
-        res.json(loans.map(withInstallmentTotals));
+        res.json(await withInstallmentTotalsList(loans));
     } catch (error) {
         res.status(500).json({ error: 'Erro ao buscar empréstimos' });
     }
@@ -713,6 +770,8 @@ loansRouter.post('/:loanId/generate-payment', authenticate, async (req: Request,
         const originalAmount = loanAmount;            // Valor emprestado original (base dos 7%)
         const remainingAmount = loan.remainingAmount; // Saldo devedor restante
         const interestAmount = parseFloat(charge.jurosMes.toFixed(2)); // Juros do mês (componente de exibição)
+        const lateFeeAmount = parseFloat((charge.multa7 + charge.multaDiaria).toFixed(2));
+        const baseChargeAmount = parseFloat((charge.base || 0).toFixed(2));
 
         let paymentAmount = 0;
         let paymentDescription = '';
@@ -809,6 +868,9 @@ Saldo devedor: R$ ${remainingAmount.toLocaleString('pt-BR', { minimumFractionDig
                 originalAmount,
                 remainingAmount,
                 interestAmount,
+                lateFeeAmount,
+                baseChargeAmount,
+                daysOverdue,
                 interestRate: monthlyRate * 100,
                 pixKey,
                 pixKeyType,

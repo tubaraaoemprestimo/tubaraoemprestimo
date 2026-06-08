@@ -709,6 +709,7 @@ export const apiService = {
             success: boolean; payment: {
                 type: string; amount: number; description: string;
                 originalAmount: number; remainingAmount: number; interestAmount: number;
+                lateFeeAmount?: number; baseChargeAmount?: number; daysOverdue?: number;
                 interestRate: number; pixKey: string; pixKeyType: string; pixReceiver: string;
                 contractId: string;
             }

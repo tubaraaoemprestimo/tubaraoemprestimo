@@ -4,6 +4,7 @@ import { authenticate, requireAdmin } from '../middleware/auth';
 import { emailService } from '../services/email';
 import { sendWhatsAppMessage } from '../services/whatsapp';
 import { sendPushToUser, sendPushToRole } from './push';
+import { applyPaymentWaterfall, getLoanPayoffBalance } from '../services/loanPayoffService';
 
 export const paymentReceiptsRouter = Router();
 paymentReceiptsRouter.use(authenticate);
@@ -153,15 +154,13 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
             }
         });
 
-        // Marca parcela como paga
-        const installment = await prisma.installment.update({
-            where: { id: receipt.installmentId },
-            data: {
-                status: 'PAID',
-                paidAt: new Date(),
-                proofUrl: receipt.receiptUrl
-            }
+        const installment = await prisma.installment.findUnique({
+            where: { id: receipt.installmentId }
         });
+        if (!installment) {
+            res.status(404).json({ error: 'Parcela não encontrada' });
+            return;
+        }
 
         // Atualizar remainingAmount do loan
         const loan = await prisma.loan.findUnique({
@@ -235,7 +234,7 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
                 // Marca o registro pago como pagamento de juros de rolagem (não é amortização)
                 await prisma.installment.update({
                     where: { id: installment.id },
-                    data: { isInterestPayment: true }
+                    data: { status: 'PAID', paidAt: new Date(), proofUrl: receipt.receiptUrl, isInterestPayment: true }
                 });
 
                 // Gerar nova parcela de juros para o próximo mês
@@ -265,18 +264,52 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
                 // Cada pagamento reduz o remainingAmount
                 // ============================================================
                 const paidAmount = Number(receipt.amount);
-                const newRemaining = Math.max(0, Number(loan.remainingAmount) - paidAmount);
+                const balance = await getLoanPayoffBalance(loan.id);
+                const waterfall = applyPaymentWaterfall({
+                    paymentAmount: paidAmount,
+                    principalBalance: balance.principalBalance,
+                    interestBalance: balance.interestBalance,
+                    feeBalance: balance.feeBalance,
+                });
+                const now = new Date();
 
-                await prisma.loan.update({
-                    where: { id: loan.id },
-                    data: {
-                        remainingAmount: newRemaining,
-                        lastPaymentDate: new Date(),
-                        status: newRemaining <= 0 ? 'COMPLETED' : loan.status
+                await prisma.$transaction(async (tx: any) => {
+                    let remainingFeeReduction = waterfall.appliedToFees;
+                    const pendingInstallments = await tx.installment.findMany({
+                        where: { id: { in: balance.pendingInstallmentIds } },
+                        orderBy: { dueDate: 'asc' },
+                    });
+
+                    for (const pending of pendingInstallments) {
+                        const currentFee = Number(pending.lateFeeAmount || pending.fineAccumulated || 0);
+                        const feeApplied = Math.min(remainingFeeReduction, currentFee);
+                        remainingFeeReduction = +(remainingFeeReduction - feeApplied).toFixed(2);
+                        const nextFee = +(currentFee - feeApplied).toFixed(2);
+                        const targetTotal = Number(pending.amount || 0) + currentFee;
+                        const shouldClose = pending.id === installment.id && paidAmount >= targetTotal;
+
+                        await tx.installment.update({
+                            where: { id: pending.id },
+                            data: {
+                                lateFeeAmount: nextFee,
+                                fineAccumulated: nextFee,
+                                ...(pending.id === installment.id && { proofUrl: receipt.receiptUrl }),
+                                ...(shouldClose && { status: 'PAID', paidAt: now }),
+                            }
+                        });
                     }
+
+                    await tx.loan.update({
+                        where: { id: loan.id },
+                        data: {
+                            remainingAmount: waterfall.remainingPrincipalBalance,
+                            lastPaymentDate: now,
+                            status: waterfall.remainingTotalBalance <= 0 ? 'COMPLETED' : loan.status
+                        }
+                    });
                 });
 
-                console.log(`[PaymentReceipts] Loan ${loan.id} AMORTIZAÇÃO: -R$ ${paidAmount.toFixed(2)} => remainingAmount = R$ ${newRemaining.toFixed(2)}`);
+                console.log(`[PaymentReceipts] Loan ${loan.id} AMORTIZAÇÃO/WATERFALL: pago R$ ${paidAmount.toFixed(2)} fees=${waterfall.appliedToFees} principal=${waterfall.appliedToPrincipal} => remainingAmount = R$ ${waterfall.remainingPrincipalBalance.toFixed(2)}`);
             }
 
             // Criar transação de entrada

@@ -377,7 +377,11 @@ export interface Installment {
   proofUrl?: string;
   paidAt?: string;
   lateFeeAmount?: number;
+  fineAccumulated?: number;
+  baseAmount?: number;
+  dynamicLateFeeAmount?: number;
   totalAmount?: number;
+  chargeBreakdown?: Array<{ label: string; amount: number }>;
   // Marca técnica de pagamento de juros (rolagem CLT/GARANTIA). Default false no backend.
   // Opcional e backward-compatible: o frontend antigo simplesmente ignora o campo.
   isInterestPayment?: boolean;

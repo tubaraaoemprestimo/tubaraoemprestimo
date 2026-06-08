@@ -22,6 +22,9 @@ interface PaymentResult {
    originalAmount: number;
    remainingAmount: number;
    interestAmount: number;
+   lateFeeAmount?: number;
+   baseChargeAmount?: number;
+   daysOverdue?: number;
    interestRate: number;
    pixKey: string;
    pixKeyType: string;
@@ -37,7 +40,7 @@ export const Contracts: React.FC = () => {
    const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
 
    // Modals
-   const [paymentModalData, setPaymentModalData] = useState<{ amount: number, installmentId: string, loanId: string } | null>(null);
+   const [paymentModalData, setPaymentModalData] = useState<{ amount: number, installmentId: string, loanId: string, baseAmount: number, lateFeeAmount: number, daysOverdue?: number } | null>(null);
    const [receiptData, setReceiptData] = useState<{ amount: number, date: string, description: string, id: string } | null>(null);
 
    // Payment type modal
@@ -62,10 +65,15 @@ export const Contracts: React.FC = () => {
    const handlePay = (inst: Installment) => {
       if (!selectedLoanId) return;
       const amountToPay = getInstallmentAmount(inst);
+      const baseAmount = Number(inst.baseAmount ?? inst.amount ?? 0);
+      const lateFeeAmount = Number(inst.dynamicLateFeeAmount ?? inst.lateFeeAmount ?? 0);
       setPaymentModalData({
          amount: amountToPay,
          installmentId: inst.id,
-         loanId: selectedLoanId
+         loanId: selectedLoanId,
+         baseAmount,
+         lateFeeAmount,
+         daysOverdue: (inst as any).daysOverdue
       });
    };
 
@@ -79,7 +87,7 @@ export const Contracts: React.FC = () => {
 
    const handleViewReceipt = (inst: Installment) => {
       setReceiptData({
-         amount: inst.amount,
+         amount: getInstallmentAmount(inst),
          date: inst.paidAt || new Date().toISOString(),
          description: `Pagamento de Juros`,
          id: inst.id
@@ -314,6 +322,9 @@ export const Contracts: React.FC = () => {
                amount={paymentModalData.amount}
                installmentId={paymentModalData.installmentId}
                loanId={paymentModalData.loanId}
+               baseAmount={paymentModalData.baseAmount}
+               lateFeeAmount={paymentModalData.lateFeeAmount}
+               daysOverdue={paymentModalData.daysOverdue}
                onClose={() => setPaymentModalData(null)}
                onPaymentSubmitted={handlePaymentSubmitted}
             />
@@ -458,8 +469,16 @@ export const Contracts: React.FC = () => {
                            <span className="text-white">R$ {generatedPayment.remainingAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                         </div>
                         <div className="border-t border-zinc-800 pt-3 flex justify-between text-sm">
+                           <span className="text-zinc-500">Valor Base</span>
+                           <span className="text-white">R$ {Number(generatedPayment.baseChargeAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
                            <span className="text-zinc-500">Juros ({generatedPayment.interestRate}% a.m.)</span>
                            <span className="text-amber-400 font-bold">R$ {generatedPayment.interestAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                           <span className="text-zinc-500">Multas e Juros por Atraso{generatedPayment.daysOverdue ? ` (${generatedPayment.daysOverdue}d)` : ''}</span>
+                           <span className="text-red-400 font-bold">R$ {Number(generatedPayment.lateFeeAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                         </div>
                         {generatedPayment.type === 'full' && (
                            <div className="border-t border-zinc-800 pt-3 flex justify-between text-sm">

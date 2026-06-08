@@ -14,6 +14,9 @@ interface PixModalProps {
   loanId: string;
   customerId?: string;
   customerName?: string;
+  baseAmount?: number;
+  lateFeeAmount?: number;
+  daysOverdue?: number;
   onClose: () => void;
   onPaymentSubmitted?: () => void;
 }
@@ -24,6 +27,9 @@ export const PixModal: React.FC<PixModalProps> = ({
   loanId,
   customerId,
   customerName,
+  baseAmount,
+  lateFeeAmount,
+  daysOverdue,
   onClose,
   onPaymentSubmitted
 }) => {
@@ -98,6 +104,21 @@ export const PixModal: React.FC<PixModalProps> = ({
                   </p>
                 </div>
               )}
+
+              <div className="mt-5 bg-black/50 border border-zinc-800 rounded-2xl p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-500">Valor Base</span>
+                  <span className="text-white font-bold">R$ {Number(baseAmount ?? amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-500">Multas e Juros por Atraso{daysOverdue ? ` (${daysOverdue}d)` : ''}</span>
+                  <span className="text-red-400 font-bold">R$ {Number(lateFeeAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="border-t border-zinc-800 pt-2 flex justify-between text-base">
+                  <span className="text-zinc-300 font-bold">Total a Pagar</span>
+                  <span className="text-[#D4AF37] font-black">R$ {Number(amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
 
               {/* Action Button */}
               <div className="mt-6 space-y-3">
