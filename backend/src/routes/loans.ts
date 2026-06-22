@@ -21,10 +21,14 @@ function normalizeRate(value: number | null | undefined): number | null {
     return value > 1 ? value / 100 : value;
 }
 
-async function withInstallmentTotals<T extends { installments?: any[]; loanRequest?: any; customer?: any; interestRate?: number; principalAmount?: number; amount?: number }>(loan: T): Promise<T> {
-    const profileType = loan.loanRequest?.profileType || '';
+async function getSystemSettingMonthlyRate(): Promise<number | null> {
     const interestSetting = await prisma.systemSettings.findFirst({ where: { key: 'monthlyInterestRate' } });
-    const systemSettingRate = normalizeRate(interestSetting?.value != null ? Number(interestSetting.value) : null);
+    return normalizeRate(interestSetting?.value != null ? Number(interestSetting.value) : null);
+}
+
+async function withInstallmentTotals<T extends { installments?: any[]; loanRequest?: any; customer?: any; interestRate?: number; principalAmount?: number; amount?: number }>(loan: T, systemSettingRateOverride?: number | null): Promise<T> {
+    const profileType = loan.loanRequest?.profileType || '';
+    const systemSettingRate = systemSettingRateOverride !== undefined ? systemSettingRateOverride : await getSystemSettingMonthlyRate();
     const monthlyRate = resolveMonthlyRate({
         contractRate: normalizeRate(loan.interestRate),
         customerRate: normalizeRate(loan.customer?.lateInterestMonthly ?? loan.customer?.monthlyInterestRate),
@@ -81,7 +85,8 @@ async function withInstallmentTotals<T extends { installments?: any[]; loanReque
 }
 
 async function withInstallmentTotalsList<T extends { installments?: any[]; loanRequest?: any; customer?: any; interestRate?: number; principalAmount?: number; amount?: number }>(loans: T[]): Promise<T[]> {
-    return Promise.all(loans.map((loan) => withInstallmentTotals(loan)));
+    const systemSettingRate = await getSystemSettingMonthlyRate();
+    return Promise.all(loans.map((loan) => withInstallmentTotals(loan, systemSettingRate)));
 }
 
 // GET /api/loans/admin/all — Admin: listar todos os contratos com filtros
@@ -106,9 +111,53 @@ loansRouter.get('/admin/all', requireAdmin, async (req: Request, res: Response) 
 
         const loans = await prisma.loan.findMany({
             where,
-            include: {
-                customer: true,
-                installments: { orderBy: { dueDate: 'asc' } },
+            select: {
+                id: true,
+                amount: true,
+                principalAmount: true,
+                remainingAmount: true,
+                installmentsCount: true,
+                totalInstallments: true,
+                dailyInstallmentAmount: true,
+                status: true,
+                startDate: true,
+                createdAt: true,
+                daysOverdue: true,
+                nextPaymentDate: true,
+                lastPaymentDate: true,
+                paymentFrequency: true,
+                interestRate: true,
+                adminNotes: true,
+                isService: true,
+                isInvestment: true,
+                isLoan: true,
+                pixReceiptUrl: true,
+                customer: {
+                    select: {
+                        id: true,
+                        name: true,
+                        cpf: true,
+                        phone: true,
+                        email: true,
+                        monthlyInterestRate: true,
+                        lateInterestMonthly: true,
+                    }
+                },
+                installments: {
+                    select: {
+                        id: true,
+                        dueDate: true,
+                        amount: true,
+                        status: true,
+                        paidAt: true,
+                        proofUrl: true,
+                        isInterestPayment: true,
+                        lateFeeAmount: true,
+                        fineAccumulated: true,
+                        daysOverdue: true,
+                    },
+                    orderBy: { dueDate: 'asc' }
+                },
                 loanRequest: { select: { profileType: true, monthlyRate: true, contractMonths: true } }
             },
             orderBy: { createdAt: 'desc' }
@@ -139,9 +188,53 @@ loansRouter.get('/:loanId/admin-details', requireAdmin, async (req: Request, res
         const { loanId } = req.params;
         const loan = await prisma.loan.findUnique({
             where: { id: loanId },
-            include: {
-                customer: true,
-                installments: { orderBy: { dueDate: 'asc' } },
+            select: {
+                id: true,
+                amount: true,
+                principalAmount: true,
+                remainingAmount: true,
+                installmentsCount: true,
+                totalInstallments: true,
+                dailyInstallmentAmount: true,
+                status: true,
+                startDate: true,
+                createdAt: true,
+                daysOverdue: true,
+                nextPaymentDate: true,
+                lastPaymentDate: true,
+                paymentFrequency: true,
+                interestRate: true,
+                adminNotes: true,
+                isService: true,
+                isInvestment: true,
+                isLoan: true,
+                pixReceiptUrl: true,
+                customer: {
+                    select: {
+                        id: true,
+                        name: true,
+                        cpf: true,
+                        phone: true,
+                        email: true,
+                        monthlyInterestRate: true,
+                        lateInterestMonthly: true,
+                    }
+                },
+                installments: {
+                    select: {
+                        id: true,
+                        dueDate: true,
+                        amount: true,
+                        status: true,
+                        paidAt: true,
+                        proofUrl: true,
+                        isInterestPayment: true,
+                        lateFeeAmount: true,
+                        fineAccumulated: true,
+                        daysOverdue: true,
+                    },
+                    orderBy: { dueDate: 'asc' }
+                },
                 loanRequest: { select: { profileType: true, monthlyRate: true, contractMonths: true } }
             }
         });

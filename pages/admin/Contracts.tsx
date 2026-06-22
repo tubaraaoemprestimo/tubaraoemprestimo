@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   FileText, Search, X, ChevronDown, ChevronUp, Eye, DollarSign,
   Edit2, CheckCircle, Clock, AlertTriangle, RefreshCw, Save, Upload,
-  Filter, Hourglass, CheckCircle2, XCircle, Image, ExternalLink
+  Filter, Hourglass, CheckCircle2, XCircle, Image, ExternalLink, PhoneCall
 } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 import { Button } from '../../components/Button';
@@ -113,13 +113,24 @@ const MODALITY_FILTERS = [
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const installmentTotal = (inst: ContractInstallment) => inst.totalAmount ?? (Number(inst.amount || 0) + Number(inst.lateFeeAmount || 0));
 const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
+const STATUS_FILTER_STORAGE_KEY = 'tubarao.admin.contracts.statusFilter';
+const getInitialStatusFilter = () => {
+  if (typeof window === 'undefined') return 'ALL';
+  return sessionStorage.getItem(STATUS_FILTER_STORAGE_KEY) || 'ALL';
+};
+const onlyDigits = (value?: string | null) => (value || '').replace(/\D/g, '');
+const whatsappHref = (phone?: string | null) => {
+  const digits = onlyDigits(phone);
+  if (!digits) return null;
+  return `https://wa.me/${digits.startsWith('55') ? digits : `55${digits}`}`;
+};
 
 export const Contracts: React.FC = () => {
   const { addToast } = useToast();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState(getInitialStatusFilter);
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [modalityFilter, setModalityFilter] = useState('ALL');
 
@@ -139,7 +150,9 @@ export const Contracts: React.FC = () => {
   const [selectedInstallment, setSelectedInstallment] = useState<ContractInstallment | null>(null);
   const [paymentData, setPaymentData] = useState({ amount: '', paymentMethod: 'PIX', receiptUrl: '', notes: '' });
   const [payoffBalance, setPayoffBalance] = useState<any | null>(null);
+  const [detailPayoffBalance, setDetailPayoffBalance] = useState<any | null>(null);
   const [loadingPayoffBalance, setLoadingPayoffBalance] = useState(false);
+  const [loadingDetailPayoffBalance, setLoadingDetailPayoffBalance] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
@@ -226,6 +239,10 @@ export const Contracts: React.FC = () => {
   }, [contracts, modalityFilter, search]);
 
   useEffect(() => {
+    sessionStorage.setItem(STATUS_FILTER_STORAGE_KEY, statusFilter);
+  }, [statusFilter]);
+
+  useEffect(() => {
     const t = setTimeout(load, 300);
     return () => clearTimeout(t);
   }, [load]);
@@ -235,19 +252,32 @@ export const Contracts: React.FC = () => {
   }, [loadPendingProofs]);
 
   const openDetails = async (c: Contract) => {
-    setLoanReceipts([]); // Reset para evitar flash de dados do contrato anterior
-    const details = await apiService.getAdminLoanDetails(c.id);
-    setSelected(details || c);
+    setSelected(c);
     setDetailsOpen(true);
     setExpandedInstallments(false);
-    // Carrega todos os comprovantes (PaymentReceipt) vinculados a este contrato
-    try {
-      const all = await apiService.getPaymentReceipts();
-      const filtered = (all || []).filter((r: any) => r.loanId === c.id);
+    setLoanReceipts([]); // Reset para evitar flash de dados do contrato anterior
+    setDetailPayoffBalance(null);
+    setLoadingDetailPayoffBalance(true);
+
+    const [detailsResult, payoffResult, receiptsResult] = await Promise.allSettled([
+      apiService.getAdminLoanDetails(c.id),
+      apiService.getLoanPayoffBalance(c.id),
+      apiService.getPaymentReceipts(),
+    ]);
+
+    if (detailsResult.status === 'fulfilled' && detailsResult.value) {
+      setSelected(detailsResult.value);
+    }
+    if (payoffResult.status === 'fulfilled') {
+      setDetailPayoffBalance(payoffResult.value);
+    }
+    if (receiptsResult.status === 'fulfilled') {
+      const filtered = (receiptsResult.value || []).filter((r: any) => r.loanId === c.id);
       setLoanReceipts(filtered);
-    } catch {
+    } else {
       setLoanReceipts([]);
     }
+    setLoadingDetailPayoffBalance(false);
   };
 
   const reloadLoanReceipts = useCallback(async () => {
@@ -766,6 +796,23 @@ export const Contracts: React.FC = () => {
                   <p className="font-bold">{selected.customer?.cpf}</p>
                 </div>
                 <div className="bg-zinc-900 p-3 rounded-lg">
+                  <p className="text-xs text-zinc-500">Telefone</p>
+                  {whatsappHref(selected.customer?.phone) ? (
+                    <a
+                      href={whatsappHref(selected.customer?.phone)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-green-700"
+                      aria-label={`Abrir WhatsApp de ${selected.customer?.name || 'cliente'}`}
+                    >
+                      <PhoneCall size={14} />
+                      {selected.customer?.phone || 'WhatsApp'}
+                    </a>
+                  ) : (
+                    <p className="font-bold text-zinc-500">Sem telefone</p>
+                  )}
+                </div>
+                <div className="bg-zinc-900 p-3 rounded-lg">
                   <p className="text-xs text-zinc-500">Valor Principal</p>
                   <p className="font-bold text-[#D4AF37]">{fmt(selected.principalAmount || selected.amount)}</p>
                 </div>
@@ -789,6 +836,26 @@ export const Contracts: React.FC = () => {
                   <p className="text-xs text-zinc-500">Início</p>
                   <p className="font-bold">{fmtDate(selected.startDate)}</p>
                 </div>
+              </div>
+
+              {/* Saldo atualizado pela API */}
+              <div className="rounded-xl border border-red-700/50 bg-red-950/30 p-4 shadow-lg shadow-red-950/20">
+                <p className="text-xs font-bold uppercase tracking-wide text-red-300">Dívida Total Atualizada</p>
+                {loadingDetailPayoffBalance ? (
+                  <p className="mt-2 text-sm text-red-200 animate-pulse">Calculando juros e multas de hoje...</p>
+                ) : detailPayoffBalance ? (
+                  <>
+                    <p className="mt-1 text-3xl font-black text-red-100">{fmt(detailPayoffBalance.totalPayoffBalance || 0)}</p>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+                      <p className="rounded-lg bg-black/30 p-2 text-zinc-300">Principal<br /><span className="font-bold text-white">{fmt(detailPayoffBalance.principalBalance || 0)}</span></p>
+                      <p className="rounded-lg bg-black/30 p-2 text-zinc-300">Juros<br /><span className="font-bold text-yellow-300">{fmt(detailPayoffBalance.interestBalance || 0)}</span></p>
+                      <p className="rounded-lg bg-black/30 p-2 text-zinc-300">Multas<br /><span className="font-bold text-red-300">{fmt(detailPayoffBalance.feeBalance || 0)}</span></p>
+                      <p className="rounded-lg bg-black/30 p-2 text-zinc-300">Cobrança atual<br /><span className="font-bold text-[#D4AF37]">{fmt(detailPayoffBalance.cycleChargeBalance || 0)}</span></p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm text-red-200">Saldo atualizado indisponível. Reabra o modal ou use Registrar Pagamento Parcial/Avulso.</p>
+                )}
               </div>
 
               {/* Notas Admin */}
