@@ -6,6 +6,7 @@ import { sendPushToRole } from './push';
 import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
+import { saveBufferToStorage } from '../services/storageService';
 
 export const webhookRouter = Router();
 
@@ -367,6 +368,100 @@ async function extractTextFromDocument(buffer: Buffer, mimetype: string): Promis
     }
 }
 
+function isPaymentReceiptCandidate(content: string, hasImage: any, hasDocument: any): boolean {
+    if (!hasImage && !hasDocument) return false;
+    const text = (content || '').toLowerCase();
+    if (!text) return true;
+    return /comprovante|paguei|pagamento|pix|transfer[êe]ncia|dep[oó]sito|recibo/.test(text);
+}
+
+async function createReceiptFromWhatsAppMedia(params: {
+    customer: any;
+    phone: string;
+    messageId?: string;
+    content: string;
+    media: { buffer: Buffer; mimetype: string; filename: string };
+    hasImage: any;
+    hasDocument: any;
+}): Promise<{ handled: boolean; reason?: string; receiptId?: string }> {
+    const { customer, phone, messageId, content, media, hasImage, hasDocument } = params;
+    if (!customer) return { handled: false, reason: 'CUSTOMER_NOT_FOUND' };
+    if (!isPaymentReceiptCandidate(content, hasImage, hasDocument)) return { handled: false, reason: 'NOT_RECEIPT' };
+
+    const existingByMessage = messageId ? await prisma.paymentReceipt.findFirst({
+        where: { notes: { contains: `whatsappMessageId:${messageId}` } },
+        select: { id: true },
+    }) : null;
+    if (existingByMessage) return { handled: true, receiptId: existingByMessage.id };
+
+    const loan = await prisma.loan.findFirst({
+        where: {
+            customerId: customer.id,
+            status: { in: ['ACTIVE', 'DEFAULT', 'APPROVED', 'DEFAULTED'] },
+            remainingAmount: { gt: 0 },
+        },
+        include: {
+            installments: {
+                where: { status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] } },
+                orderBy: { dueDate: 'asc' },
+                take: 1,
+            },
+        },
+        orderBy: { createdAt: 'desc' },
+    });
+
+    const activeLoansCount = await prisma.loan.count({
+        where: {
+            customerId: customer.id,
+            status: { in: ['ACTIVE', 'DEFAULT', 'APPROVED', 'DEFAULTED'] },
+            remainingAmount: { gt: 0 },
+        },
+    });
+    if (activeLoansCount !== 1) return { handled: false, reason: 'AMBIGUOUS_ACTIVE_LOANS' };
+
+    const installment = loan?.installments?.[0];
+    if (!loan || !installment) return { handled: false, reason: 'OPEN_INSTALLMENT_NOT_FOUND' };
+
+    const receiptUrl = await saveBufferToStorage(
+        media.buffer,
+        media.mimetype,
+        `payment-receipts/${customer.id}`,
+        media.filename
+    );
+
+    const existing = await prisma.paymentReceipt.findFirst({
+        where: {
+            installmentId: installment.id,
+            customerId: customer.id,
+            receiptUrl,
+        },
+        select: { id: true },
+    });
+    if (existing) return { handled: true, receiptId: existing.id };
+
+    const receipt = await prisma.paymentReceipt.create({
+        data: {
+            installmentId: installment.id,
+            customerId: customer.id,
+            receiptUrl,
+            amount: null,
+            status: 'PENDING',
+            notes: `Recebido via WhatsApp (${phone}) whatsappMessageId:${messageId || 'NA'}${content ? `: ${content.substring(0, 200)}` : ''}`,
+        },
+    });
+
+    await prisma.notification.create({
+        data: {
+            title: '💳 Comprovante Recebido via WhatsApp',
+            message: `${customer.name} enviou comprovante pelo WhatsApp para análise.`,
+            type: 'INFO',
+        },
+    }).catch(() => {});
+
+    sendPushToRole('ADMIN', '💳 Comprovante WhatsApp', `${customer.name} enviou comprovante para análise`).catch(() => {});
+    return { handled: true, receiptId: receipt.id };
+}
+
 /**
  * Envia mensagem pelo WhatsApp via Evolution API
  */
@@ -530,6 +625,22 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
                 }
             }
         } catch { }
+
+        // 2.6. Comprovante via WhatsApp: imagem/PDF vira PaymentReceipt antes de acionar IA
+        if (hasImage || hasDocument) {
+            const media = await downloadMedia(waConfig, key);
+            if (media) {
+                const receiptResult = await createReceiptFromWhatsAppMedia({ customer, phone, messageId, content, media, hasImage, hasDocument });
+                if (receiptResult.handled) {
+                    const confirmation = '✅ Comprovante recebido com sucesso e enviado para análise!';
+                    await prisma.aiChatHistory.create({ data: { phone, role: 'user', content: content || '[COMPROVANTE_WHATSAPP]', metadata: { receiptId: receiptResult.receiptId, messageId } } });
+                    await prisma.aiChatHistory.create({ data: { phone, role: 'assistant', content: confirmation, metadata: { autoReply: true, reason: 'PAYMENT_RECEIPT', receiptId: receiptResult.receiptId } } });
+                    await sendWhatsAppReply(waConfig, phone, confirmation);
+                    console.log(`[Webhook] ✅ Comprovante WhatsApp criado: receipt=${receiptResult.receiptId}`);
+                    return;
+                }
+            }
+        }
 
         // 3. Busca config do chatbot IA
         const chatConfig = await prisma.aiChatbotConfig.findFirst();

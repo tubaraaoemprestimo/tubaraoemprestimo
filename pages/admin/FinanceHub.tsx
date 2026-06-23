@@ -231,18 +231,25 @@ export const FinanceHub: React.FC = () => {
 
     // Handlers de comprovante
     const handleApproveReceipt = async (receipt: PaymentReceipt, options?: { isDischarge?: boolean; isInterestOnly?: boolean }) => {
+        const amount = Number(receipt.amount || 0);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            addToast('Informe o valor do comprovante na tela Comprovantes antes de aprovar', 'warning');
+            return;
+        }
+
         setProcessing(receipt.id);
         try {
             await api.put(`/payment-receipts/${receipt.id}/approve`, {
                 isDischarge: options?.isDischarge || false,
-                isInterestOnly: options?.isInterestOnly || false
+                isInterestOnly: options?.isInterestOnly || false,
+                amount
             });
 
             // Criar pagamento automaticamente
             await paymentService.createPayment({
                 request_id: receipt.loanId || '',
                 payment_type: options?.isDischarge ? 'TOTAL' : options?.isInterestOnly ? 'JUROS' : 'PARCELA',
-                amount: receipt.amount,
+                amount,
                 payment_date: new Date().toISOString().split('T')[0],
                 proof_url: receipt.receiptUrl,
                 confirmed: true,
@@ -501,7 +508,7 @@ export const FinanceHub: React.FC = () => {
                                         </div>
                                         <div className="text-right">
                                             <p className="font-bold text-[#D4AF37]">
-                                                R$ {r.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                {r.amount != null ? `R$ ${r.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Valor a confirmar'}
                                             </p>
                                             {r.status === 'PENDING' && <span className="text-xs text-yellow-400">Analisar</span>}
                                             {r.status === 'APPROVED' && <span className="text-xs text-green-400">Aprovado</span>}
@@ -691,7 +698,7 @@ export const FinanceHub: React.FC = () => {
                                             <div>
                                                 <p className="font-bold text-white">{receipt.customerName}</p>
                                                 <p className="text-[#D4AF37] font-bold">
-                                                    R$ {receipt.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                    {receipt.amount != null ? `R$ ${receipt.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Valor a confirmar'}
                                                 </p>
                                                 <p className="text-xs text-zinc-500">
                                                     {new Date(receipt.submittedAt).toLocaleString('pt-BR')}
@@ -1067,7 +1074,7 @@ export const FinanceHub: React.FC = () => {
                                     <div className="bg-black p-4 rounded-xl border border-zinc-800">
                                         <p className="text-xs text-zinc-500 mb-1">Valor</p>
                                         <p className="text-[#D4AF37] font-bold text-lg">
-                                            R$ {selectedReceipt.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            {selectedReceipt.amount != null ? `R$ ${selectedReceipt.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Valor a confirmar'}
                                         </p>
                                     </div>
                                 </div>

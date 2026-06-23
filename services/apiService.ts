@@ -995,11 +995,12 @@ export const apiService = {
         return data || [];
     },
 
-    async approvePaymentReceipt(id: string, opts?: { notes?: string; isDischarge?: boolean; isInterestOnly?: boolean }) {
+    async approvePaymentReceipt(id: string, opts?: { notes?: string; isDischarge?: boolean; isInterestOnly?: boolean; amount?: number | null }) {
         const { data, error } = await api.put(`/payment-receipts/${id}/approve`, {
             notes: opts?.notes,
             isDischarge: opts?.isDischarge || false,
-            isInterestOnly: opts?.isInterestOnly || false
+            isInterestOnly: opts?.isInterestOnly || false,
+            amount: opts?.amount
         });
         if (error) throw new Error((error as any).error || 'Erro ao aprovar');
         return data;

@@ -139,6 +139,11 @@ loansRouter.get('/admin/all', requireAdmin, async (req: Request, res: Response) 
                         cpf: true,
                         phone: true,
                         email: true,
+                        address: true,
+                        neighborhood: true,
+                        city: true,
+                        state: true,
+                        zipCode: true,
                         monthlyInterestRate: true,
                         lateInterestMonthly: true,
                     }
@@ -216,6 +221,11 @@ loansRouter.get('/:loanId/admin-details', requireAdmin, async (req: Request, res
                         cpf: true,
                         phone: true,
                         email: true,
+                        address: true,
+                        neighborhood: true,
+                        city: true,
+                        state: true,
+                        zipCode: true,
                         monthlyInterestRate: true,
                         lateInterestMonthly: true,
                     }

@@ -66,6 +66,11 @@ interface Contract {
     cpf: string;
     phone: string;
     email: string;
+    address?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
   };
   loanRequest?: {
     profileType?: string;
@@ -113,6 +118,11 @@ const MODALITY_FILTERS = [
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const installmentTotal = (inst: ContractInstallment) => inst.totalAmount ?? (Number(inst.amount || 0) + Number(inst.lateFeeAmount || 0));
 const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
+const fmtAddress = (customer?: Contract['customer']) => {
+  const cityState = [customer?.city, customer?.state].filter(Boolean).join(' - ');
+  const parts = [customer?.address, customer?.neighborhood, cityState, customer?.zipCode ? `CEP ${customer.zipCode}` : ''].filter(Boolean);
+  return parts.length ? parts.join(' · ') : '—';
+};
 const STATUS_FILTER_STORAGE_KEY = 'tubarao.admin.contracts.statusFilter';
 const getInitialStatusFilter = () => {
   if (typeof window === 'undefined') return 'ALL';
@@ -172,6 +182,7 @@ export const Contracts: React.FC = () => {
   const [receiptPreview, setReceiptPreview] = useState<any | null>(null);
   const [approvingReceipt, setApprovingReceipt] = useState(false);
   const [receiptRejectReason, setReceiptRejectReason] = useState('');
+  const [receiptApproveAmount, setReceiptApproveAmount] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -297,9 +308,15 @@ export const Contracts: React.FC = () => {
   ) => {
     setApprovingReceipt(true);
     try {
+      const amount = Number(receiptApproveAmount || receipt.amount || 0);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        addToast('Informe o valor pago antes de aprovar', 'warning');
+        return;
+      }
       await apiService.approvePaymentReceipt(receipt.id, {
         isDischarge: mode === 'DISCHARGE',
-        isInterestOnly: mode === 'INTEREST_ONLY'
+        isInterestOnly: mode === 'INTEREST_ONLY',
+        amount
       });
       const msgMap = {
         INTEREST_ONLY: 'Juros aprovado — principal mantido, próxima parcela de juros gerada.',
@@ -308,6 +325,7 @@ export const Contracts: React.FC = () => {
       };
       addToast(msgMap[mode], 'success');
       setReceiptPreview(null);
+      setReceiptApproveAmount('');
       // Recarrega detalhes + receipts + lista
       const details = await apiService.getAdminLoanDetails(selected!.id);
       if (details) setSelected(details);
@@ -327,6 +345,7 @@ export const Contracts: React.FC = () => {
       addToast('Comprovante rejeitado.', 'info');
       setReceiptPreview(null);
       setReceiptRejectReason('');
+      setReceiptApproveAmount('');
       reloadLoanReceipts();
     } catch (err: any) {
       addToast(err.message || 'Erro ao rejeitar', 'error');
@@ -836,6 +855,10 @@ export const Contracts: React.FC = () => {
                   <p className="text-xs text-zinc-500">Início</p>
                   <p className="font-bold">{fmtDate(selected.startDate)}</p>
                 </div>
+                <div className="bg-zinc-900 p-3 rounded-lg col-span-2">
+                  <p className="text-xs text-zinc-500">Endereço</p>
+                  <p className="font-bold text-sm text-white">{fmtAddress(selected.customer)}</p>
+                </div>
               </div>
 
               {/* Saldo atualizado pela API */}
@@ -893,7 +916,7 @@ export const Contracts: React.FC = () => {
                             }`}>
                               {r.status === 'PENDING' ? '⏳ Pendente' : r.status === 'APPROVED' ? '✓ Aprovado' : '✗ Rejeitado'}
                             </span>
-                            <span className="text-sm font-bold text-white">{fmt(r.amount)}</span>
+                            <span className="text-sm font-bold text-white">{r.amount != null ? fmt(r.amount) : 'Valor a confirmar'}</span>
                           </div>
                           <p className="text-xs text-zinc-500">
                             Enviado em {fmtDate(r.submittedAt || r.createdAt)}
@@ -909,7 +932,7 @@ export const Contracts: React.FC = () => {
                           )}
                           {r.status === 'PENDING' && (
                             <button
-                              onClick={() => { setReceiptPreview(r); setReceiptRejectReason(''); }}
+                              onClick={() => { setReceiptPreview(r); setReceiptRejectReason(''); setReceiptApproveAmount(r.amount ? String(r.amount) : ''); }}
                               className="text-xs bg-[#D4AF37] text-black px-3 py-1.5 rounded-lg font-bold hover:bg-yellow-500"
                             >
                               Aprovar / Rejeitar
@@ -1026,7 +1049,7 @@ export const Contracts: React.FC = () => {
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-zinc-800 sticky top-0 bg-zinc-950 z-10">
               <h2 className="font-bold text-lg text-white">Aprovar Comprovante</h2>
-              <button onClick={() => setReceiptPreview(null)} className="text-zinc-400 hover:text-white"><X size={20} /></button>
+              <button onClick={() => { setReceiptPreview(null); setReceiptApproveAmount(''); }} className="text-zinc-400 hover:text-white"><X size={20} /></button>
             </div>
 
             <div className="p-5 space-y-4">
@@ -1038,7 +1061,7 @@ export const Contracts: React.FC = () => {
                 </div>
                 <div className="bg-zinc-900 p-3 rounded-lg">
                   <p className="text-xs text-zinc-500">Valor</p>
-                  <p className="font-bold text-[#D4AF37]">{fmt(receiptPreview.amount)}</p>
+                  <p className="font-bold text-[#D4AF37]">{receiptPreview.amount != null ? fmt(receiptPreview.amount) : 'Valor a confirmar'}</p>
                 </div>
               </div>
 
@@ -1069,6 +1092,20 @@ export const Contracts: React.FC = () => {
                 • <span className="text-yellow-300 font-bold">Juros do Mês</span>: CLT/Garantia. Não abate do capital. Gera nova parcela de juros para o próximo mês.<br />
                 • <span className="text-green-300 font-bold">Amortização</span>: Comércio/Diário. Abate o valor pago do principal.<br />
                 • <span className="text-[#D4AF37] font-bold">Quitação Total</span>: Encerra o contrato (remainingAmount = 0).
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-1 text-zinc-400">Valor pago confirmado pelo comprovante</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={receiptApproveAmount}
+                  onChange={e => setReceiptApproveAmount(e.target.value)}
+                  placeholder="Ex: 300.00"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white"
+                />
+                <p className="mt-1 text-xs text-zinc-500">Obrigatório para comprovante recebido via WhatsApp.</p>
               </div>
 
               {/* Motivo de rejeição */}

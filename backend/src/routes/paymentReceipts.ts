@@ -142,15 +142,35 @@ paymentReceiptsRouter.get('/', async (req: Request, res: Response) => {
 // PUT /api/payment-receipts/:id/approve — Admin confirma pagamento
 paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: Response) => {
     try {
-        const { isDischarge, isInterestOnly } = req.body; // flags: quitação total ou só juros
+        const { isDischarge, isInterestOnly, amount } = req.body; // flags: quitação total ou só juros
+
+        const existingReceipt = await prisma.paymentReceipt.findUnique({
+            where: { id: req.params.id as string },
+            select: { notes: true, amount: true }
+        });
+        if (!existingReceipt) {
+            res.status(404).json({ error: 'Comprovante não encontrado' });
+            return;
+        }
+
+        const approvedAmount = amount !== undefined ? Number(amount) : Number(existingReceipt.amount);
+        if (!Number.isFinite(approvedAmount) || approvedAmount <= 0) {
+            res.status(400).json({ error: 'Informe o valor do comprovante antes de aprovar' });
+            return;
+        }
+
+        const nextNotes = req.body.notes
+            ? [existingReceipt.notes, req.body.notes].filter(Boolean).join(' | review: ')
+            : existingReceipt.notes || null;
 
         const receipt = await prisma.paymentReceipt.update({
             where: { id: req.params.id as string },
             data: {
+                amount: approvedAmount,
                 status: 'APPROVED',
                 reviewedBy: req.user!.id,
                 reviewedAt: new Date(),
-                notes: req.body.notes || null
+                notes: nextNotes
             }
         });
 

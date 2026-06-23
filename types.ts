@@ -272,7 +272,7 @@ export interface PaymentReceipt {
   loanId: string;
   customerId: string;
   customerName: string;
-  amount: number;
+  amount: number | null;
   receiptUrl: string;
   receiptType: 'IMAGE' | 'PDF';
   status: 'PENDING' | 'APPROVED' | 'REJECTED';

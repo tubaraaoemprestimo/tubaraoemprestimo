@@ -188,10 +188,115 @@ export function buildChargeTemplateVars(charge: ChargeBreakdown): {
   };
 }
 
-function getNextMonthlyDueDate(lastDueDate: Date): Date {
-  const nextDueDate = new Date(lastDueDate);
-  nextDueDate.setMonth(nextDueDate.getMonth() + 1);
-  return nextDueDate;
+function startOfDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function sameDay(a: Date, b: Date): boolean {
+  return startOfDay(a).getTime() === startOfDay(b).getTime();
+}
+
+function addMonthsPreservingDay(date: Date, months: number, preferredDay?: number | null): Date {
+  const base = new Date(date);
+  const day = preferredDay || base.getDate();
+  const next = new Date(base);
+  next.setDate(1);
+  next.setMonth(next.getMonth() + months);
+  const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+  next.setDate(Math.min(day, lastDay));
+  return next;
+}
+
+function buildPastMonthlyDueDates(firstDueDate: Date, today: Date, preferredDay?: number | null, limit = 24): Date[] {
+  const dates: Date[] = [];
+  let dueDate = startOfDay(firstDueDate);
+  const todayStart = startOfDay(today);
+
+  while (dueDate < todayStart && dates.length < limit) {
+    dates.push(new Date(dueDate));
+    dueDate = addMonthsPreservingDay(dueDate, 1, preferredDay);
+  }
+
+  return dates;
+}
+
+function resolveLoanMonthlyInterestAmount(loan: any, systemSettingRate: number | null): number {
+  const monthlyRate = resolveMonthlyRate({
+    contractRate: normalizeRate(loan?.interestRate),
+    customerRate: normalizeRate(loan?.customer?.lateInterestMonthly ?? loan?.customer?.monthlyInterestRate),
+    systemSettingRate,
+  });
+  return +((Number(loan.principalAmount || loan.remainingAmount || loan.amount || 0)) * monthlyRate).toFixed(2);
+}
+
+export async function catchUpInterestOnlyRolloverInstallments(today = new Date()): Promise<number> {
+  const todayStart = startOfDay(today);
+  const systemSettingRate = await getSystemMonthlyRateSetting();
+  const loans = await prisma.loan.findMany({
+    where: {
+      status: 'ACTIVE',
+      remainingAmount: { gt: 0 },
+      nextPaymentDate: { lt: todayStart },
+      loanRequest: { profileType: { in: ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'] } },
+    },
+    include: {
+      customer: { select: { monthlyInterestRate: true, lateInterestMonthly: true } },
+      installments: {
+        select: { id: true, dueDate: true },
+        orderBy: { dueDate: 'asc' },
+      },
+    },
+  });
+
+  let created = 0;
+  for (const loan of loans) {
+    if (!loan.nextPaymentDate) continue;
+
+    const preferredDay = loan.dueDay || new Date(loan.nextPaymentDate).getDate();
+    const dueDates = buildPastMonthlyDueDates(loan.nextPaymentDate, todayStart, preferredDay);
+    if (dueDates.length === 0) continue;
+
+    const amount = resolveLoanMonthlyInterestAmount(loan, systemSettingRate);
+    const nextPaymentDate = addMonthsPreservingDay(dueDates[dueDates.length - 1], 1, preferredDay);
+    let createdForLoan = 0;
+
+    await prisma.$transaction(async (tx: any) => {
+      const existingInstallments = await tx.installment.findMany({
+        where: { loanId: loan.id },
+        select: { dueDate: true },
+      });
+      const existingDueDates = existingInstallments.map((inst: any) => new Date(inst.dueDate));
+      const missingDueDates = dueDates.filter((dueDate) => !existingDueDates.some((existing) => sameDay(existing, dueDate)));
+
+      for (const dueDate of missingDueDates) {
+        await tx.installment.create({
+          data: {
+            loanId: loan.id,
+            amount,
+            dueDate,
+            status: 'OPEN',
+            isInterestPayment: true,
+          },
+        });
+        createdForLoan++;
+      }
+
+      await tx.loan.update({
+        where: { id: loan.id },
+        data: { nextPaymentDate },
+      });
+    });
+
+    created += createdForLoan;
+    console.log(`[CollectionAutomation] Rollover catch-up ${loan.id}: ${createdForLoan}/${dueDates.length} parcela(s), nextPaymentDate=${nextPaymentDate.toISOString().slice(0, 10)}`);
+  }
+
+  if (created > 0) {
+    console.log(`[CollectionAutomation] Rollover catch-up: ${created} parcela(s) de juros criada(s) para contratos com nextPaymentDate passado`);
+  }
+  return created;
 }
 
 async function ensureInterestOnlyOpenInstallments(): Promise<number> {
@@ -203,25 +308,30 @@ async function ensureInterestOnlyOpenInstallments(): Promise<number> {
       installments: { none: { status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] } } }
     },
     include: {
+      customer: { select: { monthlyInterestRate: true, lateInterestMonthly: true } },
       installments: { orderBy: { dueDate: 'desc' }, take: 1 }
     }
   });
 
+  const systemSettingRate = await getSystemMonthlyRateSetting();
   let created = 0;
   for (const loan of loans) {
     const lastInstallment = loan.installments[0];
     if (!lastInstallment || lastInstallment.status !== 'PAID') continue;
 
-    const interestRate = Number(loan.interestRate || 30) / 100;
-    const amount = Number(loan.principalAmount || loan.remainingAmount) * interestRate;
-    await prisma.installment.create({
-      data: {
-        loanId: loan.id,
-        amount,
-        dueDate: getNextMonthlyDueDate(lastInstallment.dueDate),
-        status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
-        isInterestPayment: true
-      }
+    const amount = resolveLoanMonthlyInterestAmount(loan, systemSettingRate);
+    const dueDate = getNextMonthlyDueDate(lastInstallment.dueDate);
+    await prisma.$transaction(async (tx: any) => {
+      await tx.installment.create({
+        data: {
+          loanId: loan.id,
+          amount,
+          dueDate,
+          status: 'OPEN',
+          isInterestPayment: true
+        }
+      });
+      await tx.loan.update({ where: { id: loan.id }, data: { nextPaymentDate: addMonthsPreservingDay(dueDate, 1, loan.dueDay || dueDate.getDate()) } });
     });
     created++;
   }
@@ -230,6 +340,10 @@ async function ensureInterestOnlyOpenInstallments(): Promise<number> {
     console.log(`[CollectionAutomation] Auto-heal: ${created} parcela(s) de juros criada(s) para contratos CLT/Garantia sem cobrança aberta`);
   }
   return created;
+}
+
+function getNextMonthlyDueDate(lastDueDate: Date): Date {
+  return addMonthsPreservingDay(lastDueDate, 1);
 }
 
 function getCollectionContext(installment: any) {
@@ -840,7 +954,10 @@ export async function runCollectionAutomation(): Promise<CollectionStats> {
   };
 
   try {
-    // 0. Auto-heal: garante que CLT/Garantia ativos tenham próxima parcela de juros aberta
+    // 0. Rollover catch-up: cria juros mensais pulados quando nextPaymentDate ficou no passado
+    await catchUpInterestOnlyRolloverInstallments();
+
+    // 0.1 Auto-heal: garante que CLT/Garantia ativos tenham próxima parcela de juros aberta
     await ensureInterestOnlyOpenInstallments();
 
     // 1. MULTA CUMULATIVA R$20/dia — atualiza saldo devedor ANTES dos disparos
@@ -884,6 +1001,7 @@ export async function runCollectionAutomation(): Promise<CollectionStats> {
 
 export const collectionAutomationService = {
   runCollectionAutomation,
+  catchUpInterestOnlyRolloverInstallments,
   buildOverdueCharge,
   buildChargeTemplateVars,
   getSystemMonthlyRateSetting,

@@ -19,6 +19,7 @@ export const PaymentReceipts: React.FC = () => {
     const [rejectionReason, setRejectionReason] = useState('');
     const [processing, setProcessing] = useState<string | null>(null);
     const [isDischarge, setIsDischarge] = useState(false);
+    const [approvalAmount, setApprovalAmount] = useState('');
 
     useEffect(() => {
         loadReceipts();
@@ -38,9 +39,9 @@ export const PaymentReceipts: React.FC = () => {
                     customerName: r.customer_name || r.customerName || '',
                     amount: r.amount,
                     receiptUrl: r.receipt_url || r.receiptUrl || '',
-                    receiptType: r.receipt_type || r.receiptType || '',
+                    receiptType: r.receipt_type || r.receiptType || (String(r.receipt_url || r.receiptUrl || '').toLowerCase().includes('.pdf') ? 'PDF' : 'IMAGE'),
                     status: r.status,
-                    submittedAt: r.submitted_at || r.submittedAt || '',
+                    submittedAt: r.createdAt || r.created_at || r.submitted_at || r.submittedAt || '',
                     reviewedAt: r.reviewed_at || r.reviewedAt || null,
                     reviewedBy: r.reviewed_by || r.reviewedBy || null,
                     rejectionReason: r.rejection_reason || r.rejectionReason || null
@@ -55,15 +56,21 @@ export const PaymentReceipts: React.FC = () => {
     };
 
     const handleApprove = async (receipt: PaymentReceipt) => {
+        const amount = Number(approvalAmount || receipt.amount || 0);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            addToast('Informe o valor pago antes de aprovar', 'warning');
+            return;
+        }
+
         setProcessing(receipt.id);
         try {
-            await api.put(`/payment-receipts/${receipt.id}/approve`, { isDischarge });
+            await api.put(`/payment-receipts/${receipt.id}/approve`, { isDischarge, amount });
 
             // Enviar notificação e atualizar score
             try {
                 await autoNotificationService.onPaymentConfirmed(
                     '',
-                    receipt.amount,
+                    amount,
                     true,
                     false
                 );
@@ -72,6 +79,7 @@ export const PaymentReceipts: React.FC = () => {
             addToast(isDischarge ? 'Contrato quitado com sucesso!' : 'Pagamento aprovado! Parcela baixada.', 'success');
             setSelectedReceipt(null);
             setIsDischarge(false);
+            setApprovalAmount('');
             loadReceipts();
         } catch (err) {
             console.error('Error approving:', err);
@@ -218,7 +226,7 @@ export const PaymentReceipts: React.FC = () => {
                                         <div>
                                             <p className="font-bold text-white">{receipt.customerName}</p>
                                             <p className="text-[#D4AF37] font-bold">
-                                                R$ {receipt.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                {receipt.amount != null ? `R$ ${receipt.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Valor a confirmar'}
                                             </p>
                                             <p className="text-xs text-zinc-500 mt-1">
                                                 Enviado em {new Date(receipt.submittedAt).toLocaleString('pt-BR')}
@@ -232,7 +240,10 @@ export const PaymentReceipts: React.FC = () => {
                                         <Button
                                             size="sm"
                                             variant="secondary"
-                                            onClick={() => setSelectedReceipt(receipt)}
+                                            onClick={() => {
+                                                setSelectedReceipt(receipt);
+                                                setApprovalAmount(receipt.amount ? String(receipt.amount) : '');
+                                            }}
                                         >
                                             <Eye size={16} /> Analisar
                                         </Button>
@@ -259,7 +270,7 @@ export const PaymentReceipts: React.FC = () => {
                     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                         <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
                             <h2 className="text-xl font-bold text-white">Analisar Comprovante</h2>
-                            <button onClick={() => setSelectedReceipt(null)} className="text-zinc-500 hover:text-white">
+                            <button onClick={() => { setSelectedReceipt(null); setApprovalAmount(''); }} className="text-zinc-500 hover:text-white">
                                 <X size={24} />
                             </button>
                         </div>
@@ -274,7 +285,7 @@ export const PaymentReceipts: React.FC = () => {
                                 <div className="bg-black p-4 rounded-xl border border-zinc-800">
                                     <p className="text-xs text-zinc-500 mb-1">Valor</p>
                                     <p className="text-[#D4AF37] font-bold text-lg">
-                                        R$ {selectedReceipt.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        {selectedReceipt.amount != null ? `R$ ${selectedReceipt.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Valor a confirmar'}
                                     </p>
                                 </div>
                             </div>
@@ -308,6 +319,22 @@ export const PaymentReceipts: React.FC = () => {
                             {/* Actions */}
                             {selectedReceipt.status === 'PENDING' && (
                                 <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm text-zinc-400 mb-2">
+                                            Valor pago confirmado pelo comprovante
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={approvalAmount}
+                                            onChange={(e) => setApprovalAmount(e.target.value)}
+                                            placeholder="Ex: 300.00"
+                                            className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none"
+                                        />
+                                        <p className="text-xs text-zinc-500 mt-1">Obrigatório para comprovantes recebidos via WhatsApp.</p>
+                                    </div>
+
                                     <div>
                                         <label className="block text-sm text-zinc-400 mb-2">
                                             Motivo da rejeição (opcional)
