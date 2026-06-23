@@ -769,7 +769,14 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
             orderBy: { createdAt: 'desc' },
             take: 20
         });
-        const conversationHistory = recentHistory.reverse().map(h => ({ role: h.role, content: h.content }));
+        const emptyMediaMessage = '[Mensagem de mídia não suportada ou texto vazio enviado pelo usuário]';
+        const safeMessageText = (text?: string | null) => {
+            if (!text || text.trim() === '') return emptyMediaMessage;
+            return text;
+        };
+        const conversationHistory = recentHistory
+            .reverse()
+            .map(h => ({ role: h.role, content: safeMessageText(h.content) }));
 
         // 8. Monta system prompt com contexto ENRIQUECIDO
         // IMPORTANTE: O prompt do admin vem PRIMEIRO para ter prioridade máxima
@@ -871,13 +878,17 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
         console.log(`[Webhook] Chamando IA: provider=${provider}, keyLen=${resolvedApiKey?.length || 0}${mediaBuffer ? ', com mídia nativa' : ''}`);
 
         // Monta mensagem completa com contexto de mídia
-        const fullMessage = content + mediaContext;
+        let userMessage = content + mediaContext;
+        if (!userMessage || userMessage.trim() === '') {
+            userMessage = emptyMediaMessage;
+        }
+        const fullMessage = userMessage;
 
         // Função auxiliar para chamar provider específico
         const callProvider = async (p: string, key: string): Promise<string> => {
             // Se Gemini e tem mídia, usa API multimodal nativa
             if (p === 'gemini' && mediaBuffer && mediaMimetype) {
-                const result = await callGeminiMultimodalAPI(key, systemPrompt, conversationHistory, content || '', mediaBuffer, mediaMimetype);
+                const result = await callGeminiMultimodalAPI(key, systemPrompt, conversationHistory, userMessage, mediaBuffer, mediaMimetype);
                 return result.text;
             }
             if (p === 'gemini') return callGeminiAPI(key, systemPrompt, conversationHistory, fullMessage);

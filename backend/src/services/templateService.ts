@@ -221,12 +221,12 @@ async function createSystemNotification(
   try {
     await prisma.notification.create({
       data: {
-        customerId,
+        customer: { connect: { id: customerId } },
         customerEmail,
         title,
         message,
         type,
-        read: false
+        isRead: false
       }
     });
 
