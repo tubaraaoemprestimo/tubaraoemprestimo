@@ -3,7 +3,7 @@ import { prisma } from '../services/prisma';
 import { emailService } from '../services/email';
 import { sendWhatsAppMessage } from '../services/whatsapp';
 import { sendPushToUser, sendPushToRole } from '../routes/push';
-import { buildOverdueCharge, getSystemMonthlyRateSetting } from '../services/collectionAutomationService';
+import { buildChargeTemplateVars, buildOverdueCharge, getSystemMonthlyRateSetting, getSundayPolicyForFineSetting } from '../services/collectionAutomationService';
 import { getModalityTerminology } from '../services/templateService';
 
 function brDate(d: Date | string) {
@@ -197,8 +197,9 @@ export const scheduleLatePaymentDetection = () => {
       }
 
       const pixKey = await getPixKey();
-      // Taxa do sistema lida UMA vez por execução (cascata oficial no engine).
+      // Configs lidas UMA vez por execução (cascata oficial no engine).
       const systemSettingRate = await getSystemMonthlyRateSetting();
+      const sundayFinePolicy = await getSundayPolicyForFineSetting();
 
       for (const inst of overdueInstallments) {
         const c = inst.loan?.customer;
@@ -213,7 +214,8 @@ export const scheduleLatePaymentDetection = () => {
         // CLT/GARANTIA → juros + 7% + R$20/dia; AUTONOMO → juros mora (s/ domingo) + R$20/dia.
         const profileType = inst.loan?.loanRequest?.profileType || '';
         const modalidade = getModalityTerminology(profileType);
-        const charge = buildOverdueCharge(inst, daysOverdue, Number(inst.amount), systemSettingRate);
+        const charge = buildOverdueCharge(inst, daysOverdue, Number(inst.amount), systemSettingRate, sundayFinePolicy);
+        const chargeVars = buildChargeTemplateVars(charge);
         const amtFmt = brMoney(charge.total);
         const pixInfo = inst.pixCode ? `\n\n📱 *PIX Copia e Cola:*\n${inst.pixCode}` : (pixKey ? `\n\n📱 *Chave PIX:* ${pixKey}` : '');
 
@@ -240,9 +242,8 @@ export const scheduleLatePaymentDetection = () => {
         // WhatsApp ao cliente
         if (c.phone) {
           const baseFmt = brMoney(Number(inst.amount));
-          const multaFmt = brMoney(charge.multa7 + charge.multaDiaria);
           sendWhatsAppMessage(c.phone,
-            `🚨 *EM ATRASO*\n\nOlá, ${c.name.split(' ')[0]}!\n\nSua ${modalidade.label} de *${baseFmt}* venceu em *${brDate(inst.dueDate)}* (${daysOverdue} dia${daysOverdue > 1 ? 's' : ''} de atraso).\n\nJuros/multa de atraso hoje: *${multaFmt}*\nValor atualizado para pagamento hoje: *${amtFmt}*.${pixInfo}\n\n⚠️ Juros e multas estão sendo aplicados.\n\nRegularize pelo app ou entre em contato.\n\n_Tubarão Empréstimos 🦈_`
+            `🚨 *EM ATRASO*\n\nOlá, ${c.name.split(' ')[0]}!\n\nSua ${modalidade.label} de *${baseFmt}* venceu em *${brDate(inst.dueDate)}* (${daysOverdue} dia${daysOverdue > 1 ? 's' : ''} de atraso).\n\nJuros do período: *R$ ${chargeVars.juros_mes}*\nMulta contratual: *R$ ${chargeVars.multa_7}*\nMora diária: *R$ ${chargeVars.multa_diaria}*\nValor atualizado para pagamento hoje: *${amtFmt}*.${pixInfo}\n\n⚠️ Juros e multas estão sendo aplicados.\n\nRegularize pelo app ou entre em contato.\n\n_Tubarão Empréstimos 🦈_`
           ).catch(err => console.error('[Cron] Late WA failed:', err));
         }
 
