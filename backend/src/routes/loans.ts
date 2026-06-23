@@ -249,7 +249,19 @@ loansRouter.get('/:loanId/admin-details', requireAdmin, async (req: Request, res
             }
         });
         if (!loan) { res.status(404).json({ error: 'Contrato não encontrado' }); return; }
-        res.json(await withInstallmentTotals(loan));
+
+        const installmentIds = (loan.installments || []).map((i: any) => i.id);
+        const paymentReceipts = installmentIds.length
+            ? await prisma.paymentReceipt.findMany({
+                where: { installmentId: { in: installmentIds } },
+                orderBy: { createdAt: 'desc' }
+            })
+            : [];
+
+        res.json({
+            ...(await withInstallmentTotals(loan)),
+            paymentReceipts: paymentReceipts.map((r: any) => ({ ...r, loanId }))
+        });
     } catch (err) {
         console.error('[Loans] admin-details error:', err);
         res.status(500).json({ error: 'Erro ao buscar detalhes' });

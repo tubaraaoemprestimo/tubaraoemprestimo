@@ -25,7 +25,27 @@ interface ContractInstallment {
   proofUrl?: string;
   isInterestPayment?: boolean;
   lateFeeAmount?: number;
+  fineAccumulated?: number;
+  daysOverdue?: number;
   totalAmount?: number;
+}
+
+interface PaymentReceipt {
+  id: string;
+  installmentId: string;
+  customerId?: string;
+  loanId?: string;
+  receiptUrl?: string;
+  proofUrl?: string;
+  amount?: number;
+  status: 'PENDING' | 'AWAITING_CONFIRMATION' | 'APPROVED' | 'REJECTED' | string;
+  notes?: string;
+  reviewedAt?: string;
+  createdAt?: string;
+  submittedAt?: string;
+  customerName?: string;
+  installmentDueDate?: string;
+  installmentAmount?: number;
 }
 
 interface PendingProof {
@@ -60,6 +80,7 @@ interface Contract {
   isLoan: boolean;
   pixReceiptUrl?: string;
   installments: ContractInstallment[];
+  paymentReceipts?: PaymentReceipt[];
   customer: {
     id: string;
     name: string;
@@ -134,6 +155,24 @@ const whatsappHref = (phone?: string | null) => {
   if (!digits) return null;
   return `https://wa.me/${digits.startsWith('55') ? digits : `55${digits}`}`;
 };
+const isPendingReceipt = (status?: string) => ['PENDING', 'AWAITING_CONFIRMATION'].includes((status || '').toUpperCase());
+const receiptMediaUrl = (receipt: Partial<PaymentReceipt>) => receipt.receiptUrl || receipt.proofUrl || '';
+const isImageUrl = (url?: string) => !!url && (url.startsWith('data:image') || /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url));
+const hasOverdueDebt = (c: Contract) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isOpenContract = !['COMPLETED', 'CANCELLED', 'PAID'].includes((c.status || '').toUpperCase());
+  if (!isOpenContract) return false;
+  if (Number(c.daysOverdue || 0) > 0) return true;
+  return (c.installments || []).some(inst => {
+    const due = new Date(inst.dueDate);
+    due.setHours(0, 0, 0, 0);
+    const status = (inst.status || '').toUpperCase();
+    const accumulated = Number(inst.daysOverdue || 0) > 0 || Number(inst.lateFeeAmount || 0) > 0 || Number(inst.fineAccumulated || 0) > 0;
+    const openAndPastDue = ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'].includes(status) && due < today;
+    return status === 'LATE' || accumulated || openAndPastDue;
+  });
+};
 
 export const Contracts: React.FC = () => {
   const { addToast } = useToast();
@@ -187,7 +226,7 @@ export const Contracts: React.FC = () => {
   const load = useCallback(async () => {
     setLoading(true);
     const data = await apiService.getAdminLoans({
-      status: statusFilter !== 'ALL' ? statusFilter : undefined,
+      status: statusFilter !== 'ALL' && statusFilter !== 'DEFAULT' ? statusFilter : undefined,
       type: typeFilter !== 'ALL' ? typeFilter : undefined,
       search: search || undefined
     });
@@ -237,17 +276,20 @@ export const Contracts: React.FC = () => {
     }
   };
 
-  // Filtro de modalidade aplicado no frontend (profileType vem do loanRequest)
-  // Quando há busca, ignora filtro de modalidade para encontrar em todos
+  // Filtros finais no frontend: DEFAULT usa inadimplência dinâmica, não status legado do banco.
+  // Quando há busca, ignora filtro de modalidade para encontrar em todos.
   const filteredContracts = useMemo(() => {
-    if (search) return contracts; // busca ativa → mostra tudo que o backend retornou
-    if (modalityFilter === 'ALL') return contracts;
-    return contracts.filter(c => {
+    let base = statusFilter === 'DEFAULT'
+      ? contracts.filter(hasOverdueDebt)
+      : contracts;
+
+    if (search || modalityFilter === 'ALL') return base;
+    return base.filter(c => {
       const pt = c.loanRequest?.profileType;
       if (modalityFilter === 'GARANTIA') return pt === 'GARANTIA' || pt === 'GARANTIA_VEICULO';
       return pt === modalityFilter;
     });
-  }, [contracts, modalityFilter, search]);
+  }, [contracts, modalityFilter, search, statusFilter]);
 
   useEffect(() => {
     sessionStorage.setItem(STATUS_FILTER_STORAGE_KEY, statusFilter);
@@ -554,6 +596,7 @@ export const Contracts: React.FC = () => {
   // Conta apenas parcelas amortizadoras pagas (exclui pagamentos de juros de rolagem).
   // Conceitualmente válido só para MOTO — a decisão de exibir é feita por profileType.
   const paidCount = (c: Contract) => countAmortizingPaid(c.installments);
+  const selectedPaymentReceipts = loanReceipts.length > 0 ? loanReceipts : (selected?.paymentReceipts || []);
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
@@ -894,53 +937,72 @@ export const Contracts: React.FC = () => {
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
                     <Image size={16} /> Comprovantes do Cliente
-                    {loanReceipts.filter(r => r.status === 'PENDING').length > 0 && (
+                    {selectedPaymentReceipts.filter(r => isPendingReceipt(r.status)).length > 0 && (
                       <span className="bg-amber-500 text-black text-xs font-black px-2 py-0.5 rounded-full">
-                        {loanReceipts.filter(r => r.status === 'PENDING').length} pendente(s)
+                        {selectedPaymentReceipts.filter(r => isPendingReceipt(r.status)).length} pendente(s)
                       </span>
                     )}
                   </h3>
                 </div>
-                {loanReceipts.length === 0 ? (
+                {selectedPaymentReceipts.length === 0 ? (
                   <p className="text-xs text-zinc-500">Nenhum comprovante enviado pelo cliente.</p>
                 ) : (
                   <div className="space-y-2">
-                    {loanReceipts.map((r) => (
-                      <div key={r.id} className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 flex items-center justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                              r.status === 'PENDING' ? 'bg-amber-500/20 text-amber-400' :
-                              r.status === 'APPROVED' ? 'bg-green-500/20 text-green-400' :
-                              'bg-red-500/20 text-red-400'
-                            }`}>
-                              {r.status === 'PENDING' ? '⏳ Pendente' : r.status === 'APPROVED' ? '✓ Aprovado' : '✗ Rejeitado'}
-                            </span>
-                            <span className="text-sm font-bold text-white">{r.amount != null ? fmt(r.amount) : 'Valor a confirmar'}</span>
+                    {selectedPaymentReceipts.map((r) => {
+                      const mediaUrl = receiptMediaUrl(r);
+                      const pending = isPendingReceipt(r.status);
+                      return (
+                        <div key={r.id} className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                                  pending ? 'bg-amber-500/20 text-amber-400' :
+                                  r.status === 'APPROVED' ? 'bg-green-500/20 text-green-400' :
+                                  'bg-red-500/20 text-red-400'
+                                }`}>
+                                  {pending ? '⏳ Pendente' : r.status === 'APPROVED' ? '✓ Aprovado' : '✗ Rejeitado'}
+                                </span>
+                                <span className="text-sm font-bold text-white">{r.amount != null ? fmt(r.amount) : 'Valor a confirmar'}</span>
+                              </div>
+                              <p className="text-xs text-zinc-500">
+                                Enviado em {fmtDate(r.submittedAt || r.createdAt)}
+                                {r.reviewedAt && ` · Revisado em ${fmtDate(r.reviewedAt)}`}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {mediaUrl && (
+                                <a href={mediaUrl} target="_blank" rel="noopener noreferrer"
+                                  className="text-xs bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1">
+                                  <ExternalLink size={12} /> Ver
+                                </a>
+                              )}
+                              {pending && (
+                                <button
+                                  onClick={() => { setReceiptPreview(r); setReceiptRejectReason(''); setReceiptApproveAmount(r.amount ? String(r.amount) : ''); }}
+                                  className="text-xs bg-[#D4AF37] text-black px-3 py-1.5 rounded-lg font-bold hover:bg-yellow-500"
+                                >
+                                  Aprovar / Rejeitar
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <p className="text-xs text-zinc-500">
-                            Enviado em {fmtDate(r.submittedAt || r.createdAt)}
-                            {r.reviewedAt && ` · Revisado em ${fmtDate(r.reviewedAt)}`}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {r.receiptUrl && (
-                            <a href={r.receiptUrl} target="_blank" rel="noopener noreferrer"
-                              className="text-xs bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1">
-                              <ExternalLink size={12} /> Ver
-                            </a>
-                          )}
-                          {r.status === 'PENDING' && (
-                            <button
-                              onClick={() => { setReceiptPreview(r); setReceiptRejectReason(''); setReceiptApproveAmount(r.amount ? String(r.amount) : ''); }}
-                              className="text-xs bg-[#D4AF37] text-black px-3 py-1.5 rounded-lg font-bold hover:bg-yellow-500"
-                            >
-                              Aprovar / Rejeitar
-                            </button>
+
+                          {pending && mediaUrl && (
+                            isImageUrl(mediaUrl) ? (
+                              <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg border border-amber-700/30 bg-black">
+                                <img src={mediaUrl} alt="Comprovante pendente" className="max-h-48 w-full object-contain" />
+                              </a>
+                            ) : (
+                              <a href={mediaUrl} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center gap-2 rounded-lg border border-amber-700/30 bg-black/40 p-3 text-xs text-amber-300 hover:bg-black/60">
+                                <FileText size={18} /> Abrir comprovante pendente em nova aba
+                              </a>
+                            )
                           )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1066,18 +1128,18 @@ export const Contracts: React.FC = () => {
               </div>
 
               {/* Preview do comprovante */}
-              {receiptPreview.receiptUrl && (
+              {receiptMediaUrl(receiptPreview) && (
                 <div className="bg-black rounded-lg p-2 border border-zinc-800">
-                  {/\.(jpg|jpeg|png|webp|gif)$/i.test(receiptPreview.receiptUrl) ? (
+                  {isImageUrl(receiptMediaUrl(receiptPreview)) ? (
                     <img
-                      src={receiptPreview.receiptUrl}
+                      src={receiptMediaUrl(receiptPreview)}
                       alt="Comprovante"
                       className="w-full max-h-96 object-contain rounded"
                     />
                   ) : (
                     <div className="py-10 text-center">
                       <FileText size={48} className="mx-auto text-zinc-500 mb-2" />
-                      <a href={receiptPreview.receiptUrl} target="_blank" rel="noopener noreferrer"
+                      <a href={receiptMediaUrl(receiptPreview)} target="_blank" rel="noopener noreferrer"
                         className="text-[#D4AF37] hover:underline text-sm">
                         Abrir comprovante em nova aba ↗
                       </a>
