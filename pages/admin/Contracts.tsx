@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   FileText, Search, X, ChevronDown, ChevronUp, Eye, DollarSign,
   Edit2, CheckCircle, Clock, AlertTriangle, RefreshCw, Save, Upload,
@@ -19,7 +19,7 @@ import {
 interface ContractInstallment {
   id: string;
   dueDate: string;
-  amount: number;
+  amount?: number;
   status: 'OPEN' | 'PAID' | 'LATE' | 'AWAITING_CONFIRMATION';
   paidAt?: string;
   proofUrl?: string;
@@ -28,6 +28,14 @@ interface ContractInstallment {
   fineAccumulated?: number;
   daysOverdue?: number;
   totalAmount?: number;
+}
+
+interface ContractListSummary {
+  paidCount: number;
+  totalCount: number;
+  hasOverdueDebt: boolean;
+  interestState: 'EM_DIA' | 'EM_ABERTO' | 'ATRASADO';
+  maxDaysOverdue?: number;
 }
 
 interface PaymentReceipt {
@@ -79,7 +87,8 @@ interface Contract {
   isInvestment: boolean;
   isLoan: boolean;
   pixReceiptUrl?: string;
-  installments: ContractInstallment[];
+  installments?: ContractInstallment[];
+  installmentsSummary?: ContractListSummary;
   paymentReceipts?: PaymentReceipt[];
   customer: {
     id: string;
@@ -136,6 +145,7 @@ const MODALITY_FILTERS = [
   { value: 'INVESTIDOR',label: '📈 Investidor' },
 ];
 
+const PAGE_SIZE = 50;
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const installmentTotal = (inst: ContractInstallment) => inst.totalAmount ?? (Number(inst.amount || 0) + Number(inst.lateFeeAmount || 0));
 const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
@@ -156,22 +166,33 @@ const whatsappHref = (phone?: string | null) => {
   return `https://wa.me/${digits.startsWith('55') ? digits : `55${digits}`}`;
 };
 const isPendingReceipt = (status?: string) => ['PENDING', 'AWAITING_CONFIRMATION'].includes((status || '').toUpperCase());
-const receiptMediaUrl = (receipt: Partial<PaymentReceipt>) => receipt.receiptUrl || receipt.proofUrl || '';
+const receiptMediaUrl = (receipt: Partial<PaymentReceipt> & { url?: string }) => receipt.receiptUrl || receipt.proofUrl || receipt.url || '';
 const isImageUrl = (url?: string) => !!url && (url.startsWith('data:image') || /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url));
-const hasOverdueDebt = (c: Contract) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const isOpenContract = !['COMPLETED', 'CANCELLED', 'PAID'].includes((c.status || '').toUpperCase());
-  if (!isOpenContract) return false;
-  if (Number(c.daysOverdue || 0) > 0) return true;
-  return (c.installments || []).some(inst => {
-    const due = new Date(inst.dueDate);
-    due.setHours(0, 0, 0, 0);
-    const status = (inst.status || '').toUpperCase();
-    const accumulated = Number(inst.daysOverdue || 0) > 0 || Number(inst.lateFeeAmount || 0) > 0 || Number(inst.fineAccumulated || 0) > 0;
-    const openAndPastDue = ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'].includes(status) && due < today;
-    return status === 'LATE' || accumulated || openAndPastDue;
-  });
+
+const ReceiptMediaPreview: React.FC<{ url: string; alt: string; className?: string }> = ({ url, alt, className }) => {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [url]);
+  if (!url) return null;
+
+  const link = (
+    <a href={url} target="_blank" rel="noopener noreferrer"
+      className="flex items-center justify-center gap-2 rounded-lg border border-amber-700/30 bg-black/40 p-3 text-xs text-amber-300 hover:bg-black/60">
+      <FileText size={18} /> Abrir Comprovante em Nova Aba
+    </a>
+  );
+
+  if (!isImageUrl(url) || failed) return link;
+
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg border border-amber-700/30 bg-black">
+      <img
+        src={url}
+        alt={alt}
+        onError={() => setFailed(true)}
+        className={className || 'max-h-[300px] w-full max-w-full object-contain'}
+      />
+    </a>
+  );
 };
 
 export const Contracts: React.FC = () => {
@@ -182,10 +203,14 @@ export const Contracts: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState(getInitialStatusFilter);
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [modalityFilter, setModalityFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const [totalContracts, setTotalContracts] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Detail modal
   const [selected, setSelected] = useState<Contract | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const [expandedInstallments, setExpandedInstallments] = useState(false);
 
   // Edit modal
@@ -225,14 +250,19 @@ export const Contracts: React.FC = () => {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const data = await apiService.getAdminLoans({
-      status: statusFilter !== 'ALL' && statusFilter !== 'DEFAULT' ? statusFilter : undefined,
+    const result = await apiService.getAdminLoans({
+      status: statusFilter !== 'ALL' ? statusFilter : undefined,
       type: typeFilter !== 'ALL' ? typeFilter : undefined,
-      search: search || undefined
+      modality: !search && modalityFilter !== 'ALL' ? modalityFilter : undefined,
+      search: search || undefined,
+      page,
+      limit: PAGE_SIZE
     });
-    setContracts(data);
+    setContracts(result.items || []);
+    setTotalContracts(result.total || 0);
+    setTotalPages(result.totalPages || 1);
     setLoading(false);
-  }, [statusFilter, typeFilter, search]);
+  }, [statusFilter, typeFilter, modalityFilter, search, page]);
 
   const loadPendingProofs = useCallback(async () => {
     setLoadingProofs(true);
@@ -276,20 +306,12 @@ export const Contracts: React.FC = () => {
     }
   };
 
-  // Filtros finais no frontend: DEFAULT usa inadimplência dinâmica, não status legado do banco.
-  // Quando há busca, ignora filtro de modalidade para encontrar em todos.
-  const filteredContracts = useMemo(() => {
-    let base = statusFilter === 'DEFAULT'
-      ? contracts.filter(hasOverdueDebt)
-      : contracts;
+  // Backend já entrega filtros aplicados. Evita filtrar depois da paginação e quebrar totais.
+  const filteredContracts = contracts;
 
-    if (search || modalityFilter === 'ALL') return base;
-    return base.filter(c => {
-      const pt = c.loanRequest?.profileType;
-      if (modalityFilter === 'GARANTIA') return pt === 'GARANTIA' || pt === 'GARANTIA_VEICULO';
-      return pt === modalityFilter;
-    });
-  }, [contracts, modalityFilter, search, statusFilter]);
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, typeFilter, modalityFilter, search]);
 
   useEffect(() => {
     sessionStorage.setItem(STATUS_FILTER_STORAGE_KEY, statusFilter);
@@ -310,35 +332,33 @@ export const Contracts: React.FC = () => {
     setExpandedInstallments(false);
     setLoanReceipts([]); // Reset para evitar flash de dados do contrato anterior
     setDetailPayoffBalance(null);
+    setDetailsLoading(true);
     setLoadingDetailPayoffBalance(true);
 
-    const [detailsResult, payoffResult, receiptsResult] = await Promise.allSettled([
+    const [detailsResult, payoffResult] = await Promise.allSettled([
       apiService.getAdminLoanDetails(c.id),
       apiService.getLoanPayoffBalance(c.id),
-      apiService.getPaymentReceipts(),
     ]);
 
     if (detailsResult.status === 'fulfilled' && detailsResult.value) {
       setSelected(detailsResult.value);
+      setLoanReceipts(detailsResult.value.paymentReceipts || []);
     }
     if (payoffResult.status === 'fulfilled') {
       setDetailPayoffBalance(payoffResult.value);
     }
-    if (receiptsResult.status === 'fulfilled') {
-      const filtered = (receiptsResult.value || []).filter((r: any) => r.loanId === c.id);
-      setLoanReceipts(filtered);
-    } else {
-      setLoanReceipts([]);
-    }
+    setDetailsLoading(false);
     setLoadingDetailPayoffBalance(false);
   };
 
   const reloadLoanReceipts = useCallback(async () => {
     if (!selected) return;
     try {
-      const all = await apiService.getPaymentReceipts();
-      const filtered = (all || []).filter((r: any) => r.loanId === selected.id);
-      setLoanReceipts(filtered);
+      const details = await apiService.getAdminLoanDetails(selected.id);
+      if (details) {
+        setSelected(details);
+        setLoanReceipts(details.paymentReceipts || []);
+      }
     } catch {
       // ignore
     }
@@ -369,9 +389,7 @@ export const Contracts: React.FC = () => {
       setReceiptPreview(null);
       setReceiptApproveAmount('');
       // Recarrega detalhes + receipts + lista
-      const details = await apiService.getAdminLoanDetails(selected!.id);
-      if (details) setSelected(details);
-      reloadLoanReceipts();
+      await reloadLoanReceipts();
       load();
     } catch (err: any) {
       addToast(err.message || 'Erro ao aprovar comprovante', 'error');
@@ -562,7 +580,7 @@ export const Contracts: React.FC = () => {
   // P1: Handler para Quitação Total (marca TODAS as parcelas pendentes como PAID)
   const handleSettleAll = async () => {
     if (!selected) return;
-    const pending = selected.installments.filter(i => i.status === 'OPEN' || i.status === 'LATE' || i.status === 'AWAITING_CONFIRMATION');
+    const pending = (selected.installments || []).filter(i => i.status === 'OPEN' || i.status === 'LATE' || i.status === 'AWAITING_CONFIRMATION');
     if (pending.length === 0) {
       addToast('Não há parcelas pendentes para quitar', 'info');
       return;
@@ -595,7 +613,9 @@ export const Contracts: React.FC = () => {
 
   // Conta apenas parcelas amortizadoras pagas (exclui pagamentos de juros de rolagem).
   // Conceitualmente válido só para MOTO — a decisão de exibir é feita por profileType.
-  const paidCount = (c: Contract) => countAmortizingPaid(c.installments);
+  const paidCount = (c: Contract) => c.installmentsSummary?.paidCount ?? countAmortizingPaid(c.installments || []);
+  const totalCount = (c: Contract) => c.installmentsSummary?.totalCount ?? c.totalInstallments ?? c.installmentsCount;
+  const interestState = (c: Contract) => c.installmentsSummary?.interestState ?? getInterestState(c.installments || []);
   const selectedPaymentReceipts = loanReceipts.length > 0 ? loanReceipts : (selected?.paymentReceipts || []);
 
   return (
@@ -607,7 +627,7 @@ export const Contracts: React.FC = () => {
             <FileText className="text-[#D4AF37]" /> Contratos
           </h1>
           <p className="text-zinc-400 text-sm mt-1">
-            {filteredContracts.length} contrato(s) exibido(s)
+            {totalContracts} contrato(s) · página {page} de {totalPages}
             {modalityFilter !== 'ALL' && <span className="ml-1 text-yellow-400">· filtrando por {MODALITY_FILTERS.find(f => f.value === modalityFilter)?.label}</span>}
           </p>
         </div>
@@ -622,7 +642,7 @@ export const Contracts: React.FC = () => {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
           <input
             type="text"
-            placeholder="Buscar por nome ou CPF..."
+            placeholder="Buscar por nome, CPF ou telefone..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full bg-zinc-900 border border-zinc-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-[#D4AF37] outline-none"
@@ -674,7 +694,7 @@ export const Contracts: React.FC = () => {
         ))}
         {modalityFilter !== 'ALL' && (
           <span className="text-xs text-zinc-500 ml-2">
-            {filteredContracts.length} contrato(s)
+            {totalContracts} contrato(s)
           </span>
         )}
       </div>
@@ -739,11 +759,12 @@ export const Contracts: React.FC = () => {
           {modalityFilter !== 'ALL' ? `Nenhum contrato de ${MODALITY_FILTERS.find(f => f.value === modalityFilter)?.label} encontrado` : 'Nenhum contrato encontrado'}
         </div>
       ) : (
-        <div className="space-y-2">
+        <>
+          <div className="space-y-2">
           {filteredContracts.map(c => {
             const status = STATUS_LABELS[c.status] || { label: c.status, color: 'bg-zinc-700 text-zinc-300' };
             const paid = paidCount(c);
-            const total = c.totalInstallments || c.installmentsCount;
+            const total = totalCount(c);
             const profileBadge = getProfileBadge(c);
             const displayMode = getDisplayMode(getProfileType(c));
             return (
@@ -781,7 +802,7 @@ export const Contracts: React.FC = () => {
                       <div>
                         <p className="text-xs text-zinc-500">Juros do mês</p>
                         {(() => {
-                          const state = getInterestState(c.installments);
+                          const state = interestState(c);
                           const color = state === 'ATRASADO' ? 'text-red-400' : state === 'EM_ABERTO' ? 'text-yellow-400' : 'text-green-400';
                           return <p className={`font-bold ${color}`}>{INTEREST_STATE_LABEL[state]}</p>;
                         })()}
@@ -834,7 +855,25 @@ export const Contracts: React.FC = () => {
               </div>
             );
           })}
-        </div>
+          </div>
+          <div className="flex flex-col items-center justify-between gap-3 pt-3 text-sm text-zinc-400 md:flex-row">
+            <Button
+              variant="secondary"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              Anterior
+            </Button>
+            <span>Página {page} de {totalPages} · {totalContracts} contratos</span>
+            <Button
+              variant="secondary"
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+            >
+              Próxima
+            </Button>
+          </div>
+        </>
       )}
 
       {/* ===== MODAL DETALHES ===== */}
@@ -847,6 +886,11 @@ export const Contracts: React.FC = () => {
             </div>
 
             <div className="p-5 space-y-5">
+              {detailsLoading && (
+                <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-300">
+                  Carregando detalhes completos...
+                </div>
+              )}
               {/* Cliente */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-zinc-900 p-3 rounded-lg">
@@ -989,16 +1033,7 @@ export const Contracts: React.FC = () => {
                           </div>
 
                           {pending && mediaUrl && (
-                            isImageUrl(mediaUrl) ? (
-                              <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg border border-amber-700/30 bg-black">
-                                <img src={mediaUrl} alt="Comprovante pendente" className="max-h-48 w-full object-contain" />
-                              </a>
-                            ) : (
-                              <a href={mediaUrl} target="_blank" rel="noopener noreferrer"
-                                className="flex items-center gap-2 rounded-lg border border-amber-700/30 bg-black/40 p-3 text-xs text-amber-300 hover:bg-black/60">
-                                <FileText size={18} /> Abrir comprovante pendente em nova aba
-                              </a>
-                            )
+                            <ReceiptMediaPreview url={mediaUrl} alt="Comprovante pendente" className="max-h-[300px] w-full max-w-full object-contain" />
                           )}
                         </div>
                       );
@@ -1016,12 +1051,12 @@ export const Contracts: React.FC = () => {
                   {expandedInstallments ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   {(() => {
                     const mode = getDisplayMode(getProfileType(selected));
-                    const total = selected.totalInstallments || selected.installmentsCount;
+                    const total = totalCount(selected);
                     if (mode === 'PARCELAS') {
                       return <>Parcelas ({paidCount(selected)}/{total} pagas)</>;
                     }
                     if (mode === 'SALDO_JUROS') {
-                      const state = getInterestState(selected.installments);
+                      const state = interestState(selected);
                       return <>Cobranças · Saldo {fmt(selected.remainingAmount)} · {INTEREST_STATE_LABEL[state]}</>;
                     }
                     if (mode === 'SALDO_DIARIAS') {
@@ -1033,7 +1068,7 @@ export const Contracts: React.FC = () => {
 
                 {expandedInstallments && (
                   <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                    {selected.installments.map((inst, idx) => (
+                    {(selected.installments || []).map((inst, idx) => (
                       <div key={inst.id} className={`flex items-center justify-between p-3 rounded-lg border ${inst.status === 'PAID' ? 'border-green-800 bg-green-900/10' : 'border-zinc-800 bg-zinc-900'}`}>
                         <div>
                           <p className="text-sm font-bold">#{idx + 1} — {fmt(installmentTotal(inst))}</p>
@@ -1087,7 +1122,7 @@ export const Contracts: React.FC = () => {
                 <Button onClick={() => openPartialPayment(selected)} className="w-full bg-[#D4AF37] hover:bg-yellow-500 text-black">
                   <DollarSign size={16} /> Registrar Pagamento Parcial/Avulso
                 </Button>
-                {selected.installments.some(i => i.status === 'OPEN' || i.status === 'LATE' || i.status === 'AWAITING_CONFIRMATION') && (
+                {(selected.installments || []).some(i => i.status === 'OPEN' || i.status === 'LATE' || i.status === 'AWAITING_CONFIRMATION') && (
                   <Button
                     onClick={handleSettleAll}
                     disabled={settlingAll}
@@ -1130,21 +1165,7 @@ export const Contracts: React.FC = () => {
               {/* Preview do comprovante */}
               {receiptMediaUrl(receiptPreview) && (
                 <div className="bg-black rounded-lg p-2 border border-zinc-800">
-                  {isImageUrl(receiptMediaUrl(receiptPreview)) ? (
-                    <img
-                      src={receiptMediaUrl(receiptPreview)}
-                      alt="Comprovante"
-                      className="w-full max-h-96 object-contain rounded"
-                    />
-                  ) : (
-                    <div className="py-10 text-center">
-                      <FileText size={48} className="mx-auto text-zinc-500 mb-2" />
-                      <a href={receiptMediaUrl(receiptPreview)} target="_blank" rel="noopener noreferrer"
-                        className="text-[#D4AF37] hover:underline text-sm">
-                        Abrir comprovante em nova aba ↗
-                      </a>
-                    </div>
-                  )}
+                  <ReceiptMediaPreview url={receiptMediaUrl(receiptPreview)} alt="Comprovante" />
                 </div>
               )}
 

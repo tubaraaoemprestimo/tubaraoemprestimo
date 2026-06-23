@@ -89,98 +89,200 @@ async function withInstallmentTotalsList<T extends { installments?: any[]; loanR
     return Promise.all(loans.map((loan) => withInstallmentTotals(loan, systemSettingRate)));
 }
 
+function getPublicBaseUrl(req: Request): string {
+    const envBase = process.env.PUBLIC_BASE_URL || process.env.API_PUBLIC_URL || process.env.BACKEND_URL;
+    if (envBase) return envBase.replace(/\/$/, '');
+    const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
+    const host = String(req.headers['x-forwarded-host'] || req.get('host') || '').split(',')[0].trim();
+    return host ? `${proto}://${host}` : '';
+}
+
+function publicMediaUrl(url: unknown, req: Request): string {
+    const value = String(url || '').trim();
+    if (!value || value.startsWith('data:') || /^https?:\/\//i.test(value)) return value;
+    const baseUrl = getPublicBaseUrl(req);
+    if (!baseUrl) return value;
+    if (value.startsWith('//')) return `${String(req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim()}:${value}`;
+    return `${baseUrl}/${value.replace(/^\/+/, '')}`;
+}
+
+type AdminLoanListSummary = {
+    paidCount: number;
+    totalCount: number;
+    hasOverdueDebt: boolean;
+    interestState: 'EM_DIA' | 'EM_ABERTO' | 'ATRASADO';
+    maxDaysOverdue: number;
+};
+
+function getAdminListSummary(loan: any, installments: any[]): AdminLoanListSummary {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const open = installments.filter((i) => ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'].includes(i.status));
+    const maxDaysOverdue = open.reduce((max, inst) => {
+        const due = new Date(inst.dueDate);
+        due.setHours(0, 0, 0, 0);
+        const computed = due < today ? Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+        return Math.max(max, Number(inst.daysOverdue || 0), computed);
+    }, Number(loan.daysOverdue || 0));
+
+    const hasOverdueDebt = !['COMPLETED', 'CANCELLED', 'PAID'].includes(String(loan.status || '').toUpperCase()) && open.some((inst) => {
+        const due = new Date(inst.dueDate);
+        due.setHours(0, 0, 0, 0);
+        return inst.status === 'LATE'
+            || due < today
+            || Number(inst.daysOverdue || 0) > 0
+            || Number(inst.lateFeeAmount || 0) > 0
+            || Number(inst.fineAccumulated || 0) > 0;
+    });
+
+    const interestState = open.length === 0
+        ? 'EM_DIA'
+        : hasOverdueDebt
+            ? 'ATRASADO'
+            : 'EM_ABERTO';
+
+    return {
+        paidCount: installments.filter((i) => i.status === 'PAID' && !i.isInterestPayment).length,
+        totalCount: Number(loan.totalInstallments || loan.installmentsCount || installments.length || 0),
+        hasOverdueDebt,
+        interestState,
+        maxDaysOverdue,
+    };
+}
+
 // GET /api/loans/admin/all — Admin: listar todos os contratos com filtros
 loansRouter.get('/admin/all', requireAdmin, async (req: Request, res: Response) => {
     try {
-        const { status, type, search: rawSearch } = req.query as Record<string, string>;
+        const { status, type, search: rawSearch, modality } = req.query as Record<string, string>;
         const search = rawSearch?.trim() || '';
-        console.log(`[Loans] admin/all search="${search}" status="${status}" type="${type}"`);
+        const page = Math.max(1, Number(req.query.page || 1));
+        const limit = Math.min(50, Math.max(1, Number(req.query.limit || 50)));
+        const skip = (page - 1) * limit;
+        console.log(`[Loans] admin/all search="${search}" status="${status}" type="${type}" modality="${modality}" page=${page} limit=${limit}`);
 
         const where: any = {};
-        // Se há busca, não filtra por status para encontrar em todos os contratos
-        if (!search) {
-            if (status && status !== 'ALL' && status !== 'DEFAULT') where.status = status;
-            if (status === 'DEFAULT') {
-                where.status = { in: ['ACTIVE', 'DEFAULT', 'APPROVED'] };
-                where.installments = { some: { status: { in: ['OPEN', 'LATE'] }, dueDate: { lt: new Date() } } };
-            }
+        const and: any[] = [];
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (status && status !== 'ALL' && status !== 'DEFAULT') where.status = status;
+        if (status === 'DEFAULT') {
+            and.push({
+                status: { notIn: ['COMPLETED', 'CANCELLED', 'PAID'] },
+                OR: [
+                    { daysOverdue: { gt: 0 } },
+                    { installments: { some: { status: 'LATE' } } },
+                    { installments: { some: { status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }, dueDate: { lt: today } } } },
+                    { installments: { some: { status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }, daysOverdue: { gt: 0 } } } },
+                    { installments: { some: { status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }, lateFeeAmount: { gt: 0 } } } },
+                    { installments: { some: { status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }, fineAccumulated: { gt: 0 } } } },
+                ]
+            });
         }
         if (type === 'LOAN') where.isLoan = true;
         if (type === 'SERVICE') where.isService = true;
         if (type === 'INVESTMENT') where.isInvestment = true;
+        if (modality && modality !== 'ALL') {
+            where.loanRequest = modality === 'GARANTIA'
+                ? { profileType: { in: ['GARANTIA', 'GARANTIA_VEICULO'] } }
+                : { profileType: modality };
+        }
 
-        const loans = await prisma.loan.findMany({
-            where,
-            select: {
-                id: true,
-                amount: true,
-                principalAmount: true,
-                remainingAmount: true,
-                installmentsCount: true,
-                totalInstallments: true,
-                dailyInstallmentAmount: true,
-                status: true,
-                startDate: true,
-                createdAt: true,
-                daysOverdue: true,
-                nextPaymentDate: true,
-                lastPaymentDate: true,
-                paymentFrequency: true,
-                interestRate: true,
-                adminNotes: true,
-                isService: true,
-                isInvestment: true,
-                isLoan: true,
-                pixReceiptUrl: true,
-                customer: {
-                    select: {
-                        id: true,
-                        name: true,
-                        cpf: true,
-                        phone: true,
-                        email: true,
-                        address: true,
-                        neighborhood: true,
-                        city: true,
-                        state: true,
-                        zipCode: true,
-                        monthlyInterestRate: true,
-                        lateInterestMonthly: true,
-                    }
+        if (search) {
+            const normalize = (value?: string | null) => (value || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+            const normalizedSearch = normalize(search);
+            const digitsOnly = search.replace(/\D/g, '');
+            const customers = await prisma.customer.findMany({
+                select: { id: true, name: true, cpf: true, phone: true }
+            });
+            const customerIds = customers
+                .filter((c) =>
+                    normalize(c.name).includes(normalizedSearch) ||
+                    (digitsOnly.length > 0 && (c.cpf || '').includes(digitsOnly)) ||
+                    (digitsOnly.length > 0 && (c.phone || '').replace(/\D/g, '').includes(digitsOnly))
+                )
+                .map((c) => c.id);
+            and.push(customerIds.length > 0 ? { customerId: { in: customerIds } } : { id: '00000000-0000-0000-0000-000000000000' });
+        }
+
+        if (and.length > 0) where.AND = and;
+
+        const [loans, total] = await Promise.all([
+            prisma.loan.findMany({
+                where,
+                select: {
+                    id: true,
+                    amount: true,
+                    principalAmount: true,
+                    remainingAmount: true,
+                    installmentsCount: true,
+                    totalInstallments: true,
+                    dailyInstallmentAmount: true,
+                    status: true,
+                    startDate: true,
+                    createdAt: true,
+                    daysOverdue: true,
+                    nextPaymentDate: true,
+                    lastPaymentDate: true,
+                    paymentFrequency: true,
+                    interestRate: true,
+                    adminNotes: true,
+                    isService: true,
+                    isInvestment: true,
+                    isLoan: true,
+                    pixReceiptUrl: true,
+                    customer: { select: { id: true, name: true, cpf: true, phone: true } },
+                    loanRequest: { select: { profileType: true, monthlyRate: true, contractMonths: true } }
                 },
-                installments: {
-                    select: {
-                        id: true,
-                        dueDate: true,
-                        amount: true,
-                        status: true,
-                        paidAt: true,
-                        proofUrl: true,
-                        isInterestPayment: true,
-                        lateFeeAmount: true,
-                        fineAccumulated: true,
-                        daysOverdue: true,
-                    },
-                    orderBy: { dueDate: 'asc' }
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit,
+            }),
+            prisma.loan.count({ where })
+        ]);
+
+        const loanIds = loans.map((loan) => loan.id);
+        const installments = loanIds.length
+            ? await prisma.installment.findMany({
+                where: { loanId: { in: loanIds } },
+                select: {
+                    id: true,
+                    loanId: true,
+                    dueDate: true,
+                    status: true,
+                    paidAt: true,
+                    isInterestPayment: true,
+                    daysOverdue: true,
+                    lateFeeAmount: true,
+                    fineAccumulated: true,
                 },
-                loanRequest: { select: { profileType: true, monthlyRate: true, contractMonths: true } }
-            },
-            orderBy: { createdAt: 'desc' }
+                orderBy: { dueDate: 'asc' }
+            })
+            : [];
+        const installmentsByLoan = new Map<string, any[]>();
+        for (const inst of installments) {
+            const list = installmentsByLoan.get(inst.loanId) || [];
+            list.push(inst);
+            installmentsByLoan.set(inst.loanId, list);
+        }
+
+        const items = loans.map((loan) => {
+            const summary = getAdminListSummary(loan, installmentsByLoan.get(loan.id) || []);
+            return {
+                ...loan,
+                daysOverdue: summary.maxDaysOverdue,
+                installmentsSummary: summary,
+            };
         });
 
-        // Filtro de busca por nome/CPF/telefone do cliente (ignora acentos)
-        const normalize = (value?: string | null) => (value || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-        const normalizedSearch = normalize(search);
-        const digitsOnly = search.replace(/\D/g, '');
-        const filtered = search
-            ? loans.filter(l =>
-                normalize(l.customer?.name).includes(normalizedSearch) ||
-                (digitsOnly.length > 0 && (l.customer?.cpf || '').includes(digitsOnly)) ||
-                (digitsOnly.length > 0 && (l.customer?.phone || '').replace(/\D/g, '').includes(digitsOnly))
-            )
-            : loans;
-
-        res.json(await withInstallmentTotalsList(filtered));
+        res.json({
+            items,
+            page,
+            limit,
+            total,
+            totalPages: Math.max(1, Math.ceil(total / limit)),
+        });
     } catch (err) {
         console.error('[Loans] admin/all error:', err);
         res.status(500).json({ error: 'Erro ao listar contratos' });
@@ -258,9 +360,23 @@ loansRouter.get('/:loanId/admin-details', requireAdmin, async (req: Request, res
             })
             : [];
 
+        const detailedLoan = await withInstallmentTotals({
+            ...loan,
+            installments: (loan.installments || []).map((inst: any) => ({
+                ...inst,
+                proofUrl: publicMediaUrl(inst.proofUrl, req),
+            }))
+        });
+
         res.json({
-            ...(await withInstallmentTotals(loan)),
-            paymentReceipts: paymentReceipts.map((r: any) => ({ ...r, loanId }))
+            ...detailedLoan,
+            paymentReceipts: paymentReceipts.map((r: any) => ({
+                ...r,
+                loanId,
+                receiptUrl: publicMediaUrl(r.receiptUrl, req),
+                proofUrl: publicMediaUrl(r.proofUrl, req),
+                url: publicMediaUrl(r.receiptUrl || r.proofUrl || r.url, req),
+            }))
         });
     } catch (err) {
         console.error('[Loans] admin-details error:', err);

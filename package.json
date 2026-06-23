@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node build-frontend.mjs",
     "preview": "vite preview",
     "demo": "cross-env VITE_DEMO_MODE=true vite",
     "build:demo": "cross-env VITE_DEMO_MODE=true vite build --outDir dist-demo"

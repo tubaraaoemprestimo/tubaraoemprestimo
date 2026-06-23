@@ -606,14 +606,20 @@ export const apiService = {
 
     // ============= ADMIN CONTRACTS =============
 
-    async getAdminLoans(params?: { status?: string; type?: string; search?: string }) {
+    async getAdminLoans(params?: { status?: string; type?: string; modality?: string; search?: string; page?: number; limit?: number }) {
         const qs = new URLSearchParams();
         if (params?.status) qs.set('status', params.status);
         if (params?.type) qs.set('type', params.type);
+        if (params?.modality) qs.set('modality', params.modality);
         if (params?.search) qs.set('search', params.search);
+        if (params?.page) qs.set('page', String(params.page));
+        if (params?.limit) qs.set('limit', String(params.limit));
         const { data, error } = await api.get(`/loans/admin/all?${qs.toString()}`);
-        if (error) return [];
-        return data || [];
+        if (error) return { items: [], page: 1, limit: 50, total: 0, totalPages: 0 };
+        if (Array.isArray(data)) {
+            return { items: data, page: 1, limit: data.length || 50, total: data.length, totalPages: 1 };
+        }
+        return data || { items: [], page: 1, limit: 50, total: 0, totalPages: 0 };
     },
 
     async getAdminLoanDetails(loanId: string) {
