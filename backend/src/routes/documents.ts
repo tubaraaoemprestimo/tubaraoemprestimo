@@ -11,7 +11,7 @@ const prisma = new PrismaClient();
  */
 router.get('/', authenticate, async (req: Request, res: Response) => {
     try {
-        const userId = (req as any).user?.userId;
+        const userId = (req as any).user?.id;
         if (!userId) {
             return res.status(401).json({ error: 'Usuário não autenticado' });
         }
@@ -59,7 +59,7 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
  */
 router.get('/:id', authenticate, async (req: Request, res: Response) => {
     try {
-        const userId = (req as any).user?.userId;
+        const userId = (req as any).user?.id;
         const { id } = req.params;
 
         if (!userId) {

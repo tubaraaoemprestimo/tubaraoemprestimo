@@ -12,15 +12,19 @@ const upload = multer({
         fileSize: parseInt(process.env.MAX_FILE_SIZE || '104857600') // 100MB
     },
     fileFilter: (_req, file, cb) => {
+        // Prefixos, não igualdade exata: MediaRecorder do navegador manda
+        // mimetypes com sufixo de codec (ex: "video/webm;codecs=vp9,opus").
         const allowedTypes = [
-            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-            'video/mp4', 'video/webm', 'video/quicktime',
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif',
+            'video/mp4', 'video/webm', 'video/quicktime', 'video/3gpp',
             'application/pdf'
         ];
-        if (allowedTypes.includes(file.mimetype)) {
+        const mimetype = file.mimetype.toLowerCase();
+        const isAllowed = allowedTypes.some(t => mimetype === t || mimetype.startsWith(`${t};`));
+        if (isAllowed) {
             cb(null, true);
         } else {
-            cb(new Error('Tipo de arquivo não permitido'));
+            cb(new Error(`Tipo de arquivo não permitido: ${file.mimetype}`));
         }
     }
 });

@@ -291,6 +291,12 @@ export const SecurityHub: React.FC = () => {
         return true;
     });
 
+    const filteredUsers = users.filter(user => {
+        const term = searchTerm.trim().toLowerCase();
+        if (!term) return true;
+        return (user.name || '').toLowerCase().includes(term) || (user.email || '').toLowerCase().includes(term);
+    });
+
     const tabs = [
         { id: 'antifraud', label: 'Antifraude', icon: <Shield size={18} />, badge: stats.highRiskCount },
         { id: 'blacklist', label: 'Blacklist', icon: <Ban size={18} />, badge: stats.blacklistActive },
@@ -458,15 +464,24 @@ export const SecurityHub: React.FC = () => {
             {/* Users Tab */}
             {activeTab === 'users' && (
                 <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                        <p className="text-zinc-400">Gerencie usuários e permissões do sistema</p>
+                    <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
+                        <div className="relative flex-1 max-w-md">
+                            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                            <input
+                                type="text"
+                                placeholder="Buscar por nome ou email..."
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:border-[#D4AF37] outline-none"
+                            />
+                        </div>
                         <Button onClick={() => { setEditingUser({}); setIsUserModalOpen(true); }}>
                             <Plus size={18} /> Novo Usuário
                         </Button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {users.map(user => (
+                        {filteredUsers.map(user => (
                             <div key={user.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 hover:border-[#D4AF37]/50 transition-colors">
                                 <div className="flex items-center gap-4 mb-4">
                                     <div className="w-12 h-12 bg-gradient-to-br from-[#D4AF37] to-yellow-600 rounded-full flex items-center justify-center text-black font-bold text-lg">
@@ -548,10 +563,10 @@ export const SecurityHub: React.FC = () => {
                                 )}
                             </div>
                         ))}
-                        {users.length === 0 && (
+                        {filteredUsers.length === 0 && (
                             <div className="col-span-full text-center py-12 text-zinc-500">
                                 <UserCog size={48} className="mx-auto mb-4 opacity-50" />
-                                <p>Nenhum usuário cadastrado</p>
+                                <p>{users.length === 0 ? 'Nenhum usuário cadastrado' : 'Nenhum usuário encontrado para essa busca'}</p>
                             </div>
                         )}
                     </div>

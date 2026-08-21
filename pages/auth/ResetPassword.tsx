@@ -1,10 +1,10 @@
 /**
  * 🔑 Página de Redefinir Senha
- * O usuário chega aqui pelo link do email de recuperação.
- * Captura o token da URL e permite definir nova senha.
+ * O usuário chega aqui pelo link do email de recuperação (?token=<jwt>).
+ * Envia o token + nova senha pro backend (POST /auth/reset-password).
  */
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, ArrowRight, ShieldCheck, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { api } from '../../services/apiClient';
@@ -13,6 +13,8 @@ import { useToast } from '../../components/Toast';
 const ResetPassword: React.FC = () => {
     const navigate = useNavigate();
     const { addToast } = useToast();
+    const [searchParams] = useSearchParams();
+    const token = searchParams.get('token') || '';
 
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -20,44 +22,6 @@ const ResetPassword: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
-    const [sessionReady, setSessionReady] = useState(false);
-    const [checking, setChecking] = useState(true);
-
-    useEffect(() => {
-        // Supabase detecta o token na URL automaticamente via detectSessionInUrl
-        // Precisamos aguardar a sessão ser restaurada
-        const checkSession = async () => {
-            setChecking(true);
-
-            // Ouvir evento de PASSWORD_RECOVERY
-            const { data: { subscription } } = api.auth.onAuthStateChange((event, session) => {
-                console.log('[ResetPassword] Auth event:', event);
-                if (event === 'PASSWORD_RECOVERY') {
-                    setSessionReady(true);
-                    setChecking(false);
-                } else if (event === 'SIGNED_IN' && session) {
-                    // Pode chegar como SIGNED_IN com token de recovery
-                    setSessionReady(true);
-                    setChecking(false);
-                }
-            });
-
-            // Verificar se já tem sessão ativa (caso o evento já tenha disparado)
-            const { data: { session } } = await api.auth.getSession();
-            if (session) {
-                setSessionReady(true);
-            }
-
-            // Timeout de segurança
-            setTimeout(() => {
-                setChecking(false);
-            }, 5000);
-
-            return () => subscription.unsubscribe();
-        };
-
-        checkSession();
-    }, []);
 
     const handleResetPassword = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -76,21 +40,15 @@ const ResetPassword: React.FC = () => {
         setError('');
 
         try {
-            const { error: updateError } = await api.auth.updateUser({
-                password: newPassword
-            });
+            const { error: resetError } = await api.post('/auth/reset-password', { token, newPassword });
 
-            if (updateError) {
-                console.error('Reset error:', updateError);
-                setError(updateError.message || 'Erro ao redefinir senha. Tente novamente.');
+            if (resetError) {
+                setError(resetError?.error || 'Erro ao redefinir senha. Tente novamente.');
                 return;
             }
 
             setSuccess(true);
             addToast('Senha redefinida com sucesso!', 'success');
-
-            // Fazer logout para limpar sessão de recovery
-            await api.auth.signOut();
         } catch (err: any) {
             setError('Erro ao redefinir senha. Tente solicitar um novo link.');
         } finally {
@@ -121,29 +79,17 @@ const ResetPassword: React.FC = () => {
         );
     }
 
-    // Verificando token
-    if (checking) {
-        return (
-            <div className="min-h-screen bg-black flex items-center justify-center p-4">
-                <div className="text-center">
-                    <Loader2 size={40} className="text-[#D4AF37] animate-spin mx-auto mb-4" />
-                    <p className="text-zinc-400">Verificando link de recuperação...</p>
-                </div>
-            </div>
-        );
-    }
-
-    // Token inválido ou expirado
-    if (!sessionReady) {
+    // Sem token na URL — link inválido, nem tenta mostrar o form
+    if (!token) {
         return (
             <div className="min-h-screen bg-black flex items-center justify-center p-4">
                 <div className="w-full max-w-md text-center">
                     <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-red-500 to-red-700 rounded-full flex items-center justify-center shadow-[0_0_60px_rgba(239,68,68,0.3)]">
                         <AlertCircle size={48} className="text-white" />
                     </div>
-                    <h1 className="text-2xl font-bold text-white mb-3">Link Expirado</h1>
+                    <h1 className="text-2xl font-bold text-white mb-3">Link Inválido</h1>
                     <p className="text-zinc-400 mb-6">
-                        Este link de recuperação já expirou ou é inválido.
+                        Este link de recuperação está incompleto ou é inválido.
                         Solicite um novo link na tela de login.
                     </p>
                     <Button
