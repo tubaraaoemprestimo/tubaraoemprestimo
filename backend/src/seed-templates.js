@@ -92,8 +92,13 @@ _Tubarão Empréstimos_`,
 
 Sua parcela está *{dias_atraso} dias* em atraso!
 
-Valor original: R$ {valor}
-Valor com juros: *R$ {valor_com_juros}*
+📊 Demonstrativo completo do contrato:
+Valor Principal do Empréstimo: R$ {valor_principal}
+Juros Acumulados: R$ {valor_juros_acumulados}
+Multas e Mora por Atraso: R$ {valor_multas_mora}
+━━━━━━━━━━━━━━━━━━━━━
+Total para Regularizar Hoje: *R$ {valor_cobranca_atual}*
+Total para Quitação Integral: *R$ {valor_quitacao_total}*
 
 ⚠️ Regularize HOJE para evitar:
 • Negativação no SPC/Serasa
@@ -105,7 +110,7 @@ Valor com juros: *R$ {valor_com_juros}*
 Entre em contato: {telefone_suporte}
 
 _Tubarão Empréstimos_`,
-    variables: ['nome', 'dias_atraso', 'valor', 'valor_com_juros', 'pix_key', 'telefone_suporte'],
+    variables: ['nome', 'dias_atraso', 'valor_principal', 'valor_juros_acumulados', 'valor_multas_mora', 'valor_cobranca_atual', 'valor_quitacao_total', 'pix_key', 'telefone_suporte'],
     isActive: true
   },
   {
@@ -139,8 +144,13 @@ _Tubarão Empréstimos_`,
 
 Sua parcela está *15 dias* em atraso!
 
-Valor original: R$ {valor}
-Valor com juros: *R$ {valor_com_juros}*
+📊 Demonstrativo completo do contrato:
+Valor Principal do Empréstimo: R$ {valor_principal}
+Juros Acumulados: R$ {valor_juros_acumulados}
+Multas e Mora por Atraso: R$ {valor_multas_mora}
+━━━━━━━━━━━━━━━━━━━━━
+Total para Regularizar Hoje: *R$ {valor_cobranca_atual}*
+Total para Quitação Integral: *R$ {valor_quitacao_total}*
 
 ⚠️ ATENÇÃO:
 • Negativação será realizada em 48h
@@ -153,7 +163,7 @@ PIX: {pix_key}
 Suporte: {telefone_suporte}
 
 _Tubarão Empréstimos_`,
-    variables: ['nome', 'valor', 'valor_com_juros', 'pix_key', 'telefone_suporte'],
+    variables: ['nome', 'valor_principal', 'valor_juros_acumulados', 'valor_multas_mora', 'valor_cobranca_atual', 'valor_quitacao_total', 'pix_key', 'telefone_suporte'],
     isActive: true
   },
   {
@@ -166,8 +176,13 @@ _Tubarão Empréstimos_`,
 
 Sua parcela está *30 dias* em atraso!
 
-Valor original: R$ {valor}
-Valor com juros e multa: *R$ {valor_com_juros}*
+📊 Demonstrativo completo do contrato:
+Valor Principal do Empréstimo: R$ {valor_principal}
+Juros Acumulados: R$ {valor_juros_acumulados}
+Multas e Mora por Atraso: R$ {valor_multas_mora}
+━━━━━━━━━━━━━━━━━━━━━
+Total para Regularizar Hoje: *R$ {valor_cobranca_atual}*
+Total para Quitação Integral: *R$ {valor_quitacao_total}*
 
 ⚠️ AÇÕES TOMADAS:
 ✓ Negativação no SPC/Serasa
@@ -180,7 +195,7 @@ Esta é a ÚLTIMA oportunidade de regularização antes da execução judicial.
 📞 Suporte: {telefone_suporte}
 
 _Tubarão Empréstimos - Departamento Jurídico_`,
-    variables: ['nome', 'valor', 'valor_com_juros', 'pix_key', 'telefone_suporte'],
+    variables: ['nome', 'valor_principal', 'valor_juros_acumulados', 'valor_multas_mora', 'valor_cobranca_atual', 'valor_quitacao_total', 'pix_key', 'telefone_suporte'],
     isActive: true
   },
 
@@ -300,8 +315,13 @@ Equipe Tubarão Empréstimos`,
 
 Sua parcela está {dias_atraso} dias em atraso!
 
-Valor original: R$ {valor}
-Valor com juros: R$ {valor_com_juros}
+Demonstrativo completo do contrato:
+Valor Principal do Empréstimo: R$ {valor_principal}
+Juros Acumulados: R$ {valor_juros_acumulados}
+Multas e Mora por Atraso: R$ {valor_multas_mora}
+-----------------------------
+Total para Regularizar Hoje: R$ {valor_cobranca_atual}
+Total para Quitação Integral: R$ {valor_quitacao_total}
 
 ⚠️ Regularize HOJE para evitar:
 • Negativação no SPC/Serasa
@@ -314,7 +334,7 @@ Entre em contato: {telefone_suporte}
 
 Atenciosamente,
 Equipe Tubarão Empréstimos`,
-    variables: ['nome', 'dias_atraso', 'valor', 'valor_com_juros', 'pix_key', 'telefone_suporte'],
+    variables: ['nome', 'dias_atraso', 'valor_principal', 'valor_juros_acumulados', 'valor_multas_mora', 'valor_cobranca_atual', 'valor_quitacao_total', 'pix_key', 'telefone_suporte'],
     isActive: true
   },
   {
@@ -327,8 +347,13 @@ Equipe Tubarão Empréstimos`,
 
 Sua parcela está 15 dias em atraso!
 
-Valor original: R$ {valor}
-Valor com juros: R$ {valor_com_juros}
+Demonstrativo completo do contrato:
+Valor Principal do Empréstimo: R$ {valor_principal}
+Juros Acumulados: R$ {valor_juros_acumulados}
+Multas e Mora por Atraso: R$ {valor_multas_mora}
+-----------------------------
+Total para Regularizar Hoje: R$ {valor_cobranca_atual}
+Total para Quitação Integral: R$ {valor_quitacao_total}
 
 ⚠️ ATENÇÃO:
 • Negativação será realizada em 48h
@@ -343,7 +368,7 @@ Suporte: {telefone_suporte}
 Atenciosamente,
 Departamento de Cobrança
 Tubarão Empréstimos`,
-    variables: ['nome', 'valor', 'valor_com_juros', 'pix_key', 'telefone_suporte'],
+    variables: ['nome', 'valor_principal', 'valor_juros_acumulados', 'valor_multas_mora', 'valor_cobranca_atual', 'valor_quitacao_total', 'pix_key', 'telefone_suporte'],
     isActive: true
   },
   {
@@ -356,8 +381,13 @@ Tubarão Empréstimos`,
 
 Sua parcela está 30 dias em atraso!
 
-Valor original: R$ {valor}
-Valor com juros e multa: R$ {valor_com_juros}
+Demonstrativo completo do contrato:
+Valor Principal do Empréstimo: R$ {valor_principal}
+Juros Acumulados: R$ {valor_juros_acumulados}
+Multas e Mora por Atraso: R$ {valor_multas_mora}
+-----------------------------
+Total para Regularizar Hoje: R$ {valor_cobranca_atual}
+Total para Quitação Integral: R$ {valor_quitacao_total}
 
 ⚠️ AÇÕES TOMADAS:
 ✓ Negativação no SPC/Serasa
@@ -372,7 +402,7 @@ Esta é a ÚLTIMA oportunidade de regularização antes da execução judicial.
 Atenciosamente,
 Departamento Jurídico
 Tubarão Empréstimos`,
-    variables: ['nome', 'valor', 'valor_com_juros', 'pix_key', 'telefone_suporte'],
+    variables: ['nome', 'valor_principal', 'valor_juros_acumulados', 'valor_multas_mora', 'valor_cobranca_atual', 'valor_quitacao_total', 'pix_key', 'telefone_suporte'],
     isActive: true
   },
 

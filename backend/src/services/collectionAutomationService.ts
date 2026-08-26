@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import { templateService } from './templateService';
+import { getLoanPayoffBalance } from './loanPayoffService';
 import {
   computeCharge,
   resolveMonthlyRate,
@@ -186,6 +187,52 @@ export function buildChargeTemplateVars(charge: ChargeBreakdown): {
     multa_7: formatCurrency(charge.multa7),
     multa_diaria: formatCurrency(charge.multaDiaria),
   };
+}
+
+/**
+ * Demonstrativo financeiro COMPLETO do contrato, usando `getLoanPayoffBalance`
+ * (mesma fonte de verdade da tela de admin — `GET /api/loans/:id/payoff-balance`)
+ * como ÚNICA fonte de saldo devedor exibida ao cliente nas réguas de cobrança.
+ *
+ * Corrige a divergência onde o WhatsApp mostrava o valor de UMA parcela isolada
+ * (ex.: R$ 485,00) enquanto o painel admin mostrava a dívida real acumulada do
+ * contrato (ex.: R$ 4.095,00) — cada um calculando de um jeito.
+ */
+export async function buildPayoffDemonstrativoVars(loanId: string): Promise<{
+  valor_principal: string;
+  valor_juros_acumulados: string;
+  valor_multas_mora: string;
+  valor_cobranca_atual: string;
+  valor_quitacao_total: string;
+}> {
+  const balance = await getLoanPayoffBalance(loanId);
+  return {
+    valor_principal: formatCurrency(balance.principalBalance),
+    valor_juros_acumulados: formatCurrency(balance.interestBalance),
+    valor_multas_mora: formatCurrency(balance.feeBalance),
+    valor_cobranca_atual: formatCurrency(balance.cycleChargeBalance),
+    valor_quitacao_total: formatCurrency(balance.totalPayoffBalance),
+  };
+}
+
+/**
+ * Trava de idempotência diária da régua de cobrança (Bugfix "templates de
+ * cobrança inconsistentes" — 26/08/2026).
+ *
+ * Evita que o MESMO contrato receba dois templates de cobrança conflitantes no
+ * mesmo dia (ex.: uma parcela de juros em atraso E o boleto geral do contrato
+ * caindo em buckets de dias diferentes na mesma execução do cron). Granularidade
+ * é por CONTRATO (loan), não por parcela — um contrato só dispara 1x por dia,
+ * não importa quantas parcelas em atraso ele tenha.
+ */
+async function wasCollectionMessageSentToday(loanId: string): Promise<boolean> {
+  const loan = await prisma.loan.findUnique({ where: { id: loanId }, select: { lastCollectionMessageAt: true } });
+  if (!loan?.lastCollectionMessageAt) return false;
+  return sameDay(new Date(loan.lastCollectionMessageAt), new Date());
+}
+
+async function markCollectionMessageSent(loanId: string): Promise<void> {
+  await prisma.loan.update({ where: { id: loanId }, data: { lastCollectionMessageAt: new Date() } }).catch(() => {});
 }
 
 function startOfDay(date: Date): Date {
@@ -604,6 +651,11 @@ async function processOverdue1Day(): Promise<number> {
   let sent = 0;
   for (const installment of installments) {
     try {
+      if (await wasCollectionMessageSentToday(installment.loanId)) {
+        console.log(`[CollectionAutomation] Loan ${installment.loanId} já recebeu cobrança hoje, pulando (1 dia)`);
+        continue;
+      }
+
       const customer = installment.loan.customer;
       const daysOverdue = Math.max(1, calcDaysOverdue(installment.dueDate, new Date()));
       const collectionContext = getCollectionContext(installment);
@@ -626,11 +678,13 @@ async function processOverdue1Day(): Promise<number> {
           valor_total: formatCurrency(charge.total),
           valor_com_juros: formatCurrency(charge.total),
           ...buildChargeTemplateVars(charge),
+          ...(await buildPayoffDemonstrativoVars(installment.loanId)),
           data_vencimento: formatDate(installment.dueDate),
           pix_key: await getAdminPixKey()
         }
       );
 
+      await markCollectionMessageSent(installment.loanId);
       sent++;
       await new Promise(resolve => setTimeout(resolve, 1500));
     } catch (error) {
@@ -680,6 +734,11 @@ async function processOverdue3Days(): Promise<number> {
   let sent = 0;
   for (const installment of installments) {
     try {
+      if (await wasCollectionMessageSentToday(installment.loanId)) {
+        console.log(`[CollectionAutomation] Loan ${installment.loanId} já recebeu cobrança hoje, pulando (3 dias)`);
+        continue;
+      }
+
       const customer = installment.loan.customer;
       const daysOverdue = Math.max(3, calcDaysOverdue(installment.dueDate, new Date()));
       const collectionContext = getCollectionContext(installment);
@@ -702,11 +761,13 @@ async function processOverdue3Days(): Promise<number> {
           valor_total: formatCurrency(charge.total),
           valor_com_juros: formatCurrency(charge.total),
           ...buildChargeTemplateVars(charge),
+          ...(await buildPayoffDemonstrativoVars(installment.loanId)),
           data_vencimento: formatDate(installment.dueDate),
           pix_key: await getAdminPixKey()
         }
       );
 
+      await markCollectionMessageSent(installment.loanId);
       sent++;
       await new Promise(resolve => setTimeout(resolve, 1500));
     } catch (error) {
@@ -756,6 +817,11 @@ async function processOverdue7Days(): Promise<number> {
   let sent = 0;
   for (const installment of installments) {
     try {
+      if (await wasCollectionMessageSentToday(installment.loanId)) {
+        console.log(`[CollectionAutomation] Loan ${installment.loanId} já recebeu cobrança hoje, pulando (7 dias)`);
+        continue;
+      }
+
       const customer = installment.loan.customer;
       const daysOverdue = Math.floor((Date.now() - installment.dueDate.getTime()) / (1000 * 60 * 60 * 24));
       const collectionContext = getCollectionContext(installment);
@@ -779,11 +845,13 @@ async function processOverdue7Days(): Promise<number> {
           valor_total: formatCurrency(charge.total),
           valor_com_juros: formatCurrency(charge.total),
           ...buildChargeTemplateVars(charge),
+          ...(await buildPayoffDemonstrativoVars(installment.loanId)),
           pix_key: await getAdminPixKey(),
           telefone_suporte: process.env.SUPPORT_PHONE || '(11) 99999-9999'
         }
       );
 
+      await markCollectionMessageSent(installment.loanId);
       sent++;
       await new Promise(resolve => setTimeout(resolve, 1500));
     } catch (error) {
@@ -833,6 +901,11 @@ async function processOverdue15Days(): Promise<number> {
   let sent = 0;
   for (const installment of installments) {
     try {
+      if (await wasCollectionMessageSentToday(installment.loanId)) {
+        console.log(`[CollectionAutomation] Loan ${installment.loanId} já recebeu cobrança hoje, pulando (15 dias)`);
+        continue;
+      }
+
       const customer = installment.loan.customer;
       const daysOverdue = Math.floor((Date.now() - installment.dueDate.getTime()) / (1000 * 60 * 60 * 24));
       const collectionContext = getCollectionContext(installment);
@@ -856,11 +929,13 @@ async function processOverdue15Days(): Promise<number> {
           valor_total: formatCurrency(charge.total),
           valor_com_juros: formatCurrency(charge.total),
           ...buildChargeTemplateVars(charge),
+          ...(await buildPayoffDemonstrativoVars(installment.loanId)),
           pix_key: await getAdminPixKey(),
           telefone_suporte: process.env.SUPPORT_PHONE || '(11) 99999-9999'
         }
       );
 
+      await markCollectionMessageSent(installment.loanId);
       sent++;
       await new Promise(resolve => setTimeout(resolve, 1500));
     } catch (error) {
@@ -910,6 +985,11 @@ async function processOverdue30Days(): Promise<number> {
   let sent = 0;
   for (const installment of installments) {
     try {
+      if (await wasCollectionMessageSentToday(installment.loanId)) {
+        console.log(`[CollectionAutomation] Loan ${installment.loanId} já recebeu cobrança hoje, pulando (30 dias)`);
+        continue;
+      }
+
       const customer = installment.loan.customer;
       const daysOverdue = Math.floor((Date.now() - installment.dueDate.getTime()) / (1000 * 60 * 60 * 24));
       const collectionContext = getCollectionContext(installment);
@@ -933,11 +1013,13 @@ async function processOverdue30Days(): Promise<number> {
           valor_total: formatCurrency(charge.total),
           valor_com_juros: formatCurrency(charge.total),
           ...buildChargeTemplateVars(charge),
+          ...(await buildPayoffDemonstrativoVars(installment.loanId)),
           pix_key: await getAdminPixKey(),
           telefone_suporte: process.env.SUPPORT_PHONE || '(11) 99999-9999'
         }
       );
 
+      await markCollectionMessageSent(installment.loanId);
       sent++;
       await new Promise(resolve => setTimeout(resolve, 1500));
     } catch (error) {
@@ -1019,6 +1101,7 @@ export const collectionAutomationService = {
   catchUpInterestOnlyRolloverInstallments,
   buildOverdueCharge,
   buildChargeTemplateVars,
+  buildPayoffDemonstrativoVars,
   getSystemMonthlyRateSetting,
   getSundayPolicyForFineSetting
 };

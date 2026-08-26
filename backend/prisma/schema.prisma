@@ -377,6 +377,7 @@ model Loan {
   daysOverdue             Int           @default(0) @map("days_overdue")
   lastPaymentDate         DateTime?     @map("last_payment_date")
   nextPaymentDate         DateTime?     @map("next_payment_date")
+  lastCollectionMessageAt DateTime?     @map("last_collection_message_at") // Trava de idempotência diária da régua de cobrança
 
   // Flags de classificação de contrato
   nivelOuroUtilizado      Boolean       @default(false) @map("nivel_ouro_utilizado")

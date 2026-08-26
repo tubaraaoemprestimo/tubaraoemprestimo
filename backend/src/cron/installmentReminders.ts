@@ -663,12 +663,20 @@ const scheduleCounterOfferReminder = () => {
 
 // ============ INIT ============
 export const initCronJobs = () => {
-  scheduleInstallmentReminders();
-  scheduleLatePaymentDetection();
+  // Bugfix "templates de cobrança inconsistentes" (26/08/2026):
+  // scheduleInstallmentReminders + scheduleLatePaymentDetection duplicavam
+  // exatamente o que collectionCron.ts (runCollectionAutomation) já cobre —
+  // as duas rodavam "às 9h" mas uma sem timezone explícito (vira 9h UTC =
+  // 6h BRT no servidor) e a outra com America/Sao_Paulo, mandando 2 mensagens
+  // conflitantes no mesmo dia pro cliente. Templates de DUE_7/3/TODAY e
+  // OVERDUE_1/3/7/15/30 já existem e estão ativos no banco (message_templates),
+  // então desligar essas duas não deixa nenhum lembrete sem cobertura.
+  // scheduleInstallmentReminders();
+  // scheduleLatePaymentDetection();
   // scheduleWhatsAppStatus(); // Temporariamente desabilitado até migration completa
   schedulePartnerBonusEvaluation();
   scheduleCommissionCancellation();
   scheduleCounterOfferReminder();
-  console.log('[Cron] initialized (reminders + late detection + partner bonus + commission cancellation + counteroffer reminder)');
+  console.log('[Cron] initialized (partner bonus + commission cancellation + counteroffer reminder) — reminders/late detection movidos para collectionCron.ts');
 };
 

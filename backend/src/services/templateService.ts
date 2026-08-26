@@ -296,9 +296,13 @@ export async function triggerTemplate(
     }
 
     // 3. ENVIAR PUSH NOTIFICATION
-    if (notificationTemplate && recipient.userId) {
-      const title = notificationTemplate.subject || 'Tubarão Empréstimos';
-      const body = replaceVariables(notificationTemplate.content, variables);
+    // Sem template dedicado de canal 'notification' (nenhum gatilho de cobrança
+    // tem um cadastrado hoje), usa o conteúdo de WhatsApp/Email como fallback —
+    // nenhum cliente deixa de receber o aviso no celular por falta de template.
+    const pushSourceTemplate = notificationTemplate || whatsappTemplate || emailTemplate || genericTemplate;
+    if (pushSourceTemplate && recipient.userId) {
+      const title = pushSourceTemplate.subject || 'Tubarão Empréstimos';
+      const body = replaceVariables(pushSourceTemplate.content, variables);
 
       result.channels.notification = await sendPushNotification(recipient.userId, title, body);
 
