@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:tubarao123@localhost:5432/tubarao_db"
+  url      = env("DATABASE_URL")
 }
 
 model AiChatHistory {
