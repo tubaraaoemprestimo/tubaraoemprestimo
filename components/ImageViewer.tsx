@@ -16,7 +16,7 @@ interface ImageViewerProps {
 // Detecta se a URL é um PDF (com ou sem extensão)
 function detectType(url: string): 'pdf' | 'image' | 'unknown' {
     const lower = url.toLowerCase();
-    if (lower.includes('.pdf')) return 'pdf';
+    if (lower.startsWith('data:application/pdf') || lower.includes('.pdf')) return 'pdf';
     // Padrões do R2 para documentos suplementares sem extensão
     if (
         lower.includes('supp_doc') ||

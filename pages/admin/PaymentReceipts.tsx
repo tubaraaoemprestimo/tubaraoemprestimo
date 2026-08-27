@@ -8,6 +8,19 @@ import { api } from '../../services/apiClient';
 import { PaymentReceipt } from '../../types';
 import { useToast } from '../../components/Toast';
 import { autoNotificationService } from '../../services/autoNotificationService';
+import { getApiBaseUrl } from '../../services/runtimeConfig';
+
+const resolveMediaUrl = (url?: string | null) => {
+    if (!url) return '';
+    if (url.startsWith('/uploads/')) return `${getApiBaseUrl().replace(/\/api\/?$/, '')}${url}`;
+    return url;
+};
+
+const isPdfReceipt = (url?: string | null, type?: string | null) => {
+    const lowerUrl = String(url || '').toLowerCase();
+    const lowerType = String(type || '').toLowerCase();
+    return lowerType.includes('pdf') || lowerUrl.startsWith('data:application/pdf') || lowerUrl.includes('.pdf');
+};
 
 export const PaymentReceipts: React.FC = () => {
     const { addToast } = useToast();
@@ -20,6 +33,7 @@ export const PaymentReceipts: React.FC = () => {
     const [processing, setProcessing] = useState<string | null>(null);
     const [isDischarge, setIsDischarge] = useState(false);
     const [approvalAmount, setApprovalAmount] = useState('');
+    const [receiptImgFailed, setReceiptImgFailed] = useState(false);
 
     useEffect(() => {
         loadReceipts();
@@ -38,8 +52,8 @@ export const PaymentReceipts: React.FC = () => {
                     customerId: r.customer_id || r.customerId || '',
                     customerName: r.customer_name || r.customerName || '',
                     amount: r.amount,
-                    receiptUrl: r.receipt_url || r.receiptUrl || '',
-                    receiptType: r.receipt_type || r.receiptType || (String(r.receipt_url || r.receiptUrl || '').toLowerCase().includes('.pdf') ? 'PDF' : 'IMAGE'),
+                    receiptUrl: resolveMediaUrl(r.receipt_url || r.receiptUrl || ''),
+                    receiptType: isPdfReceipt(r.receipt_url || r.receiptUrl, r.receipt_type || r.receiptType) ? 'PDF' : 'IMAGE',
                     status: r.status,
                     submittedAt: r.createdAt || r.created_at || r.submitted_at || r.submittedAt || '',
                     reviewedAt: r.reviewed_at || r.reviewedAt || null,
@@ -243,6 +257,7 @@ export const PaymentReceipts: React.FC = () => {
                                             onClick={() => {
                                                 setSelectedReceipt(receipt);
                                                 setApprovalAmount(receipt.amount ? String(receipt.amount) : '');
+                                                setReceiptImgFailed(false);
                                             }}
                                         >
                                             <Eye size={16} /> Analisar
@@ -294,22 +309,24 @@ export const PaymentReceipts: React.FC = () => {
                             <div>
                                 <p className="text-sm text-zinc-400 mb-2">Comprovante Enviado</p>
                                 <div className="bg-black border border-zinc-800 rounded-xl p-4">
-                                    {selectedReceipt.receiptType === 'IMAGE' ? (
+                                    {selectedReceipt.receiptType === 'IMAGE' && !receiptImgFailed ? (
                                         <img
                                             src={selectedReceipt.receiptUrl}
                                             alt="Comprovante"
+                                            onError={() => setReceiptImgFailed(true)}
                                             className="max-w-full max-h-96 mx-auto rounded-lg"
                                         />
                                     ) : (
                                         <div className="text-center py-8">
                                             <FileText size={48} className="mx-auto text-red-400 mb-4" />
+                                            {receiptImgFailed && <p className="text-red-400 text-sm mb-3">Falha ao carregar imagem.</p>}
                                             <a
                                                 href={selectedReceipt.receiptUrl}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="text-[#D4AF37] hover:underline"
                                             >
-                                                Visualizar PDF
+                                                Abrir arquivo
                                             </a>
                                         </div>
                                     )}

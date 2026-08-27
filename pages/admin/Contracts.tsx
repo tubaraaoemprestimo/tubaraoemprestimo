@@ -165,8 +165,13 @@ const whatsappHref = (phone?: string | null) => {
   if (!digits) return null;
   return `https://wa.me/${digits.startsWith('55') ? digits : `55${digits}`}`;
 };
+const resolveMediaUrl = (url?: string | null) => {
+  if (!url) return '';
+  if (url.startsWith('/uploads/')) return `${getApiBaseUrl().replace(/\/api\/?$/, '')}${url}`;
+  return url;
+};
 const isPendingReceipt = (status?: string) => ['PENDING', 'AWAITING_CONFIRMATION'].includes((status || '').toUpperCase());
-const receiptMediaUrl = (receipt: Partial<PaymentReceipt> & { url?: string }) => receipt.receiptUrl || receipt.proofUrl || receipt.url || '';
+const receiptMediaUrl = (receipt: Partial<PaymentReceipt> & { url?: string; receipt_url?: string; proof_url?: string }) => resolveMediaUrl(receipt.receiptUrl || receipt.receipt_url || receipt.proofUrl || receipt.proof_url || receipt.url || '');
 const isImageUrl = (url?: string) => !!url && (url.startsWith('data:image') || /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url));
 
 const ReceiptMediaPreview: React.FC<{ url: string; alt: string; className?: string }> = ({ url, alt, className }) => {
