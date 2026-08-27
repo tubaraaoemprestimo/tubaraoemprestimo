@@ -19,29 +19,29 @@ model AiChatHistory {
 }
 
 model AiChatbotConfig {
-  id                String   @id @default(uuid())
-  enabled           Boolean  @default(false)
-  provider          String   @default("gemini")
-  apiKey            String   @default("") @map("api_key")
+  id                 String   @id @default(uuid())
+  enabled            Boolean  @default(false)
+  provider           String   @default("gemini")
+  apiKey             String   @default("") @map("api_key")
   geminiApiKey       String   @default("") @map("gemini_api_key")
   perplexityApiKey   String   @default("") @map("perplexity_api_key")
-  openaiApiKey      String   @default("") @map("openai_api_key")
+  openaiApiKey       String   @default("") @map("openai_api_key")
   openrouterApiKey   String   @default("") @map("openrouter_api_key")
-  nvidiaApiKey      String   @default("") @map("nvidia_api_key")
+  nvidiaApiKey       String   @default("") @map("nvidia_api_key")
   zaiApiKey          String   @default("") @map("zai_api_key")
   anthropicApiKey    String   @default("") @map("anthropic_api_key")
   groqApiKey         String   @default("") @map("groq_api_key")
   grokApiKey         String   @default("") @map("grok_api_key")
-  systemPrompt      String   @default("") @map("system_prompt")
-  welcomeMessage    String   @default("") @map("welcome_message")
-  fallbackMessage   String   @default("") @map("fallback_message")
-  autoReplyEnabled  Boolean  @default(true) @map("auto_reply_enabled")
-  workingHoursOnly  Boolean  @default(false) @map("working_hours_only")
-  workingHoursStart String   @default("08:00") @map("working_hours_start")
-  workingHoursEnd   String   @default("18:00") @map("working_hours_end")
-  maxMessagesPerChat Int     @default(50) @map("max_messages_per_chat")
-  transferKeywords  String[] @default(["atendente", "humano", "pessoa"]) @map("transfer_keywords")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  systemPrompt       String   @default("") @map("system_prompt")
+  welcomeMessage     String   @default("") @map("welcome_message")
+  fallbackMessage    String   @default("") @map("fallback_message")
+  autoReplyEnabled   Boolean  @default(true) @map("auto_reply_enabled")
+  workingHoursOnly   Boolean  @default(false) @map("working_hours_only")
+  workingHoursStart  String   @default("08:00") @map("working_hours_start")
+  workingHoursEnd    String   @default("18:00") @map("working_hours_end")
+  maxMessagesPerChat Int      @default(50) @map("max_messages_per_chat")
+  transferKeywords   String[] @default(["atendente", "humano", "pessoa"]) @map("transfer_keywords")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@map("ai_chatbot_config")
 }
@@ -149,56 +149,57 @@ model Coupon {
 }
 
 model Customer {
-  id                  String         @id @default(uuid())
-  userId              String?        @map("user_id")
-  name                String
-  cpf                 String         @unique
-  rg                  String?
-  email               String
-  phone               String
-  status              String         @default("ACTIVE")
-  internalScore       Int            @default(0) @map("internal_score")
-  totalDebt           Float          @default(0) @map("total_debt")
-  activeLoansCount    Int            @default(0) @map("active_loans_count")
-  address             String?
-  neighborhood        String?
-  city                String?
-  state               String?
-  zipCode             String?        @map("zip_code")
-  latitude            Float?
-  longitude           Float?
-  locationUpdatedAt   DateTime?      @map("location_updated_at")
-  deviceInfo          String?        @map("device_info")
-  lastIp              String?        @map("last_ip")
-  monthlyIncome       Float?         @map("monthly_income")
-  preApprovedAmount   Float?         @map("pre_approved_amount")
-  preApprovedAt       DateTime?      @map("pre_approved_at")
-  instagram           String?
-  source              String?        @default("MANUAL")
-  profilePic          String?        @map("profile_pic")
-  birthDate           String?        @map("birth_date")
-  monthlyInterestRate Float?         @map("monthly_interest_rate")
-  lateFixedFee        Float?         @map("late_fixed_fee")
-  lateInterestDaily   Float?         @map("late_interest_daily")
-  lateInterestMonthly Float?         @map("late_interest_monthly")
-  installmentOffer    Json?          @map("installment_offer")
-  referralCode        String?        @unique @map("referral_code")
-  referralPoints      Int            @default(0) @map("referral_points")
-  joinedAt            DateTime       @default(now()) @map("joined_at")
-  partnerId           String?        @map("partner_id") // ID do parceiro que trouxe o cliente
-  isPartnerCustomer   Boolean        @default(false) @map("is_partner_customer") // Indica se o cliente veio de um parceiro
-  partnerCommissionRate Float?       @map("partner_commission_rate") // Taxa de comissão do parceiro
-  contractTermsAccepted Boolean      @default(false) @map("contract_terms_accepted") // Termo de veracidade aceito
+  id                    String         @id @default(uuid())
+  userId                String?        @map("user_id")
+  name                  String
+  cpf                   String         @unique
+  rg                    String?
+  email                 String
+  phone                 String
+  status                String         @default("ACTIVE")
+  internalScore         Int            @default(0) @map("internal_score")
+  totalDebt             Float          @default(0) @map("total_debt")
+  activeLoansCount      Int            @default(0) @map("active_loans_count")
+  address               String?
+  neighborhood          String?
+  city                  String?
+  state                 String?
+  zipCode               String?        @map("zip_code")
+  latitude              Float?
+  longitude             Float?
+  locationUpdatedAt     DateTime?      @map("location_updated_at")
+  deviceInfo            String?        @map("device_info")
+  lastIp                String?        @map("last_ip")
+  monthlyIncome         Float?         @map("monthly_income")
+  preApprovedAmount     Float?         @map("pre_approved_amount")
+  preApprovedAt         DateTime?      @map("pre_approved_at")
+  instagram             String?
+  source                String?        @default("MANUAL")
+  profilePic            String?        @map("profile_pic")
+  birthDate             String?        @map("birth_date")
+  monthlyInterestRate   Float?         @map("monthly_interest_rate")
+  lateFixedFee          Float?         @map("late_fixed_fee")
+  lateInterestDaily     Float?         @map("late_interest_daily")
+  lateInterestMonthly   Float?         @map("late_interest_monthly")
+  installmentOffer      Json?          @map("installment_offer")
+  referralCode          String?        @unique @map("referral_code")
+  referralPoints        Int            @default(0) @map("referral_points")
+  joinedAt              DateTime       @default(now()) @map("joined_at")
+  partnerId             String?        @map("partner_id")
+  isPartnerCustomer     Boolean        @default(false) @map("is_partner_customer")
+  partnerCommissionRate Float?         @map("partner_commission_rate")
+  contractTermsAccepted Boolean        @default(false) @map("contract_terms_accepted")
+  source_detail         String?
+  coupons               Coupon[]
+  partner               User?          @relation("CustomerPartner", fields: [partnerId], references: [id])
+  user                  User?          @relation("CustomerUser", fields: [userId], references: [id])
+  loanRequests          LoanRequest[]  @relation("LoanRequestCustomer")
+  loans                 Loan[]
+  notifications         Notification[]
+  referralsReceived     Referral[]     @relation("ReferredCustomer")
+  referralsGiven        Referral[]     @relation("ReferrerCustomer")
 
-  coupons             Coupon[]
-  user                User?          @relation(fields: [userId], references: [id], name: "CustomerUser") // Relacionamento com usuário (agente)
-  partner             User?          @relation(fields: [partnerId], references: [id], name: "CustomerPartner") // Relacionamento com parceiro
-  loanRequests        LoanRequest[]  @relation("LoanRequestCustomer")
-  loans               Loan[]
-  notifications       Notification[]
-  referralsGiven      Referral[]     @relation("ReferrerCustomer")
-  referralsReceived   Referral[]     @relation("ReferredCustomer")
-
+  @@index([source], map: "idx_customers_source")
   @@map("customers")
 }
 
@@ -216,20 +217,20 @@ model GoalsSettings {
 }
 
 model Installment {
-  id               String    @id @default(uuid())
-  loanId           String    @map("loan_id")
-  dueDate          DateTime  @map("due_date")
-  amount           Float
-  status           String    @default("OPEN")
-  pixCode          String?   @map("pix_code")
-  proofUrl         String?   @map("proof_url")
-  paidAt           DateTime? @map("paid_at")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  daysOverdue      Int       @default(0) @map("days_overdue")
-  lateFeeAmount    Float     @default(0) @map("late_fee_amount")
-  fineAccumulated  Float     @default(0) @map("fine_accumulated")
-  isInterestPayment Boolean  @default(false) @map("is_interest_payment")
-  loan             Loan      @relation(fields: [loanId], references: [id])
+  id                String    @id @default(uuid())
+  loanId            String    @map("loan_id")
+  dueDate           DateTime  @map("due_date")
+  amount            Float
+  status            String    @default("OPEN")
+  pixCode           String?   @map("pix_code")
+  proofUrl          String?   @map("proof_url")
+  paidAt            DateTime? @map("paid_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  lateFeeAmount     Float     @default(0) @map("late_fee_amount")
+  fineAccumulated   Float     @default(0) @map("fine_accumulated")
+  daysOverdue       Int       @default(0) @map("days_overdue")
+  isInterestPayment Boolean   @default(false) @map("is_interest_payment")
+  loan              Loan      @relation(fields: [loanId], references: [id])
 
   @@map("installments")
 }
@@ -248,106 +249,113 @@ model LoanPackage {
 }
 
 model LoanRequest {
-  id                      String    @id @default(uuid())
-  customerId              String?   @map("customer_id")
-  userId                  String?   @map("user_id")
-  clientName              String    @map("client_name")
-  cpf                     String
-  email                   String
-  phone                   String
-  preferredContactTime    String?   @map("preferred_contact_time")
-  amount                  Float     @default(0)
-  requestedAmount         Float?    @map("requested_amount") // Valor original solicitado pelo cliente
-  approvedAmount          Float?    @map("approved_amount")  // Valor aprovado pelo analista (contraproposta)
-  approvedAt              DateTime? @map("approved_at")      // Data/hora da aprovação
-  approvedById            String?   @map("approved_by_id")   // ID do admin que aprovou
-  counterOfferAccepted    Boolean   @default(false) @map("counter_offer_accepted") // Cliente aceitou a contraproposta
-  counterOfferAcceptedAt  DateTime? @map("counter_offer_accepted_at") // Data/hora do aceite
-  installments            Int       @default(1)
-  billingType             String?   @map("billing_type")
-  status                  String    @default("PENDING")
-  profileType             String?   @map("profile_type")
-  fatherPhone             String?   @map("father_phone")
-  motherPhone             String?   @map("mother_phone")
-  spousePhone             String?   @map("spouse_phone")
-  reference1Name          String?   @map("reference1_name")
-  reference1Phone         String?   @map("reference1_phone")
-  reference2Name          String?   @map("reference2_name")
-  reference2Phone         String?   @map("reference2_phone")
-  fatherPhoneRelationship String?   @map("father_phone_relationship")
-  motherPhoneRelationship String?   @map("mother_phone_relationship")
-  spousePhoneRelationship String?   @map("spouse_phone_relationship")
-  address                 String?
-  neighborhood            String?
-  city                    String?
-  state                   String?
-  zipCode                 String?   @map("zip_code")
-  birthDate               String?   @map("birth_date")
-  preferredDueDay         Int?      @map("preferred_due_day")
-  instagram               String?
-  monthlyIncome           Float?    @map("monthly_income")
-  selfieUrl               String?   @map("selfie_url")
-  idCardUrl               String?   @map("id_card_url")
-  idCardBackUrl           String?   @map("id_card_back_url")
-  proofOfAddressUrl       String?   @map("proof_of_address_url")
-  proofIncomeUrl          String?   @map("proof_income_url")
-  vehicleUrl              String?   @map("vehicle_url")
-  videoSelfieUrl          String?   @map("video_selfie_url")
-  videoHouseUrl           String?   @map("video_house_url")
-  videoVehicleUrl         String?   @map("video_vehicle_url")
-  signatureUrl            String?   @map("signature_url")
-  workCardUrl             String?   @map("work_card_url")
-  companyAddress          Json?     @map("company_address")
-  companyProfession       String?   @map("company_profession")
-  companyWorkSince        String?   @map("company_work_since")
-  companyIncome           Float?    @map("company_income")
-  companyPaymentDay       Int?      @map("company_payment_day")
-  companyName             String?   @map("company_name")
-  supplementalDescription String?   @map("supplemental_description")
-  supplementalDocUrl      String?   @map("supplemental_doc_url")
-  supplementalRequestedAt DateTime? @map("supplemental_requested_at")
-  supplementalUploadedAt  DateTime? @map("supplemental_uploaded_at")
-  latitude                Float?
-  longitude               Float?
-  accuracy                Float?
-  contractAccepted        Boolean   @default(false) @map("contract_accepted")
-  contractTermsAccepted   Boolean   @default(false) @map("contract_terms_accepted")
-  declarationAccepted     Boolean   @default(false) @map("declaration_accepted")
-  bankName                String?   @map("bank_name")
-  bankAgency              String?   @map("bank_agency")
-  bankAccount             String?   @map("bank_account")
-  bankAccountType         String?   @map("bank_account_type")
-  pixKey                  String?   @map("pix_key")
-  pixKeyType              String?   @map("pix_key_type")
-  createdAt               DateTime  @default(now()) @map("created_at")
-  updatedAt               DateTime  @updatedAt @map("updated_at")
-  contractPdfUrl          String?   @map("contract_pdf_url")
-  referralCode            String?   @map("referral_code")
-  partnerId               String?   @map("partner_id")
-  isPartnerReferral       Boolean   @default(false) @map("is_partner_referral")
-  partnerCommissionRate   Float?    @map("partner_commission_rate")
-  // Campos específicos para INVESTIDOR
-  investmentTier          String?   @map("investment_tier")
-  payoutMode              String?   @map("payout_mode")
-  monthlyRate             Float?    @map("monthly_rate")
-  contractMonths          Int?      @map("contract_months")
-  autoRenew               Boolean   @default(true) @map("auto_renew")
-  withdrawalNoticeMonths  Int?      @map("withdrawal_notice_months")
-  accountHolderName       String?   @map("account_holder_name")
-  // Flags de classificação de contrato
-  isService               Boolean   @default(false) @map("is_service")      // LIMPA_NOME
-  isInvestment            Boolean   @default(false) @map("is_investment")   // INVESTIDOR
-  isLoan                  Boolean   @default(true) @map("is_loan")          // EMPRÉSTIMO (CLT, AUTONOMO, MOTO, GARANTIA)
+  id                         String              @id @default(uuid())
+  customerId                 String?             @map("customer_id")
+  userId                     String?             @map("user_id")
+  clientName                 String              @map("client_name")
+  cpf                        String
+  email                      String
+  phone                      String
+  preferredContactTime       String?             @map("preferred_contact_time")
+  amount                     Float               @default(0)
+  installments               Int                 @default(1)
+  status                     String              @default("PENDING")
+  profileType                String?             @map("profile_type")
+  fatherPhone                String?             @map("father_phone")
+  motherPhone                String?             @map("mother_phone")
+  spousePhone                String?             @map("spouse_phone")
+  fatherPhoneRelationship    String?             @map("father_phone_relationship")
+  motherPhoneRelationship    String?             @map("mother_phone_relationship")
+  spousePhoneRelationship    String?             @map("spouse_phone_relationship")
+  address                    String?
+  neighborhood               String?
+  city                       String?
+  state                      String?
+  zipCode                    String?             @map("zip_code")
+  birthDate                  String?             @map("birth_date")
+  preferredDueDay            Int?                @map("preferred_due_day")
+  instagram                  String?
+  monthlyIncome              Float?              @map("monthly_income")
+  selfieUrl                  String?             @map("selfie_url")
+  idCardUrl                  String?             @map("id_card_url")
+  idCardBackUrl              String?             @map("id_card_back_url")
+  proofOfAddressUrl          String?             @map("proof_of_address_url")
+  proofIncomeUrl             String?             @map("proof_income_url")
+  vehicleUrl                 String?             @map("vehicle_url")
+  videoSelfieUrl             String?             @map("video_selfie_url")
+  videoHouseUrl              String?             @map("video_house_url")
+  videoVehicleUrl            String?             @map("video_vehicle_url")
+  signatureUrl               String?             @map("signature_url")
+  workCardUrl                String?             @map("work_card_url")
+  companyAddress             Json?               @map("company_address")
+  companyProfession          String?             @map("company_profession")
+  companyWorkSince           String?             @map("company_work_since")
+  companyIncome              Float?              @map("company_income")
+  companyPaymentDay          Int?                @map("company_payment_day")
+  companyName                String?             @map("company_name")
+  supplementalDescription    String?             @map("supplemental_description")
+  supplementalDocUrl         String?             @map("supplemental_doc_url")
+  supplementalRequestedAt    DateTime?           @map("supplemental_requested_at")
+  supplementalUploadedAt     DateTime?           @map("supplemental_uploaded_at")
+  latitude                   Float?
+  longitude                  Float?
+  accuracy                   Float?
+  contractAccepted           Boolean             @default(false) @map("contract_accepted")
+  contractTermsAccepted      Boolean             @default(false) @map("contract_terms_accepted")
+  declarationAccepted        Boolean             @default(false) @map("declaration_accepted")
+  bankName                   String?             @map("bank_name")
+  bankAgency                 String?             @map("bank_agency")
+  bankAccount                String?             @map("bank_account")
+  bankAccountType            String?             @map("bank_account_type")
+  pixKey                     String?             @map("pix_key")
+  pixKeyType                 String?             @map("pix_key_type")
+  createdAt                  DateTime            @default(now()) @map("created_at")
+  updatedAt                  DateTime            @updatedAt @map("updated_at")
+  contractPdfUrl             String?             @map("contract_pdf_url")
+  referralCode               String?             @map("referral_code")
+  partnerId                  String?             @map("partner_id")
+  isPartnerReferral          Boolean             @default(false) @map("is_partner_referral")
+  partnerCommissionRate      Float?              @map("partner_commission_rate")
+  investmentTier             String?             @map("investment_tier")
+  payoutMode                 String?             @map("payout_mode")
+  monthlyRate                Float?              @map("monthly_rate")
+  contractMonths             Int?                @map("contract_months")
+  autoRenew                  Boolean             @default(true) @map("auto_renew")
+  withdrawalNoticeMonths     Int?                @map("withdrawal_notice_months")
+  accountHolderName          String?             @map("account_holder_name")
+  isService                  Boolean             @default(false) @map("is_service")
+  isInvestment               Boolean             @default(false) @map("is_investment")
+  isLoan                     Boolean             @default(true) @map("is_loan")
+  collateralItems            Json?               @map("collateral_items")
+  approvedAmount             Float?              @map("approved_amount")
+  approvedAt                 DateTime?           @map("approved_at")
+  approvedById               String?             @map("approved_by_id")
+  counterOfferAccepted       Boolean             @default(false) @map("counter_offer_accepted")
+  counterOfferAcceptedAt     DateTime?           @map("counter_offer_accepted_at")
+  requestedAmount            Float?              @map("requested_amount")
+  reference1Name             String?             @map("reference1_name")
+  reference1Phone            String?             @map("reference1_phone")
+  reference2Name             String?             @map("reference2_name")
+  reference2Phone            String?             @map("reference2_phone")
+  has_more_than_3_months_clt Boolean?
+  clt_auto_rejected          Boolean             @default(false)
+  asset_description          String?
+  asset_value                Float?
+  asset_proof_url            String?
+  commerce_terms_accepted    Boolean             @default(false)
+  geofence_city              String?
+  geofence_state             String?             @db.VarChar(5)
+  geofence_blocked           Boolean             @default(false)
+  billingType                String              @default("MONTHLY") @map("billing_type")
+  approvedBy                 User?               @relation("LoanRequestApprovedBy", fields: [approvedById], references: [id])
+  customer                   Customer?           @relation("LoanRequestCustomer", fields: [customerId], references: [id])
+  partner                    User?               @relation("LoanRequestPartner", fields: [partnerId], references: [id])
+  user                       User?               @relation("LoanRequestUser", fields: [userId], references: [id])
+  loan                       Loan?
+  notifications              Notification[]
+  partnerCommissions         PartnerCommission[] @relation("PartnerCommissionLoanRequest")
 
-  customer                Customer? @relation(fields: [customerId], references: [id], name: "LoanRequestCustomer")
-  user                    User?     @relation(fields: [userId], references: [id], name: "LoanRequestUser")
-  partner                 User?     @relation(fields: [partnerId], references: [id], name: "LoanRequestPartner")
-  approvedBy              User?     @relation(fields: [approvedById], references: [id], name: "LoanRequestApprovedBy")
-  loan                    Loan?
-  partnerCommissions      PartnerCommission[] @relation("PartnerCommissionLoanRequest")
-  collateralItems         Json?     @map("collateral_items")
-  notifications           Notification[]
-
+  @@index([reference1Phone, reference2Phone], map: "idx_loan_requests_references")
   @@map("loan_requests")
 }
 
@@ -355,66 +363,59 @@ model Loan {
   id                      String        @id @default(uuid())
   customerId              String        @map("customer_id")
   requestId               String        @unique @map("request_id")
-  amount                  Float         // Valor principal aprovado/transferido
+  amount                  Float
   installmentsCount       Int           @map("installments_count")
   remainingAmount         Float         @map("remaining_amount")
-  status                  String        @default("ACTIVE") // ACTIVE, DEFAULT, COMPLETED, CANCELLED
+  status                  String        @default("ACTIVE")
   startDate               DateTime      @map("start_date")
   createdAt               DateTime      @default(now()) @map("created_at")
-  updatedAt               DateTime      @updatedAt @map("updated_at")
-
-  // Novos campos para gestão completa do contrato
-  principalAmount         Float         @map("principal_amount") // Valor final aprovado
-  dailyInstallmentAmount  Float?        @map("daily_installment_amount") // Valor da diária (para AUTONOMO)
-  totalInstallments       Int           @map("total_installments") // Quantidade total de parcelas/diárias
-  firstPaymentDate        DateTime?     @map("first_payment_date") // Data do primeiro pagamento
-  pixReceiptUrl           String?       @map("pix_receipt_url") // Comprovante de PIX enviado ao cliente
-  interestRate            Float?        @map("interest_rate") // Taxa de juros aplicada
-  paymentFrequency        String        @default("MONTHLY") @map("payment_frequency") // DAILY, WEEKLY, MONTHLY
-  dueDay                  Int?          @map("due_day") // Dia de vencimento (para mensais)
-
-  // Controle de inadimplência
+  nivelOuroUtilizado      Boolean       @default(false) @map("nivel_ouro_utilizado")
+  dataAtivacaoNivelOuro   DateTime?     @map("data_ativacao_nivel_ouro")
+  isService               Boolean       @default(false) @map("is_service")
+  isInvestment            Boolean       @default(false) @map("is_investment")
+  isLoan                  Boolean       @default(true) @map("is_loan")
+  updatedAt               DateTime      @default(now()) @updatedAt @map("updated_at")
+  principalAmount         Float         @default(0) @map("principal_amount")
+  dailyInstallmentAmount  Float?        @map("daily_installment_amount")
+  totalInstallments       Int           @default(1) @map("total_installments")
+  firstPaymentDate        DateTime?     @map("first_payment_date")
+  pixReceiptUrl           String?       @map("pix_receipt_url")
+  interestRate            Float?        @map("interest_rate")
+  paymentFrequency        String        @default("MONTHLY") @map("payment_frequency")
+  dueDay                  Int?          @map("due_day")
   daysOverdue             Int           @default(0) @map("days_overdue")
   lastPaymentDate         DateTime?     @map("last_payment_date")
   nextPaymentDate         DateTime?     @map("next_payment_date")
   lastCollectionMessageAt DateTime?     @map("last_collection_message_at") // Trava de idempotência diária da régua de cobrança
-
-  // Flags de classificação de contrato
-  nivelOuroUtilizado      Boolean       @default(false) @map("nivel_ouro_utilizado")
-  dataAtivacaoNivelOuro   DateTime?     @map("data_ativacao_nivel_ouro")
-  isService               Boolean       @default(false) @map("is_service")      // LIMPA_NOME
-  isInvestment            Boolean       @default(false) @map("is_investment")   // INVESTIDOR
-  isLoan                  Boolean       @default(true) @map("is_loan")          // EMPRÉSTIMO
-
-  // Observações e notas do admin
   adminNotes              String?       @map("admin_notes")
-
+  source                  String?       @default("MANUAL")
+  billing_type            String        @default("MONTHLY") @db.VarChar(20)
   installments            Installment[]
   customer                Customer      @relation(fields: [customerId], references: [id])
   loanRequest             LoanRequest   @relation(fields: [requestId], references: [id])
 
-  @@map("loans")
   @@index([status])
   @@index([customerId])
   @@index([nextPaymentDate])
+  @@map("loans")
 }
 
 model MessageTemplate {
-  id          String   @id @default(uuid())
-  name        String
-  category    String
+  id           String   @id @default(uuid())
+  name         String
+  category     String
   triggerEvent String?  @map("trigger_event")
-  channel     String?  // email, whatsapp, notification
-  subject     String?  // subject for emails
-  content     String
-  variables   String[]
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
+  channel      String?
+  subject      String?
+  content      String
+  variables    String[]
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  @@map("message_templates")
   @@index([triggerEvent])
   @@index([isActive])
   @@index([category])
+  @@map("message_templates")
 }
 
 model NotificationLog {
@@ -442,7 +443,7 @@ model Notification {
   isRead        Boolean      @default(false) @map("is_read")
   requestId     String?      @map("request_id")
   customer      Customer?    @relation(fields: [customerId], references: [id])
-  loanRequest   LoanRequest? @relation(fields: [requestId], references: [id])
+  loanRequest   LoanRequest? @relation(fields: [requestId], references: [id], onUpdate: NoAction)
 
   @@map("notifications")
 }
@@ -489,30 +490,30 @@ model RiskEvent {
 }
 
 model ScheduledStatus {
-  id                  String    @id @default(uuid())
-  title               String?
-  content             String?
-  mediaType           String?   @map("media_type")
-  mediaUrl            String?   @map("media_url")
-  imageUrl            String?   @map("image_url")
-  caption             String?
-  aiGeneratedCaption  Boolean   @default(false) @map("ai_generated_caption")
-  recurrence          String    @default("ONCE")
-  selectedDays        String[]  @map("selected_days")
-  postsPerDay         Int       @default(1) @map("posts_per_day")
-  totalDays           Int       @default(1) @map("total_days")
-  startDate           DateTime  @map("start_date")
-  endDate             DateTime? @map("end_date")
-  postTimes           String[]  @map("post_times")
-  status              String    @default("SCHEDULED")
-  nextPostAt          DateTime? @map("next_post_at")
-  lastPostedAt        DateTime? @map("last_posted_at")
-  postsCount          Int       @default(0) @map("posts_count")
-  errorMessage        String?   @map("error_message")
-  scheduledAt         DateTime  @default(now()) @map("scheduled_at")
-  postedAt            DateTime? @map("posted_at")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  createdBy           String?   @map("created_by")
+  id                 String    @id @default(uuid())
+  title              String?
+  content            String?
+  mediaType          String?   @map("media_type")
+  mediaUrl           String?   @map("media_url")
+  imageUrl           String?   @map("image_url")
+  caption            String?
+  aiGeneratedCaption Boolean   @default(false) @map("ai_generated_caption")
+  recurrence         String    @default("ONCE")
+  selectedDays       String[]  @map("selected_days")
+  postsPerDay        Int       @default(1) @map("posts_per_day")
+  totalDays          Int       @default(1) @map("total_days")
+  startDate          DateTime  @map("start_date")
+  endDate            DateTime? @map("end_date")
+  postTimes          String[]  @map("post_times")
+  status             String    @default("SCHEDULED")
+  nextPostAt         DateTime? @map("next_post_at")
+  lastPostedAt       DateTime? @map("last_posted_at")
+  postsCount         Int       @default(0) @map("posts_count")
+  errorMessage       String?   @map("error_message")
+  scheduledAt        DateTime  @default(now()) @map("scheduled_at")
+  postedAt           DateTime? @map("posted_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  createdBy          String?   @map("created_by")
 
   @@map("scheduled_status")
 }
@@ -613,45 +614,43 @@ model TrustedDevice {
 }
 
 model User {
-  id                  String               @id @default(uuid())
-  authId              String?              @unique @map("auth_id")
-  name                String
-  email               String               @unique
-  password            String
-  role                String               @default("CLIENT")
-  phone               String?
-  address             String?
-  city                String?
-  neighborhood        String?
-  avatarUrl           String?              @map("avatar_url")
-  referralCode        String?              @unique @map("referral_code")
-  createdAt           DateTime             @default(now()) @map("created_at")
-  isPartner           Boolean              @default(false) @map("is_partner")
-  partnerScore        Float?               @map("partner_score")
-  hasCourseAccess     Boolean              @default(false) @map("has_course_access")
-  customers           Customer[]           @relation("CustomerUser")
-  loanRequests        LoanRequest[]        @relation("LoanRequestUser")
-  partnerCustomers    Customer[]           @relation("CustomerPartner")
-  partnerLoanRequests LoanRequest[]        @relation("LoanRequestPartner")
-  approvedLoanRequests LoanRequest[]       @relation("LoanRequestApprovedBy")
-  partnerCommissions  PartnerCommission[]  @relation("PartnerCommissionPartner")
-  partnerBonuses      PartnerBonus[]       @relation("PartnerBonusPartner")
-  partnerInvites      PartnerInvite[]      @relation("PartnerInvitePartner")
-  pushSubscriptions   PushSubscription[]
-  riskEvents          RiskEvent[]
-  securityBlocks      SecurityBlock[]
-  trustedDevices      TrustedDevice[]
-  webauthnCredentials WebAuthnCredential[]
-  userProgress        UserProgress[]
-  trackflowQueries    TrackFlowQuery[]
-  lessonComments      LessonComment[]
-  commentRatings      CommentRating[]
-  quizResponses       QuizResponse[]
+  id                   String               @id @default(uuid())
+  authId               String?              @unique @map("auth_id")
+  name                 String
+  email                String               @unique
+  password             String
+  role                 String               @default("CLIENT")
+  phone                String?
+  address              String?
+  city                 String?
+  neighborhood         String?
+  avatarUrl            String?              @map("avatar_url")
+  referralCode         String?              @unique @map("referral_code")
+  createdAt            DateTime             @default(now()) @map("created_at")
+  isPartner            Boolean              @default(false) @map("is_partner")
+  partnerScore         Float?               @map("partner_score")
+  hasCourseAccess      Boolean              @default(false) @map("has_course_access")
+  commentRatings       CommentRating[]
+  partnerCustomers     Customer[]           @relation("CustomerPartner")
+  customers            Customer[]           @relation("CustomerUser")
+  lessonComments       LessonComment[]
+  approvedLoanRequests LoanRequest[]        @relation("LoanRequestApprovedBy")
+  partnerLoanRequests  LoanRequest[]        @relation("LoanRequestPartner")
+  loanRequests         LoanRequest[]        @relation("LoanRequestUser")
+  partnerBonuses       PartnerBonus[]       @relation("PartnerBonusPartner")
+  partnerCommissions   PartnerCommission[]  @relation("PartnerCommissionPartner")
+  partnerInvites       PartnerInvite[]      @relation("PartnerInvitePartner")
+  pushSubscriptions    PushSubscription[]
+  quizResponses        QuizResponse[]
+  riskEvents           RiskEvent[]
+  securityBlocks       SecurityBlock[]
+  trackflowQueries     TrackFlowQuery[]
+  trustedDevices       TrustedDevice[]
+  userProgress         UserProgress[]
+  webauthnCredentials  WebAuthnCredential[]
 
   @@map("users")
 }
-
-// ─── MICRO-LMS ────────────────────────────────────────────────────────────────
 
 model Course {
   id          String   @id @default(uuid())
@@ -674,12 +673,12 @@ model Module {
   order       Int      @default(0)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
-  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons     Lesson[]
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  @@map("modules")
   @@index([courseId])
   @@index([order])
+  @@map("modules")
 }
 
 model Lesson {
@@ -687,38 +686,38 @@ model Lesson {
   moduleId        String         @map("module_id")
   title           String
   description     String?
-  descriptionHtml String?        @map("description_html")
   videoUrl        String?        @map("video_url")
   materialUrl     String?        @map("material_url")
-  attachments     Json?          @default("[]")
   order           Int            @default(0)
-  duration        Int?           // duração em segundos (extraída no frontend após upload)
+  duration        Int?
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
+  descriptionHtml String?        @map("description_html")
+  attachments     Json?          @default("[]")
   module          Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   progress        UserProgress[]
-  comments        LessonComment[]
 
-  @@map("lessons")
   @@index([moduleId])
   @@index([order])
+  @@index([attachments], map: "idx_lessons_attachments", type: Gin)
+  @@map("lessons")
 }
 
 model UserProgress {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  lessonId    String   @map("lesson_id")
-  isCompleted Boolean  @default(false) @map("is_completed")
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  lessonId    String    @map("lesson_id")
+  isCompleted Boolean   @default(false) @map("is_completed")
   completedAt DateTime? @map("completed_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, lessonId])
-  @@map("user_progress")
   @@index([userId])
   @@index([lessonId])
+  @@map("user_progress")
 }
 
 model WebAuthnCredential {
@@ -749,33 +748,33 @@ model WhatsappConfig {
 }
 
 model QualificationLead {
-  id                String   @id @default(uuid())
-  name              String
-  email             String
-  phone             String
-  city              String?
-  state             String?
-  mainInterest      String?  @map("main_interest")
-  creditExperience  String?  @map("credit_experience")
-  hasCapital        Boolean  @default(false) @map("has_capital")
-  capitalAmount     String?  @map("capital_amount")
-  intention         String?
-  investmentCapacity String? @map("investment_capacity")
-  interests         String[] @default([])
-  weeklyTime        String?  @map("weekly_time")
-  hasExperience     Boolean  @default(false) @map("has_experience")
-  experienceLevel   String?  @map("experience_level")
-  wantsToLearn      Boolean  @default(false) @map("wants_to_learn")
-  learningInterest  String?  @map("learning_interest")
-  hasTime           Boolean  @default(false) @map("has_time")
-  timeAvailability  String?  @map("time_availability")
-  wantsPartnership  Boolean  @default(false) @map("wants_partnership")
-  partnershipType   String?  @map("partnership_type")
-  tags              String[] @default([])
-  status            String   @default("NEW")
-  notes             String?
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(uuid())
+  name               String
+  email              String
+  phone              String
+  city               String?
+  state              String?
+  mainInterest       String?  @map("main_interest")
+  creditExperience   String?  @map("credit_experience")
+  hasCapital         Boolean  @default(false) @map("has_capital")
+  capitalAmount      String?  @map("capital_amount")
+  intention          String?
+  investmentCapacity String?  @map("investment_capacity")
+  interests          String[] @default([])
+  weeklyTime         String?  @map("weekly_time")
+  hasExperience      Boolean  @default(false) @map("has_experience")
+  experienceLevel    String?  @map("experience_level")
+  wantsToLearn       Boolean  @default(false) @map("wants_to_learn")
+  learningInterest   String?  @map("learning_interest")
+  hasTime            Boolean  @default(false) @map("has_time")
+  timeAvailability   String?  @map("time_availability")
+  wantsPartnership   Boolean  @default(false) @map("wants_partnership")
+  partnershipType    String?  @map("partnership_type")
+  tags               String[] @default([])
+  status             String   @default("NEW")
+  notes              String?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@map("qualification_leads")
 }
@@ -792,8 +791,8 @@ model Referral {
   bonusAmount        Float     @default(0) @map("bonus_amount")
   createdAt          DateTime  @default(now()) @map("created_at")
   approvedAt         DateTime? @map("approved_at")
-  referrer           Customer  @relation("ReferrerCustomer", fields: [referrerCustomerId], references: [id])
   referred           Customer? @relation("ReferredCustomer", fields: [referredCustomerId], references: [id])
+  referrer           Customer  @relation("ReferrerCustomer", fields: [referrerCustomerId], references: [id])
 
   @@map("referrals")
 }
@@ -856,14 +855,14 @@ model OpenFinanceConsent {
 
 model PartnerProgram {
   id                String    @id @default(uuid())
-  name              String    // Nome do programa de parceiros
-  description       String    // Descrição do programa
-  commissionRate    Float     @map("commission_rate") // Taxa de comissão (em porcentagem)
-  minimumCommission Float     @map("minimum_commission") // Valor mínimo de comissão
-  maximumCommission Float     @map("maximum_commission") // Valor máximo de comissão
-  isActive          Boolean   @default(true) @map("is_active") // Programa ativo ou não
-  startDate         DateTime  @map("start_date") // Data de início do programa
-  endDate           DateTime? @map("end_date") // Data de término do programa
+  name              String
+  description       String
+  commissionRate    Float     @map("commission_rate")
+  minimumCommission Float     @map("minimum_commission")
+  maximumCommission Float     @map("maximum_commission")
+  isActive          Boolean   @default(true) @map("is_active")
+  startDate         DateTime  @map("start_date")
+  endDate           DateTime? @map("end_date")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
@@ -871,79 +870,74 @@ model PartnerProgram {
 }
 
 model PartnerCommission {
-  id                    String    @id @default(uuid())
-  partnerId             String    @map("partner_id")
-  loanRequestId         String    @map("loan_request_id")
-  contractId            String?   @map("contract_id") // ID do empréstimo/contrato
-  totalCommission       Float     @map("total_commission") // Valor total da comissão
-  commissionAmount      Float     @map("commission_amount") // Valor já liberado da comissão
-  commissionRate        Float     @map("commission_rate")
-  installmentsReleased  Int       @default(0) @map("installments_released") // Parcelas pagas (0, 1, 2, 3)
-  releasedPercent       Float     @default(0) @map("released_percent") // % já liberado (0, 40, 70, 100)
-  release1Amount        Float?    @map("release_1_amount") // 40% liberado na 1ª parcela
-  release1At            DateTime? @map("release_1_at")
-  release2Amount        Float?    @map("release_2_amount") // 30% liberado na 2ª parcela
-  release2At            DateTime? @map("release_2_at")
-  release3Amount        Float?    @map("release_3_amount") // 30% liberado na 3ª parcela
-  release3At            DateTime? @map("release_3_at")
-  status                String    @default("PENDING") // PENDING, PARTIAL, PAID, CANCELLED
-  cancelReason          String?   @map("cancel_reason")
-  paidAt                DateTime? @map("paid_at")
-  paymentMethod         String?   @map("payment_method")
-  paymentReference      String?   @map("payment_reference")
-  notes                 String?
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
+  id                   String      @id @default(uuid())
+  partnerId            String      @map("partner_id")
+  loanRequestId        String      @map("loan_request_id")
+  contractId           String?     @map("contract_id")
+  totalCommission      Float       @map("total_commission")
+  commissionAmount     Float       @map("commission_amount")
+  commissionRate       Float       @map("commission_rate")
+  installmentsReleased Int         @default(0) @map("installments_released")
+  releasedPercent      Float       @default(0) @map("released_percent")
+  release1Amount       Float?      @map("release_1_amount")
+  release1At           DateTime?   @map("release_1_at")
+  release2Amount       Float?      @map("release_2_amount")
+  release2At           DateTime?   @map("release_2_at")
+  release3Amount       Float?      @map("release_3_amount")
+  release3At           DateTime?   @map("release_3_at")
+  status               String      @default("PENDING")
+  cancelReason         String?     @map("cancel_reason")
+  paidAt               DateTime?   @map("paid_at")
+  paymentMethod        String?     @map("payment_method")
+  paymentReference     String?     @map("payment_reference")
+  notes                String?
+  createdAt            DateTime    @default(now()) @map("created_at")
+  updatedAt            DateTime    @updatedAt @map("updated_at")
+  loanRequest          LoanRequest @relation("PartnerCommissionLoanRequest", fields: [loanRequestId], references: [id])
+  partner              User        @relation("PartnerCommissionPartner", fields: [partnerId], references: [id])
 
-  partner               User        @relation(fields: [partnerId], references: [id], name: "PartnerCommissionPartner")
-  loanRequest           LoanRequest @relation(fields: [loanRequestId], references: [id], name: "PartnerCommissionLoanRequest")
-
-  @@map("partner_commissions")
   @@index([partnerId])
   @@index([loanRequestId])
   @@index([contractId])
   @@index([status])
+  @@map("partner_commissions")
 }
 
 model PartnerBonus {
-  id              String    @id @default(uuid())
-  partnerId       String    @map("partner_id")
-  month           String    // YYYY-MM
-  contractsCount  Int       @default(0) @map("contracts_count")
-  defaultRate     Float     @default(0) @map("default_rate") // Taxa de inadimplência %
-  bonusAmount     Float     @map("bonus_amount")
-  bonusTier       String    @map("bonus_tier") // SILVER (R$500) ou GOLD (R$1000)
-  status          String    @default("PENDING") // PENDING, PAID, CANCELLED
-  paidAt          DateTime? @map("paid_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
+  id             String    @id @default(uuid())
+  partnerId      String    @map("partner_id")
+  month          String
+  contractsCount Int       @default(0) @map("contracts_count")
+  defaultRate    Float     @default(0) @map("default_rate")
+  bonusAmount    Float     @map("bonus_amount")
+  bonusTier      String    @map("bonus_tier")
+  status         String    @default("PENDING")
+  paidAt         DateTime? @map("paid_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  partner        User      @relation("PartnerBonusPartner", fields: [partnerId], references: [id])
 
-  partner         User      @relation(fields: [partnerId], references: [id], name: "PartnerBonusPartner")
-
-  @@map("partner_bonuses")
   @@unique([partnerId, month])
   @@index([partnerId])
   @@index([month])
+  @@map("partner_bonuses")
 }
 
 model PartnerInvite {
-  id                  String    @id @default(uuid())
-  partnerId           String    @map("partner_id")
-  invitedEmail        String    @map("invited_email")
-  inviteCode          String    @unique @map("invite_code")
-  status              String    @default("PENDING")
-  acceptedAt          DateTime? @map("accepted_at")
-  expiredAt           DateTime  @map("expired_at")
-  createdAt           DateTime  @default(now()) @map("created_at")
+  id           String    @id @default(uuid())
+  partnerId    String    @map("partner_id")
+  invitedEmail String    @map("invited_email")
+  inviteCode   String    @unique @map("invite_code")
+  status       String    @default("PENDING")
+  acceptedAt   DateTime? @map("accepted_at")
+  expiredAt    DateTime  @map("expired_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  partner      User      @relation("PartnerInvitePartner", fields: [partnerId], references: [id])
 
-  partner             User    @relation(fields: [partnerId], references: [id], name: "PartnerInvitePartner")
-
-  @@map("partner_invites")
   @@index([partnerId])
   @@index([invitedEmail])
   @@index([inviteCode])
+  @@map("partner_invites")
 }
-
-// ─── FUNIL DE VENDAS ──────────────────────────────────────────────────────────
 
 model FunnelLead {
   id          String           @id @default(uuid())
@@ -961,23 +955,23 @@ model FunnelLead {
   events      FunnelEvent[]
   purchases   FunnelPurchase[]
 
-  @@map("funnel_leads")
   @@index([sessionId])
+  @@map("funnel_leads")
 }
 
 model FunnelEvent {
-  id         String     @id @default(uuid())
-  leadId     String     @map("lead_id")
-  sessionId  String     @map("session_id")
-  step       Int
-  eventType  String     @map("event_type")
-  metadata   Json?
-  createdAt  DateTime   @default(now()) @map("created_at")
-  lead       FunnelLead @relation(fields: [leadId], references: [id])
+  id        String     @id @default(uuid())
+  leadId    String     @map("lead_id")
+  sessionId String     @map("session_id")
+  step      Int
+  eventType String     @map("event_type")
+  metadata  Json?
+  createdAt DateTime   @default(now()) @map("created_at")
+  lead      FunnelLead @relation(fields: [leadId], references: [id])
 
-  @@map("funnel_events")
   @@index([sessionId])
   @@index([step, eventType])
+  @@map("funnel_events")
 }
 
 model FunnelPurchase {
@@ -991,138 +985,107 @@ model FunnelPurchase {
   createdAt   DateTime   @default(now()) @map("created_at")
   lead        FunnelLead @relation(fields: [leadId], references: [id])
 
-  @@map("funnel_purchases")
   @@index([sessionId])
+  @@map("funnel_purchases")
 }
 
 model TrackFlowQuery {
   id          String   @id @default(uuid())
   userId      String   @map("user_id")
-  apiType     String   @map("api_type") // cpf, cnpj, contatos, nome-endereco, historico-veicular
-  queryParams Json     @map("query_params") // Parâmetros da consulta
-  response    Json?    // Resposta da API
+  apiType     String   @map("api_type")
+  queryParams Json     @map("query_params")
+  response    Json?
   success     Boolean  @default(false)
   errorMsg    String?  @map("error_msg")
   createdAt   DateTime @default(now()) @map("created_at")
+  user        User     @relation(fields: [userId], references: [id])
 
-  user User @relation(fields: [userId], references: [id])
-
-  @@map("trackflow_queries")
   @@index([userId])
   @@index([apiType])
   @@index([createdAt])
+  @@map("trackflow_queries")
 }
 
-// ============================================
-// BLOCO 1: ENGAJAMENTO NAS AULAS
-// ============================================
-
 model LessonComment {
-  id           String   @id @default(uuid())
-  lessonId     String   @map("lesson_id")
-  userId       String   @map("user_id")
-  content      String   @db.Text
-  parentId     String?  @map("parent_id") // Para respostas (replies)
-  isAdminReply Boolean  @default(false) @map("is_admin_reply")
-  rating       Int      @default(0) // Média de avaliações (0-5)
-  ratingCount  Int      @default(0) @map("rating_count") // Total de avaliações
-  priority     Int      @default(0) // Prioridade definida pelo admin (0-10)
-  isPinned     Boolean  @default(false) @map("is_pinned") // Fixar comentário no topo
-  adminNotes   String?  @db.Text @map("admin_notes") // Notas internas do admin
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id           String          @id @default(uuid())
+  lessonId     String          @map("lesson_id")
+  userId       String          @map("user_id")
+  content      String
+  parentId     String?         @map("parent_id")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @default(now()) @updatedAt @map("updated_at")
+  isAdminReply Boolean         @default(false) @map("is_admin_reply")
+  rating       Int?            @default(0)
+  ratingCount  Int?            @default(0) @map("rating_count")
+  priority     Int?            @default(0)
+  isPinned     Boolean?        @default(false) @map("is_pinned")
+  adminNotes   String?         @map("admin_notes")
+  ratings      CommentRating[]
+  parent       LessonComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies      LessonComment[] @relation("CommentReplies")
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent    LessonComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies   LessonComment[] @relation("CommentReplies")
-  ratings   CommentRating[]
-
-  @@map("lesson_comments")
   @@index([lessonId])
   @@index([userId])
   @@index([parentId])
-  @@index([createdAt])
   @@index([rating])
   @@index([priority])
   @@index([isPinned])
+  @@map("lesson_comments")
 }
 
 model CommentRating {
-  id        String   @id @default(uuid())
-  commentId String   @map("comment_id")
-  userId    String   @map("user_id")
-  rating    Int      // 1-5 estrelas
-  createdAt DateTime @default(now()) @map("created_at")
-
-  comment LessonComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String        @id @default(uuid())
+  commentId String        @map("comment_id")
+  userId    String        @map("user_id")
+  rating    Int
+  createdAt DateTime      @default(now()) @map("created_at")
+  comment   LessonComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([commentId, userId])
-  @@map("comment_ratings")
   @@index([commentId])
   @@index([userId])
+  @@map("comment_ratings")
 }
 
-// ============================================
-// BLOCO 2 & 3: QUIZ DE QUALIFICAÇÃO + LEAD SCORING
-// ============================================
-
 model QuizResponse {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  courseId  String   @map("course_id")
-
-  // PASSO 1: Experiência
-  npsScore           Int      @map("nps_score") // 0-10
-  wouldRecommend     String   @map("would_recommend") // Sim/Não/Talvez
-  whatCaughtAttention String? @db.Text @map("what_caught_attention")
-
-  // PASSO 2: Transformação
-  situationBefore    String   @map("situation_before") // Endividado/Apertado/Estável/Bem
-  clarityNow         String   @map("clarity_now") // Muito mais claro/Um pouco/Igual
-
-  // PASSO 3: Intenção
-  interestMotos      String   @map("interest_motos") // Sim/Não/Talvez
-  interestCredit     String   @map("interest_credit") // Sim/Não/Talvez
-
-  // PASSO 4: Qualificação
-  wouldStartSteps    String   @map("would_start_steps") // Sim/Não/Talvez
-  investmentAmount   String   @map("investment_amount") // Até 500/500-1k/1k-3k/+3k
-
-  // PASSO 5: Venda Direta
-  interestOnlineMentorship  String @map("interest_online_mentorship") // Sim/Não/Talvez
-  interestPresentialMentorship String @map("interest_presential_mentorship") // Sim/Não/Talvez
-
-  // PASSO 6: Confirmação de Contato
-  fullName     String   @map("full_name")
-  whatsapp     String
-  city         String?
-  state        String?
-  suggestions  String?  @db.Text
-
-  // LEAD SCORING (calculado automaticamente)
-  leadStatus   String   @map("lead_status") // HOT/WARM/COLD
-  leadScore    Int      @default(0) @map("lead_score") // 0-100
-
-  // Controle
-  notifiedAdmin Boolean  @default(false) @map("notified_admin")
-  contactedAt   DateTime? @map("contacted_at")
-  contactedBy   String?  @map("contacted_by")
-  notes         String?  @db.Text
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                           String    @id @default(uuid())
+  userId                       String    @map("user_id")
+  courseId                     String    @map("course_id")
+  npsScore                     Int       @map("nps_score")
+  wouldRecommend               String    @map("would_recommend")
+  whatCaughtAttention          String?   @map("what_caught_attention")
+  situationBefore              String    @map("situation_before")
+  clarityNow                   String    @map("clarity_now")
+  interestMotos                String    @map("interest_motos")
+  interestCredit               String    @map("interest_credit")
+  wouldStartSteps              String    @map("would_start_steps")
+  investmentAmount             String    @map("investment_amount")
+  interestOnlineMentorship     String    @map("interest_online_mentorship")
+  interestPresentialMentorship String    @map("interest_presential_mentorship")
+  fullName                     String    @map("full_name")
+  whatsapp                     String
+  city                         String?
+  state                        String?
+  suggestions                  String?
+  leadStatus                   String    @map("lead_status")
+  leadScore                    Int       @default(0) @map("lead_score")
+  notifiedAdmin                Boolean   @default(false) @map("notified_admin")
+  contactedAt                  DateTime? @map("contacted_at")
+  contactedBy                  String?   @map("contacted_by")
+  notes                        String?
+  createdAt                    DateTime  @default(now()) @map("created_at")
+  updatedAt                    DateTime  @default(now()) @updatedAt @map("updated_at")
+  user                         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
-  @@map("quiz_responses")
   @@index([userId])
   @@index([courseId])
   @@index([leadStatus])
   @@index([leadScore])
   @@index([createdAt])
+  @@map("quiz_responses")
 }
 
 model WhatsAppAutomation {
@@ -1131,25 +1094,25 @@ model WhatsAppAutomation {
   leadStatus  String    @map("lead_status")
   clientName  String    @map("client_name")
   phone       String
-  messageText String    @db.Text @map("message_text")
+  messageText String    @map("message_text")
   status      String    @default("PENDING")
   messageId   String?   @map("message_id")
-  error       String?   @db.Text
+  error       String?
   sentAt      DateTime? @map("sent_at")
   createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  @@map("whatsapp_automations")
   @@index([leadId])
   @@index([status])
   @@index([leadStatus])
   @@index([createdAt])
+  @@map("whatsapp_automations")
 }
 
 model QuizQuestion {
   id        String   @id @default(uuid())
   step      Int
-  question  String   @db.Text
+  question  String
   type      String
   options   Json     @default("[]")
   weight    Int      @default(10)
@@ -1157,20 +1120,62 @@ model QuizQuestion {
   order     Int      @default(0)
   active    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  @@map("quiz_questions")
   @@index([step])
+  @@map("quiz_questions")
 }
 
 model ScoringRule {
   id          String   @id @default(uuid())
-  condition   String   @db.Text
+  condition   String
   points      Int
-  description String   @db.Text
+  description String
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("scoring_rules")
+}
+
+model generated_documents {
+  id             String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  type           String
+  loan_id        String?
+  installment_id String?
+  customer_id    String
+  title          String
+  html_content   String
+  amount         Float?
+  metadata       Json?     @default("{}")
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  created_by     String?   @default("SYSTEM")
+
+  @@index([customer_id], map: "idx_gendocs_customer")
+  @@index([loan_id], map: "idx_gendocs_loan")
+  @@index([type], map: "idx_gendocs_type")
+}
+
+model geofence_settings {
+  id             String   @id
+  enabled        Boolean  @default(false)
+  allowed_states String[] @default([])
+  allowed_cities String[] @default([])
+  block_message  String   @default("Nao atendemos sua regiao ainda")
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model whatsapp_onboarding_sessions {
+  id           String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  phone        String    @unique
+  step         String    @default("NOME")
+  data         Json      @default("{}")
+  initiated_by String?
+  status       String    @default("ACTIVE")
+  created_at   DateTime  @default(now()) @db.Timestamp(6)
+  updated_at   DateTime  @default(now()) @db.Timestamp(6)
+  completed_at DateTime? @db.Timestamp(6)
+
+  @@index([phone], map: "idx_onboarding_phone")
+  @@index([status], map: "idx_onboarding_status")
 }
