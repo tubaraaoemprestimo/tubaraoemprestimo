@@ -1441,13 +1441,6 @@ export const Wizard: React.FC = () => {
     }
   };
 
-  // Função para upload de array de arquivos
-  const uploadMultiple = async (dataUrls: string[], folder: string): Promise<string[]> => {
-    if (!dataUrls || dataUrls.length === 0) return [];
-    const results = await Promise.all(dataUrls.map((url, index) => uploadToStorage(url, folder, index)));
-    return results;
-  };
-
   // === INVESTIDOR: Submit separado ===
   const handleInvestorSubmit = async () => {
     if (!formData.signature) {
@@ -1629,26 +1622,49 @@ export const Wizard: React.FC = () => {
         locationCapturedAt: location ? new Date().toISOString() : null,
       };
 
-      // Enviar múltiplos itens de garantia (GARANTIA profile) - fazer upload das fotos
+      // Enviar múltiplos itens de garantia (GARANTIA profile) - fazer upload das fotos.
+      // Também passa pela fila com limite: um cliente com 3 itens de 4 fotos
+      // dispararia 12 uploads simultâneos aqui e reproduziria o mesmo estouro
+      // de memória que a fila acima resolve.
       let uploadedCollateralItems = null;
       if (profileType === 'GARANTIA' && collateralItems.length > 0) {
-        uploadedCollateralItems = await Promise.all(
-          collateralItems.map(async (item) => {
-            // Upload das fotos do item
-            const photoUrls = item.photos.length > 0
-              ? await uploadMultiple(item.photos, `collateral_${item.id}`)
-              : [];
-            // Upload da nota fiscal se existir
-            const invoiceUrl = item.invoiceUrl
-              ? await uploadToStorage(item.invoiceUrl, `invoice_${item.id}`)
-              : null;
-            return {
-              ...item,
-              photos: photoUrls,
-              invoiceUrl,
-            };
-          })
+        type CollateralSlot = { itemId: string; kind: 'photo' | 'invoice'; url: string; index: number };
+        const collateralSlots: CollateralSlot[] = [];
+
+        collateralItems.forEach(item => {
+          item.photos.forEach((url, index) => {
+            if (url) collateralSlots.push({ itemId: item.id, kind: 'photo', url, index });
+          });
+          if (item.invoiceUrl) {
+            collateralSlots.push({ itemId: item.id, kind: 'invoice', url: item.invoiceUrl, index: 0 });
+          }
+        });
+
+        setUploadProgress({ done: 0, total: collateralSlots.length });
+
+        const uploadedCollateralSlots = await runWithConcurrencyLimit(
+          collateralSlots.map(slot => async () => {
+            const folder = slot.kind === 'photo'
+              ? `collateral_${slot.itemId}`
+              : `invoice_${slot.itemId}`;
+            const uploaded = await uploadToStorage(slot.url, folder, slot.index);
+            setUploadProgress(prev => (prev ? { ...prev, done: prev.done + 1 } : prev));
+            return { ...slot, uploaded };
+          }),
+          2
         );
+
+        uploadedCollateralItems = collateralItems.map(item => ({
+          ...item,
+          photos: uploadedCollateralSlots
+            .filter(slot => slot.itemId === item.id && slot.kind === 'photo')
+            .sort((a, b) => a.index - b.index)
+            .map(slot => slot.uploaded),
+          invoiceUrl: uploadedCollateralSlots
+            .find(slot => slot.itemId === item.id && slot.kind === 'invoice')?.uploaded || null,
+        }));
+
+        setUploadProgress(null);
       }
 
       // Montar objeto de garantia para envio (CLT, MOTO, etc.)
