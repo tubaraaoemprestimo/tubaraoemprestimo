@@ -152,6 +152,8 @@ export const Wizard: React.FC = () => {
   // Progresso do envio de anexos ("Enviando documento 3 de 12...") para o
   // cliente saber que o app está trabalhando e não travado.
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
+  // Anexo sendo enviado no momento (PDF e fotos sobem na hora em que são escolhidos).
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [errors, setErrors] = useState<{ cpf?: string; cep?: string }>({});
 
@@ -615,6 +617,9 @@ export const Wizard: React.FC = () => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    // Todo anexo (PDF ou foto) sobe agora, então sempre há espera a sinalizar.
+    setUploadingFile(true);
+
     try {
       const newFiles: string[] = [];
 
@@ -628,20 +633,50 @@ export const Wizard: React.FC = () => {
         }
 
         if (isPdf) {
-          // PDF: guardar apenas uma blob: URL (~60 chars), NUNCA base64.
+          // PDF: sobe para o storage AGORA e guarda a URL http definitiva.
           //
-          // Bugfix OOM mobile (04/09/2026): readAsDataURL de um PDF de 20MB
-          // gerava uma string base64 de ~27MB que o V8 mantém em UTF-16
-          // (2 bytes/char) = ~53MB de heap por arquivo, retidos até o submit
-          // da etapa 7. Somado aos demais documentos, o Chrome Android
-          // (limite ~256-512MB por aba) matava a página antes do envio.
-          // createObjectURL mantém o binário fora do heap JS; uploadToStorage
-          // já sabe converter blob: para File no momento do upload.
-          newFiles.push(URL.createObjectURL(file));
+          // Histórico desta linha (importa para não regredir de novo):
+          //  1. Originalmente: readAsDataURL -> base64 de ~53MB no heap por
+          //     PDF de 20MB, retido até a etapa 7. Estourava a memória do
+          //     Chrome Android e matava a aba.
+          //  2. Depois: blob: URL, que resolveu a memória mas criou um bug
+          //     pior — a blob: URL é invalidada quando o Android descarrega a
+          //     aba (trocar de app para buscar o arquivo já basta). No submit
+          //     o fetch do blob falhava, uploadToStorage devolvia '' e o
+          //     backend recusava com "Carteira de trabalho obrigatória para
+          //     CLT" depois do cliente preencher tudo.
+          //  3. Agora: upload imediato. Não há base64 no heap nem referência
+          //     que possa expirar — o que fica no state é uma URL http real,
+          //     e uploadToStorage a repassa direto (early-return de 'http').
+          const uploaded = await apiService.uploadFile(
+            'documents',
+            `loan_documents/${(formData.cpf || 'sem_cpf').replace(/\D/g, '')}/${fieldName}_${Date.now()}.pdf`,
+            file
+          );
+
+          if (!uploaded) {
+            addToast(`Não foi possível enviar ${file.name}. Verifique sua conexão e tente anexar novamente.`, 'error');
+            continue;
+          }
+
+          newFiles.push(uploaded);
         } else {
-          // Imagem: comprimir via canvas
-          const compressed = await compressImage(file);
-          newFiles.push(compressed);
+          // Imagem: comprime e sobe na hora, pelo mesmo motivo do PDF acima —
+          // nem base64 no heap, nem blob: que o Android possa invalidar antes
+          // do envio.
+          const compressedBlob = await compressImage(file);
+          const uploaded = await apiService.uploadFile(
+            'documents',
+            `loan_documents/${(formData.cpf || 'sem_cpf').replace(/\D/g, '')}/${fieldName}_${Date.now()}_${newFiles.length}.jpg`,
+            compressedBlob
+          );
+
+          if (!uploaded) {
+            addToast(`Não foi possível enviar ${file.name}. Verifique sua conexão e tente anexar novamente.`, 'error');
+            continue;
+          }
+
+          newFiles.push(uploaded);
         }
       }
 
@@ -674,12 +709,18 @@ export const Wizard: React.FC = () => {
         }));
       }
 
-      const hasPdf = Array.from(files).some(f => f.type === 'application/pdf');
-      addToast(hasPdf ? `PDF adicionado com sucesso` : `${newFiles.length} foto(s) adicionada(s)`, 'success');
+      // Só confirma o que realmente entrou: com o upload imediato, um PDF pode
+      // ter falhado e já avisou o cliente — dizer "adicionado com sucesso"
+      // aqui faria ele seguir até a etapa 7 achando que estava tudo certo.
+      if (newFiles.length > 0) {
+        const hasPdf = Array.from(files).some(f => f.type === 'application/pdf');
+        addToast(hasPdf ? `PDF enviado com sucesso` : `${newFiles.length} foto(s) adicionada(s)`, 'success');
+      }
     } catch (error) {
       console.error('Erro ao processar arquivo:', error);
       addToast('Erro ao processar arquivo. Tente novamente.', 'error');
     } finally {
+      setUploadingFile(false);
       // Libera a referência do FileList no input: sem isso o browser segura os
       // arquivos selecionados enquanto o input existir, e reselecionar o mesmo
       // arquivo não dispara onChange.
@@ -687,8 +728,8 @@ export const Wizard: React.FC = () => {
     }
   };
 
-  // Função para comprimir imagem
-  const compressImage = (file: File): Promise<string> => {
+  // Comprime a imagem e devolve o Blob — quem chama sobe na hora.
+  const compressImage = (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
 
@@ -729,11 +770,10 @@ export const Wizard: React.FC = () => {
 
           // Comprimir para JPEG com qualidade 0.8.
           //
-          // toBlob + createObjectURL em vez de toDataURL: o dataURL virava uma
-          // string base64 no heap do V8 (UTF-16, 2 bytes/char) por foto, e um
-          // cliente que anexa 8 fotos carregava dezenas de MB até o submit.
-          // A blob: URL deixa o binário fora do heap e uploadToStorage já a
-          // converte em File na hora do envio.
+          // toBlob em vez de toDataURL: o dataURL virava uma string base64 no
+          // heap do V8 (UTF-16, 2 bytes/char) por foto, e um cliente que anexa
+          // 8 fotos carregava dezenas de MB até o submit. O Blob fica fora do
+          // heap e é enviado imediatamente por quem chamou.
           canvas.toBlob(
             (blob) => {
               // Libera o backing store do canvas antes de sair.
@@ -744,7 +784,7 @@ export const Wizard: React.FC = () => {
                 reject(new Error('Erro ao comprimir imagem'));
                 return;
               }
-              resolve(URL.createObjectURL(blob));
+              resolve(blob);
             },
             'image/jpeg',
             0.8
@@ -1956,11 +1996,23 @@ export const Wizard: React.FC = () => {
             />
             <label
               htmlFor={`${isGuarantee ? 'g-' : ''}${name}`}
-              className="flex flex-col items-center justify-center w-full py-8 rounded-xl border-2 border-dashed border-[#D4AF37]/50 bg-zinc-900/50 hover:border-[#D4AF37] hover:bg-zinc-900 cursor-pointer transition-all"
+              className={`flex flex-col items-center justify-center w-full py-8 rounded-xl border-2 border-dashed border-[#D4AF37]/50 bg-zinc-900/50 hover:border-[#D4AF37] hover:bg-zinc-900 transition-all ${
+                uploadingFile ? 'opacity-60 pointer-events-none' : 'cursor-pointer'
+              }`}
             >
-              <FileText size={36} className="text-red-500 mb-2" />
-              <span className="text-sm font-bold text-white">Selecionar PDF</span>
-              <span className="text-xs text-zinc-500 mt-1">Apenas arquivo .PDF (máx. 20MB)</span>
+              {uploadingFile ? (
+                <>
+                  <Loader2 size={36} className="text-[#D4AF37] mb-2 animate-spin" />
+                  <span className="text-sm font-bold text-white">Enviando PDF...</span>
+                  <span className="text-xs text-zinc-500 mt-1">Aguarde, não feche esta tela</span>
+                </>
+              ) : (
+                <>
+                  <FileText size={36} className="text-red-500 mb-2" />
+                  <span className="text-sm font-bold text-white">Selecionar PDF</span>
+                  <span className="text-xs text-zinc-500 mt-1">Apenas arquivo .PDF (máx. 20MB)</span>
+                </>
+              )}
             </label>
           </div>
         )}
