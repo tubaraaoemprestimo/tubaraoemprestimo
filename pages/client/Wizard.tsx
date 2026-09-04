@@ -547,14 +547,16 @@ export const Wizard: React.FC = () => {
         }
 
         if (isPdf) {
-          // PDF: converter para base64 diretamente, sem canvas
-          const dataUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (ev) => resolve(ev.target?.result as string);
-            reader.onerror = () => reject(new Error('Erro ao ler PDF'));
-            reader.readAsDataURL(file);
-          });
-          newFiles.push(dataUrl);
+          // PDF: guardar apenas uma blob: URL (~60 chars), NUNCA base64.
+          //
+          // Bugfix OOM mobile (04/09/2026): readAsDataURL de um PDF de 20MB
+          // gerava uma string base64 de ~27MB que o V8 mantém em UTF-16
+          // (2 bytes/char) = ~53MB de heap por arquivo, retidos até o submit
+          // da etapa 7. Somado aos demais documentos, o Chrome Android
+          // (limite ~256-512MB por aba) matava a página antes do envio.
+          // createObjectURL mantém o binário fora do heap JS; uploadToStorage
+          // já sabe converter blob: para File no momento do upload.
+          newFiles.push(URL.createObjectURL(file));
         } else {
           // Imagem: comprimir via canvas
           const compressed = await compressImage(file);
@@ -596,6 +598,11 @@ export const Wizard: React.FC = () => {
     } catch (error) {
       console.error('Erro ao processar arquivo:', error);
       addToast('Erro ao processar arquivo. Tente novamente.', 'error');
+    } finally {
+      // Libera a referência do FileList no input: sem isso o browser segura os
+      // arquivos selecionados enquanto o input existir, e reselecionar o mesmo
+      // arquivo não dispara onChange.
+      e.target.value = '';
     }
   };
 
@@ -651,6 +658,12 @@ export const Wizard: React.FC = () => {
     });
   };
 
+  // Libera o binário de uma blob: URL. Sem isso o arquivo continua retido pelo
+  // browser mesmo depois de removido da tela (vaza até o reload da página).
+  const releaseIfBlobUrl = (url?: string | null) => {
+    if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
+  };
+
   const removeFile = (fieldName: string, index: number, isGuarantee = false) => {
     // Verificar se é campo de collateralItems (invoice_${id} ou photos_${id})
     if (fieldName.startsWith('invoice_') || fieldName.startsWith('photos_')) {
@@ -661,9 +674,11 @@ export const Wizard: React.FC = () => {
         if (item.id === itemId) {
           if (field === 'invoiceUrl') {
             // invoiceUrl é string | null
+            releaseIfBlobUrl(item.invoiceUrl);
             return { ...item, invoiceUrl: null };
           } else {
             // photos é array
+            releaseIfBlobUrl(item.photos[index]);
             return { ...item, photos: item.photos.filter((_, i) => i !== index) };
           }
         }
@@ -672,11 +687,13 @@ export const Wizard: React.FC = () => {
     } else if (isGuarantee) {
       setGuarantee(prev => {
         const files = prev[fieldName as keyof typeof prev] as string[];
+        releaseIfBlobUrl(files[index]);
         return { ...prev, [fieldName]: files.filter((_, i) => i !== index) };
       });
     } else {
       setFormData(prev => {
         const files = prev[fieldName as keyof typeof prev] as string[];
+        releaseIfBlobUrl(files[index]);
         return { ...prev, [fieldName]: files.filter((_, i) => i !== index) };
       });
     }
@@ -1225,7 +1242,8 @@ export const Wizard: React.FC = () => {
           file = blobFile;
           // Determinar extensão pelo mime type do blob
           const mime = blobFile.type;
-          if (mime.includes('video/webm')) extension = 'webm';
+          if (mime.includes('application/pdf')) extension = 'pdf';
+          else if (mime.includes('video/webm')) extension = 'webm';
           else if (mime.includes('video/mp4')) extension = 'mp4';
           else if (mime.includes('video/')) extension = 'webm';
           else if (mime.includes('image/png')) extension = 'png';
