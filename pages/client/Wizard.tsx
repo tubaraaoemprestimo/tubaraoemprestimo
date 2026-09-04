@@ -149,6 +149,9 @@ export const Wizard: React.FC = () => {
   const { addToast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  // Progresso do envio de anexos ("Enviando documento 3 de 12...") para o
+  // cliente saber que o app está trabalhando e não travado.
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [errors, setErrors] = useState<{ cpf?: string; cep?: string }>({});
 
@@ -340,6 +343,37 @@ export const Wizard: React.FC = () => {
   // Geofencing state
   const [geofenceSettings, setGeofenceSettings] = useState<{enabled:boolean, allowedStates:string[], allowedCities:string[], blockMessage:string} | null>(null);
 
+  // ---------------------------------------------------------------------------
+  // Rascunho do formulário (apenas dados digitados)
+  //
+  // Bugfix "cliente perde tudo no submit" (04/09/2026): se a aba morresse por
+  // falta de memória, o cliente voltava para a etapa 1 sem nada — 7 etapas
+  // preenchidas jogadas fora. Persistimos o texto para que um reload acidental
+  // não custe o trabalho todo.
+  //
+  // NUNCA gravar anexos aqui: blob:/base64 de fotos, PDF, vídeos e assinatura
+  // ficam de fora — blob: URL morre com a página (seria lixo) e base64 estouraria
+  // a cota do storage, que é o problema que estamos justamente resolvendo.
+  //
+  // O rascunho carrega CPF/endereço/renda, então é apagado assim que a
+  // solicitação é enviada e expira sozinho em 24h.
+  // ---------------------------------------------------------------------------
+  const DRAFT_KEY = 'tubarao_wizard_draft_v1';
+  const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+  // Campos que carregam anexo — excluídos do rascunho.
+  const DRAFT_EXCLUDED_FIELDS = [
+    'selfie', 'signature', 'videoSelfie', 'videoHouse',
+    'idCardFront', 'idCardBack', 'proofAddress', 'proofIncome', 'workCard',
+    'billInName', 'bankStatement', 'cnh', 'vehicleCRLV', 'vehicleFront',
+    'proofPurchase', 'housePhotos', 'assetProofUrl', 'location',
+  ];
+
+  const clearDraft = () => {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch { /* storage indisponível/cheio: rascunho é best-effort */ }
+  };
+
   // Carregar configurações REAIS do banco e registrar visita (antifraude)
   useEffect(() => {
     const loadSettings = async () => {
@@ -386,6 +420,53 @@ export const Wizard: React.FC = () => {
     };
     loadSettings();
   }, [searchParams]);
+
+  // Restaura o rascunho uma única vez, ao montar.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+
+      const draft = JSON.parse(raw);
+      if (!draft?.savedAt || Date.now() - draft.savedAt > DRAFT_TTL_MS) {
+        clearDraft();
+        return;
+      }
+
+      if (draft.formData) {
+        setFormData(prev => ({ ...prev, ...draft.formData }));
+      }
+      if (draft.profileType) setProfileType(draft.profileType);
+      if (typeof draft.currentStep === 'number' && draft.currentStep > 1) {
+        setCurrentStep(draft.currentStep);
+        addToast('Recuperamos os dados que você já tinha preenchido.', 'info');
+      }
+    } catch {
+      // Rascunho corrompido não pode impedir o cliente de usar o formulário.
+      clearDraft();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Salva o rascunho a cada mudança, sem os campos de anexo.
+  useEffect(() => {
+    try {
+      const textOnly = Object.fromEntries(
+        Object.entries(formData).filter(
+          ([key, value]) =>
+            !DRAFT_EXCLUDED_FIELDS.includes(key) &&
+            (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
+        )
+      );
+
+      localStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({ savedAt: Date.now(), currentStep, profileType, formData: textOnly })
+      );
+    } catch {
+      // QuotaExceeded ou modo privado: seguir sem rascunho é aceitável.
+    }
+  }, [formData, currentStep, profileType]);
 
   // Verificar se precisa de garantia
   useEffect(() => {
@@ -646,9 +727,28 @@ export const Wizard: React.FC = () => {
 
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Comprimir para JPEG com qualidade 0.8
-          const compressed = canvas.toDataURL('image/jpeg', 0.8);
-          resolve(compressed);
+          // Comprimir para JPEG com qualidade 0.8.
+          //
+          // toBlob + createObjectURL em vez de toDataURL: o dataURL virava uma
+          // string base64 no heap do V8 (UTF-16, 2 bytes/char) por foto, e um
+          // cliente que anexa 8 fotos carregava dezenas de MB até o submit.
+          // A blob: URL deixa o binário fora do heap e uploadToStorage já a
+          // converte em File na hora do envio.
+          canvas.toBlob(
+            (blob) => {
+              // Libera o backing store do canvas antes de sair.
+              canvas.width = 0;
+              canvas.height = 0;
+
+              if (!blob) {
+                reject(new Error('Erro ao comprimir imagem'));
+                return;
+              }
+              resolve(URL.createObjectURL(blob));
+            },
+            'image/jpeg',
+            0.8
+          );
         };
 
         img.src = e.target?.result as string;
@@ -662,6 +762,38 @@ export const Wizard: React.FC = () => {
   // browser mesmo depois de removido da tela (vaza até o reload da página).
   const releaseIfBlobUrl = (url?: string | null) => {
     if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
+  };
+
+  /**
+   * Executa tarefas com no máximo `limit` em voo ao mesmo tempo, preservando a
+   * ordem dos resultados.
+   *
+   * Bugfix "crash no submit final" (04/09/2026): o envio disparava ~20 uploads
+   * simultâneos via Promise.all aninhado. Como cada upload materializa o arquivo
+   * inteiro em memória (fetch do blob -> File), todos os binários coexistiam:
+   * 2 vídeos + PDF + fotos passavam de 150MB de pico e o Chrome Android matava
+   * a aba — o cliente perdia o formulário inteiro depois de preencher 7 etapas.
+   * Com limite de 2, só 2 arquivos ocupam RAM por vez.
+   */
+  const runWithConcurrencyLimit = async <T,>(
+    tasks: Array<() => Promise<T>>,
+    limit = 2
+  ): Promise<T[]> => {
+    const results = new Array<T>(tasks.length);
+    let next = 0;
+
+    const worker = async () => {
+      while (next < tasks.length) {
+        const current = next++;
+        results[current] = await tasks[current]();
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(limit, tasks.length) }, () => worker())
+    );
+
+    return results;
   };
 
   const removeFile = (fieldName: string, index: number, isGuarantee = false) => {
@@ -1299,6 +1431,9 @@ export const Wizard: React.FC = () => {
       }
 
       console.log(`✅ Upload concluído: ${folder} -> ${uploadedUrl}`);
+      // Libera o binário assim que ele chega no storage, em vez de segurar tudo
+      // até o fim do submit — mantém a RAM baixa durante a fila.
+      releaseIfBlobUrl(dataUrl);
       return uploadedUrl;
     } catch (error) {
       console.error('Erro no upload:', error);
@@ -1360,6 +1495,7 @@ export const Wizard: React.FC = () => {
       ).catch(() => { });
 
       setLoading(false);
+      clearDraft();
       addToast("Solicitação de investimento enviada com sucesso!", 'success');
       navigate('/client/dashboard');
     } catch (error: any) {
@@ -1395,42 +1531,77 @@ export const Wizard: React.FC = () => {
     addToast("Enviando documentos... Aguarde.", 'info');
 
     try {
-      // Upload de todas as imagens para o Storage
-      const [
-        selfieUrl,
-        idCardFrontUrls,
-        idCardBackUrls,
-        proofAddressUrls,
-        proofIncomeUrls,
-        workCardUrls,
-        cnhUrls,
-        vehicleFrontUrls,
-        signatureUrl,
-        videoSelfieUrl,
-        videoHouseUrl,
-        guaranteePhotos,
-        // Novos campos
-        housePhotosUrls,
-        billInNameUrls,
-        guaranteeVideoUrl
-      ] = await Promise.all([
-        formData.selfie ? uploadToStorage(formData.selfie, 'selfie') : Promise.resolve(''),
-        uploadMultiple(formData.idCardFront, 'id_front'),
-        uploadMultiple(formData.idCardBack, 'id_back'),
-        uploadMultiple(formData.proofAddress, 'proof_address'),
-        uploadMultiple(formData.proofIncome, 'proof_income'),
-        uploadMultiple(formData.workCard, 'work_card'),
-        uploadMultiple(formData.cnh, 'cnh'),
-        uploadMultiple(formData.vehicleFront, 'vehicle'),
-        formData.signature ? uploadToStorage(formData.signature, 'signature') : Promise.resolve(''),
-        formData.videoSelfie ? uploadToStorage(formData.videoSelfie, 'video_selfie') : Promise.resolve(''),
-        formData.videoHouse ? uploadToStorage(formData.videoHouse, 'video_house') : Promise.resolve(''),
-        needsGuarantee && guarantee.photos.length > 0 ? uploadMultiple(guarantee.photos, 'guarantee') : Promise.resolve([]),
-        // Novos campos
-        uploadMultiple(formData.housePhotos, 'house_photos'),
-        uploadMultiple(formData.billInName, 'bill_in_name'),
-        needsGuarantee && guarantee.video ? uploadToStorage(guarantee.video, 'guarantee_video') : Promise.resolve('')
-      ]);
+      // Upload de todos os anexos para o Storage.
+      //
+      // Antes: Promise.all com 15 entradas, várias delas uploadMultiple (que por
+      // sua vez fazia outro Promise.all) — ~20 uploads simultâneos, todos com o
+      // binário em RAM ao mesmo tempo. Ver runWithConcurrencyLimit.
+      //
+      // Agora: monta a lista plana de arquivos e envia no máximo 2 por vez,
+      // liberando cada blob assim que sobe e reportando progresso ao cliente.
+      type UploadSlot = { url: string; folder: string; index: number };
+      const slots: UploadSlot[] = [];
+      const pushOne = (url: string | undefined | null, folder: string) => {
+        if (url) slots.push({ url, folder, index: 0 });
+      };
+      const pushMany = (urls: string[] | undefined, folder: string) => {
+        (urls || []).forEach((url, index) => {
+          if (url) slots.push({ url, folder, index });
+        });
+      };
+
+      pushOne(formData.selfie, 'selfie');
+      pushMany(formData.idCardFront, 'id_front');
+      pushMany(formData.idCardBack, 'id_back');
+      pushMany(formData.proofAddress, 'proof_address');
+      pushMany(formData.proofIncome, 'proof_income');
+      pushMany(formData.workCard, 'work_card');
+      pushMany(formData.cnh, 'cnh');
+      pushMany(formData.vehicleFront, 'vehicle');
+      pushOne(formData.signature, 'signature');
+      pushOne(formData.videoSelfie, 'video_selfie');
+      pushOne(formData.videoHouse, 'video_house');
+      if (needsGuarantee) pushMany(guarantee.photos, 'guarantee');
+      pushMany(formData.housePhotos, 'house_photos');
+      pushMany(formData.billInName, 'bill_in_name');
+      if (needsGuarantee) pushOne(guarantee.video, 'guarantee_video');
+
+      setUploadProgress({ done: 0, total: slots.length });
+
+      const uploadedSlots = await runWithConcurrencyLimit(
+        slots.map(slot => async () => {
+          const uploaded = await uploadToStorage(slot.url, slot.folder, slot.index);
+          setUploadProgress(prev => (prev ? { ...prev, done: prev.done + 1 } : prev));
+          return { ...slot, uploaded };
+        }),
+        2
+      );
+
+      // Reagrupa os resultados por pasta, preservando a ordem original.
+      const byFolder = (folder: string): string[] =>
+        uploadedSlots
+          .filter(slot => slot.folder === folder)
+          .sort((a, b) => a.index - b.index)
+          .map(slot => slot.uploaded);
+      const oneOf = (folder: string): string => byFolder(folder)[0] || '';
+
+      const selfieUrl = oneOf('selfie');
+      const idCardFrontUrls = byFolder('id_front');
+      const idCardBackUrls = byFolder('id_back');
+      const proofAddressUrls = byFolder('proof_address');
+      const proofIncomeUrls = byFolder('proof_income');
+      const workCardUrls = byFolder('work_card');
+      const cnhUrls = byFolder('cnh');
+      const vehicleFrontUrls = byFolder('vehicle');
+      const signatureUrl = oneOf('signature');
+      const videoSelfieUrl = oneOf('video_selfie');
+      const videoHouseUrl = oneOf('video_house');
+      const guaranteePhotos = byFolder('guarantee');
+      const housePhotosUrls = byFolder('house_photos');
+      const billInNameUrls = byFolder('bill_in_name');
+      const guaranteeVideoUrl = oneOf('guarantee_video');
+
+      setUploadProgress(null);
 
       // Separar location para enviar como campos separados ao backend
       const { location, ...formDataWithoutLocation } = formData;
@@ -1672,12 +1843,19 @@ export const Wizard: React.FC = () => {
       ).catch(() => { });
 
       setLoading(false);
+      setUploadProgress(null);
+      // Enviado com sucesso: remove os dados pessoais do armazenamento local.
+      clearDraft();
       addToast("Solicitação enviada!", 'success');
       navigate('/client/dashboard');
     } catch (error: any) {
       console.error('❌ Erro ao enviar solicitação:', error);
       console.error('❌ Detalhes completos:', error?.response?.data || error?.message || error);
       setLoading(false);
+      setUploadProgress(null);
+      // O formulário NÃO é limpo: o cliente continua nesta tela com tudo
+      // preenchido e os anexos já enviados viram URL http, então "Tentar
+      // Novamente" só reenvia o que faltou.
 
       // Mostrar erro real do servidor para debug
       let errorMsg = 'Erro ao enviar. Tente novamente.';
@@ -1695,7 +1873,20 @@ export const Wizard: React.FC = () => {
         errorMsg = 'Arquivo muito grande. Tente tirar fotos com menor resolução.';
       }
 
-      addToast(`Erro: ${errorMsg}`, 'error');
+      // Falha de rede/timeout no meio dos anexos: deixa claro que os dados
+      // continuam na tela e que basta tentar de novo.
+      const isNetworkFailure =
+        !error?.response ||
+        /network|timeout|failed to fetch|conex|load failed/i.test(String(errorMsg));
+
+      if (isNetworkFailure) {
+        addToast(
+          'Houve uma instabilidade no envio dos seus anexos. Seus dados continuam preenchidos — toque em "Enviar" novamente.',
+          'error'
+        );
+      } else {
+        addToast(`Erro: ${errorMsg}`, 'error');
+      }
     }
   };
 
@@ -3851,21 +4042,31 @@ export const Wizard: React.FC = () => {
                 {currentStep === 1 ? '🚀 Começar' : 'Continuar →'}
               </Button>
             ) : (
-              <Button
-                onClick={handleSubmit}
-                className="flex-1 bg-green-600 hover:bg-green-700 font-bold text-base py-4 rounded-2xl shadow-lg shadow-green-900/30"
-                isLoading={loading}
-                disabled={
-                  profileType === 'INVESTIDOR' ? false :
-                  profileType === 'LIMPA_NOME' ? !formData.signature :
-                  (!formData.signature || !formData.declarationAccepted)
-                }
-              >
-                {loading ? 'Enviando...' :
-                  profileType === 'INVESTIDOR' ? '✅ QUERO SER INVESTIDOR' :
-                  profileType === 'LIMPA_NOME' ? '✅ SOLICITAR SERVIÇO' :
-                  profileType === 'MOTO' ? '✅ SOLICITAR FINANCIAMENTO' : '✅ SOLICITAR MEU EMPRÉSTIMO'}
-              </Button>
+              <div className="flex-1">
+                <Button
+                  onClick={handleSubmit}
+                  className="w-full bg-green-600 hover:bg-green-700 font-bold text-base py-4 rounded-2xl shadow-lg shadow-green-900/30"
+                  isLoading={loading}
+                  disabled={
+                    profileType === 'INVESTIDOR' ? false :
+                    profileType === 'LIMPA_NOME' ? !formData.signature :
+                    (!formData.signature || !formData.declarationAccepted)
+                  }
+                >
+                  {loading
+                    ? (uploadProgress && uploadProgress.total > 0
+                        ? `Enviando documento ${Math.min(uploadProgress.done + 1, uploadProgress.total)} de ${uploadProgress.total}...`
+                        : 'Enviando...')
+                    : profileType === 'INVESTIDOR' ? '✅ QUERO SER INVESTIDOR' :
+                      profileType === 'LIMPA_NOME' ? '✅ SOLICITAR SERVIÇO' :
+                      profileType === 'MOTO' ? '✅ SOLICITAR FINANCIAMENTO' : '✅ SOLICITAR MEU EMPRÉSTIMO'}
+                </Button>
+                {loading && (
+                  <p className="text-xs text-zinc-500 text-center mt-2">
+                    Não feche esta tela até concluir.
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </div>

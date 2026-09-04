@@ -83,6 +83,7 @@ import { firebasePushService } from './services/firebasePushService';
 import { themeService } from './services/themeService';
 import { PermissionGate } from './components/PermissionGate';
 import { BiometricAccessGate } from './components/BiometricAccessGate';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { locationTrackingService } from './services/locationTrackingService';
 import { startDebtCollectionCron, stopDebtCollectionCron } from './services/debtCollectionCronService';
 
@@ -543,7 +544,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/wizard" element={<BiometricAccessGate><PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/wizard" element={<BiometricAccessGate><PermissionGate><ClientLayout><ErrorBoundary><Wizard /></ErrorBoundary></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/demo" element={<DemoSimulator />} />
 
             {/* Funil de Vendas — One Page Funnel SPA */}
@@ -552,7 +553,7 @@ function App() {
             {/* Client Welcome & Onboarding */}
             <Route path="/client/welcome" element={<BiometricAccessGate><PermissionGate><ClientWelcome /></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/returning" element={<BiometricAccessGate><PermissionGate><ReturningClientForm /></PermissionGate></BiometricAccessGate>} />
-            <Route path="/client/wizard" element={<BiometricAccessGate><PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/wizard" element={<BiometricAccessGate><PermissionGate><ClientLayout><ErrorBoundary><Wizard /></ErrorBoundary></ClientLayout></PermissionGate></BiometricAccessGate>} />
 
             {/* Client Protected */}
             <Route path="/client/dashboard" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={false} showBottomNav={true}><ClientDashboard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
