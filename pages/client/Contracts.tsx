@@ -48,9 +48,13 @@ export const Contracts: React.FC = () => {
    const [paymentGenerating, setPaymentGenerating] = useState(false);
    const [generatedPayment, setGeneratedPayment] = useState<PaymentResult | null>(null);
    const [pixCopied, setPixCopied] = useState(false);
+   // Pagamento online só aparece se a InfinitePay estiver configurada no servidor.
+   const [onlinePaymentEnabled, setOnlinePaymentEnabled] = useState(false);
+   const [onlineRedirecting, setOnlineRedirecting] = useState(false);
 
    useEffect(() => {
       loadContracts();
+      apiService.isOnlinePaymentEnabled().then(setOnlinePaymentEnabled).catch(() => setOnlinePaymentEnabled(false));
    }, []);
 
    const loadContracts = async () => {
@@ -112,6 +116,21 @@ export const Contracts: React.FC = () => {
          addToast(err.message || 'Erro ao gerar cobrança', 'error');
       } finally {
          setPaymentGenerating(false);
+      }
+   };
+
+   // O servidor recalcula o valor (não confia no que está na tela), cria ou
+   // reaproveita a cobrança e devolve o link do checkout da InfinitePay.
+   const handlePayOnline = async (type: 'interest_only' | 'full') => {
+      if (!selectedLoanId || onlineRedirecting) return;
+      setOnlineRedirecting(true);
+      try {
+         const charge = await apiService.createOnlineCharge(selectedLoanId, type);
+         if (!charge.checkoutUrl) throw new Error('Link de pagamento indisponível. Tente novamente.');
+         window.location.href = charge.checkoutUrl;
+      } catch (err: any) {
+         addToast(err.message || 'Não foi possível gerar o pagamento', 'error');
+         setOnlineRedirecting(false);
       }
    };
 
@@ -487,6 +506,30 @@ export const Contracts: React.FC = () => {
                            </div>
                         )}
                      </div>
+
+                     {/* Pagamento online (InfinitePay): Pix ou cartão com baixa automática */}
+                     {onlinePaymentEnabled && (
+                        <div className="bg-gradient-to-br from-green-900/30 to-black border-2 border-green-600/50 rounded-2xl p-5">
+                           <div className="text-center mb-4">
+                              <div className="inline-flex items-center gap-2 bg-green-600/20 px-3 py-1 rounded-full mb-3">
+                                 <CreditCard size={14} className="text-green-400" />
+                                 <span className="text-xs font-bold text-green-400 uppercase tracking-wide">Pix ou Cartão</span>
+                              </div>
+                              <p className="text-zinc-400 text-xs">Pague online e seu pagamento é confirmado automaticamente, sem enviar comprovante.</p>
+                           </div>
+                           <button
+                              onClick={() => handlePayOnline(generatedPayment.type as 'interest_only' | 'full')}
+                              disabled={onlineRedirecting}
+                              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 bg-green-600 hover:bg-green-500 text-white disabled:opacity-60"
+                           >
+                              {onlineRedirecting ? (
+                                 <><Loader2 size={18} className="animate-spin" /> Gerando pagamento...</>
+                              ) : (
+                                 <><CreditCard size={18} /> Pagar agora</>
+                              )}
+                           </button>
+                        </div>
+                     )}
 
                      {/* PIX Box */}
                      <div className="bg-gradient-to-br from-[#1a1a00] to-black border-2 border-[#D4AF37]/50 rounded-2xl p-5">

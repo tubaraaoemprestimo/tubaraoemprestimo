@@ -8,6 +8,21 @@ import { api as mockApi } from './mockApiClient';
 // Tree-shaking: o Vite vai remover o branch não usado no build
 export const api = import.meta.env.VITE_DEMO_MODE === 'true' ? mockApi : realApi;
 
+// Cobrança online (InfinitePay). O status só vira PAID no servidor, após
+// webhook + confirmação oficial — nunca pelo retorno do checkout.
+export interface OnlineCharge {
+    id: string;
+    status: 'PENDING' | 'PAYMENT_LINK_CREATED' | 'CONFIRMING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'NEEDS_REVIEW';
+    chargeType: 'INTEREST_ONLY' | 'FULL';
+    description: string;
+    amount: number;
+    checkoutUrl: string | null;
+    paymentMethod: string | null;
+    receiptUrl: string | null;
+    paidAt: string | null;
+    loanId: string;
+}
+
 if (import.meta.env.VITE_DEMO_MODE === 'true') {
   console.log('[apiService] 🎭 MODO DEMO ATIVO — Mock API carregado');
 }
@@ -720,6 +735,31 @@ export const apiService = {
                 contractId: string;
             }
         };
+    },
+
+    // ============= PAGAMENTO ONLINE (InfinitePay) =============
+
+    async isOnlinePaymentEnabled(): Promise<boolean> {
+        const { data } = await api.get<{ enabled: boolean }>('/payments/infinitepay/enabled');
+        return data?.enabled === true;
+    },
+
+    async createOnlineCharge(loanId: string, type: 'interest_only' | 'full') {
+        const { data, error } = await api.post<{ charge: OnlineCharge }>('/payments/infinitepay/charges', { loanId, type });
+        if (error) throw new Error(error.error || 'Não foi possível gerar o pagamento');
+        return data!.charge;
+    },
+
+    async getOnlineCharge(chargeId: string, hints: { transactionNsu?: string; slug?: string } = {}) {
+        const params = new URLSearchParams();
+        if (hints.transactionNsu) params.set('transaction_nsu', hints.transactionNsu);
+        if (hints.slug) params.set('slug', hints.slug);
+        const qs = params.toString();
+        const { data, error } = await api.get<{ charge: OnlineCharge }>(
+            `/payments/infinitepay/charges/${encodeURIComponent(chargeId)}${qs ? `?${qs}` : ''}`
+        );
+        if (error) throw new Error(error.error || 'Não foi possível consultar o pagamento');
+        return data!.charge;
     },
 
     // ============= CUSTOMERS / CRM =============

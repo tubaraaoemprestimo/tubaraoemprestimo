@@ -89,6 +89,85 @@ async function withInstallmentTotalsList<T extends { installments?: any[]; loanR
     return Promise.all(loans.map((loan) => withInstallmentTotals(loan, systemSettingRate)));
 }
 
+/**
+ * Valor que o cliente deve pagar para "só juros" ou "quitação total".
+ *
+ * Extraído sem alteração de POST /:loanId/generate-payment para ser a única
+ * fonte de verdade também da cobrança online (InfinitePay): mesma cascata de
+ * taxa, mesmo engine (computeCharge) e mesma parcela-alvo que o cron de
+ * cobrança usa. `loan` precisa vir com `installments` e `loanRequest.profileType`.
+ */
+export async function computeLoanPaymentQuote(loan: any, customer: any, type: 'interest_only' | 'full') {
+        // 2. Resolver parâmetros do engine de juros — MESMA forma do cron
+        //    `collectionAutomationService.buildOverdueCharge`, garantindo
+        //    convergência EXATA entre este caminho e o cron (req 2.7).
+        const profileType = loan.loanRequest?.profileType || '';
+
+        // Parcela-alvo = próxima cobrança em aberto (menor dueDate). Define o D
+        // (dias de atraso) e a base, exatamente como o cron faz por parcela.
+        const targetInstallment = (loan.installments || [])
+            .filter((i: any) => ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'].includes(i.status))
+            .sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
+
+        // principal = base dos 30% (juros do mês). loanAmount = base dos 7%.
+        const principal = Number(loan.principalAmount ?? loan.amount ?? targetInstallment?.amount ?? 0);
+        const loanAmount = Number(loan.amount ?? principal);
+
+        // daysOverdue: mesma fórmula do cron — floor((now - dueDate)/86400000), min 0.
+        const daysOverdue = targetInstallment
+            ? Math.max(0, Math.floor((Date.now() - new Date(targetInstallment.dueDate).getTime()) / (1000 * 60 * 60 * 24)))
+            : 0;
+
+        // Cascata de taxa (req 2.1): contrato → cliente → SystemSetting → 0.30.
+        const interestSetting = await prisma.systemSettings.findFirst({
+            where: { key: 'monthlyInterestRate' }
+        });
+        const systemSettingRate = normalizeRate(interestSetting?.value != null ? Number(interestSetting.value) : null);
+        const monthlyRate = resolveMonthlyRate({
+            contractRate: normalizeRate(loan.interestRate),
+            customerRate: normalizeRate(customer.lateInterestMonthly ?? customer.monthlyInterestRate),
+            systemSettingRate,
+        });
+
+        // 3. Calcular via engine (única fonte de verdade; converge com o cron).
+        const charge = computeCharge({
+            profileType,
+            principal,
+            loanAmount,
+            daysOverdue,
+            base: targetInstallment ? Number(targetInstallment.amount) : principal,
+            dueDate: targetInstallment?.dueDate,
+            today: new Date(), // AUTONOMO: exclusão de domingos da contagem de juros
+            monthlyRate,
+        });
+
+        const originalAmount = loanAmount;            // Valor emprestado original (base dos 7%)
+        const remainingAmount = loan.remainingAmount; // Saldo devedor restante
+        const interestAmount = parseFloat(charge.jurosMes.toFixed(2)); // Juros do mês (componente de exibição)
+        const lateFeeAmount = parseFloat((charge.multa7 + charge.multaDiaria).toFixed(2));
+        const baseChargeAmount = parseFloat((charge.base || 0).toFixed(2));
+
+        let paymentAmount = 0;
+        let paymentDescription = '';
+
+        if (type === 'interest_only') {
+            // Cobrança do juros do mês (com 7% + R$20/dia quando em atraso) —
+            // idêntico ao valor_com_juros que o cron enviaria para a mesma parcela.
+            paymentAmount = parseFloat(charge.total.toFixed(2));
+            paymentDescription = `Pagamento de Juros Mensal (${(monthlyRate * 100).toFixed(0)}% sobre R$ ${principal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`;
+        } else {
+            // Full: saldo devedor restante + cobrança do mês (juros + multas).
+            paymentAmount = parseFloat((remainingAmount + charge.total).toFixed(2));
+            paymentDescription = `Quitação Total (Saldo R$ ${remainingAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} + Juros R$ ${interestAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`;
+        }
+
+        return {
+            profileType, targetInstallment, principal, loanAmount, daysOverdue, monthlyRate,
+            originalAmount, remainingAmount, interestAmount, lateFeeAmount, baseChargeAmount,
+            paymentAmount, paymentDescription,
+        };
+}
+
 function getPublicBaseUrl(req: Request): string {
     const envBase = process.env.PUBLIC_BASE_URL || process.env.API_PUBLIC_URL || process.env.BACKEND_URL;
     if (envBase) return envBase.replace(/\/$/, '');
@@ -955,68 +1034,13 @@ loansRouter.post('/:loanId/generate-payment', authenticate, async (req: Request,
             return;
         }
 
-        // 2. Resolver parâmetros do engine de juros — MESMA forma do cron
-        //    `collectionAutomationService.buildOverdueCharge`, garantindo
-        //    convergência EXATA entre este caminho e o cron (req 2.7).
-        const profileType = loan.loanRequest?.profileType || '';
-
-        // Parcela-alvo = próxima cobrança em aberto (menor dueDate). Define o D
-        // (dias de atraso) e a base, exatamente como o cron faz por parcela.
-        const targetInstallment = (loan.installments || [])
-            .filter((i) => ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'].includes(i.status))
-            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
-
-        // principal = base dos 30% (juros do mês). loanAmount = base dos 7%.
-        const principal = Number(loan.principalAmount ?? loan.amount ?? targetInstallment?.amount ?? 0);
-        const loanAmount = Number(loan.amount ?? principal);
-
-        // daysOverdue: mesma fórmula do cron — floor((now - dueDate)/86400000), min 0.
-        const daysOverdue = targetInstallment
-            ? Math.max(0, Math.floor((Date.now() - new Date(targetInstallment.dueDate).getTime()) / (1000 * 60 * 60 * 24)))
-            : 0;
-
-        // Cascata de taxa (req 2.1): contrato → cliente → SystemSetting → 0.30.
-        const interestSetting = await prisma.systemSettings.findFirst({
-            where: { key: 'monthlyInterestRate' }
-        });
-        const systemSettingRate = normalizeRate(interestSetting?.value != null ? Number(interestSetting.value) : null);
-        const monthlyRate = resolveMonthlyRate({
-            contractRate: normalizeRate(loan.interestRate),
-            customerRate: normalizeRate(customer.lateInterestMonthly ?? customer.monthlyInterestRate),
-            systemSettingRate,
-        });
-
-        // 3. Calcular via engine (única fonte de verdade; converge com o cron).
-        const charge = computeCharge({
-            profileType,
-            principal,
-            loanAmount,
-            daysOverdue,
-            base: targetInstallment ? Number(targetInstallment.amount) : principal,
-            dueDate: targetInstallment?.dueDate,
-            today: new Date(), // AUTONOMO: exclusão de domingos da contagem de juros
-            monthlyRate,
-        });
-
-        const originalAmount = loanAmount;            // Valor emprestado original (base dos 7%)
-        const remainingAmount = loan.remainingAmount; // Saldo devedor restante
-        const interestAmount = parseFloat(charge.jurosMes.toFixed(2)); // Juros do mês (componente de exibição)
-        const lateFeeAmount = parseFloat((charge.multa7 + charge.multaDiaria).toFixed(2));
-        const baseChargeAmount = parseFloat((charge.base || 0).toFixed(2));
-
-        let paymentAmount = 0;
-        let paymentDescription = '';
-
-        if (type === 'interest_only') {
-            // Cobrança do juros do mês (com 7% + R$20/dia quando em atraso) —
-            // idêntico ao valor_com_juros que o cron enviaria para a mesma parcela.
-            paymentAmount = parseFloat(charge.total.toFixed(2));
-            paymentDescription = `Pagamento de Juros Mensal (${(monthlyRate * 100).toFixed(0)}% sobre R$ ${principal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`;
-        } else {
-            // Full: saldo devedor restante + cobrança do mês (juros + multas).
-            paymentAmount = parseFloat((remainingAmount + charge.total).toFixed(2));
-            paymentDescription = `Quitação Total (Saldo R$ ${remainingAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} + Juros R$ ${interestAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`;
-        }
+        // 2-3. Valor via computeLoanPaymentQuote (mesmo cálculo de sempre,
+        //      agora compartilhado com a cobrança online da InfinitePay).
+        const {
+            profileType, targetInstallment, principal, loanAmount, daysOverdue, monthlyRate,
+            originalAmount, remainingAmount, interestAmount, lateFeeAmount, baseChargeAmount,
+            paymentAmount, paymentDescription,
+        } = await computeLoanPaymentQuote(loan, customer, type);
 
         // 4. Buscar PIX da empresa
         const pixKeySetting = await prisma.systemSettings.findFirst({ where: { key: 'pixKey' } });
