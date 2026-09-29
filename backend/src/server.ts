@@ -42,6 +42,7 @@ import { funilRouter } from './routes/funil';
 import { cursoRouter } from './routes/curso';
 import { checkoutRouter } from './routes/checkout';
 import { stripeWebhookRouter } from './routes/webhooks/stripe';
+import { paymentsRouter, infinitePayWebhookRouter } from './routes/infinitepay';
 import trackflowRouter from './routes/trackflow';
 import documentsRouter from './routes/documents';
 import { aiRouter } from './routes/ai';
@@ -148,6 +149,9 @@ app.use('/api/returning-clients', returningClientsRouter);
 app.use('/api/funil', funilRouter);
 app.use('/api/curso', cursoRouter);
 app.use('/api/checkout', checkoutRouter);
+// Webhook da InfinitePay: público; a baixa só ocorre após payment_check oficial.
+app.use('/api/webhooks/infinitepay', infinitePayWebhookRouter);
+app.use('/api/payments', paymentsRouter);
 app.use('/api/trackflow', trackflowRouter);
 app.use('/api/documents', documentsRouter);
 app.use('/api/ai', aiRouter);

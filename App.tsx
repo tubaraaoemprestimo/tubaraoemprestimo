@@ -9,6 +9,7 @@ import { ReturningClientForm } from './pages/client/ReturningClientForm';
 import { Login } from './pages/auth/Login';
 import { ClientDashboard } from './pages/client/ClientDashboard';
 import { Contracts } from './pages/client/Contracts';
+import { PaymentReturn } from './pages/client/PaymentReturn';
 import { Profile } from './pages/client/Profile';
 import { Statement } from './pages/client/Statement';
 import { HelpCenter } from './pages/client/HelpCenter';
@@ -557,6 +558,7 @@ function App() {
             {/* Client Protected */}
             <Route path="/client/dashboard" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={false} showBottomNav={true}><ClientDashboard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/contracts" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Contracts /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/pagamento/retorno" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><PaymentReturn /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/profile" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Profile /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/statement" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><Statement /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/help" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><HelpCenter /></ClientLayout></PermissionGate></BiometricAccessGate>} />

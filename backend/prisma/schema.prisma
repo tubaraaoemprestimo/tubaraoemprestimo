@@ -812,6 +812,42 @@ model PaymentReceipt {
   @@map("payment_receipts")
 }
 
+// Cobrança online (checkout de gateway). Sem FKs de propósito, mesmo padrão
+// do PaymentReceipt: a tabela é puramente aditiva e não altera as existentes.
+// Dinheiro em centavos (Int) — o restante do sistema usa Float em reais, a
+// conversão acontece só na criação da cobrança.
+model PaymentCharge {
+  id             String    @id @default(uuid()) // usado como order_nsu na InfinitePay
+  provider       String    @default("INFINITEPAY")
+  customerId     String    @map("customer_id")
+  loanId         String    @map("loan_id")
+  installmentId  String?   @map("installment_id") // parcela que recebe a baixa
+  chargeType     String    @map("charge_type") // INSTALLMENT | INTEREST_ONLY | FULL
+  description    String
+  amountCents    Int       @map("amount_cents") // valor que o sistema calculou
+  currency       String    @default("BRL")
+  // PENDING -> PAYMENT_LINK_CREATED -> PAID ; FAILED | CANCELLED | EXPIRED
+  status         String    @default("PENDING")
+  checkoutUrl    String?   @map("checkout_url")
+  invoiceSlug    String?   @map("invoice_slug")
+  transactionNsu String?   @unique @map("transaction_nsu") // idempotência do webhook
+  receiptUrl     String?   @map("receipt_url")
+  paymentMethod  String?   @map("payment_method") // capture_method: pix | credit_card
+  installments   Int?      // parcelas do cartão, não do empréstimo
+  paidAmountCents Int?     @map("paid_amount_cents") // paid_amount informado pela InfinitePay
+  paidAt         DateTime? @map("paid_at")
+  expiresAt      DateTime? @map("expires_at")
+  lastCheckedAt  DateTime? @map("last_checked_at") // último payment_check (evita polling agressivo)
+  errorMessage   String?   @map("error_message")
+  webhookPayload Json?     @map("webhook_payload")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([loanId, status])
+  @@index([customerId])
+  @@map("payment_charges")
+}
+
 model CreditScore {
   id             String   @id @default(uuid())
   customerId     String   @map("customer_id")
