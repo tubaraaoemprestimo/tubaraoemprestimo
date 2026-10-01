@@ -9,21 +9,32 @@ import {
   type SundayPolicyForFine,
 } from './interestEngine';
 
-/** Busca a chave PIX configurada pelo admin no banco */
 /**
- * Valor da variável {pix_key} nos templates de cobrança (WhatsApp/e-mail).
+ * Valor da variável {pix_key} nos templates de cobrança (WhatsApp/e-mail/push).
  *
- * Com o pagamento online (InfinitePay) ativo, o cliente não deve mais pagar
- * por chave PIX avulsa: esse pagamento exige comprovante e aprovação manual.
- * Em vez da chave, vai o caminho para pagar no app, onde o checkout aceita Pix
- * e cartão e confirma sozinho. Os templates não mudam — só o valor injetado,
- * então desligar a InfinitePay (remover INFINITEPAY_HANDLE) volta à chave PIX.
+ * Com o pagamento online (InfinitePay) ativo, o cliente recebe o LINK DE
+ * PAGAMENTO real da cobrança — o mesmo checkout que o botão "Pagar agora" do
+ * app abre: Pix ou cartão, baixa automática pelo webhook. O valor é calculado
+ * pelo servidor (computeLoanPaymentQuote) e o link é reaproveitado enquanto
+ * nada mudar, então a régua não cria uma cobrança nova a cada envio.
+ *
+ * Se a InfinitePay estiver fora ou falhar, cai no link da tela de contratos
+ * (o cliente paga pelo app do mesmo jeito). Sem InfinitePay configurada,
+ * volta à chave PIX manual.
  */
-async function getAdminPixKey(): Promise<string> {
+async function getAdminPixKey(customer?: any, loanId?: string): Promise<string> {
   if (process.env.INFINITEPAY_HANDLE) {
     const appUrl = (process.env.FRONTEND_URL || 'https://www.tubaraoemprestimo.com.br').replace(/\/$/, '');
-    // Os templates já dizem "Pague pelo app (Pix ou cartão)" na linha anterior.
-    return `${appUrl}/#/client/contracts`;
+    const fallback = `${appUrl}/#/client/contracts`;
+    if (!customer || !loanId) return fallback;
+    try {
+      const { getInfinitePayService } = require('./infinitepay/infinitepayService');
+      const charge = await getInfinitePayService().createChargeForCustomer(customer, loanId, 'interest_only');
+      return charge?.checkoutUrl || fallback;
+    } catch (error: any) {
+      console.error(`[CollectionAutomation] Link InfinitePay indisponível para loan ${loanId}, usando link do app:`, error?.message);
+      return fallback;
+    }
   }
   try {
     const setting = await prisma.systemSetting.findFirst({ where: { key: 'pixKey' } });
@@ -485,7 +496,7 @@ async function processDueIn7Days(): Promise<number> {
           nome: customer.name,
           ...getCollectionContext(installment),
           data_vencimento: formatDate(installment.dueDate),
-          pix_key: await getAdminPixKey()
+          pix_key: await getAdminPixKey(customer, installment.loanId)
         }
       );
 
@@ -549,7 +560,7 @@ async function processDueIn3Days(): Promise<number> {
           nome: customer.name,
           ...getCollectionContext(installment),
           data_vencimento: formatDate(installment.dueDate),
-          pix_key: await getAdminPixKey()
+          pix_key: await getAdminPixKey(customer, installment.loanId)
         }
       );
 
@@ -612,7 +623,7 @@ async function processDueToday(): Promise<number> {
           nome: customer.name,
           ...getCollectionContext(installment),
           data_vencimento: formatDate(installment.dueDate),
-          pix_key: await getAdminPixKey()
+          pix_key: await getAdminPixKey(customer, installment.loanId)
         }
       );
 
@@ -694,7 +705,7 @@ async function processOverdue1Day(): Promise<number> {
           ...buildChargeTemplateVars(charge),
           ...(await buildPayoffDemonstrativoVars(installment.loanId)),
           data_vencimento: formatDate(installment.dueDate),
-          pix_key: await getAdminPixKey()
+          pix_key: await getAdminPixKey(customer, installment.loanId)
         }
       );
 
@@ -777,7 +788,7 @@ async function processOverdue3Days(): Promise<number> {
           ...buildChargeTemplateVars(charge),
           ...(await buildPayoffDemonstrativoVars(installment.loanId)),
           data_vencimento: formatDate(installment.dueDate),
-          pix_key: await getAdminPixKey()
+          pix_key: await getAdminPixKey(customer, installment.loanId)
         }
       );
 
@@ -860,7 +871,7 @@ async function processOverdue7Days(): Promise<number> {
           valor_com_juros: formatCurrency(charge.total),
           ...buildChargeTemplateVars(charge),
           ...(await buildPayoffDemonstrativoVars(installment.loanId)),
-          pix_key: await getAdminPixKey(),
+          pix_key: await getAdminPixKey(customer, installment.loanId),
           telefone_suporte: process.env.SUPPORT_PHONE || '(11) 99999-9999'
         }
       );
@@ -944,7 +955,7 @@ async function processOverdue15Days(): Promise<number> {
           valor_com_juros: formatCurrency(charge.total),
           ...buildChargeTemplateVars(charge),
           ...(await buildPayoffDemonstrativoVars(installment.loanId)),
-          pix_key: await getAdminPixKey(),
+          pix_key: await getAdminPixKey(customer, installment.loanId),
           telefone_suporte: process.env.SUPPORT_PHONE || '(11) 99999-9999'
         }
       );
@@ -1028,7 +1039,7 @@ async function processOverdue30Days(): Promise<number> {
           valor_com_juros: formatCurrency(charge.total),
           ...buildChargeTemplateVars(charge),
           ...(await buildPayoffDemonstrativoVars(installment.loanId)),
-          pix_key: await getAdminPixKey(),
+          pix_key: await getAdminPixKey(customer, installment.loanId),
           telefone_suporte: process.env.SUPPORT_PHONE || '(11) 99999-9999'
         }
       );

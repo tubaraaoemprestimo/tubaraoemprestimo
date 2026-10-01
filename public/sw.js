@@ -337,7 +337,9 @@ self.addEventListener('push', (event) => {
           { action: 'open', title: `📋 Ver todas (${total})` },
           { action: 'close', title: 'Fechar' }
         ],
-        data: { messages, isGroup: true }
+        // Mantém o link da notificação mais recente: sem ele, tocar no grupo
+        // abria a página inicial em vez da tela de pagamento.
+        data: { messages, isGroup: true, link: extraData.link || extraData.url }
       });
     })
   );

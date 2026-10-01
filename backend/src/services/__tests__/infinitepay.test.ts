@@ -233,6 +233,30 @@ describe('criação da cobrança', () => {
         expect(b.id).not.toBe(a.id);
     });
 
+    it('régua de cobrança (cron): gera o link com o cliente já carregado', async () => {
+        const t = setup({ amount: 485 });
+        const charge = await t.service.createChargeForCustomer(t.db.customers[0], 'loan-1', 'interest_only');
+        expect(charge.checkoutUrl).toMatch(/^https:\/\/checkout\.infinitepay\.io\//);
+        expect(t.calls.links[0].amountCents).toBe(48500);
+    });
+
+    it('régua de cobrança: envios repetidos reaproveitam o mesmo link (sem cobrança nova a cada mensagem)', async () => {
+        const t = setup();
+        const a = await t.service.createChargeForCustomer(t.db.customers[0], 'loan-1', 'interest_only');
+        const b = await t.service.createChargeForCustomer(t.db.customers[0], 'loan-1', 'interest_only');
+        const c = await t.service.createCharge('user-1', 'loan-1', 'interest_only'); // cliente clicando no app
+        expect(b.id).toBe(a.id);
+        expect(c.id).toBe(a.id);
+        expect(t.calls.links).toHaveLength(1);
+    });
+
+    it('régua de cobrança: não gera link para contrato de outro cliente', async () => {
+        const t = setup();
+        await expect(
+            t.service.createChargeForCustomer({ id: 'outro-cliente' }, 'loan-1', 'interest_only')
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
     it('bloqueia contrato de outro cliente', async () => {
         const t = setup();
         t.db.loans[0].customerId = 'outro';

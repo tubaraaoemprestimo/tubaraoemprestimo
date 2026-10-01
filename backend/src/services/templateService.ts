@@ -160,47 +160,45 @@ async function sendEmail(to: string, subject: string, content: string): Promise<
 /**
  * Envia Notificação Push
  */
-async function sendPushNotification(userId: string, title: string, body: string): Promise<boolean> {
+/**
+ * Envia Notificação Push (Web Push) para o usuário do cliente.
+ *
+ * Bugfix: a versão anterior lia `pushSubscriptions` do Customer, mas as
+ * inscrições pertencem ao User (PushSubscription.userId → users.id). O Prisma
+ * rejeitava a consulta e nenhum push da régua de cobrança chegava a sair.
+ * Agora usa o mesmo envio do resto do sistema (routes/push.ts), que também
+ * apaga inscrições expiradas.
+ *
+ * `customerId` é aceito como fallback: resolve o users.id via Customer.userId.
+ */
+async function sendPushNotification(
+  userOrCustomerId: string,
+  title: string,
+  body: string,
+  link?: string
+): Promise<boolean> {
   try {
+    let userId = userOrCustomerId;
     const customer = await prisma.customer.findUnique({
-      where: { id: userId },
-      select: { pushSubscriptions: true }
+      where: { id: userOrCustomerId },
+      select: { userId: true }
     });
+    if (customer) {
+      if (!customer.userId) {
+        console.log('[TemplateService] Cliente sem usuário vinculado — push não enviado');
+        return false;
+      }
+      userId = customer.userId;
+    }
 
-    if (!customer || !customer.pushSubscriptions || customer.pushSubscriptions.length === 0) {
+    const subscriptions = await prisma.pushSubscription.count({ where: { userId } });
+    if (subscriptions === 0) {
       console.log('[TemplateService] Cliente sem push subscription');
       return false;
     }
 
-    const webpush = require('web-push');
-
-    // Configurar VAPID se ainda não configurado
-    if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-      webpush.setVapidDetails(
-        process.env.VAPID_SUBJECT || 'mailto:admin@tubarao.com',
-        process.env.VAPID_PUBLIC_KEY,
-        process.env.VAPID_PRIVATE_KEY
-      );
-    }
-
-    for (const sub of customer.pushSubscriptions) {
-      try {
-        const payload = JSON.stringify({
-          title,
-          body,
-          icon: '/logo.png',
-          url: '/client/dashboard'
-        });
-
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: sub.keys as any },
-          payload
-        );
-      } catch (error) {
-        console.error('[TemplateService] Erro ao enviar push:', error);
-      }
-    }
-
+    const { sendPushToUser } = require('../routes/push');
+    await sendPushToUser(userId, title, body, { link: link || '/client/dashboard', url: link || '/client/dashboard' });
     return true;
   } catch (error) {
     console.error('[TemplateService] Erro ao enviar push notification:', error);
@@ -302,9 +300,17 @@ export async function triggerTemplate(
     const pushSourceTemplate = notificationTemplate || whatsappTemplate || emailTemplate || genericTemplate;
     if (pushSourceTemplate && recipient.userId) {
       const title = pushSourceTemplate.subject || 'Tubarão Empréstimos';
-      const body = replaceVariables(pushSourceTemplate.content, variables);
+      // Cobrança com link de pagamento: o push vira um aviso curto e o toque
+      // na notificação abre o checkout (Pix ou cartão). O demonstrativo
+      // completo continua no WhatsApp/e-mail — push longo é cortado pelo celular.
+      const paymentLink = typeof variables.pix_key === 'string' && /^https?:\/\//.test(variables.pix_key)
+        ? variables.pix_key
+        : undefined;
+      const body = paymentLink
+        ? `${variables.nome ? `${variables.nome}, ` : ''}você tem uma cobrança de R$ ${variables.valor_cobranca_atual || variables.valor}. Toque para pagar com Pix ou cartão.`
+        : replaceVariables(pushSourceTemplate.content, variables);
 
-      result.channels.notification = await sendPushNotification(recipient.userId, title, body);
+      result.channels.notification = await sendPushNotification(recipient.userId, title, body, paymentLink);
 
       if (result.channels.notification) {
         console.log(`[TemplateService] ✅ Push notification enviado para userId ${recipient.userId}`);

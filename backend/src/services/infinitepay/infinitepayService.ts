@@ -264,11 +264,21 @@ export function createInfinitePayService(deps: InfinitePayDeps) {
 
         /** Cria (ou reaproveita) a cobrança e devolve a URL do checkout. */
         async createCharge(userId: string, loanId: string, type: ChargeType) {
+            const customer = await prisma.customer.findFirst({ where: { userId } });
+            return this.createChargeForCustomer(customer, loanId, type);
+        },
+
+        /**
+         * Mesmo que createCharge, mas para quem já tem o cliente em mãos — a
+         * régua de cobrança (cron) usa isto para mandar o link de pagamento
+         * real no WhatsApp/e-mail/push. As mesmas regras valem: valor
+         * recalculado pelo servidor, link reaproveitado se nada mudou.
+         */
+        async createChargeForCustomer(customer: any, loanId: string, type: ChargeType) {
             if (!isInfinitePayConfigured(config)) {
                 throw new ChargeError('Pagamento online indisponível no momento', 'NOT_CONFIGURED');
             }
 
-            const customer = await prisma.customer.findFirst({ where: { userId } });
             const loan = await prisma.loan.findUnique({
                 where: { id: loanId },
                 include: { installments: true, loanRequest: { select: { profileType: true } } },
