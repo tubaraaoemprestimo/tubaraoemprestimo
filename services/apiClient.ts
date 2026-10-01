@@ -120,10 +120,10 @@ class ApiClient {
     async upload(file: File | Blob, filename?: string): Promise<{ data: any; error: any }> {
         try {
             const formData = new FormData();
-            formData.append('file', file, filename || 'upload');
+            formData.append('file', file, filename || (file as File).name || 'upload');
             const response = await this.client.post('/upload', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
-                timeout: 300000, // 5 minutos para vídeos grandes
+                timeout: 600000, // 10 minutos: vídeo grande em 4G fraco
                 maxContentLength: 104857600, // 100MB
                 maxBodyLength: 104857600, // 100MB
             });

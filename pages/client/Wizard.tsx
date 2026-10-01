@@ -544,10 +544,12 @@ export const Wizard: React.FC = () => {
 
       for (const file of Array.from(files)) {
         const isPdf = file.type === 'application/pdf';
-        const maxSize = isPdf ? 20 * 1024 * 1024 : 5 * 1024 * 1024;
+        // Foto: limite sobre o ORIGINAL, que ainda vai ser comprimido (~1920px
+        // JPEG, <1MB). Antes era 5MB e barrava foto comum de celular atual.
+        const maxSize = isPdf ? 20 * 1024 * 1024 : 25 * 1024 * 1024;
 
         if (file.size > maxSize) {
-          addToast(`Arquivo muito grande: ${file.name}. Máximo ${isPdf ? '20MB' : '5MB'}.`, 'warning');
+          addToast(`Arquivo muito grande: ${file.name}. Máximo ${isPdf ? '20MB' : '25MB'}.`, 'warning');
           continue;
         }
 
@@ -571,7 +573,7 @@ export const Wizard: React.FC = () => {
             'documents',
             `loan_documents/${(formData.cpf || 'sem_cpf').replace(/\D/g, '')}/${fieldName}_${Date.now()}.pdf`,
             file
-          );
+          ).catch(() => null);
 
           if (!uploaded) {
             addToast(`Não foi possível enviar ${file.name}. Verifique sua conexão e tente anexar novamente.`, 'error');
@@ -580,9 +582,19 @@ export const Wizard: React.FC = () => {
 
           newFiles.push(uploaded);
         } else {
-          // Imagem: comprimir via canvas
-          const compressed = await compressImage(file);
-          newFiles.push(compressed);
+          // Imagem: comprimir via canvas. Se o navegador não decodifica o
+          // formato (HEIC do iPhone no Android/Chrome), sobe o original na hora.
+          try {
+            newFiles.push(await compressImage(file));
+          } catch {
+            setUploadingFile(true);
+            const uploaded = await apiService.uploadFile('documents', file.name, file).catch(() => null);
+            if (uploaded) {
+              newFiles.push(uploaded);
+            } else {
+              addToast(`Não foi possível enviar ${file.name}. Tente outra foto ou tire pela câmera.`, 'error');
+            }
+          }
         }
       }
 

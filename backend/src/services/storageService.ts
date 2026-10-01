@@ -21,9 +21,16 @@ function getExtensionFromMimetype(mimetype: string): string {
         'image/png': '.png',
         'image/gif': '.gif',
         'image/webp': '.webp',
+        'image/heic': '.heic',
+        'image/heif': '.heif',
+        'video/mp4': '.mp4',
+        'video/webm': '.webm',
+        'video/quicktime': '.mov',
+        'video/3gpp': '.3gp',
         'application/pdf': '.pdf'
     };
-    return mimeMap[mimetype] || '.bin';
+    // MediaRecorder manda sufixo de codec ("video/webm;codecs=vp9,opus")
+    return mimeMap[mimetype.split(';')[0].trim().toLowerCase()] || '.bin';
 }
 
 function sanitizeFilename(filename: string): string {

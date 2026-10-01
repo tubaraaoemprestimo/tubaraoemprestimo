@@ -29,8 +29,20 @@ const upload = multer({
     }
 });
 
+// Erros do multer (tamanho/tipo) viram resposta clara em vez de 500 genérico
+const singleFile = (req: Request, res: Response, next: Function) => {
+    upload.single('file')(req, res, (err: any) => {
+        if (!err) return next();
+        const tooLarge = err.code === 'LIMIT_FILE_SIZE';
+        console.warn('[Upload] Rejeitado:', err.code || err.message);
+        res.status(tooLarge ? 413 : 400).json({
+            error: tooLarge ? 'Arquivo muito grande. Máximo 100MB.' : err.message
+        });
+    });
+};
+
 // POST /api/upload — Upload de arquivo único
-uploadRouter.post('/', upload.single('file'), async (req: Request, res: Response) => {
+uploadRouter.post('/', singleFile, async (req: Request, res: Response) => {
     try {
         if (!req.file) {
             res.status(400).json({ error: 'Nenhum arquivo enviado' });

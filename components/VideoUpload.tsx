@@ -11,6 +11,9 @@ interface VideoUploadProps {
 }
 
 const MIN_RECORDING_TIME = 30; // Mínimo 30 segundos
+// Teto real é o corpo de 100MB do Cloudflare na frente do app-api (multer/nginx
+// aceitam mais). Igual ao maxBodyLength do apiClient.upload.
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 
 // Detectar plataforma
 const isIOS = (): boolean => {
@@ -77,6 +80,10 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
 
   // Upload imediato de um File para o R2, chama onUpload com URL final
   const uploadAndNotify = async (file: File) => {
+    if (file.size > MAX_VIDEO_BYTES) {
+      alert(`Vídeo muito grande (${Math.round(file.size / 1048576)}MB). O máximo é 100MB.\n\nUse o botão "Gravar" daqui do app (gera arquivo bem menor) ou grave um vídeo mais curto / em qualidade HD em vez de 4K.`);
+      return;
+    }
     setUploading(true);
     try {
       const remoteUrl = await uploadVideoFile(file);
@@ -85,9 +92,9 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
       } else {
         alert('Falha ao enviar o vídeo para o servidor. Verifique sua conexão e tente novamente.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro no upload do vídeo:', err);
-      alert('Erro ao enviar o vídeo. Tente novamente.');
+      alert(`Erro ao enviar o vídeo: ${err?.message || 'falha de conexão'}. Tente novamente.`);
     } finally {
       setUploading(false);
     }
@@ -266,7 +273,10 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({ label, onUpload, onRem
         const blob = new Blob(chunksRef.current, { type: finalMimeType });
         if (blob.size > 0) {
           const ext = finalMimeType.includes('mp4') ? 'mp4' : 'webm';
-          const file = new File([blob], `video_selfie_${Date.now()}.${ext}`, { type: finalMimeType });
+          // Sem o sufixo de codec: "video/webm;codecs=vp9,opus" tem vírgula que
+          // o parser multipart do backend (busboy) não entende — vira text/plain
+          // e o upload é recusado. Por isso nenhuma gravação do app chegava.
+          const file = new File([blob], `video_selfie_${Date.now()}.${ext}`, { type: finalMimeType.split(';')[0] });
           // Upload imediato — não salvar blob URL
           await uploadAndNotify(file);
         } else {

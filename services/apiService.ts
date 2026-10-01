@@ -427,6 +427,10 @@ export const apiService = {
         if (uploadedData.billInName && Array.isArray(uploadedData.billInName) && uploadedData.billInName.length > 0) {
             extraData.billInName = uploadedData.billInName;
         }
+        // CNH (MOTO/AUTONOMO): não tem coluna própria, vai no JSON extra
+        if (Array.isArray(uploadedData.cnh) && uploadedData.cnh.filter(Boolean).length > 0) {
+            extraData.cnh = uploadedData.cnh.filter(Boolean);
+        }
         if (uploadedData.contactTrust1Name) {
             extraData.contactTrust1Name = uploadedData.contactTrust1Name;
         }

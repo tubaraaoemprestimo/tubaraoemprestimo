@@ -2118,6 +2118,18 @@ const HistoryModal: React.FC<{ customer: any; loading: boolean; onClose: () => v
                                   </div>
                                 </div>
                               )}
+
+                              {/* CNH (MOTO/AUTONOMO) */}
+                              {Array.isArray(parsed.cnh) && parsed.cnh.length > 0 && (
+                                <div>
+                                  <p className="text-zinc-500 text-xs mb-2">CNH</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {parsed.cnh.map((url: string, i: number) => (
+                                      <DocViewer key={i} url={url} label={`🪪 CNH ${i + 1}`} />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })()}

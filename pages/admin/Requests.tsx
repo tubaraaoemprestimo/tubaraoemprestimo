@@ -1800,6 +1800,20 @@ export const Requests: React.FC = () => {
                                                     </div>
                                                 )}
 
+                                                {/* CNH (MOTO/AUTONOMO) */}
+                                                {extraData.cnh && ensureArray(extraData.cnh).filter(Boolean).length > 0 && (
+                                                    <div>
+                                                        <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-wider border-b border-zinc-800 pb-2 mb-4">🪪 CNH</h3>
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                            <DocCard
+                                                                title="CNH - Frente e Verso"
+                                                                urls={ensureArray(extraData.cnh)}
+                                                                onView={() => setViewingImage({ urls: ensureArray(extraData.cnh), title: "CNH" })}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 {/* Dados Específicos do Perfil (Bloco 1) */}
 
                                                 {/* CLT */}
