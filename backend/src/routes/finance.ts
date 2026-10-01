@@ -502,19 +502,29 @@ financeRouter.get('/today-summary', requireAdmin, async (_req: Request, res: Res
             };
 
             if (nextDue) {
-                const daysOverdue = Math.max(0, Math.floor((startOfDay.getTime() - nextDue.getTime()) / (1000 * 60 * 60 * 24)));
+                const diffTime = startOfDay.getTime() - nextDue.getTime();
+                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+                // Se o vencimento for no futuro (diffDays < 0), não vence hoje e não está em atraso
+                if (diffDays < 0) {
+                    continue;
+                }
+
+                const daysOverdue = diffDays;
+                const isDueToday = diffDays === 0;
+
                 const item = {
                     ...base,
                     reason: isDaily
-                        ? (daysOverdue === 0 ? 'DAILY_COLLECTION' : 'DAILY_OVERDUE')
-                        : (daysOverdue === 0 ? 'MONTHLY_DUE_TODAY' : 'MONTHLY_OVERDUE'),
-                    label: daysOverdue === 0
+                        ? (isDueToday ? 'DAILY_COLLECTION' : 'DAILY_OVERDUE')
+                        : (isDueToday ? 'MONTHLY_DUE_TODAY' : 'MONTHLY_OVERDUE'),
+                    label: isDueToday
                         ? (isDaily ? 'Cobrança diária pendente' : 'Vence hoje')
                         : 'Em atraso',
                     daysOverdue,
                 };
 
-                if (daysOverdue === 0) {
+                if (isDueToday) {
                     collectionsDueToday.push(item);
                 } else {
                     overdueCollections.push(item);
