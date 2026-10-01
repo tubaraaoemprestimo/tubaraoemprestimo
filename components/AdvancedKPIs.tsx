@@ -91,12 +91,16 @@ export const AdvancedKPIs: React.FC = () => {
     const loadKPIs = async () => {
         setLoading(true);
         try {
-            const [requests, customers, loans, goalsData] = await Promise.all([
+            const [requests, customers, adminLoansResult, goalsData] = await Promise.all([
                 apiService.getRequests(),
                 apiService.getCustomers(),
-                apiService.getClientLoans(),
+                apiService.getAdminLoans({ limit: 500 }).catch(() => null),
                 apiService.getGoalsSettings()
             ]);
+
+            const loans: any[] = Array.isArray(adminLoansResult)
+                ? adminLoansResult
+                : (adminLoansResult?.items || []);
 
             setGoals(goalsData);
 
@@ -111,9 +115,10 @@ export const AdvancedKPIs: React.FC = () => {
             const today = new Date();
             let lateAmount = 0;
             loans.forEach(loan => {
-                loan.installments.forEach(inst => {
-                    if (inst.status === 'OPEN' && new Date(inst.dueDate) < today) {
-                        lateAmount += inst.amount;
+                (loan.installments || []).forEach((inst: any) => {
+                    const isDuePast = inst.dueDate && new Date(inst.dueDate) < today;
+                    if ((inst.status === 'LATE' || (inst.status === 'OPEN' && isDuePast)) && inst.amount) {
+                        lateAmount += Number(inst.amount);
                     }
                 });
             });

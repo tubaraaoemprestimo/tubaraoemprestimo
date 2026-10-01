@@ -473,11 +473,13 @@ financeRouter.get('/today-summary', requireAdmin, async (_req: Request, res: Res
             const balance = await getLoanPayoffBalance(loan.id);
             if (!isDaily && balance.cycleChargeBalance <= 0) continue;
 
-            const nextDue = loan.nextPaymentDate
-                ? new Date(loan.nextPaymentDate)
-                : loan.installments[0]?.dueDate
-                    ? new Date(loan.installments[0].dueDate)
-                    : null;
+            // A parcela pendente mais antiga (installments[0]) é a referência real de vencimento
+            const oldestPending = loan.installments[0] || null;
+            const oldestDue = oldestPending?.dueDate ? new Date(oldestPending.dueDate) : null;
+            if (oldestDue) oldestDue.setHours(0, 0, 0, 0);
+
+            // nextDue é o vencimento efetivo: se a parcela mais antiga já venceu, ela determina o atraso
+            const nextDue = oldestDue || (loan.nextPaymentDate ? new Date(loan.nextPaymentDate) : null);
             if (nextDue) nextDue.setHours(0, 0, 0, 0);
 
             const dailyChargeBalance = Number(loan.installments[0]?.amount || loan.dailyInstallmentAmount || 0) + Number(loan.installments[0]?.lateFeeAmount || 0);
@@ -499,21 +501,24 @@ financeRouter.get('/today-summary', requireAdmin, async (_req: Request, res: Res
                 nextInstallment: loan.installments[0] || null,
             };
 
-            if (isDaily) {
-                collectionsDueToday.push({ ...base, reason: 'DAILY_COLLECTION', label: 'Cobrança diária pendente', daysOverdue: 0 });
-                continue;
-            }
-
-            if (isMonthly && nextDue && startOfDay >= nextDue) {
+            if (nextDue) {
                 const daysOverdue = Math.max(0, Math.floor((startOfDay.getTime() - nextDue.getTime()) / (1000 * 60 * 60 * 24)));
                 const item = {
                     ...base,
-                    reason: daysOverdue === 0 ? 'MONTHLY_DUE_TODAY' : 'MONTHLY_OVERDUE',
-                    label: daysOverdue === 0 ? 'Vence hoje' : 'Em atraso',
+                    reason: isDaily
+                        ? (daysOverdue === 0 ? 'DAILY_COLLECTION' : 'DAILY_OVERDUE')
+                        : (daysOverdue === 0 ? 'MONTHLY_DUE_TODAY' : 'MONTHLY_OVERDUE'),
+                    label: daysOverdue === 0
+                        ? (isDaily ? 'Cobrança diária pendente' : 'Vence hoje')
+                        : 'Em atraso',
                     daysOverdue,
                 };
-                if (daysOverdue === 0) collectionsDueToday.push(item);
-                else overdueCollections.push(item);
+
+                if (daysOverdue === 0) {
+                    collectionsDueToday.push(item);
+                } else {
+                    overdueCollections.push(item);
+                }
             }
         }
 
