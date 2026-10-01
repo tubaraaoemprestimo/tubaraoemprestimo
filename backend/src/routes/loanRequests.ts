@@ -103,20 +103,24 @@ function normalizeDocField(value: any): string | null {
 }
 
 // ── Validação estrita por profileType ──────────────────────────────────────
-function validateRequestByProfile(data: any): string | null {
+export function validateRequestByProfile(data: any): string | null {
     const profile = data.profileType as string | undefined;
 
-    // Validar referências obrigatórias (aceitar ambos os nomes de campo: frontend usa contactTrust1Name/contactTrust1)
-    const ref1Name = data.reference1Name || data.contactTrust1Name;
-    const ref1Phone = data.reference1Phone || data.contactTrust1;
-    const ref2Name = data.reference2Name || data.contactTrust2Name;
-    const ref2Phone = data.reference2Phone || data.contactTrust2;
+    // Referências só para empréstimos: o wizard de LIMPA_NOME e INVESTIDOR não
+    // pede referências, e exigir aqui recusava 100% desses pedidos no envio.
+    // (aceitar ambos os nomes de campo: frontend usa contactTrust1Name/contactTrust1)
+    if (!['LIMPA_NOME', 'INVESTIDOR'].includes(profile || '')) {
+        const ref1Name = data.reference1Name || data.contactTrust1Name;
+        const ref1Phone = data.reference1Phone || data.contactTrust1;
+        const ref2Name = data.reference2Name || data.contactTrust2Name;
+        const ref2Phone = data.reference2Phone || data.contactTrust2;
 
-    if (!ref1Name || !ref1Phone) {
-        return 'Referência 1 (nome e telefone) é obrigatória.';
-    }
-    if (!ref2Name || !ref2Phone) {
-        return 'Referência 2 (nome e telefone) é obrigatória.';
+        if (!ref1Name || !ref1Phone) {
+            return 'Referência 1 (nome e telefone) é obrigatória.';
+        }
+        if (!ref2Name || !ref2Phone) {
+            return 'Referência 2 (nome e telefone) é obrigatória.';
+        }
     }
 
     // Documentos básicos obrigatórios para TODOS os perfis de empréstimo
@@ -219,9 +223,11 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
         }
 
         // Verificar se cliente já tem solicitação ativa (prevenção de duplicatas)
+        // INVESTIDOR não informa CPF (vem ''): sem isso, todo investidor colidia
+        // com o pedido pendente de qualquer outro investidor.
         const existingRequest = await prisma.loanRequest.findFirst({
             where: {
-                cpf: data.cpf,
+                ...(data.cpf ? { cpf: data.cpf } : { userId: req.user!.id }),
                 status: {
                     in: ['PENDING', 'WAITING_DOCS', 'PENDING_ACCEPTANCE', 'APPROVED']
                 },
@@ -242,8 +248,10 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
         }
 
         // Busca ou cria customer
+        // CPF vazio (INVESTIDOR) não pode entrar no OR: casaria com o customer
+        // de outra pessoa que também tenha cpf ''.
         let customer = await prisma.customer.findFirst({
-            where: { OR: [{ cpf: data.cpf }, { email: req.user!.email }] }
+            where: { OR: [...(data.cpf ? [{ cpf: data.cpf }] : []), { email: req.user!.email }] }
         });
 
         // Verificar se o cliente veio de um parceiro
@@ -282,7 +290,8 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
                 data: {
                     userId: req.user!.id,
                     name: data.clientName || req.user!.name,
-                    cpf: data.cpf,
+                    // customers.cpf é UNIQUE: INVESTIDOR sem CPF não pode gravar ''
+                    cpf: data.cpf || `INV_${req.user!.id.substring(0, 8)}`,
                     email: req.user!.email,
                     phone: data.phone,
                     address: data.address,

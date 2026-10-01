@@ -3644,7 +3644,9 @@ export const Wizard: React.FC = () => {
                       </p>
                     </div>
 
-                    {renderUploadArea('guaranteePhotos', 'Fotos do Bem em Garantia (OBRIGATÓRIO)', guarantee.photos)}
+                    {/* 'photos' + isGuarantee: grava em guarantee.photos (o que é validado e enviado).
+                        Antes era 'guaranteePhotos' sem isGuarantee — ia para formData e quebrava. */}
+                    {renderUploadArea('photos', 'Fotos do Bem em Garantia (OBRIGATÓRIO)', guarantee.photos, true)}
 
                     <div className="bg-black p-4 rounded-xl border border-zinc-800">
                       <VideoUpload
