@@ -10,7 +10,21 @@ import {
 } from './interestEngine';
 
 /** Busca a chave PIX configurada pelo admin no banco */
+/**
+ * Valor da variável {pix_key} nos templates de cobrança (WhatsApp/e-mail).
+ *
+ * Com o pagamento online (InfinitePay) ativo, o cliente não deve mais pagar
+ * por chave PIX avulsa: esse pagamento exige comprovante e aprovação manual.
+ * Em vez da chave, vai o caminho para pagar no app, onde o checkout aceita Pix
+ * e cartão e confirma sozinho. Os templates não mudam — só o valor injetado,
+ * então desligar a InfinitePay (remover INFINITEPAY_HANDLE) volta à chave PIX.
+ */
 async function getAdminPixKey(): Promise<string> {
+  if (process.env.INFINITEPAY_HANDLE) {
+    const appUrl = (process.env.FRONTEND_URL || 'https://www.tubaraoemprestimo.com.br').replace(/\/$/, '');
+    // Os templates já dizem "Pague pelo app (Pix ou cartão)" na linha anterior.
+    return `${appUrl}/#/client/contracts`;
+  }
   try {
     const setting = await prisma.systemSetting.findFirst({ where: { key: 'pixKey' } });
     return setting?.value || process.env.PIX_KEY || '57.241.795/0001-47';

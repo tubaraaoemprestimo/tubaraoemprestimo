@@ -68,6 +68,14 @@ export const Contracts: React.FC = () => {
 
    const handlePay = (inst: Installment) => {
       if (!selectedLoanId) return;
+      // Pagamento online ativo: em vez do QR Code PIX + comprovante manual,
+      // abre a escolha "Pagar Juros / Quitar Tudo", que gera o checkout da
+      // InfinitePay. O servidor recalcula o valor e sempre cobra a parcela
+      // em aberto mais antiga, então não há como pagar a parcela errada.
+      if (onlinePaymentEnabled) {
+         setIsPaymentChoiceOpen(true);
+         return;
+      }
       const amountToPay = getInstallmentAmount(inst);
       const baseAmount = Number(inst.baseAmount ?? inst.amount ?? 0);
       const lateFeeAmount = Number(inst.dynamicLateFeeAmount ?? inst.lateFeeAmount ?? 0);
@@ -101,6 +109,14 @@ export const Contracts: React.FC = () => {
    // Gerar pagamento (juros ou total)
    const handleGeneratePayment = async (type: 'interest_only' | 'full') => {
       if (!selectedLoanId) return;
+      // Pagamento online ativo: vai direto para o checkout da InfinitePay
+      // (Pix ou cartão, baixa automática). Não gera a cobrança PIX manual,
+      // que mandaria ao cliente um e-mail com chave PIX e pedido de comprovante.
+      if (onlinePaymentEnabled) {
+         setIsPaymentChoiceOpen(false);
+         await handlePayOnline(type);
+         return;
+      }
       setPaymentGenerating(true);
       try {
          const result = await apiService.generatePayment(selectedLoanId, type);
@@ -257,6 +273,11 @@ export const Contracts: React.FC = () => {
                                  </button>
                               </div>
                            )}
+                           {onlineRedirecting && (
+                              <div className="flex items-center justify-center gap-2 mt-3 text-green-400 text-sm font-bold">
+                                 <Loader2 size={16} className="animate-spin" /> Abrindo pagamento seguro...
+                              </div>
+                           )}
                            {selectedLoan.status === 'PAID' && (
                               <div className="flex items-center justify-center gap-2 p-3.5 bg-zinc-950 border border-zinc-700 rounded-2xl text-zinc-400 text-sm">
                                  <CheckCircle2 size={16} className="text-green-500" />
@@ -314,14 +335,16 @@ export const Contracts: React.FC = () => {
                                        <div className="flex flex-col items-end gap-2">
                                           <span className="text-red-500 flex items-center gap-1 text-xs font-bold"><AlertCircle size={14} /> Atrasado</span>
                                           <Button size="sm" variant="danger" onClick={() => handlePay(inst)} className="h-8 text-xs">
-                                             Enviar Comprovante
+                                             {onlinePaymentEnabled ? 'Pagar agora' : 'Enviar Comprovante'}
                                           </Button>
                                        </div>
                                     ) : (
                                        <div className="flex flex-col items-end gap-2">
                                           <span className="text-yellow-500 flex items-center gap-1 text-xs font-bold"><Clock size={14} /> Aberto</span>
                                           <Button size="sm" variant="primary" onClick={() => handlePay(inst)} className="h-8 text-xs bg-shark">
-                                             <QrCode size={14} className="mr-1" /> Enviar PIX
+                                             {onlinePaymentEnabled
+                                                ? <><CreditCard size={14} className="mr-1" /> Pagar agora</>
+                                                : <><QrCode size={14} className="mr-1" /> Enviar PIX</>}
                                           </Button>
                                        </div>
                                     )}
@@ -531,7 +554,11 @@ export const Contracts: React.FC = () => {
                         </div>
                      )}
 
-                     {/* PIX Box */}
+                     {/* PIX manual (chave + comprovante): só aparece se o pagamento
+                         online estiver desligado no servidor. Com a InfinitePay ativa,
+                         o cliente paga só pelo checkout, que confirma sozinho — sem
+                         comprovante para o admin aprovar à mão. */}
+                     {!onlinePaymentEnabled && (
                      <div className="bg-gradient-to-br from-[#1a1a00] to-black border-2 border-[#D4AF37]/50 rounded-2xl p-5">
                         <div className="text-center mb-4">
                            <div className="inline-flex items-center gap-2 bg-[#D4AF37]/20 px-3 py-1 rounded-full mb-3">
@@ -561,12 +588,15 @@ export const Contracts: React.FC = () => {
                            )}
                         </button>
                      </div>
+                     )}
 
                      {/* Email Sent Info */}
                      <div className="flex items-center gap-3 bg-blue-900/20 border border-blue-800/40 rounded-xl p-3">
                         <Mail size={18} className="text-blue-400 shrink-0" />
                         <p className="text-xs text-zinc-400">
-                           Os detalhes desta cobrança foram enviados para seu <strong className="text-white">email cadastrado</strong>. Após o pagamento, envie o comprovante pelo app.
+                           {onlinePaymentEnabled
+                              ? <>O pagamento é confirmado <strong className="text-white">automaticamente</strong> assim que for aprovado. Não é preciso enviar comprovante.</>
+                              : <>Os detalhes desta cobrança foram enviados para seu <strong className="text-white">email cadastrado</strong>. Após o pagamento, envie o comprovante pelo app.</>}
                         </p>
                      </div>
 
