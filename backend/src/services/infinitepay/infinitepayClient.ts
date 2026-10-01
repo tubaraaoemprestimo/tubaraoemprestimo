@@ -77,12 +77,14 @@ function toInfinitePayError(err: any, op: string): InfinitePayError {
         return new InfinitePayError(`${op}: timeout`, 'TIMEOUT');
     }
     const status: number | undefined = err?.response?.status;
+    const errorData = err?.response?.data;
     if (status) {
-        const reason =
+        let reason =
             status === 400 ? 'requisição inválida' :
             status === 401 || status === 403 ? 'acesso negado (verifique INFINITEPAY_HANDLE)' :
             status === 404 ? 'recurso não encontrado' :
             status === 409 ? 'conflito' :
+            status === 422 ? (errorData?.errors?.items?.[0] || errorData?.message || 'valor abaixo do mínimo permitido pela InfinitePay (mínimo R$ 1,00)') :
             status === 429 ? 'limite de requisições' :
             status >= 500 ? 'indisponibilidade da InfinitePay' : 'erro HTTP';
         return new InfinitePayError(`${op}: ${reason} (HTTP ${status})`, 'HTTP', status);

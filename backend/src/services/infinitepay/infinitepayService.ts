@@ -288,8 +288,14 @@ export function createInfinitePayService(deps: InfinitePayDeps) {
 
             const quote = await deps.computeQuote(loan, customer, type);
             const target = quote.targetInstallment;
-            const amountCents = reaisToCents(quote.paymentAmount);
+            let amountCents = reaisToCents(quote.paymentAmount);
             if (!target || amountCents <= 0) throw new ChargeError('Não há valor em aberto para este contrato', 'NOTHING_DUE');
+
+            // Piso mínimo da InfinitePay: R$ 1,00 (100 centavos).
+            // Em testes ou centavos residuais, eleva para o piso mínimo aceito pelo checkout.
+            if (amountCents < 100) {
+                amountCents = 100;
+            }
 
             const chargeType = type === 'full' ? 'FULL' : 'INTEREST_ONLY';
             const now = deps.now();
@@ -368,7 +374,11 @@ export function createInfinitePayService(deps: InfinitePayDeps) {
                 });
                 await audit('checkout_error', charge.id, { error: message });
                 console.error('[InfinitePay] Falha ao criar checkout:', message);
-                throw new ChargeError('Não foi possível gerar o pagamento agora. Tente novamente em instantes.', 'PROVIDER_ERROR');
+                let userMsg = 'Não foi possível gerar o pagamento agora. Tente novamente em instantes.';
+                if (err instanceof InfinitePayError && err.status === 422) {
+                    userMsg = `InfinitePay: ${err.message}`;
+                }
+                throw new ChargeError(userMsg, 'PROVIDER_ERROR');
             }
         },
 
