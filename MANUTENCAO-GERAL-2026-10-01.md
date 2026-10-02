@@ -17,7 +17,7 @@ O sistema foi migrado com sucesso de uma instância saturada de 1GB RAM para uma
 - **IP Privado:** `10.0.0.203`
 - **IP Público:** `150.230.226.76`
 - **Uso de RAM Médio:** ~1.6 GB de 12 GB (**10.4 GB livres**, 0 MB de Swap)
-- **Status da VM Antiga (`tubarao` 1GB):** **STOPPED (Desligada com segurança)** no console da Oracle. Todos os dados permanecem preservados nela para rollback se necessário.
+- **Status da VM Antiga (`tubarao` 1GB, E2.1.Micro):** **APAGADA em 02/10/2026** (instância + boot volume de 200 GB), após conferir VM nova estável, backups diários e cópia completa local. Não há mais rollback para ela — o rollback agora é restaurar os backups (seção 6).
 
 ---
 
@@ -121,4 +121,68 @@ docker ps
    - Destino: `/home/ubuntu/backups/`
 2. **Backups Locais Salvos na Máquina de Desenvolvimento:**
    - Pasta: `J:\AREA DE TRABALHO\Projetos\TUBARÃO EMPRÉSTIMOS LTDA\backups_completos\`
-   - Contém dumps completos do Postgres, Evolution, Redis e uploads (2.9 GB íntegros).
+   - Contém dumps completos do Postgres, Evolution, Redis e uploads (2.9 GB íntegros), de 30/09/2026.
+3. **Backup do build anterior do backend:** `/home/ubuntu/dist-backup-pre-uploads` (antes dos fixes de 01/10).
+   Rollback rápido: `cd /home/ubuntu/backend/backend && mv dist dist-ruim && cp -r /home/ubuntu/dist-backup-pre-uploads dist && pm2 restart tubarao-backend`.
+
+---
+
+## 7. 📎 Uploads de Fotos e Vídeos (Cloudflare R2)
+
+### Fluxo
+Wizard (`pages/client/Wizard.tsx`) → `apiService.uploadFile` → `api.upload` (FormData, timeout 10 min) → `POST /api/upload` (`backend/src/routes/upload.ts`, multer em memória, autenticado) → `saveBufferToStorage` (`backend/src/services/storageService.ts`) → R2 em `solicitacoes/<userId>/<timestamp>-<uuid>-<nome>`, URL pública `https://pub-8123cae3d0f14991b1fd5e456c4f9e24.r2.dev/...`.
+
+- **Vídeos** (`components/VideoUpload.tsx`): sobem na hora (gravação in-app, galeria ou câmera nativa). Nunca guardar `blob:` no state.
+- **PDF** (CTPS): sobe na hora ao anexar.
+- **Fotos**: comprimidas no navegador (1920px JPEG) e sobem no envio final. HEIC que o navegador não decodifica sobe o original na hora.
+- **Limites**: foto original 25 MB, PDF 20 MB, vídeo 100 MB (teto real = corpo de requisição do Cloudflare). `MAX_FILE_SIZE` do backend = 200 MB, nginx 110 MB.
+- **Tipos aceitos no backend**: jpeg, png, gif, webp, heic, heif, mp4, webm, quicktime, 3gpp, pdf.
+- **Onde cada mídia fica no banco** (`loan_requests`): colunas `selfie_url`, `id_card_url`, `id_card_back_url`, `proof_of_address_url`, `proof_income_url`, `video_selfie_url`, `video_house_url`, `signature_url`, `work_card_url`, `vehicle_url`; o resto vai no JSON `supplemental_description` (`housePhotos`, `billInName`, `cnh`, `guarantee.photos/video`) e `collateral_items` (GARANTIA).
+- **Uploads antigos** (até 13/03/2026) continuam em disco: `/home/ubuntu/uploads` (2,8 GB, 1.784 arquivos).
+
+### Armadilhas já resolvidas (não regredir)
+1. **Vídeo gravado no app nunca chegava** (commit `5f2e432`): o MediaRecorder gera `video/webm;codecs=vp9,opus`; a vírgula quebra o parser multipart (busboy), o arquivo chega como `text/plain` e é recusado. Fix: `VideoUpload` envia o tipo sem `;codecs`. Em 60 dias havia 0 gravações in-app no R2.
+2. **CNH (AUTONOMO/MOTO) não era salva** (`5f2e432`): agora vai em `supplemental_description.cnh` e aparece no admin (Solicitações e Clientes). CNHs de pedidos anteriores estão no R2, mas sem vínculo com o pedido.
+3. **Foto > 5 MB barrada antes de comprimir** (`5f2e432`): limite passou a 25 MB.
+4. **Extensão `.bin` no R2** (`5f2e432`): `storageService` agora conhece mp4/webm/mov/3gp/heic.
+5. **PDF via `blob:` invalidado no Android** (`700be90`): PDF sobe na hora do anexo.
+
+### Como testar upload sem afetar produção
+Gerar JWT de vida curta na VM (`jsonwebtoken`, `JWT_SECRET` do `.env`), fazer `POST https://app-api.tubaraoemprestimo.com.br/api/upload` com `FormData`, conferir `HEAD` público na URL e **apagar o objeto de teste do R2** (`DeleteObjectCommand`). Para testar código novo antes do deploy: copiar `src` para `/tmp/bt`, compilar e subir numa porta livre (ex.: 3099).
+
+---
+
+## 8. 📝 Envio de Solicitação por Modalidade
+
+| Modalidade | Etapas com mídia | Validação no backend (`validateRequestByProfile`) |
+|---|---|---|
+| CLT | selfie, RG frente/verso, endereço, boleto, renda, CTPS **PDF**, fotos casa, vídeo casa, vídeo aceite, assinatura | referências, docs básicos, vídeo selfie e casa, CTPS |
+| AUTONOMO | igual CLT, sem CTPS, + **CNH** + vídeo do estabelecimento | referências, docs básicos, vídeos |
+| MOTO | selfie, RG, endereço, renda, **CNH**, fotos fachada (sem vídeos) | referências, docs básicos (sem vídeo) |
+| GARANTIA | docs básicos + itens de garantia (fotos e nota fiscal opcional) + vídeos | referências, docs, vídeos, itens com fotos |
+| LIMPA_NOME | só assinatura | só assinatura (**sem referências**) |
+| INVESTIDOR | só assinatura, sem CPF | nada obrigatório (**sem referências**) |
+
+Se o valor passar de `maxLoanNoGuarantee`, CLT/AUTONOMO também pedem fotos e vídeo do bem em garantia (gravados em `guarantee.photos`/`guarantee.video`).
+
+### Bugs de envio corrigidos em 01/10/2026 (commit `2f12a0f`)
+1. **LIMPA_NOME e INVESTIDOR recusados no envio**: o backend exigia 2 referências de todas as modalidades, mas o wizard dessas duas não tem o campo. Nunca houve nenhum pedido de INVESTIDOR por isso.
+2. **INVESTIDOR com CPF vazio**: duplicidade agora é checada por `userId` quando não há CPF; o customer é criado com `cpf = INV_<userId>` (coluna UNIQUE).
+3. **"Fotos do Bem em Garantia"** (etapa de documentos) gravavam num campo inexistente e travavam a etapa.
+
+Teste automatizado com o payload real de cada modalidade: `backend/src/services/__tests__/loanRequestValidation.test.ts`.
+Rodar testes do backend: `cd backend && node node_modules/vitest/vitest.mjs --run` (5 testes de `interestEngine` já falhavam antes, sem relação).
+
+---
+
+## 9. ⏳ Pendências em Aberto
+
+- **Teste real no celular** de cada modalidade após os fixes de 01/10: LIMPA_NOME, INVESTIDOR, CLT com garantia, AUTONOMO (gravar vídeo pelo app + CNH), MOTO.
+- **Branch `fix/submit-crash-wizard`** (fila de uploads, rascunho no localStorage, ErrorBoundary): não mesclada; precisa rebase sobre a `main` atual (mexe no mesmo `Wizard.tsx`) e teste no Android.
+- **WhatsApp do Tubarão** (instância `tubarao` na Evolution) desconectado: ler QR Code.
+- **Teste de pagamento real** na InfinitePay com cartão.
+- **Chave API da Oracle**: remover `~/.oci` e `/home/ubuntu/oci-cli` da VM e revogar a chave no console após o fim da manutenção.
+- **Segurança**: senha do Postgres fraca e Adminer público (`db-admin.tubaraoemprestimo.com.br`) — decisão pendente.
+- **Alerta de gastos** na Oracle (Pay As You Go) — sugerido US$ 10.
+- **Telefone** ("não consegue colocar telefone"): nunca reproduzido.
+- Arquivo `api-oracle.png` solto na raiz do projeto (não versionado) — pode apagar.
