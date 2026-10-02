@@ -183,6 +183,6 @@ Rodar testes do backend: `cd backend && node node_modules/vitest/vitest.mjs --ru
 - **Teste de pagamento real** na InfinitePay com cartão.
 - **Chave API da Oracle**: remover `~/.oci` e `/home/ubuntu/oci-cli` da VM e revogar a chave no console após o fim da manutenção.
 - **Segurança**: senha do Postgres fraca e Adminer público (`db-admin.tubaraoemprestimo.com.br`) — decisão pendente.
-- **Alerta de gastos** na Oracle (Pay As You Go) — sugerido US$ 10.
+- ~~Alerta de gastos na Oracle~~ — **criado em 02/10/2026**: budget `alerta-gastos-tubarao` (R$ 25/mês, conta toda), e-mails para `tubaraao.emprestimo@gmail.com` quando: gasto real ≥ R$ 1 no mês; gasto real ≥ 80%; previsão ≥ 100%. Consumo esperado: R$ 0 (VM A1 2 OCPU/12 GB + 100 GB disco, dentro do Always Free: 4 OCPU/24 GB/200 GB). Única cobrança até agora: ~R$ 0,73 em 01–02/10 (300 GB de disco com as duas VMs juntas).
 - **Telefone** ("não consegue colocar telefone"): nunca reproduzido.
 - Arquivo `api-oracle.png` solto na raiz do projeto (não versionado) — pode apagar.
