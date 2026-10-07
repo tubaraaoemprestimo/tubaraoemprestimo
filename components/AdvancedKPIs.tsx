@@ -13,6 +13,7 @@ import {
     Calendar, RefreshCw, Percent
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
+import { api } from '../services/apiClient';
 import { LoanStatus, GoalsSettings } from '../types';
 
 interface KPIData {
@@ -83,6 +84,7 @@ export const AdvancedKPIs: React.FC = () => {
     });
     const [goals, setGoals] = useState<GoalsSettings | null>(null);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     useEffect(() => {
         loadKPIs();
@@ -90,17 +92,22 @@ export const AdvancedKPIs: React.FC = () => {
 
     const loadKPIs = async () => {
         setLoading(true);
+        setLoadError(null);
         try {
-            const [requests, customers, adminLoansResult, goalsData] = await Promise.all([
-                apiService.getRequests(),
-                apiService.getCustomers(),
-                apiService.getAdminLoans({ limit: 500 }).catch(() => null),
+            // GET /loans retorna todos os contratos e parcelas para ADMIN.
+            // /loans/admin/all é paginado e omite installments e customerId.
+            const [requestResult, customerResult, loanResult, goalsData] = await Promise.all([
+                api.get<any[]>('/loan-requests'),
+                api.get<any[]>('/customers'),
+                api.get<any[]>('/loans'),
                 apiService.getGoalsSettings()
             ]);
-
-            const loans: any[] = Array.isArray(adminLoansResult)
-                ? adminLoansResult
-                : (adminLoansResult?.items || []);
+            if ([requestResult, customerResult, loanResult].some(r => r.error || !Array.isArray(r.data))) {
+                throw new Error('Não foi possível carregar os indicadores. Tente novamente.');
+            }
+            const requests = requestResult.data!;
+            const customers = customerResult.data!;
+            const loans = loanResult.data!;
 
             setGoals(goalsData);
 
@@ -108,16 +115,21 @@ export const AdvancedKPIs: React.FC = () => {
             const rejected = requests.filter(r => r.status === LoanStatus.REJECTED);
             const pending = requests.filter(r => r.status === LoanStatus.PENDING);
 
-            const totalLent = approved.reduce((acc, r) => acc + r.amount, 0);
-            const totalReceived = loans.reduce((acc, l) => acc + (l.amount - l.remainingAmount), 0);
+            const totalLent = loans.reduce((acc, l) => acc + Number(l.amount || 0), 0);
+            // Juros pagos não amortizam o principal; somar parcelas pagas.
+            const totalReceived = loans.reduce((acc, l) => acc + (l.installments || [])
+                .filter((i: any) => i.status === 'PAID')
+                .reduce((sum: number, i: any) => sum + Number(i.amount || 0), 0), 0);
 
             // Calculate late installments
             const today = new Date();
+            today.setHours(0, 0, 0, 0);
             let lateAmount = 0;
             loans.forEach(loan => {
+                if (['COMPLETED', 'CANCELLED', 'PAID'].includes(loan.status)) return;
                 (loan.installments || []).forEach((inst: any) => {
                     const isDuePast = inst.dueDate && new Date(inst.dueDate) < today;
-                    if ((inst.status === 'LATE' || (inst.status === 'OPEN' && isDuePast)) && inst.amount) {
+                    if ((inst.status === 'LATE' || (['OPEN', 'AWAITING_CONFIRMATION'].includes(inst.status) && isDuePast)) && inst.amount) {
                         lateAmount += Number(inst.amount);
                     }
                 });
@@ -150,15 +162,17 @@ export const AdvancedKPIs: React.FC = () => {
                 }).length,
                 approvalRate: requests.length > 0 ? Math.round((approved.length / requests.length) * 100) : 0,
                 defaultRate: totalLent > 0 ? Number(((lateAmount / totalLent) * 100).toFixed(1)) : 0,
-                avgLoanAmount: approved.length > 0 ? Math.round(totalLent / approved.length) : 0,
-                avgInstallments: loans.length > 0 ? Math.round(loans.reduce((a, l) => a + l.installments.length, 0) / loans.length) : 0,
+                avgLoanAmount: loans.length > 0 ? Math.round(totalLent / loans.length) : 0,
+                avgInstallments: loans.length > 0 ? Math.round(loans.reduce((a, l) => a + (l.installments || []).length, 0) / loans.length) : 0,
                 projectedRevenue: projectedRevenue || 0,
                 monthlyGrowth: goalsData?.expectedGrowthRate || 0
             });
         } catch (error) {
             console.error('Error loading KPIs:', error);
+            setLoadError('Não foi possível carregar os indicadores. Tente novamente.');
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const formatCurrency = (value: number) => {
@@ -167,6 +181,14 @@ export const AdvancedKPIs: React.FC = () => {
         return `R$ ${value.toLocaleString()}`;
     };
 
+    if (loading) return <p role="status" className="text-zinc-400">Carregando indicadores...</p>;
+    if (loadError) return (
+        <div role="alert" className="space-y-3 text-red-400">
+            <p>{loadError}</p>
+            <button type="button" onClick={loadKPIs} className="underline">Tentar novamente</button>
+        </div>
+    );
+
     return (
         <div className="space-y-6">
             {/* Top KPI Cards */}
@@ -174,7 +196,7 @@ export const AdvancedKPIs: React.FC = () => {
                 <KPICard
                     title="Total Emprestado"
                     value={formatCurrency(kpis.totalLent)}
-                    trend="+12.5%"
+                    trend="acumulado"
                     trendUp={true}
                     icon={DollarSign}
                     color="gold"
@@ -182,7 +204,7 @@ export const AdvancedKPIs: React.FC = () => {
                 <KPICard
                     title="Total Recebido"
                     value={formatCurrency(kpis.totalReceived)}
-                    trend="+8.3%"
+                    trend="parcelas pagas"
                     trendUp={true}
                     icon={CheckCircle}
                     color="green"
@@ -206,7 +228,7 @@ export const AdvancedKPIs: React.FC = () => {
                 <KPICard
                     title="Taxa Inadimplência"
                     value={`${kpis.defaultRate}%`}
-                    trend="-0.5%"
+                    trend="valor vencido / emprestado"
                     trendUp={false}
                     icon={AlertTriangle}
                     color="red"

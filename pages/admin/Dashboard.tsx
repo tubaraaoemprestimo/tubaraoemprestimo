@@ -44,7 +44,7 @@ export const Dashboard: React.FC = () => {
     // Active loans count
     try {
       const loans = await apiService.getAdminLoans({ status: 'ACTIVE' });
-      setActiveLoansCount(Array.isArray(loans) ? loans.length : 0);
+      setActiveLoansCount(Array.isArray(loans) ? loans.length : loans.total);
     } catch {}
 
     // Load counteroffer analytics
