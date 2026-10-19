@@ -38,6 +38,27 @@ export function startCollectionCron() {
   });
 
   console.log('[CollectionCron] ✅ Cron de cobrança iniciado - Executa diariamente às 9h');
+
+  // Régua do financiamento de celulares: job separado, só roda com a flag ligada.
+  // Não chama nem altera a régua de empréstimos acima.
+  cron.schedule('10 9 * * *', async () => {
+    const { getFlags } = require('../services/phoneFinancing/flags');
+    if (!getFlags().phonePayment) return;
+    try {
+      const { runPhoneCollection } = require('../services/phoneFinancing/phoneCollection');
+      const { prisma } = require('../services/prisma');
+      const { sendWhatsAppMessage } = require('../services/whatsapp');
+      const { sendPushToRole } = require('../routes/push');
+      const r = await runPhoneCollection({
+        prisma, sendWhatsApp: sendWhatsAppMessage,
+        notifyAdmins: (t: string, b: string) => sendPushToRole('ADMIN', t, b).catch(() => {}),
+        appUrl: process.env.FRONTEND_URL || 'https://www.tubaraoemprestimo.com.br', now: () => new Date(),
+      });
+      console.log(`[PhoneCollection] enviados=${r.sent} já_enviados=${r.skipped}`);
+    } catch (error: any) {
+      console.error('[PhoneCollection] erro:', error?.message);
+    }
+  }, { timezone: 'America/Sao_Paulo' });
 }
 
 /**

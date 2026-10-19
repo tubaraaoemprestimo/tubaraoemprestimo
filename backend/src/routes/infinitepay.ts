@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth';
 import { ChargeError, getInfinitePayService } from '../services/infinitepay/infinitepayService';
+import { getPhonePaymentService, isPhoneOrder } from '../services/phoneFinancing/phonePayments';
 
 // Rotas do cliente (autenticadas): criar cobrança e acompanhar status.
 export const paymentsRouter = Router();
@@ -71,7 +72,11 @@ export const infinitePayWebhookRouter = Router();
 
 infinitePayWebhookRouter.post('/', async (req: Request, res: Response) => {
     try {
-        const result = await getInfinitePayService().processWebhook(req.body || {});
+        // Financiamento de celulares usa a mesma conta/webhook, com order_nsu "PH-…".
+        // Qualquer outro order_nsu segue exatamente o fluxo antigo de empréstimos.
+        const result = isPhoneOrder(req.body?.order_nsu)
+            ? await getPhonePaymentService().processWebhook(req.body)
+            : await getInfinitePayService().processWebhook(req.body || {});
         console.log(`[InfinitePay] Webhook ${req.body?.order_nsu || '-'}: ${result}`);
     } catch (error: any) {
         // Nunca devolver 5xx por erro nosso após gravar a auditoria: a
