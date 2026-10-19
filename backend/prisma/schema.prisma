@@ -1215,3 +1215,442 @@ model whatsapp_onboarding_sessions {
   @@index([phone], map: "idx_onboarding_phone")
   @@index([status], map: "idx_onboarding_status")
 }
+
+// ============================================================================
+// FINANCIAMENTO DE CELULARES + APPLE MDM: modulo ADITIVO (2026-10)
+// Nenhum modelo legado foi alterado. customerId/userId referenciam
+// customers/users por FK no SQL da migracao, sem relacao Prisma, para nao
+// tocar Customer/User. Valores monetarios em centavos (Int).
+// ============================================================================
+
+model ServiceCatalogEntry {
+  code              String   @id
+  label             String
+  description       String
+  icon              String
+  sortOrder         Int      @map("sort_order")
+  active            Boolean  @default(true)
+  visibleInClient   Boolean  @default(true) @map("visible_in_client")
+  visibleInWhatsApp Boolean  @default(true) @map("visible_in_whatsapp")
+  applicationRoute  String   @map("application_route")
+  category          String   @default("COMMERCIAL")
+  termsVersion      String?  @map("terms_version")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("service_catalog_entries")
+}
+
+model PhoneFinancingSettings {
+  id                   String   @id @default("default")
+  offerEnabled         Boolean  @default(false) @map("offer_enabled")
+  legalTemplateStatus  String   @default("legal_template_pending") @map("legal_template_status")
+  monthlyInterestBps   Int?     @map("monthly_interest_bps")
+  minDownPaymentBps    Int?     @map("min_down_payment_bps")
+  maxInstallments      Int?     @map("max_installments")
+  lateFeeBps           Int?     @map("late_fee_bps")
+  dailyLateInterestBps Int?     @map("daily_late_interest_bps")
+  manualPaymentSecondApprovalCents Int @default(50000) @map("manual_payment_second_approval_cents")
+  reminderDaysBefore   Int      @default(2) @map("reminder_days_before")
+  graceDaysAfterDue    Int      @default(3) @map("grace_days_after_due")
+  contactHour          Int      @default(9) @map("contact_hour")
+  commercialTerms      String?  @map("commercial_terms")
+  updatedBy            String?  @map("updated_by")
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("phone_financing_settings")
+}
+
+model PhoneProduct {
+  id          String     @id @default(uuid())
+  brand       String
+  line        String?
+  model       String
+  description String?
+  imageUrl    String?    @map("image_url")
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @default(now()) @updatedAt @map("updated_at")
+  skus        PhoneSku[]
+
+  @@map("phone_products")
+}
+
+model PhoneSku {
+  id                 String                      @id @default(uuid())
+  productId          String                      @map("product_id")
+  sku                String                      @unique
+  storage            String?
+  color              String?
+  condition          String                      @default("NEW")
+  costCents          Int                         @map("cost_cents")
+  cashPriceCents     Int                         @map("cash_price_cents")
+  financedPriceCents Int?                        @map("financed_price_cents")
+  active             Boolean                     @default(true)
+  createdAt          DateTime                    @default(now()) @map("created_at")
+  updatedAt          DateTime                    @default(now()) @updatedAt @map("updated_at")
+  product            PhoneProduct                @relation(fields: [productId], references: [id])
+  units              PhoneInventoryUnit[]
+  applications       PhoneFinancingApplication[]
+
+  @@map("phone_skus")
+}
+
+model PhoneInventoryUnit {
+  id                 String                   @id @default(uuid())
+  skuId              String                   @map("sku_id")
+  serialNumber       String                   @unique @map("serial_number")
+  imei               String?                  @unique
+  imei2              String?                  @unique
+  assetTag           String?                  @map("asset_tag")
+  supplier           String?
+  invoiceNumber      String?                  @map("invoice_number")
+  invoiceUrl         String?                  @map("invoice_url")
+  purchasedAt        DateTime?                @map("purchased_at")
+  storageLocation    String?                  @map("storage_location")
+  physicalCondition  String?                  @map("physical_condition")
+  legalOwner         String?                  @map("legal_owner")
+  custodian          String?
+  // AVAILABLE | RESERVED | SOLD | DELIVERED | RETURNED | WRITTEN_OFF
+  commercialStatus   String                   @default("AVAILABLE") @map("commercial_status")
+  // registered_local | apple_business_assigned | enrollment_pending | enrolled_supervised
+  // | enrolled_unsupervised | unmanaged | release_pending | released | error
+  mdmStatus          String                   @default("registered_local") @map("mdm_status")
+  mdmStatusSource    String                   @default("LOCAL") @map("mdm_status_source")
+  mdmStatusUpdatedAt DateTime?                @map("mdm_status_updated_at")
+  createdAt          DateTime                 @default(now()) @map("created_at")
+  updatedAt          DateTime                 @default(now()) @updatedAt @map("updated_at")
+  sku                PhoneSku                 @relation(fields: [skuId], references: [id])
+  reservations       PhoneDeviceReservation[]
+  sales              PhoneSale[]
+  appleDevice        AppleMdmDevice?
+  custodyEvents      DeviceCustodyEvent[]
+
+  @@index([commercialStatus])
+  @@index([mdmStatus])
+  @@map("phone_inventory_units")
+}
+
+model PhoneFinancingApplication {
+  id                        String                     @id @default(uuid())
+  protocol                  String                     @unique
+  customerId                String                     @map("customer_id")
+  userId                    String                     @map("user_id")
+  skuId                     String?                    @map("sku_id")
+  wantsQuote                Boolean                    @default(false) @map("wants_quote")
+  source                    String                     @default("CLIENT_APP")
+  // draft | submitted | under_review | awaiting_documents | approved | rejected
+  // | contract_pending | awaiting_down_payment | ready_for_handover | active | cancelled | closed
+  status                    String                     @default("submitted")
+  requestedInstallments     Int?                       @map("requested_installments")
+  requestedDownPaymentCents Int?                       @map("requested_down_payment_cents")
+  monthlyIncomeCents        Int?                       @map("monthly_income_cents")
+  occupation                String?
+  notes                     String?
+  lgpdConsentAt             DateTime                   @map("lgpd_consent_at")
+  termsVersion              String                     @map("terms_version")
+  reviewedBy                String?                    @map("reviewed_by")
+  reviewedAt                DateTime?                  @map("reviewed_at")
+  decisionReason            String?                    @map("decision_reason")
+  createdAt                 DateTime                   @default(now()) @map("created_at")
+  updatedAt                 DateTime                   @default(now()) @updatedAt @map("updated_at")
+  sku                       PhoneSku?                  @relation(fields: [skuId], references: [id])
+  documents                 PhoneApplicationDocument[]
+  audits                    PhoneApplicationAudit[]
+  sale                      PhoneSale?
+  reservations              PhoneDeviceReservation[]
+
+  @@index([customerId])
+  @@index([status])
+  @@map("phone_financing_applications")
+}
+
+model PhoneApplicationDocument {
+  id            String                    @id @default(uuid())
+  applicationId String                    @map("application_id")
+  kind          String
+  url           String
+  createdAt     DateTime                  @default(now()) @map("created_at")
+  application   PhoneFinancingApplication @relation(fields: [applicationId], references: [id])
+
+  @@map("phone_application_documents")
+}
+
+model PhoneApplicationAudit {
+  id            String                    @id @default(uuid())
+  applicationId String                    @map("application_id")
+  actorId       String?                   @map("actor_id")
+  fromStatus    String?                   @map("from_status")
+  toStatus      String                    @map("to_status")
+  reason        String?
+  createdAt     DateTime                  @default(now()) @map("created_at")
+  application   PhoneFinancingApplication @relation(fields: [applicationId], references: [id])
+
+  @@map("phone_application_audits")
+}
+
+model PhoneDeviceReservation {
+  id            String                    @id @default(uuid())
+  unitId        String                    @map("unit_id")
+  applicationId String                    @map("application_id")
+  // ACTIVE | RELEASED | CONVERTED | EXPIRED
+  status        String                    @default("ACTIVE")
+  expiresAt     DateTime                  @map("expires_at")
+  createdAt     DateTime                  @default(now()) @map("created_at")
+  unit          PhoneInventoryUnit        @relation(fields: [unitId], references: [id])
+  application   PhoneFinancingApplication @relation(fields: [applicationId], references: [id])
+
+  @@index([unitId, status])
+  @@map("phone_device_reservations")
+}
+
+model PhoneSale {
+  id                     String                    @id @default(uuid())
+  applicationId          String                    @unique @map("application_id")
+  customerId             String                    @map("customer_id")
+  unitId                 String                    @map("unit_id")
+  cashPriceCents         Int                       @map("cash_price_cents")
+  downPaymentCents       Int                       @map("down_payment_cents")
+  financedCents          Int                       @map("financed_cents")
+  totalCents             Int                       @map("total_cents")
+  installmentsCount      Int                       @map("installments_count")
+  monthlyInterestBps     Int                       @map("monthly_interest_bps")
+  firstDueDate           DateTime                  @map("first_due_date")
+  // pending_contract | active | paid_off | cancelled | in_collection
+  status                 String                    @default("pending_contract")
+  physicalDeliveryDate   DateTime?                 @map("physical_delivery_date")
+  legalTitleTransferDate DateTime?                 @map("legal_title_transfer_date")
+  paidOffAt              DateTime?                 @map("paid_off_at")
+  mdmReleasedAt          DateTime?                 @map("mdm_released_at")
+  createdBy              String?                   @map("created_by")
+  createdAt              DateTime                  @default(now()) @map("created_at")
+  updatedAt              DateTime                  @default(now()) @updatedAt @map("updated_at")
+  application            PhoneFinancingApplication @relation(fields: [applicationId], references: [id])
+  unit                   PhoneInventoryUnit        @relation(fields: [unitId], references: [id])
+  installments           PhoneSaleInstallment[]
+  payments               PhoneSalePayment[]
+  contract               PhoneContract?
+  deliveries             PhoneDeliveryReceipt[]
+  releaseCase            PhoneReleaseCase?
+
+  @@index([customerId])
+  @@index([status])
+  @@map("phone_sales")
+}
+
+model PhoneSaleInstallment {
+  id               String                   @id @default(uuid())
+  saleId           String                   @map("sale_id")
+  number           Int
+  // DOWN_PAYMENT | INSTALLMENT
+  kind             String                   @default("INSTALLMENT")
+  dueDate          DateTime                 @map("due_date")
+  amountCents      Int                      @map("amount_cents")
+  paidCents        Int                      @default(0) @map("paid_cents")
+  // OPEN | PARTIAL | PAID | CANCELLED
+  status           String                   @default("OPEN")
+  paidAt           DateTime?                @map("paid_at")
+  collectionPaused Boolean                  @default(false) @map("collection_paused")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @default(now()) @updatedAt @map("updated_at")
+  sale             PhoneSale                @relation(fields: [saleId], references: [id])
+  allocations      PhonePaymentAllocation[]
+  collectionEvents PhoneCollectionEvent[]
+
+  @@unique([saleId, number])
+  @@index([status, dueDate])
+  @@map("phone_sale_installments")
+}
+
+model PhoneSalePayment {
+  id               String                   @id @default(uuid())
+  saleId           String                   @map("sale_id")
+  // INFINITEPAY | MANUAL
+  provider         String
+  // order_nsu enviado a InfinitePay. Prefixo "PH-" separa de PaymentCharge (emprestimos)
+  orderNsu         String?                  @unique @map("order_nsu")
+  transactionNsu   String?                  @unique @map("transaction_nsu")
+  installmentId    String?                  @map("installment_id")
+  amountCents      Int                      @map("amount_cents")
+  paidAmountCents  Int?                     @map("paid_amount_cents")
+  // PENDING | PAYMENT_LINK_CREATED | CONFIRMING | AWAITING_SECOND_APPROVAL | PAID
+  // | NEEDS_REVIEW | FAILED | CANCELLED | EXPIRED | REFUNDED
+  status           String                   @default("PENDING")
+  checkoutUrl      String?                  @map("checkout_url")
+  invoiceSlug      String?                  @map("invoice_slug")
+  receiptUrl       String?                  @map("receipt_url")
+  paymentMethod    String?                  @map("payment_method")
+  note             String?
+  errorMessage     String?                  @map("error_message")
+  recordedBy       String?                  @map("recorded_by")
+  secondApprovedBy String?                  @map("second_approved_by")
+  lastCheckedAt    DateTime?                @map("last_checked_at")
+  paidAt           DateTime?                @map("paid_at")
+  expiresAt        DateTime?                @map("expires_at")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @default(now()) @updatedAt @map("updated_at")
+  sale             PhoneSale                @relation(fields: [saleId], references: [id])
+  allocations      PhonePaymentAllocation[]
+
+  @@index([saleId, status])
+  @@map("phone_sale_payments")
+}
+
+model PhonePaymentAllocation {
+  id            String               @id @default(uuid())
+  paymentId     String               @map("payment_id")
+  installmentId String               @map("installment_id")
+  amountCents   Int                  @map("amount_cents")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  payment       PhoneSalePayment     @relation(fields: [paymentId], references: [id])
+  installment   PhoneSaleInstallment @relation(fields: [installmentId], references: [id])
+
+  @@unique([paymentId, installmentId])
+  @@map("phone_payment_allocations")
+}
+
+model PhoneContract {
+  id              String    @id @default(uuid())
+  saleId          String    @unique @map("sale_id")
+  templateVersion String    @map("template_version")
+  // legal_template_pending | generated | signed | cancelled
+  status          String    @default("legal_template_pending")
+  pdfUrl          String?   @map("pdf_url")
+  signedAt        DateTime? @map("signed_at")
+  signatureRef    String?   @map("signature_ref")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+  sale            PhoneSale @relation(fields: [saleId], references: [id])
+
+  @@map("phone_contracts")
+}
+
+model PhoneDeliveryReceipt {
+  id          String    @id @default(uuid())
+  saleId      String    @map("sale_id")
+  deliveredAt DateTime  @map("delivered_at")
+  deliveredBy String    @map("delivered_by")
+  receivedBy  String    @map("received_by")
+  receiptUrl  String?   @map("receipt_url")
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  sale        PhoneSale @relation(fields: [saleId], references: [id])
+
+  @@map("phone_delivery_receipts")
+}
+
+model PhoneReleaseCase {
+  id          String              @id @default(uuid())
+  saleId      String              @unique @map("sale_id")
+  // open | in_progress | completed | cancelled
+  status      String              @default("open")
+  reason      String
+  completedAt DateTime?           @map("completed_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @default(now()) @updatedAt @map("updated_at")
+  sale        PhoneSale           @relation(fields: [saleId], references: [id])
+  steps       DeviceReleaseStep[]
+
+  @@map("phone_release_cases")
+}
+
+model DeviceReleaseStep {
+  id            String           @id @default(uuid())
+  releaseCaseId String           @map("release_case_id")
+  // MDM_REMOVE | ABM_RELEASE | ACTIVATION_LOCK_CLEARED | RESTORE_CONFIRMED | TERM_SIGNED
+  step          String
+  // pending | done | not_applicable | failed
+  status        String           @default("pending")
+  evidence      String?
+  doneBy        String?          @map("done_by")
+  doneAt        DateTime?        @map("done_at")
+  releaseCase   PhoneReleaseCase @relation(fields: [releaseCaseId], references: [id])
+
+  @@unique([releaseCaseId, step])
+  @@map("device_release_steps")
+}
+
+model PhoneCollectionEvent {
+  id            String               @id @default(uuid())
+  installmentId String               @map("installment_id")
+  // REMINDER | DUE_TODAY | AFTER_GRACE | HUMAN_HANDOFF
+  stage         String
+  channel       String
+  status        String
+  sentOn        String               @map("sent_on")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  installment   PhoneSaleInstallment @relation(fields: [installmentId], references: [id])
+
+  @@unique([installmentId, stage, sentOn])
+  @@map("phone_collection_events")
+}
+
+model AppleMdmDevice {
+  id              String             @id @default(uuid())
+  unitId          String             @unique @map("unit_id")
+  enrollmentId    String?            @unique @map("enrollment_id")
+  serialNumber    String             @unique @map("serial_number")
+  abmAssigned     Boolean            @default(false) @map("abm_assigned")
+  supervised      Boolean?
+  osVersion       String?            @map("os_version")
+  lastSeenAt      DateTime?          @map("last_seen_at")
+  lastInventoryAt DateTime?          @map("last_inventory_at")
+  // ORG_OWNED | RELEASED. Comandos so para ORG_OWNED
+  ownership       String             @default("ORG_OWNED")
+  // LOCAL | MOCK | NANOHUB: origem da ultima informacao
+  stateSource     String             @default("LOCAL") @map("state_source")
+  rawInventory    Json?              @map("raw_inventory")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @default(now()) @updatedAt @map("updated_at")
+  unit            PhoneInventoryUnit @relation(fields: [unitId], references: [id])
+  commands        MdmCommand[]
+
+  @@map("apple_mdm_devices")
+}
+
+model MdmCommand {
+  id              String            @id @default(uuid())
+  deviceId        String            @map("device_id")
+  commandUuid     String            @unique @map("command_uuid")
+  requestType     String            @map("request_type")
+  // requested | authorized | queued | dispatched | acknowledged | failed | expired | unknown
+  status          String            @default("requested")
+  purpose         String
+  requestedBy     String            @map("requested_by")
+  approvedBy      String?           @map("approved_by")
+  idempotencyKey  String            @unique @map("idempotency_key")
+  adapter         String
+  responseStatus  String?           @map("response_status")
+  responseSummary String?           @map("response_summary")
+  errorMessage    String?           @map("error_message")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at")
+  device          AppleMdmDevice    @relation(fields: [deviceId], references: [id])
+  events          MdmCommandEvent[]
+
+  @@index([deviceId, createdAt])
+  @@map("mdm_commands")
+}
+
+model MdmCommandEvent {
+  id         String     @id @default(uuid())
+  commandId  String     @map("command_id")
+  fromStatus String?    @map("from_status")
+  toStatus   String     @map("to_status")
+  detail     String?
+  createdAt  DateTime   @default(now()) @map("created_at")
+  command    MdmCommand @relation(fields: [commandId], references: [id])
+
+  @@map("mdm_command_events")
+}
+
+model DeviceCustodyEvent {
+  id        String             @id @default(uuid())
+  unitId    String             @map("unit_id")
+  event     String
+  actorId   String             @map("actor_id")
+  detail    String?
+  createdAt DateTime           @default(now()) @map("created_at")
+  unit      PhoneInventoryUnit @relation(fields: [unitId], references: [id])
+
+  @@map("device_custody_events")
+}
