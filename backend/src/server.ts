@@ -49,6 +49,8 @@ import { aiRouter } from './routes/ai';
 import { quizRouter } from './routes/quiz';
 import { commentsRouter } from './routes/comments';
 import { automationRouter } from './routes/automation';
+import { servicesCatalogRouter, phoneProductsRouter, phoneFinancingRouter, phoneFinancingAdminRouter } from './routes/phoneFinancing';
+import { appleMdmRouter, mdmWebhookRouter } from './routes/appleMdm';
 import { initCronJobs } from './cron/installmentReminders';
 import { startCollectionCron } from './cron/collectionCron';
 
@@ -135,6 +137,14 @@ app.use('/api/cpf', cpfLookupRouter);
 app.use('/api/whatsapp', whatsappStatusRouter);
 app.use('/api/referrals', referralsRouter);
 app.use('/api/communication', communicationRouter);
+// Financiamento de celulares + Apple MDM (módulo aditivo; flags desligadas por padrão).
+// Montados ANTES de /api/admin para o prefixo específico ter prioridade.
+app.use('/api/services', servicesCatalogRouter);
+app.use('/api/phone-products', phoneProductsRouter);
+app.use('/api/phone-financing', phoneFinancingRouter);
+app.use('/api/admin/phone-financing', phoneFinancingAdminRouter);
+app.use('/api/admin/mdm/webhook', mdmWebhookRouter);
+app.use('/api/admin/mdm', appleMdmRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/payment-receipts', paymentReceiptsRouter);
 app.use('/api/open-finance', openFinanceRouter);

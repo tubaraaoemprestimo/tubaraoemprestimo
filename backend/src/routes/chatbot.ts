@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import axios from 'axios';
+import { buildServiceKnowledgeBlock } from '../services/phoneFinancing/serviceKnowledge';
 
 export const chatbotRouter = Router();
 
@@ -750,8 +751,11 @@ INFORMAÇÕES SOBRE O SISTEMA DE INDICAÇÃO:
             contextData += `\n\nContexto do cliente:\n${JSON.stringify(customerContext)}`;
         }
 
+        // Catálogo oficial de serviços (mesma fonte do app e do webhook Evolution).
+        const servicesBlock = await buildServiceKnowledgeBlock(prisma, process.env.FRONTEND_URL || 'https://www.tubaraoemprestimo.com.br').catch(() => '');
+
         // Monta o prompt final: ADMIN PROMPT PRIMEIRO (prioridade máxima) + contexto depois
-        const systemPrompt = `${adminPrompt}\n\n${contextData}`;
+        const systemPrompt = `${adminPrompt}\n\n${servicesBlock}\n${contextData}`;
 
         // 7. Chama a IA com fallback automático: provider principal → Perplexity → Groq → Anthropic
         let aiResponse: string;

@@ -7,6 +7,8 @@ import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
 import { saveBufferToStorage } from '../services/storageService';
+import { buildServiceKnowledgeBlock, buildPhoneCustomerSummary } from '../services/phoneFinancing/serviceKnowledge';
+import { getFlags } from '../services/phoneFinancing/flags';
 
 export const webhookRouter = Router();
 
@@ -865,12 +867,19 @@ webhookRouter.post('/whatsapp', async (req: Request, res: Response) => {
                 console.error('[Webhook] Erro ao buscar dados financeiros do cliente:', dbErr.message);
             }
 
+            // Celulares: só quando o número do WhatsApp já é do cliente cadastrado
+            // (não por CPF digitado), e sem IMEI/CPF no texto.
+            if (customer && getFlags().phoneWhatsapp) contextData += await buildPhoneCustomerSummary(prisma, customer.id);
             contextData += `\n===== FIM DOS DADOS DO CLIENTE =====`;
             contextData += `\n\nIMPORTANTE: Use esses dados para responder perguntas do cliente sobre seus empréstimos, parcelas, saldo devedor, datas de vencimento, etc. Nunca exponha o CPF completo ou dados sensíveis na resposta. Se o cliente perguntar "quanto devo?", informe o saldo devedor. Se perguntar sobre parcelas, detalhe as próximas e atrasadas.`;
         }
 
+        // Catálogo oficial de serviços (mesma fonte do app e do chatbot interno).
+        // Falha aqui nunca derruba o atendimento.
+        const servicesBlock = await buildServiceKnowledgeBlock(prisma, process.env.FRONTEND_URL || 'https://www.tubaraoemprestimo.com.br').catch(() => '');
+
         // Monta o prompt final: ADMIN PROMPT PRIMEIRO (prioridade máxima) + contexto depois
-        const systemPrompt = `${adminPrompt}\n\n${contextData}${mediaContext}`;
+        const systemPrompt = `${adminPrompt}\n\n${servicesBlock}\n${contextData}${mediaContext}`;
 
         // 9. Chama a IA com fallback automático: Gemini → Perplexity → Groq → Claude
         let aiResponse: string;
