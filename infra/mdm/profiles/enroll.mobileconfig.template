@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Perfil de inscrição MDM — TEMPLATE. Gerar o arquivo final substituindo:
+    {{MDM_PUBLIC_HOST}}   host público (ex.: mdm.tubaraoemprestimo.com.br)
+    {{SCEP_CHALLENGE}}    challenge do SCEP (SEGREDO: não versionar o perfil gerado)
+    {{PUSH_TOPIC}}        topic do cert APNs (retornado por upload-pushcert.sh)
+    {{UUID_ROOT}} {{UUID_SCEP}} {{UUID_MDM}}   UUIDs (uuidgen), fixos por versão do perfil
+  Exemplo (na VM, dentro de infra/mdm):
+    set -a; . ./.env; set +a   # (ou exporte as variáveis manualmente)
+    sed -e "s|{{MDM_PUBLIC_HOST}}|$MDM_PUBLIC_HOST|g" -e "s|{{SCEP_CHALLENGE}}|$SCEP_CHALLENGE|g" \
+        -e "s|{{PUSH_TOPIC}}|$PUSH_TOPIC|g" -e "s|{{UUID_ROOT}}|$(uuidgen)|g" \
+        -e "s|{{UUID_SCEP}}|$(uuidgen)|g" -e "s|{{UUID_MDM}}|$(uuidgen)|g" \
+        profiles/enroll.mobileconfig.template > /root/enroll.mobileconfig
+    chmod 600 /root/enroll.mobileconfig
+
+  Assinatura: sem assinatura o iOS mostra "Não verificado", mas instala. Para
+  produção, assine com certificado de assinatura confiável (ex.: o TLS do host):
+    openssl smime -sign -signer cert.pem -inkey key.pem -certfile chain.pem \
+      -nodetach -outform der -in enroll.mobileconfig -out enroll-signed.mobileconfig
+  Ver docs/financiamento-celulares/07_CERTIFICADOS_INSCRICAO.md.
+
+  AccessRights 8191 = todos os direitos. O MDM NÃO lê WhatsApp, fotos, mensagens
+  nem Apple ID. Uso proibido: bloqueio, Modo Perdido ou apagamento por inadimplência.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>PayloadContent</key>
+    <array>
+        <dict>
+            <key>PayloadType</key>
+            <string>com.apple.security.scep</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>PayloadIdentifier</key>
+            <string>br.com.tubaraoemprestimo.mdm.scep</string>
+            <key>PayloadUUID</key>
+            <string>{{UUID_SCEP}}</string>
+            <key>PayloadDisplayName</key>
+            <string>Identidade do aparelho (SCEP)</string>
+            <key>PayloadContent</key>
+            <dict>
+                <key>URL</key>
+                <string>https://{{MDM_PUBLIC_HOST}}/scep</string>
+                <key>Challenge</key>
+                <string>{{SCEP_CHALLENGE}}</string>
+                <key>Keysize</key>
+                <integer>2048</integer>
+                <key>Key Type</key>
+                <string>RSA</string>
+                <key>Key Usage</key>
+                <integer>5</integer>
+                <key>Subject</key>
+                <array>
+                    <array><array><string>O</string><string>Tubarao Emprestimos</string></array></array>
+                    <array><array><string>CN</string><string>MDM Identity</string></array></array>
+                </array>
+            </dict>
+        </dict>
+        <dict>
+            <key>PayloadType</key>
+            <string>com.apple.mdm</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>PayloadIdentifier</key>
+            <string>br.com.tubaraoemprestimo.mdm.mdm</string>
+            <key>PayloadUUID</key>
+            <string>{{UUID_MDM}}</string>
+            <key>PayloadDisplayName</key>
+            <string>Gestão do aparelho</string>
+            <key>IdentityCertificateUUID</key>
+            <string>{{UUID_SCEP}}</string>
+            <key>ServerURL</key>
+            <string>https://{{MDM_PUBLIC_HOST}}/mdm</string>
+            <key>CheckInURL</key>
+            <string>https://{{MDM_PUBLIC_HOST}}/checkin</string>
+            <key>Topic</key>
+            <string>{{PUSH_TOPIC}}</string>
+            <key>SignMessage</key>
+            <true/>
+            <key>CheckOutWhenRemoved</key>
+            <true/>
+            <key>AccessRights</key>
+            <integer>8191</integer>
+        </dict>
+    </array>
+    <key>PayloadDisplayName</key>
+    <string>Tubarão Empréstimos — Inscrição MDM</string>
+    <key>PayloadDescription</key>
+    <string>Gestão de aparelho financiado. Não acessa WhatsApp, fotos, mensagens nem Apple ID.</string>
+    <key>PayloadOrganization</key>
+    <string>Tubarão Empréstimos LTDA</string>
+    <key>PayloadIdentifier</key>
+    <string>br.com.tubaraoemprestimo.mdm.enroll</string>
+    <key>PayloadUUID</key>
+    <string>{{UUID_ROOT}}</string>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+    <key>PayloadRemovalDisallowed</key>
+    <false/>
+</dict>
+</plist>

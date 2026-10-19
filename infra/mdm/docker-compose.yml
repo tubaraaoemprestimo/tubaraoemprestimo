@@ -1,0 +1,96 @@
+# Infraestrutura Apple MDM (NanoHUB + SCEP) — Tubarão Empréstimos.
+# Uso: bash scripts/bootstrap.sh (não suba direto sem a CA SCEP criada).
+# Portas publicadas SOMENTE em 127.0.0.1; a exposição pública é feita pelo nginx
+# (nginx/mdm.conf.example), que publica apenas /mdm, /checkin e /scep.
+
+name: tubarao-mdm
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
+services:
+  nanohub:
+    build:
+      context: ./nanohub
+      args:
+        NANOHUB_VERSION: v0.2.0
+    # Tag fixa. Atualizar junto com NANOHUB_VERSION acima (ver docs 06_NANOMDM_DEPLOY.md).
+    image: tubarao-mdm/nanohub:v0.2.0
+    restart: unless-stopped
+    command:
+      - -listen=:9004
+      - -storage=file
+      - -storage-dsn=/data
+      # CA do SCEP: valida o certificado de identidade enviado pelo aparelho.
+      - -ca=/scep-depot/ca.pem
+      # Endpoint separado /checkin (perfil usa CheckInURL).
+      - -checkin
+      # Sem -cert-header: NanoHUB usa Mdm-Signature (perfil com SignMessage=true),
+      # que funciona atrás de proxy TLS.
+    environment:
+      # Segredos via env (NANOHUB_<FLAG>), não aparecem na linha de comando.
+      # API: HTTP Basic, usuário "nanohub", senha = esta chave.
+      NANOHUB_API_KEY: ${NANOHUB_API_KEY:?defina NANOHUB_API_KEY no .env}
+      # Callback compatível MicroMDM para o backend no host (PM2, porta 3001).
+      NANOHUB_WEBHOOK_URL: ${MDM_WEBHOOK_URL:-http://host.docker.internal:3001/api/admin/mdm/webhook}?token=${MDM_WEBHOOK_TOKEN:?defina MDM_WEBHOOK_TOKEN no .env}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:9004:9004"
+    volumes:
+      # Dados do MDM (aparelhos, filas, cert APNs). Faça backup (scripts/backup.sh).
+      - nanohub_db:/data
+      - scep_depot:/scep-depot:ro
+    # Evita volume anônimo do VOLUME /app/db da imagem base (não usado).
+    tmpfs:
+      - /app/db
+    read_only: true
+    depends_on:
+      scep:
+        condition: service_started
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "/bin/wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9004/version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging: *logging
+
+  scep:
+    build:
+      context: ./scep
+      args:
+        SCEP_VERSION: v2.3.0
+    image: tubarao-mdm/scep:v2.3.0
+    restart: unless-stopped
+    # Challenge via env (equivale a -challenge=...), fora da linha de comando.
+    environment:
+      SCEP_CHALLENGE_PASSWORD: ${SCEP_CHALLENGE:?defina SCEP_CHALLENGE no .env}
+      # Validade (dias) do certificado de identidade emitido ao aparelho.
+      SCEP_CERT_VALID: ${SCEP_CERT_VALID:-365}
+    ports:
+      - "127.0.0.1:2016:2016"
+    volumes:
+      - scep_depot:/depot
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2016/scep?operation=GetCACaps"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging: *logging
+
+volumes:
+  # Nomes fixos: usados por scripts/backup.sh e pela restauração.
+  nanohub_db:
+    name: tubarao_mdm_nanohub_db
+  scep_depot:
+    name: tubarao_mdm_scep_depot

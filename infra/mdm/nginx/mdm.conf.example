@@ -1,0 +1,76 @@
+# nginx — host dedicado ao MDM. Copiar para /etc/nginx/sites-available/mdm.conf,
+# trocar mdm.exemplo.com.br pelo MDM_PUBLIC_HOST e ativar com symlink.
+# NÃO misturar com app-api.tubaraoemprestimo.com.br.
+#
+# Publica SOMENTE: /mdm, /checkin, /scep. Todo o resto retorna 404,
+# inclusive /api/ (API administrativa do NanoHUB), que NUNCA deve ser publicada.
+#
+# TLS: Let's Encrypt (certbot). Emissão inicial (com o bloco :80 ativo):
+#   sudo certbot certonly --webroot -w /var/www/certbot -d mdm.exemplo.com.br
+# Renovação automática pelo timer do certbot; recarregar nginx no deploy-hook.
+#
+# Cloudflare Tunnel: se a entrada for pelo túnel, o TLS público é do Cloudflare
+# e o túnel aponta para este nginx. Compatibilidade do túnel com MDM: VALIDAR EM
+# LABORATÓRIO antes de inscrever qualquer aparelho (ver 06_NANOMDM_DEPLOY.md).
+# Mdm-Signature (SignMessage=true) não depende de certificado de cliente TLS,
+# por isso funciona com terminação TLS em proxy.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name mdm.exemplo.com.br;
+
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { return 301 https://$host$request_uri; }
+}
+
+server {
+    # Sintaxe compatível com nginx 1.24 (Ubuntu 24.04); em >= 1.25.1 use "http2 on;".
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name mdm.exemplo.com.br;
+
+    ssl_certificate     /etc/letsencrypt/live/mdm.exemplo.com.br/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mdm.exemplo.com.br/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:mdmssl:10m;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    server_tokens off;
+    # Respostas MDM (inventário, lista de apps, certificados) podem passar de 1 MB.
+    client_max_body_size 20m;
+    proxy_read_timeout 60s;
+    proxy_http_version 1.1;
+
+    # Logs sem query string: evita gravar parâmetros sensíveis.
+    access_log /var/log/nginx/mdm.access.log combined;
+    error_log  /var/log/nginx/mdm.error.log warn;
+
+    # Mesmos cabeçalhos para os três upstreams. Mdm-Signature é repassado por padrão.
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Real-IP $remote_addr;
+
+    # Somente PUT (protocolo MDM). Match exato: /mdm/qualquercoisa cai no 404.
+    location = /mdm {
+        limit_except PUT { deny all; }
+        proxy_pass http://127.0.0.1:9004;
+    }
+
+    location = /checkin {
+        limit_except PUT { deny all; }
+        proxy_pass http://127.0.0.1:9004;
+    }
+
+    # SCEP usa GET (GetCACert/GetCACaps) e POST (PKIOperation).
+    location = /scep {
+        limit_except GET POST { deny all; }
+        proxy_pass http://127.0.0.1:2016;
+    }
+
+    # Bloqueio explícito da API administrativa e de qualquer outro caminho.
+    location ^~ /api/ { return 404; }
+    location / { return 404; }
+}

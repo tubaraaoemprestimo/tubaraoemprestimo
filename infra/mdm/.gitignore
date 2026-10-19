@@ -1,0 +1,8 @@
+.env
+*.pem
+*.key
+*.p7m
+*.plist
+*.mobileconfig
+!profiles/*.template
+backups/
