@@ -16,6 +16,8 @@ import { HelpCenter } from './pages/client/HelpCenter';
 import { MyDocuments } from './pages/client/MyDocuments';
 import { ReferralsPage } from './pages/client/ReferralsPage';
 import { PartnerDashboard } from './pages/client/PartnerDashboard';
+import { PhoneFinancingWizard } from './pages/client/PhoneFinancingWizard';
+import { MyPhoneFinancing } from './pages/client/MyPhoneFinancing';
 
 // Pages - Admin Core
 import { Dashboard } from './pages/admin/Dashboard';
@@ -29,6 +31,8 @@ import { DataSearch } from './pages/admin/DataSearch';
 import { DataSearchNew } from './pages/admin/DataSearchNew';
 import { Partners } from './pages/admin/Partners';
 import { QualificationLeadsAdmin } from './pages/admin/QualificationLeadsAdmin';
+import { PhoneFinancingAdmin } from './pages/admin/PhoneFinancingAdmin';
+import { AppleMdmAdmin } from './pages/admin/AppleMdmAdmin';
 
 // Pages - Admin Extended (Hubs Unificados)
 import { FinanceHub } from './pages/admin/FinanceHub';
@@ -75,7 +79,7 @@ import {
   LayoutDashboard, FileText, Settings as SettingsIcon, LogOut, Users, Bot, Menu, X,
   UserCog, Home as HomeIcon, PieChart, User as UserIcon, Megaphone, BarChart3,
   Calendar, Ban, FileCheck, DollarSign, MessageSquare, Star, ChevronDown, ChevronRight,
-  MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload, Search, Handshake, TrendingUp, BookOpen
+  MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload, Search, Handshake, TrendingUp, BookOpen, Smartphone
 } from 'lucide-react';
 import { Logo } from './components/Logo';
 import { apiService } from './services/apiService';
@@ -217,6 +221,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <Link to="/admin/contracts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/contracts')}`}><FileCheck size={18} /> Contratos</Link>
         <Link to="/admin/requests" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/requests')}`}><FileText size={18} /> Solicitações</Link>
         <Link to="/admin/investors" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/investors')}`}><Landmark size={18} /> Solicitações de Investidores</Link>
+        <Link to="/admin/phone-financing" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/phone-financing')}`}><Smartphone size={18} /> Financiamento de Celulares</Link>
         <Link to="/admin/contract-migrations" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/contract-migrations')}`}><Users size={18} /> Migração de Contratos</Link>
         <Link to="/admin/collection-automation" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/collection-automation')}`}><TrendingUp size={18} /> Réguas de Cobrança</Link>
         <Link to="/admin/import-contacts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/import-contacts')}`}><Upload size={18} /> Importar Contatos</Link>
@@ -402,6 +407,9 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
         <Link to="/client/contracts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/contracts')}`}>
           <FileText size={20} /> Meus Contratos
         </Link>
+        <Link to="/client/financiamento-celulares" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/financiamento-celulares')}`}>
+          <Smartphone size={20} /> Meus financiamentos de celulares
+        </Link>
         <Link to="/client/statement" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive('/client/statement')}`}>
           <PieChart size={20} /> Extrato
         </Link>
@@ -565,6 +573,8 @@ function App() {
             <Route path="/client/documents" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><MyDocuments /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/referrals" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><ReferralsPage /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/partner" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><PartnerDashboard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/financiamento-celulares/solicitar" element={<BiometricAccessGate><PermissionGate><ClientLayout><PhoneFinancingWizard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/financiamento-celulares" element={<BiometricAccessGate><PermissionGate><ClientLayout showNav={true} showBottomNav={true}><MyPhoneFinancing /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/acesso" element={<BiometricAccessGate><PermissionGate><AcessoCurso /></PermissionGate></BiometricAccessGate>} />
 
             {/* Admin Protected - Core */}
@@ -580,6 +590,8 @@ function App() {
             <Route path="/admin/data-search-old" element={<AdminLayout><DataSearch /></AdminLayout>} />
             <Route path="/admin/partners" element={<AdminLayout><Partners /></AdminLayout>} />
             <Route path="/admin/qualification-leads" element={<AdminLayout><QualificationLeadsAdmin /></AdminLayout>} />
+            <Route path="/admin/phone-financing" element={<AdminLayout><PhoneFinancingAdmin /></AdminLayout>} />
+            <Route path="/admin/phone-financing/mdm" element={<AdminLayout><AppleMdmAdmin /></AdminLayout>} />
             <Route path="/admin/settings" element={<AdminLayout><Settings /></AdminLayout>} />
             <Route path="/admin/curso" element={<AdminLayout><CursoAdmin /></AdminLayout>} />
             <Route path="/admin/metodo-tubarao" element={<AdminLayout><MetodoTubarao /></AdminLayout>} />

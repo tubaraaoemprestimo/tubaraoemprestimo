@@ -2,6 +2,8 @@
 
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../../services/apiClient';
 import { Check, X, Eye, Maximize, Layers, Download, Filter, Video, Users, Phone, FileWarning, Send, AlertTriangle, MapPin, FileText, ExternalLink, Trash, Pause, Play, Bell, MessageSquare, CheckSquare, Square, Megaphone } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { apiService } from '../../services/apiService';
@@ -107,6 +109,14 @@ export const Requests: React.FC = () => {
     // Filters
     const [filterStatus, setFilterStatus] = useState<string>('ALL');
     const [filterProfile, setFilterProfile] = useState<string>('ALL');
+    const navigate = useNavigate();
+    // Contagem de propostas de celular em aberto (módulo separado). null = módulo desligado.
+    const [phoneApplicationsCount, setPhoneApplicationsCount] = useState<number | null>(null);
+    useEffect(() => {
+        api.get<{ applications: { status: string }[] }>('/admin/phone-financing/applications').then(({ data, error }) => {
+            if (!error && data?.applications) setPhoneApplicationsCount(data.applications.filter(a => ['submitted', 'under_review', 'awaiting_documents'].includes(a.status)).length);
+        }).catch(() => {});
+    }, []);
     const [filterStatusTab, setFilterStatusTab] = useState<string>('ALL');
 
     // Delete Modal
@@ -788,6 +798,17 @@ export const Requests: React.FC = () => {
                         </button>
                     );
                 })}
+                {/* Celulares: propostas ficam no módulo próprio (outra tabela, outra aprovação).
+                    Este botão só navega; não mistura com as solicitações de empréstimo. */}
+                <button
+                    onClick={() => navigate('/admin/phone-financing')}
+                    className="px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all duration-200 flex items-center gap-2 border-2 whitespace-nowrap shrink-0 bg-zinc-900 text-sky-400 border-zinc-800 hover:border-sky-600"
+                >
+                    Celulares
+                    {phoneApplicationsCount !== null && (
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-500">{phoneApplicationsCount}</span>
+                    )}
+                </button>
             </div>
 
             {/* Filtros por Status */}

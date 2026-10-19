@@ -12,6 +12,7 @@ import { Camera } from '../../components/Camera';
 import { SignaturePad } from '../../components/SignaturePad';
 import { VideoUpload } from '../../components/VideoUpload';
 import { apiService } from '../../services/apiService';
+import { api } from '../../services/apiClient';
 import { loanSettingsService, LoanSettings } from '../../services/loanSettingsService';
 import { antifraudService } from '../../services/antifraudService';
 import { emailService } from '../../services/emailService';
@@ -148,6 +149,19 @@ export const Wizard: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { addToast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
+
+  // Financiamento de celulares: cartão só aparece com a oferta aberta no backend.
+  // Falha na consulta = cartão escondido; o Wizard segue igual.
+  const [phoneOfferAvailable, setPhoneOfferAvailable] = useState(false);
+  useEffect(() => {
+    if (searchParams.get('service') === 'FINANCIAMENTO_CELULAR') {
+      navigate('/client/financiamento-celulares/solicitar', { replace: true });
+      return;
+    }
+    api.get<{ services: { code: string; available: boolean }[] }>('/services/catalog?channel=client')
+      .then(({ data }) => setPhoneOfferAvailable(Boolean(data?.services?.some(s => s.code === 'FINANCIAMENTO_CELULAR' && s.available))))
+      .catch(() => {});
+  }, []);
   const [loading, setLoading] = useState(false);
   // Anexo sendo enviado no momento (o PDF sobe na hora em que é escolhido).
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -1922,6 +1936,18 @@ export const Wizard: React.FC = () => {
                     </button>
                   );
                 })}
+                {/* Financiamento de Celulares: fluxo próprio em outra rota (não usa as etapas deste Wizard).
+                    Só aparece quando o backend diz que a oferta está aberta. */}
+                {phoneOfferAvailable && (
+                  <button
+                    onClick={() => navigate('/client/financiamento-celulares/solicitar')}
+                    className="p-6 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all border-zinc-800 bg-black hover:border-zinc-600"
+                  >
+                    <Smartphone size={36} className="text-sky-400" />
+                    <span className="font-bold text-lg">Financiamento de Celulares <span className="text-[10px] align-middle bg-[#D4AF37] text-black px-1.5 py-0.5 rounded-full">NOVIDADE</span></span>
+                    <p className="text-xs text-zinc-500">Compre seu celular em parcelas, com análise da Tubarão</p>
+                  </button>
+                )}
               </div>
 
               {/* Seta animada guiando o usuário para baixo após selecionar serviço */}
