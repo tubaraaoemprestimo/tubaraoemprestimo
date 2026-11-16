@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldAlert, ChevronLeft, RefreshCw, Server, KeyRound, FlaskConical, X } from 'lucide-react';
+import { ShieldAlert, ChevronLeft, RefreshCw, Server, KeyRound, FlaskConical, X, Download, MapPin, AlertTriangle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
 import { Badge, ErrorBox, Field, Loading, Row, inputCls, cardCls } from '../../components/PhoneFinancingUi';
@@ -59,6 +59,41 @@ const StatusPanel: React.FC<{ status: MdmStatus }> = ({ status: s }) => {
     );
 };
 
+// Inscrição de aparelho corporativo: perfis para baixar e passo a passo.
+const EnrollPanel: React.FC = () => {
+    const { addToast } = useToast();
+    const [busy, setBusy] = useState<string | null>(null);
+    const get = async (key: string, kind: 'enrollment' | 'restrictions', locked = false) => {
+        setBusy(key);
+        try { await svc.mdm.downloadProfile(kind, locked); }
+        catch (e: any) { addToast(e.message, 'error'); }
+        finally { setBusy(null); }
+    };
+    return (
+        <section className={`${cardCls} space-y-3`} aria-label="Inscrever aparelho">
+            <h2 className="text-lg font-bold">Inscrever iPhone de funcionário</h2>
+            <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="gold" isLoading={busy === 'e'} onClick={() => get('e', 'enrollment')}><Download size={14} aria-hidden="true" /> Perfil de inscrição</Button>
+                <Button size="sm" variant="secondary" isLoading={busy === 'el'} onClick={() => get('el', 'enrollment', true)}><Download size={14} aria-hidden="true" /> Inscrição travada (Configurator)</Button>
+                <Button size="sm" variant="secondary" isLoading={busy === 'r'} onClick={() => get('r', 'restrictions')}><Download size={14} aria-hidden="true" /> Restrições (Configurator)</Button>
+            </div>
+            <ol className="list-decimal pl-5 text-sm text-zinc-400 space-y-1">
+                <li>Sem Mac: envie o <b>perfil de inscrição</b> ao iPhone (AirDrop ou e-mail) e instale em Ajustes → Perfil baixado. O funcionário consegue remover; se remover, você recebe alerta.</li>
+                <li>Com Mac (Apple Configurator): Preparar → Supervisionar (apaga o aparelho). Depois adicione os perfis <b>Inscrição travada</b> e <b>Restrições</b>. Em aparelho supervisionado o funcionário não remove e não sai do iCloud.</li>
+                <li>Sempre: iCloud da empresa com Buscar iPhone ligado; o funcionário não sabe a senha.</li>
+            </ol>
+            <p className="text-xs text-zinc-500">O arquivo de inscrição contém um segredo: não publique nem envie para grupos.</p>
+        </section>
+    );
+};
+
+const LocationRow: React.FC<{ loc: NonNullable<MdmDevice['lastLocation']> }> = ({ loc }) => (
+    <a href={`https://www.google.com/maps?q=${loc.lat},${loc.lng}`} target="_blank" rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-sm text-[#D4AF37] underline">
+        <MapPin size={14} aria-hidden="true" /> {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}{loc.accuracy ? ` (±${Math.round(loc.accuracy)} m)` : ''} · {formatDateTime(loc.at)}
+    </a>
+);
+
 const DeviceDetail: React.FC<{ id: string; status: MdmStatus; onClose: () => void }> = ({ id, status, onClose }) => {
     const { addToast } = useToast();
     const [device, setDevice] = useState<MdmDevice | null>(null);
@@ -69,12 +104,15 @@ const DeviceDetail: React.FC<{ id: string; status: MdmStatus; onClose: () => voi
     const [requestType, setRequestType] = useState('');
     const [purpose, setPurpose] = useState('');
     const [ack, setAck] = useState(false);
+    const [lostMsg, setLostMsg] = useState('Este iPhone pertence à Tubarão Empréstimos. Se encontrou, ligue para o número abaixo.');
+    const [lostPhone, setLostPhone] = useState('');
+    const [assignee, setAssignee] = useState('');
 
     const load = useCallback(async () => {
         setError(null);
         try {
             const [d, c, h] = await Promise.all([svc.mdm.getDevice(id), svc.mdm.getCapabilities(id), svc.mdm.listCommands(id)]);
-            setDevice(d); setCaps(c); setHistory(h);
+            setDevice(d); setCaps(c); setHistory(h); setAssignee(d.assignedTo || '');
         } catch (e: any) { setError(e.message); }
     }, [id]);
 
@@ -92,38 +130,65 @@ const DeviceDetail: React.FC<{ id: string; status: MdmStatus; onClose: () => voi
 
     const orgOwned = device.ownership === 'ORG_OWNED';
     const sensitive = SENSITIVE_MDM_COMMANDS.includes(requestType);
+    // Corporativo: o servidor despacha direto (sem 2º admin), salvo modo laboratório.
+    const needsSecond = sensitive && (!device.corporate || status.labMode);
+    const lost = requestType === 'EnableLostMode';
     const purposeError = purpose && COLLECTION_WORDS.test(purpose) ? 'Propósito ligado a cobrança é proibido.' : purpose && purpose.trim().length < 10 ? 'Descreva o propósito (mín. 10 caracteres).' : null;
-    const canSend = orgOwned && requestType && purpose.trim().length >= 10 && !purposeError && (!sensitive || ack);
+    const canSend = orgOwned && requestType && purpose.trim().length >= 10 && !purposeError && (!sensitive || ack) && (!lost || lostMsg.trim() || lostPhone.trim());
 
     const send = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!canSend) return;
-        const ok = await run('cmd', () => svc.mdm.sendCommand(id, { requestType, purpose: purpose.trim(), idempotencyKey: crypto.randomUUID() }),
-            sensitive ? 'Comando registrado. Aguarda aprovação de um segundo administrador.' : 'Comando enviado.');
+        const params = lost ? { Message: lostMsg.trim(), PhoneNumber: lostPhone.trim() } : undefined;
+        const ok = await run('cmd', () => svc.mdm.sendCommand(id, { requestType, purpose: purpose.trim(), idempotencyKey: crypto.randomUUID(), params }),
+            needsSecond ? 'Comando registrado. Aguarda aprovação de um segundo administrador.' : 'Comando enviado.');
         if (ok) { setRequestType(''); setPurpose(''); setAck(false); }
     };
 
     return (
         <section className={`${cardCls} space-y-5`} aria-label="Detalhe do dispositivo">
             <div className="flex justify-between items-start">
-                <div><p className="font-mono text-white">{device.serialMasked}</p><p className="text-xs text-zinc-500">Registro {device.enrollmentId || '—'}</p></div>
+                <div>
+                    <p className="text-white font-semibold">{device.deviceName || device.model || 'iPhone'}</p>
+                    <p className="font-mono text-sm text-zinc-300">{device.serialMasked}</p>
+                    <p className="text-xs text-zinc-500">Registro {device.enrollmentId || '—'}</p>
+                </div>
                 <button type="button" onClick={onClose} aria-label="Fechar detalhe" className="text-zinc-400 hover:text-white"><X size={20} /></button>
             </div>
+            {device.unenrolledAt && (
+                <p role="alert" className="flex items-center gap-2 text-sm text-red-300"><AlertTriangle size={16} aria-hidden="true" /> Perfil MDM removido em {formatDateTime(device.unenrolledAt)}. Use o Buscar iPhone (icloud.com/find) e reinscreva.</p>
+            )}
+            {device.lostMode && <p role="status" className="text-sm font-semibold text-yellow-300">Modo Perdido ATIVO</p>}
+            {device.lastLocation && <LocationRow loc={device.lastLocation} />}
             <div className="grid sm:grid-cols-2 gap-x-6">
-                <Row label="Propriedade" value={OWNERSHIP[device.ownership] || device.ownership} />
-                <Row label="Supervisionado" value={device.supervised ? 'Sim' : 'Não'} />
+                <Row label="Propriedade" value={device.corporate ? 'Corporativo (funcionário)' : OWNERSHIP[device.ownership] || device.ownership} />
+                <Row label="Supervisionado" value={device.supervised == null ? '—' : device.supervised ? 'Sim' : 'Não'} />
+                <Row label="Modelo" value={device.model || '—'} />
                 <Row label="iOS" value={device.osVersion || '—'} />
                 <Row label="Último contato" value={formatDateTime(device.lastSeenAt)} />
-                <Row label="Apple Business Manager" value={device.abmAssigned ? 'Atribuído' : 'Não atribuído'} />
-                <Row label="Fonte do estado" value={device.stateSource || '—'} />
+                {device.inventory?.BatteryLevel != null && <Row label="Bateria" value={`${Math.round(Number(device.inventory.BatteryLevel) * 100)}%`} />}
+                {device.inventory?.PhoneNumber && <Row label="Número" value={String(device.inventory.PhoneNumber)} />}
+                {device.inventory?.IMEI && <Row label="IMEI" value={String(device.inventory.IMEI)} />}
+                {device.inventory?.IsActivationLockEnabled != null && <Row label="Bloqueio de Ativação" value={device.inventory.IsActivationLockEnabled ? 'Ativo' : 'DESLIGADO'} />}
+                {!device.corporate && <Row label="Apple Business Manager" value={device.abmAssigned ? 'Atribuído' : 'Não atribuído'} />}
             </div>
+            {device.corporate && (
+                <form className="flex gap-2 items-end" onSubmit={e => { e.preventDefault(); run('assign', () => svc.mdm.assignDevice(id, assignee), 'Responsável salvo.'); }}>
+                    <Field id="assignee" label="Funcionário responsável">
+                        <input id="assignee" className={inputCls} value={assignee} maxLength={120} onChange={e => setAssignee(e.target.value)} />
+                    </Field>
+                    <Button type="submit" size="sm" variant="secondary" isLoading={busy === 'assign'}>Salvar</Button>
+                </form>
+            )}
             <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="secondary" isLoading={busy === 'sync'} onClick={() => run('sync', () => svc.mdm.syncDevice(id), 'Sincronização de inventário enfileirada.')}>
                     <RefreshCw size={14} aria-hidden="true" /> Sincronizar inventário
                 </Button>
-                <Button size="sm" variant="outline" isLoading={busy === 'release'} onClick={() => run('release', () => svc.mdm.releaseReview(id), 'Marcado para revisão de liberação.')}>
-                    Marcar para liberação
-                </Button>
+                {!device.corporate && (
+                    <Button size="sm" variant="outline" isLoading={busy === 'release'} onClick={() => run('release', () => svc.mdm.releaseReview(id), 'Marcado para revisão de liberação.')}>
+                        Marcar para liberação
+                    </Button>
+                )}
             </div>
 
             <div>
@@ -140,16 +205,29 @@ const DeviceDetail: React.FC<{ id: string; status: MdmStatus; onClose: () => voi
                 <Field id="cmd-type" label="Comando">
                     <select id="cmd-type" className={inputCls} disabled={!orgOwned} value={requestType} onChange={e => { setRequestType(e.target.value); setAck(false); }}>
                         <option value="">Selecione</option>
-                        {caps.filter(c => c.allowed).map(c => <option key={c.requestType} value={c.requestType}>{c.requestType}{SENSITIVE_MDM_COMMANDS.includes(c.requestType) ? ' (exige 2º admin)' : ''}</option>)}
+                        {caps.filter(c => c.allowed).map(c => <option key={c.requestType} value={c.requestType}>{c.requestType}{SENSITIVE_MDM_COMMANDS.includes(c.requestType) && (!device.corporate || status.labMode) ? ' (exige 2º admin)' : ''}</option>)}
                     </select>
                 </Field>
+                {lost && (
+                    <>
+                        <Field id="lost-msg" label="Mensagem na tela bloqueada">
+                            <textarea id="lost-msg" rows={2} maxLength={200} className={inputCls} value={lostMsg} onChange={e => setLostMsg(e.target.value)} />
+                        </Field>
+                        <Field id="lost-phone" label="Telefone para contato (opcional)">
+                            <input id="lost-phone" type="tel" maxLength={30} className={inputCls} value={lostPhone} onChange={e => setLostPhone(e.target.value)} />
+                        </Field>
+                        <p className="text-xs text-zinc-400">Depois de ativado, envie "DeviceLocation" para obter a localização.</p>
+                    </>
+                )}
                 <Field id="cmd-purpose" label="Propósito (obrigatório)" error={purposeError} hint="Ex.: aparelho de estoque extraviado durante transporte.">
                     <textarea id="cmd-purpose" rows={2} className={inputCls} disabled={!orgOwned} value={purpose} aria-invalid={!!purposeError} onChange={e => setPurpose(e.target.value)} />
                 </Field>
                 {sensitive && (
                     <label className="flex items-start gap-2 text-sm text-yellow-200">
                         <input type="checkbox" className="mt-1 accent-[#D4AF37]" checked={ack} onChange={e => setAck(e.target.checked)} />
-                        Confirmo que este aparelho é da empresa e que o comando não tem relação com inadimplência ou cobrança.
+                        {device.corporate
+                            ? 'Confirmo que este aparelho é da empresa e que o comando é por perda, roubo ou segurança.'
+                            : 'Confirmo que este aparelho é da empresa e que o comando não tem relação com inadimplência ou cobrança.'}
                     </label>
                 )}
                 <Button type="submit" size="sm" variant={sensitive ? 'danger' : 'gold'} isLoading={busy === 'cmd'} disabled={!canSend}>Enviar comando</Button>
@@ -222,6 +300,7 @@ export const AppleMdmAdmin: React.FC = () => {
             {error ? <ErrorBox message={error} onRetry={load} /> : !status || !devices ? <Loading /> : (
                 <>
                     <StatusPanel status={status} />
+                    <EnrollPanel />
                     <div className="grid lg:grid-cols-[2fr_3fr] gap-4">
                         <section className={cardCls} aria-label="Dispositivos">
                             <h2 className="text-lg font-bold mb-3">Dispositivos</h2>
@@ -231,9 +310,12 @@ export const AppleMdmAdmin: React.FC = () => {
                                         <button type="button" onClick={() => setSel(d.id)}
                                             className={`w-full text-left p-3 rounded-xl border focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${sel === d.id ? 'border-[#D4AF37]' : 'border-zinc-800 hover:border-zinc-600'}`}>
                                             <div className="flex justify-between gap-2">
-                                                <span className="font-mono text-sm text-white">{d.serialMasked}</span>
-                                                <Badge status={d.ownership === 'ORG_OWNED' ? 'submitted' : 'zinc'}>{OWNERSHIP[d.ownership] || d.ownership}</Badge>
+                                                <span className="text-sm text-white">{d.deviceName || d.model || <span className="font-mono">{d.serialMasked}</span>}</span>
+                                                {d.unenrolledAt ? <Badge status="failed">Perfil removido</Badge>
+                                                    : d.lostMode ? <Badge status="pending">Modo Perdido</Badge>
+                                                    : <Badge status={d.ownership === 'ORG_OWNED' ? 'submitted' : 'zinc'}>{d.corporate ? 'Corporativo' : OWNERSHIP[d.ownership] || d.ownership}</Badge>}
                                             </div>
+                                            {d.assignedTo && <p className="text-xs text-zinc-300">{d.assignedTo}</p>}
                                             <p className="text-xs text-zinc-400">iOS {d.osVersion || '—'} · {d.supervised ? 'supervisionado' : 'não supervisionado'} · visto {formatDateTime(d.lastSeenAt)}</p>
                                         </button>
                                     </li>

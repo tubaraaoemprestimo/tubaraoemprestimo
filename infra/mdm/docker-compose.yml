@@ -16,9 +16,9 @@ services:
     build:
       context: ./nanohub
       args:
-        NANOHUB_VERSION: v0.2.0
+        NANOHUB_VERSION: 0.2.0
     # Tag fixa. Atualizar junto com NANOHUB_VERSION acima (ver docs 06_NANOMDM_DEPLOY.md).
-    image: tubarao-mdm/nanohub:v0.2.0
+    image: tubarao-mdm/nanohub:0.2.0
     restart: unless-stopped
     command:
       - -listen=:9004

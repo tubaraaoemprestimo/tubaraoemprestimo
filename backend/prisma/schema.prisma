@@ -1586,9 +1586,17 @@ model PhoneCollectionEvent {
 
 model AppleMdmDevice {
   id              String             @id @default(uuid())
-  unitId          String             @unique @map("unit_id")
+  // null = aparelho corporativo (funcionário), auto-registrado no check-in do MDM
+  unitId          String?             @unique @map("unit_id")
   enrollmentId    String?            @unique @map("enrollment_id")
   serialNumber    String             @unique @map("serial_number")
+  deviceName      String?            @map("device_name")
+  model           String?
+  assignedTo      String?            @map("assigned_to")
+  lostMode        Boolean            @default(false) @map("lost_mode")
+  lastLocation    Json?              @map("last_location")
+  // CheckOut do aparelho (perfil MDM removido). Limpo em nova inscrição.
+  unenrolledAt    DateTime?          @map("unenrolled_at")
   abmAssigned     Boolean            @default(false) @map("abm_assigned")
   supervised      Boolean?
   osVersion       String?            @map("os_version")
@@ -1601,7 +1609,7 @@ model AppleMdmDevice {
   rawInventory    Json?              @map("raw_inventory")
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @default(now()) @updatedAt @map("updated_at")
-  unit            PhoneInventoryUnit @relation(fields: [unitId], references: [id])
+  unit            PhoneInventoryUnit? @relation(fields: [unitId], references: [id])
   commands        MdmCommand[]
 
   @@map("apple_mdm_devices")
@@ -1618,6 +1626,8 @@ model MdmCommand {
   requestedBy     String            @map("requested_by")
   approvedBy      String?           @map("approved_by")
   idempotencyKey  String            @unique @map("idempotency_key")
+  // Parâmetros do comando (ex.: mensagem do Modo Perdido), usados no envio após aprovação
+  params          Json?
   adapter         String
   responseStatus  String?           @map("response_status")
   responseSummary String?           @map("response_summary")

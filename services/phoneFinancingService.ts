@@ -323,6 +323,14 @@ export interface MdmDevice {
     ownership: string;
     stateSource?: string | null;
     abmAssigned?: boolean;
+    corporate?: boolean;
+    deviceName?: string | null;
+    model?: string | null;
+    assignedTo?: string | null;
+    lostMode?: boolean;
+    lastLocation?: { lat: number; lng: number; accuracy?: number | null; at: string } | null;
+    unenrolledAt?: string | null;
+    inventory?: Record<string, string | number | boolean> | null;
 }
 
 export interface MdmCapability { requestType: string; allowed: boolean; reason?: string }
@@ -428,7 +436,19 @@ export const phoneFinancingService = {
         linkDevice: (unitId: string, enrollmentId?: string) => call<unknown>(api.post(`${MDM}/devices`, { unitId, enrollmentId })),
         syncDevice: (id: string) => call<unknown>(api.post(`${MDM}/devices/${id}/sync`, {})),
         getCapabilities: (id: string) => call<{ commands: MdmCapability[] }>(api.get(`${MDM}/devices/${id}/capabilities`)).then(r => r.commands ?? []),
-        sendCommand: (id: string, body: { requestType: string; purpose: string; idempotencyKey: string }) =>
+        assignDevice: (id: string, assignedTo: string) => call<unknown>(api.patch(`${MDM}/devices/${id}`, { assignedTo })),
+        /** Baixa o .mobileconfig (rota autenticada; abre o download no navegador). */
+        downloadProfile: async (kind: 'enrollment' | 'restrictions', locked = false) => {
+            // responseType text: o erro também chega como texto (JSON), então é convertido aqui.
+            const { data, error } = await api.get<string>(`${MDM}/profiles/${kind}${locked ? '?locked=1' : ''}`, { responseType: 'text' });
+            if (error) { let e = error; try { e = JSON.parse(error); } catch { /* texto puro */ } throw toError(e); }
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([data || ''], { type: 'application/x-apple-aspen-config' }));
+            a.download = `tubarao-${kind}.mobileconfig`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        },
+        sendCommand: (id: string, body: { requestType: string; purpose: string; idempotencyKey: string; params?: Record<string, string> }) =>
             call<{ command: MdmCommand }>(api.post(`${MDM}/devices/${id}/commands`, body)).then(r => r.command),
         listCommands: (id: string) =>
             call<{ commands: MdmCommand[] } | MdmCommand[]>(api.get(`${MDM}/devices/${id}/commands`)).then(r => (Array.isArray(r) ? r : r.commands ?? [])),

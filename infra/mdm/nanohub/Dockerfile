@@ -2,7 +2,7 @@
 # Motivo: a imagem oficial é distroless (sem shell/curl/wget), então o Docker
 # não consegue consultar /version sozinho.
 # Atualização: troque NANOHUB_VERSION aqui E nos args/tag do docker-compose.yml.
-ARG NANOHUB_VERSION=v0.2.0
+ARG NANOHUB_VERSION=0.2.0
 
 FROM busybox:1.36.1-musl AS tools
 # Diretório de dados com dono não-root. Fica em /data (fora do VOLUME /app/db

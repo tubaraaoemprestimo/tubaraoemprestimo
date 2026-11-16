@@ -65,7 +65,7 @@ describe('fila de comandos', () => {
     });
     it('comando sensível exige 2º admin; o mesmo admin não aprova', async () => {
         const svc = createMdmCommandService({ prisma: ctx.prisma, adapter: new MockMdmAdapter(), labMode: false });
-        const cmd = await svc.request({ deviceId: 'd1', requestType: 'EnableLostMode', purpose: 'Aparelho de demonstração furtado da loja', idempotencyKey: 'k2', adminId: 'a1' });
+        const cmd = await svc.request({ deviceId: 'd1', requestType: 'EnableLostMode', purpose: 'Aparelho de demonstração furtado da loja', idempotencyKey: 'k2', adminId: 'a1', params: { Message: 'Devolva à loja' } });
         expect(cmd.status).toBe('requested');
         await expect(svc.approve(cmd.id, 'a1')).rejects.toBeInstanceOf(MdmCommandError);
         const done = await svc.approve(cmd.id, 'a2');
@@ -93,10 +93,62 @@ describe('fila de comandos', () => {
         expect(await svc.handleWebhook({ topic: 'mdm.Connect', acknowledge_event: { udid: 'UDID-1', command_uuid: 'cu-1', status: 'Acknowledged' } })).toBe('UPDATED');
         expect(ctx.t.mdmCommand.get(cmd.id).status).toBe('acknowledged');
     });
+    it('aparelho corporativo: Modo Perdido sai sem 2º admin, exige mensagem e leva os parâmetros', async () => {
+        ctx.t.appleMdmDevice.set('c1', { id: 'c1', unitId: null, enrollmentId: 'UDID-C', serialNumber: 'SC', supervised: true, ownership: 'ORG_OWNED' });
+        let sent: any;
+        const http: any = { put: async (_u: string, body: string) => { sent = body; return { data: { status: { 'UDID-C': { push_result: 'p' } }, command_uuid: 'cu-c' } }; } };
+        const svc = createMdmCommandService({ prisma: ctx.prisma, adapter: new NanoHubAdapter('http://x', 'k', http), labMode: false });
+        const base = { deviceId: 'c1', requestType: 'EnableLostMode', purpose: 'iPhone do vendedor roubado na rua', adminId: 'a1' };
+        await expect(svc.request({ ...base, idempotencyKey: 'kc0' })).rejects.toMatchObject({ code: 'INVALID' });
+        const cmd = await svc.request({ ...base, idempotencyKey: 'kc1', params: { Message: 'Aparelho roubado', PhoneNumber: '11999990000', Evil: 'x' } });
+        expect(cmd.status).toBe('dispatched');
+        expect(sent).toContain('<string>Aparelho roubado</string>');
+        expect(sent).not.toContain('Evil');
+        await svc.handleWebhook({ topic: 'mdm.Connect', acknowledge_event: { command_uuid: 'cu-c', status: 'Acknowledged', raw_payload: '' } });
+        expect(ctx.t.appleMdmDevice.get('c1').lostMode).toBe(true);
+    });
     it('push falhou: fica "queued", não "dispatched"', async () => {
         const http: any = { put: async () => ({ data: { status: { 'UDID-1': { push_error: 'apns down' } }, command_uuid: 'cu-2' } }) };
         const svc = createMdmCommandService({ prisma: ctx.prisma, adapter: new NanoHubAdapter('http://x', 'k', http), labMode: false });
         const cmd = await svc.request({ deviceId: 'd1', requestType: 'DeviceInformation', purpose: 'Inventário do estoque', idempotencyKey: 'k6', adminId: 'a1' });
         expect(cmd.status).toBe('queued');
+    });
+});
+
+const b64 = (s: string) => Buffer.from(s).toString('base64');
+const plist = (body: string) => `<?xml version="1.0"?><plist version="1.0"><dict>${body}</dict></plist>`;
+
+describe('webhook: aparelhos corporativos', () => {
+    let ctx: ReturnType<typeof makeDb>;
+    const alerts: string[] = [];
+    const svc = () => createMdmCommandService({ prisma: ctx.prisma, adapter: new MockMdmAdapter(), labMode: false, notify: async t => { alerts.push(t); } });
+    beforeEach(() => { ctx = makeDb(); alerts.length = 0; });
+
+    it('Authenticate de aparelho desconhecido cria o registro; TokenUpdate pede inventário', async () => {
+        const raw = b64(plist('<key>DeviceName</key><string>iPhone do João</string><key>ProductName</key><string>iPhone15,2</string><key>OSVersion</key><string>18.1</string><key>SerialNumber</key><string>F2LXYZ</string>'));
+        expect(await svc().handleWebhook({ topic: 'mdm.Authenticate', checkin_event: { udid: 'U-NEW', raw_payload: raw } })).toBe('CHECKIN');
+        const dev = [...ctx.t.appleMdmDevice.values()][0];
+        expect(dev).toMatchObject({ enrollmentId: 'U-NEW', serialNumber: 'F2LXYZ', deviceName: 'iPhone do João', model: 'iPhone15,2', ownership: 'ORG_OWNED' });
+        expect(alerts).toHaveLength(1);
+        await svc().handleWebhook({ topic: 'mdm.TokenUpdate', checkin_event: { udid: 'U-NEW', raw_payload: b64(plist('')) } });
+        expect([...ctx.t.mdmCommand.values()].map(c => c.requestType)).toEqual(['DeviceInformation']);
+        expect(ctx.t.appleMdmDevice.size).toBe(1);
+    });
+    it('inventário grava supervisionado e Modo Perdido; localização grava coordenadas', async () => {
+        ctx.t.appleMdmDevice.set('c1', { id: 'c1', unitId: null, enrollmentId: 'U1', serialNumber: 'S', ownership: 'ORG_OWNED', supervised: true });
+        ctx.t.mdmCommand.set('m1', { id: 'm1', deviceId: 'c1', commandUuid: 'cu1', requestType: 'DeviceInformation', status: 'dispatched' });
+        ctx.t.mdmCommand.set('m2', { id: 'm2', deviceId: 'c1', commandUuid: 'cu2', requestType: 'DeviceLocation', status: 'dispatched' });
+        const inv = plist('<key>QueryResponses</key><dict><key>IsSupervised</key><false/><key>IsMDMLostModeEnabled</key><true/><key>BatteryLevel</key><real>0.5</real><key>OSVersion</key><string>18.2</string></dict>');
+        await svc().handleWebhook({ topic: 'mdm.Connect', acknowledge_event: { command_uuid: 'cu1', status: 'Acknowledged', raw_payload: b64(inv) } });
+        expect(ctx.t.appleMdmDevice.get('c1')).toMatchObject({ supervised: false, lostMode: true, osVersion: '18.2' });
+        const loc = plist('<key>Latitude</key><real>-23.55</real><key>Longitude</key><real>-46.63</real><key>HorizontalAccuracy</key><real>12</real>');
+        await svc().handleWebhook({ topic: 'mdm.Connect', acknowledge_event: { command_uuid: 'cu2', status: 'Acknowledged', raw_payload: b64(loc) } });
+        expect(ctx.t.appleMdmDevice.get('c1').lastLocation).toMatchObject({ lat: -23.55, lng: -46.63, accuracy: 12 });
+    });
+    it('CheckOut (perfil removido) marca e alerta', async () => {
+        ctx.t.appleMdmDevice.set('c1', { id: 'c1', enrollmentId: 'U1', serialNumber: 'S', assignedTo: 'Maria' });
+        expect(await svc().handleWebhook({ topic: 'mdm.CheckOut', checkin_event: { udid: 'U1' } })).toBe('CHECKOUT');
+        expect(ctx.t.appleMdmDevice.get('c1').unenrolledAt).toBeInstanceOf(Date);
+        expect(alerts[0]).toContain('removido');
     });
 });

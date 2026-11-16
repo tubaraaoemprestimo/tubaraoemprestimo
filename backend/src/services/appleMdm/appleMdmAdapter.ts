@@ -17,16 +17,36 @@ import { randomUUID } from 'crypto';
  * contrato/parcela. Comandos só para aparelhos ORG_OWNED (patrimônio da empresa).
  */
 
+// supervisedOnly: exigência da Apple (o iOS recusa em aparelho não supervisionado).
 export const ALLOWED_COMMANDS = {
-    DeviceInformation: { sensitive: false, label: 'Inventário do aparelho' },
-    SecurityInfo: { sensitive: false, label: 'Informações de segurança' },
-    ProfileList: { sensitive: false, label: 'Perfis instalados' },
-    InstalledApplicationList: { sensitive: false, label: 'Apps instalados' },
-    EnableLostMode: { sensitive: true, label: 'Ativar Modo Perdido (aparelho da empresa perdido/roubado)' },
-    DisableLostMode: { sensitive: true, label: 'Desativar Modo Perdido' },
-    DeviceLocation: { sensitive: true, label: 'Localizar (só em Modo Perdido)' },
-    DeviceLock: { sensitive: true, label: 'Bloqueio de tela corporativo' },
+    DeviceInformation: { sensitive: false, supervisedOnly: false, label: 'Inventário do aparelho' },
+    SecurityInfo: { sensitive: false, supervisedOnly: false, label: 'Informações de segurança' },
+    ProfileList: { sensitive: false, supervisedOnly: false, label: 'Perfis instalados' },
+    InstalledApplicationList: { sensitive: false, supervisedOnly: false, label: 'Apps instalados' },
+    EnableLostMode: { sensitive: true, supervisedOnly: true, label: 'Ativar Modo Perdido (aparelho da empresa perdido/roubado)' },
+    DisableLostMode: { sensitive: true, supervisedOnly: true, label: 'Desativar Modo Perdido' },
+    DeviceLocation: { sensitive: true, supervisedOnly: true, label: 'Localizar (só em Modo Perdido)' },
+    DeviceLock: { sensitive: true, supervisedOnly: false, label: 'Bloqueio de tela corporativo' },
 } as const;
+
+// Campos pedidos no inventário (DeviceInformation exige a lista Queries).
+export const INVENTORY_QUERIES = [
+    'DeviceName', 'OSVersion', 'SerialNumber', 'ModelName', 'ProductName', 'IMEI', 'PhoneNumber',
+    'IsSupervised', 'IsMDMLostModeEnabled', 'IsActivationLockEnabled', 'BatteryLevel', 'DeviceCapacity', 'AvailableDeviceCapacity',
+];
+
+/**
+ * Lê um valor escalar de um plist XML pela chave (string/integer/real/true/false/date).
+ * ponytail: regex, não parser completo; serve para respostas planas do MDM (QueryResponses,
+ * Authenticate, DeviceLocation). Trocar por parser de plist se precisar de dicts aninhados com chaves repetidas.
+ */
+export function plistGet(xml: string, key: string): string | number | boolean | undefined {
+    const m = new RegExp(`<key>${key}</key>\\s*<(string|integer|real|true|false|date)\\s*/?>(?:([^<]*)</\\1>)?`).exec(xml);
+    if (!m) return undefined;
+    if (m[1] === 'true' || m[1] === 'false') return m[1] === 'true';
+    if (m[1] === 'integer' || m[1] === 'real') return Number(m[2]);
+    return m[2].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+}
 export type MdmRequestType = keyof typeof ALLOWED_COMMANDS;
 
 // Propósitos aceitos. Termos de cobrança são recusados (ver isForbiddenPurpose).
@@ -53,10 +73,12 @@ function xmlEscape(s: string) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** Gera o plist do comando (formato de `cmdr.py` do NanoMDM). Só strings simples. */
-export function buildCommandPlist(requestType: MdmRequestType, commandUuid: string, params: Record<string, string> = {}) {
+/** Gera o plist do comando (formato de `cmdr.py` do NanoMDM). Valores: string ou lista de strings. */
+export function buildCommandPlist(requestType: MdmRequestType, commandUuid: string, params: Record<string, string | string[]> = {}) {
     const extra = Object.entries(params)
-        .map(([k, v]) => `\t\t<key>${xmlEscape(k)}</key>\n\t\t<string>${xmlEscape(String(v))}</string>`)
+        .map(([k, v]) => `\t\t<key>${xmlEscape(k)}</key>\n\t\t${Array.isArray(v)
+            ? `<array>${v.map(s => `<string>${xmlEscape(s)}</string>`).join('')}</array>`
+            : `<string>${xmlEscape(String(v))}</string>`}`)
         .join('\n');
     return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

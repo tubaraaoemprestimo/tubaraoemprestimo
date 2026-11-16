@@ -6,3 +6,4 @@
 *.mobileconfig
 !profiles/*.template
 backups/
+certs/

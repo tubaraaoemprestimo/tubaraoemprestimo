@@ -5,6 +5,8 @@ import { getFlags } from '../services/phoneFinancing/flags';
 import { maskIdentifier } from '../services/phoneFinancing/rules';
 import { getMdmAdapter } from '../services/appleMdm/appleMdmAdapter';
 import { capabilitiesFor, createMdmCommandService, isValidWebhookToken, MdmCommandError } from '../services/appleMdm/mdmCommandService';
+import { enrollmentProfile, restrictionsProfile } from '../services/appleMdm/mdmProfiles';
+import { notificationHub } from '../services/notificationHub';
 
 /**
  * Apple MDM (NanoHUB) — rotas NOVAS, só admin. Sem relação com cobrança:
@@ -14,7 +16,10 @@ const db: any = prisma;
 
 function service() {
     const f = getFlags();
-    return createMdmCommandService({ prisma: db, adapter: getMdmAdapter(process.env, f.mdmRealCommands), labMode: f.mdmLabMode });
+    return createMdmCommandService({
+        prisma: db, adapter: getMdmAdapter(process.env, f.mdmRealCommands), labMode: f.mdmLabMode,
+        notify: (title, message) => notificationHub.notifyAdmins({ title, message, type: 'WARNING', waToAdmin: process.env.MDM_ALERT_WHATSAPP || null }),
+    });
 }
 const fail = (res: Response, status: number, error: string, code: string) => res.status(status).json({ error, code });
 const requireMdm = (_req: Request, res: Response, next: NextFunction) => {
@@ -32,9 +37,12 @@ const wrap = (fn: (req: Request, res: Response) => Promise<any>) => async (req: 
         fail(res, 500, 'Erro ao processar', 'INTERNAL');
     }
 };
+// Aparelho corporativo (sem unitId) mostra o serial completo: necessário para B.O. e Apple.
 const deviceView = (d: any) => ({
-    id: d.id, unitId: d.unitId, serialMasked: maskIdentifier(d.serialNumber), enrollmentId: d.enrollmentId, supervised: d.supervised,
+    id: d.id, unitId: d.unitId, serialMasked: d.unitId ? maskIdentifier(d.serialNumber) : d.serialNumber, enrollmentId: d.enrollmentId, supervised: d.supervised,
     osVersion: d.osVersion, lastSeenAt: d.lastSeenAt, lastInventoryAt: d.lastInventoryAt, ownership: d.ownership, stateSource: d.stateSource, abmAssigned: d.abmAssigned,
+    corporate: !d.unitId, deviceName: d.deviceName, model: d.model, assignedTo: d.assignedTo, lostMode: d.lostMode, lastLocation: d.lastLocation,
+    unenrolledAt: d.unenrolledAt, inventory: d.rawInventory,
 });
 
 // Webhook do NanoHUB: sem JWT, protegido por token na URL (e rede local).
@@ -75,6 +83,27 @@ appleMdmRouter.get('/devices/:id', wrap(async (req, res) => {
     if (!d) return fail(res, 404, 'Aparelho não encontrado', 'NOT_FOUND');
     res.json({ device: deviceView(d) });
 }));
+appleMdmRouter.patch('/devices/:id', wrap(async (req, res) => {
+    const assignedTo = typeof req.body?.assignedTo === 'string' ? req.body.assignedTo.trim().slice(0, 120) || null : undefined;
+    if (assignedTo === undefined) return fail(res, 400, 'assignedTo obrigatório', 'INVALID');
+    const d = await db.appleMdmDevice.update({ where: { id: String(req.params.id) }, data: { assignedTo } }).catch(() => null);
+    if (!d) return fail(res, 404, 'Aparelho não encontrado', 'NOT_FOUND');
+    res.json({ device: deviceView(d) });
+}));
+// Download dos perfis. O de inscrição contém o SCEP_CHALLENGE: só admin autenticado.
+appleMdmRouter.get('/profiles/:kind', wrap(async (req, res) => {
+    let xml: string;
+    if (req.params.kind === 'restrictions') xml = restrictionsProfile();
+    else if (req.params.kind === 'enrollment') {
+        const { MDM_PUBLIC_HOST: host, SCEP_CHALLENGE: challenge, MDM_PUSH_TOPIC: topic } = process.env;
+        if (!host || !challenge || !topic) return fail(res, 409, 'MDM ainda sem certificado push (APNs) ou sem configuração no servidor', 'NOT_ENROLLED');
+        xml = enrollmentProfile({ host, challenge, topic, locked: req.query.locked === '1' });
+    } else return fail(res, 404, 'Perfil inexistente', 'NOT_FOUND');
+    res.setHeader('Content-Type', 'application/x-apple-aspen-config');
+    res.setHeader('Content-Disposition', `attachment; filename="tubarao-${req.params.kind}.mobileconfig"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(xml);
+}));
 appleMdmRouter.get('/devices/:id/capabilities', wrap(async (req, res) => {
     const d = await db.appleMdmDevice.findUnique({ where: { id: String(req.params.id) } });
     if (!d) return fail(res, 404, 'Aparelho não encontrado', 'NOT_FOUND');
@@ -85,9 +114,9 @@ appleMdmRouter.post('/devices/:id/sync', wrap(async (req, res) => {
     res.json({ command: { id: cmd.id, status: cmd.status, commandUuid: cmd.commandUuid } });
 }));
 appleMdmRouter.post('/devices/:id/commands', wrap(async (req, res) => {
-    const { requestType, purpose, idempotencyKey } = req.body || {};
+    const { requestType, purpose, idempotencyKey, params } = req.body || {};
     if (typeof idempotencyKey !== 'string' || idempotencyKey.length < 8 || idempotencyKey.length > 100) return fail(res, 400, 'idempotencyKey obrigatório', 'INVALID');
-    const cmd = await service().request({ deviceId: String(req.params.id), requestType: String(requestType), purpose: String(purpose || ''), idempotencyKey, adminId: req.user!.id });
+    const cmd = await service().request({ deviceId: String(req.params.id), requestType: String(requestType), purpose: String(purpose || ''), idempotencyKey, adminId: req.user!.id, params });
     res.status(201).json({ command: { id: cmd.id, status: cmd.status, commandUuid: cmd.commandUuid, requestType: cmd.requestType } });
 }));
 appleMdmRouter.get('/devices/:id/commands', wrap(async (req, res) => {
@@ -101,6 +130,7 @@ appleMdmRouter.post('/commands/:id/approve', wrap(async (req, res) => {
 appleMdmRouter.post('/devices/:id/release-review', wrap(async (req, res) => {
     const d = await db.appleMdmDevice.findUnique({ where: { id: String(req.params.id) } });
     if (!d) return fail(res, 404, 'Aparelho não encontrado', 'NOT_FOUND');
+    if (!d.unitId) return fail(res, 400, 'Aparelho corporativo não passa por liberação de venda', 'INVALID');
     await db.phoneInventoryUnit.update({ where: { id: d.unitId }, data: { mdmStatus: 'release_pending', mdmStatusSource: 'LOCAL', mdmStatusUpdatedAt: new Date() } });
     res.json({ ok: true });
 }));
