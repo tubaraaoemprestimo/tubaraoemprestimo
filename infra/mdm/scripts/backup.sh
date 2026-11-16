@@ -36,7 +36,7 @@ docker run --rm --network none \
   -v tubarao_mdm_scep_depot:/src/scep_depot:ro \
   "${env_mount[@]}" \
   -v "$BACKUP_DIR:/out" \
-  alpine:3.20 sh -c "tar --numeric-owner -czf /out/$out -C /src . && chmod 600 /out/$out"
+  alpine:3.20 sh -c "tar --numeric-owner -czf /out/$out -C /src . && chmod 600 /out/$out && chown $(id -u):$(id -g) /out/$out"
 
 ( cd "$BACKUP_DIR" && sha256sum "$out" >"$out.sha256" && chmod 600 "$out.sha256" )
 log "Backup: $BACKUP_DIR/$out ($(du -h "$BACKUP_DIR/$out" | cut -f1))"
