@@ -44,11 +44,14 @@ echo "== Push cert (APNs)"
 topic="$(env_get PUSH_TOPIC)"
 if [ -z "$topic" ]; then
   warn "PUSH_TOPIC vazio (rode scripts/upload-pushcert.sh)"
-elif [ -n "$(env_get NANOHUB_API_KEY)" ]; then
-  resp="$(api_curl -f "$NANOHUB_LOCAL/api/v1/nanomdm/pushcert?topic=$topic" 2>/dev/null)" || resp=""
-  na="$(printf '%s' "$resp" | sed -n 's/.*"not_after"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+else
+  # NanoHUB 0.2.0 não tem GET de pushcert: a validade vem do .pem enviado.
+  cert="$MDM_DIR/certs/apns-cert.pem"
+  na="$(openssl x509 -in "$cert" -noout -enddate 2>/dev/null | cut -d= -f2)"
   if [ -z "$na" ]; then
-    bad "push cert do topic $topic não encontrado na API"
+    bad "push cert não encontrado em $cert"
+  elif [ "$(openssl x509 -in "$cert" -noout -subject 2>/dev/null | grep -o 'com\.apple\.mgmt[^,]*')" != "$topic" ]; then
+    bad "topic de $cert difere de PUSH_TOPIC ($topic)"
   else
     days=$(( ( $(date -d "$na" +%s) - $(date +%s) ) / 86400 ))
     if [ "$days" -lt 0 ]; then bad "push cert EXPIRADO em $na (aparelhos não recebem comandos)"

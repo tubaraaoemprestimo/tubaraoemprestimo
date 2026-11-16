@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
-import { randomUUID } from 'crypto';
+import { randomUUID, X509Certificate } from 'crypto';
+import { readFileSync } from 'fs';
 
 /**
  * Único ponto do backend que fala com o servidor MDM (NanoHUB).
@@ -118,11 +119,14 @@ export class NanoHubAdapter implements MdmAdapter {
             return { reachable: false, error: err?.code === 'ECONNREFUSED' ? 'servidor MDM fora do ar' : `falha ao consultar (${err?.response?.status || err?.code || 'erro'})` };
         }
     }
+    // NanoHUB 0.2.0 só aceita PUT em /pushcert (sem consulta): a validade vem do .pem
+    // enviado (MDM_PUSH_CERT_PATH), o mesmo arquivo usado em upload-pushcert.sh.
     async pushCert(topic?: string) {
-        if (!topic) return null;
+        const path = process.env.MDM_PUSH_CERT_PATH;
+        if (!topic || !path) return null;
         try {
-            const { data } = await this.http.get('/api/v1/nanomdm/pushcert', { params: { topic } });
-            return { topic: data.topic, notAfter: data.not_after || null };
+            const cert = new X509Certificate(readFileSync(path));
+            return { topic, notAfter: new Date(cert.validTo).toISOString() };
         } catch { return null; }
     }
     async enqueue(enrollmentId: string, requestType: MdmRequestType, params: Record<string, any> = {}): Promise<EnqueueResult> {

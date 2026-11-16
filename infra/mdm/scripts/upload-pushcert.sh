@@ -35,4 +35,9 @@ fi
 env_set PUSH_TOPIC "$topic"
 log "Push cert carregado. Topic: $topic"
 
-log "Conferência: $(api_curl -f "$NANOHUB_LOCAL/api/v1/nanomdm/pushcert?topic=$topic")"
+# Cópia usada por doctor.sh e pelo backend (MDM_PUSH_CERT_PATH) para checar validade.
+dest="$MDM_DIR/certs/apns-cert.pem"
+if [ "$(realpath "$cert")" != "$(realpath -m "$dest")" ]; then
+  mkdir -p "$MDM_DIR/certs"; install -m 600 "$cert" "$dest"
+fi
+log "Validade gravada em $dest"
