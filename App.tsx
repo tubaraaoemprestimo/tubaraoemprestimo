@@ -331,7 +331,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <Logo size="xs" />
         <div className="flex items-center gap-2">
           <NotificationCenter />
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-zinc-400 hover:text-white">
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={isMobileMenuOpen} className="p-2 text-zinc-400 hover:text-white">
             {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
@@ -451,7 +451,7 @@ const ClientLayout: React.FC<{ children: React.ReactNode; showNav?: boolean; sho
           {/* Mobile Header */}
           <header className="md:hidden fixed top-0 left-0 right-0 bg-zinc-950 border-b border-zinc-800 z-40 p-4 flex justify-between items-center">
             <Logo size="xs" />
-            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-zinc-400 hover:text-white">
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={isMobileMenuOpen} className="p-2 text-zinc-400 hover:text-white">
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </header>

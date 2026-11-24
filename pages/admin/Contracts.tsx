@@ -810,9 +810,10 @@ export const Contracts: React.FC = () => {
             const displayMode = getDisplayMode(getProfileType(c));
             return (
               <div key={c.id} className={`bg-zinc-950 border rounded-xl p-4 hover:border-zinc-600 transition-colors ${c.loanRequest?.profileType === 'AUTONOMO' ? 'border-yellow-800/40 hover:border-yellow-700/60' : 'border-zinc-800'}`}>
-                <div className="flex flex-col md:flex-row md:items-center gap-3">
+                {/* Em linha só com espaço (xl): no tablet o menu lateral espremia o nome até sumir. */}
+                <div className="flex flex-col xl:flex-row xl:items-center gap-3">
                   {/* Cliente */}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 xl:min-w-[220px]">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-bold text-white truncate">{c.customer?.name || '—'}</p>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${status.color}`}>{status.label}</span>

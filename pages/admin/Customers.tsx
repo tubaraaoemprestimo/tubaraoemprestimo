@@ -678,7 +678,7 @@ export const Customers: React.FC = () => {
 
   return (
     <div className="p-4 md:p-8 bg-black min-h-screen text-white">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-[#D4AF37]">Gestão de Clientes</h1>
           <p className="text-zinc-500 text-sm mt-1">
@@ -693,8 +693,8 @@ export const Customers: React.FC = () => {
             </div>
           )}
         </div>
-        <div className="flex flex-col gap-4 w-full md:w-auto">
-          <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+        <div className="flex flex-col gap-4 w-full xl:w-auto min-w-0">
+          <div className="flex gap-2 w-full xl:w-auto overflow-x-auto pb-2 xl:pb-0">
             {/* Filtro por tipo de cliente */}
             <div className="flex bg-zinc-900 rounded-lg p-1 border border-zinc-800">
               <button onClick={() => setClientTypeFilter('ALL')} className={`px-3 py-1 rounded-md text-sm transition-colors ${clientTypeFilter === 'ALL' ? 'bg-[#D4AF37] text-black font-bold' : 'text-zinc-400 hover:text-white'}`}>
@@ -725,7 +725,7 @@ export const Customers: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col md:flex-row md:flex-wrap gap-4">
             <div className="relative w-full md:w-auto">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={20} />
               <input
@@ -758,7 +758,7 @@ export const Customers: React.FC = () => {
 
       {/* ===== Celular: cartões, nome sempre junto das ações ===== */}
       {/* Cartões até 1024 px: no tablet o menu lateral fixo deixa a tabela sem espaço para as ações. */}
-      <div className="lg:hidden space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0" aria-label="Lista de clientes">
+      <div className="xl:hidden space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0" aria-label="Lista de clientes">
         {loading ? (
           <p className="p-8 text-center text-zinc-500">Carregando carteira de clientes...</p>
         ) : filteredCustomers.length === 0 ? (
@@ -830,7 +830,7 @@ export const Customers: React.FC = () => {
         )}
       </div>
 
-      <div className="hidden lg:block bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
+      <div className="hidden xl:block bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[800px]">
             <thead className="bg-zinc-950 text-zinc-400 text-sm uppercase tracking-wider">

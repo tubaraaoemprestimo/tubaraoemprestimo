@@ -1,0 +1,163 @@
+{
+ "375": {
+  "clientes_ovf": 0,
+  "busca_nome": true,
+  "busca_cpf": true,
+  "busca_tel": true,
+  "acao_visivel_sem_rolar": true,
+  "ficha_ovf": 0,
+  "ficha_sem_referencias": true,
+  "busca_mantida": true,
+  "dbg_links": [
+   true
+  ],
+  "dbg_url": "http://127.0.0.1:4331/#/admin/contracts",
+  "dbg_txt": "Contratos\n\n1 contrato(s) · página 1 de 1\n\nAtualizar\nTodos\nAtivo\nInadimplente\nQuitado\nCancelado\nTodos\nEmpréstimos\nLimpa Nome\nInvestidor\nModalidade:\nTodas\n🏪 Comércio\n🏢 CLT\n🔒 Garantia\n✨ Limpa Nome\n🏍️ Moto\n📈 Investidor\n\nPedro Henrique Martins\n\nAtivo\n🏢 CLT\n\n789.012.345-67 · 5541921098765\n\nValor\n\nR$ 9.000",
+  "contratos_ovf": 0,
+  "detalhe_ovf": 0,
+  "contrato_ficha_sem_referencias": true,
+  "editar_ovf": 0,
+  "editar_tem_campos": true,
+  "cliente_painel_ovf": 0,
+  "cliente_bloqueado_admin": true,
+  "erros_js": []
+ },
+ "390": {
+  "clientes_ovf": 0,
+  "busca_nome": true,
+  "busca_cpf": true,
+  "busca_tel": true,
+  "acao_visivel_sem_rolar": true,
+  "ficha_ovf": 0,
+  "ficha_sem_referencias": true,
+  "busca_mantida": true,
+  "dbg_links": [
+   true
+  ],
+  "dbg_url": "http://127.0.0.1:4331/#/admin/contracts",
+  "dbg_txt": "Contratos\n\n1 contrato(s) · página 1 de 1\n\nAtualizar\nTodos\nAtivo\nInadimplente\nQuitado\nCancelado\nTodos\nEmpréstimos\nLimpa Nome\nInvestidor\nModalidade:\nTodas\n🏪 Comércio\n🏢 CLT\n🔒 Garantia\n✨ Limpa Nome\n🏍️ Moto\n📈 Investidor\n\nPedro Henrique Martins\n\nAtivo\n🏢 CLT\n\n789.012.345-67 · 5541921098765\n\nValor\n\nR$ 9.000",
+  "contratos_ovf": 0,
+  "detalhe_ovf": 0,
+  "contrato_ficha_sem_referencias": true,
+  "editar_ovf": 0,
+  "editar_tem_campos": true,
+  "cliente_painel_ovf": 0,
+  "cliente_bloqueado_admin": true,
+  "erros_js": []
+ },
+ "430": {
+  "clientes_ovf": 0,
+  "busca_nome": true,
+  "busca_cpf": true,
+  "busca_tel": true,
+  "acao_visivel_sem_rolar": true,
+  "ficha_ovf": 0,
+  "ficha_sem_referencias": true,
+  "busca_mantida": true,
+  "dbg_links": [
+   true
+  ],
+  "dbg_url": "http://127.0.0.1:4331/#/admin/contracts",
+  "dbg_txt": "Contratos\n\n1 contrato(s) · página 1 de 1\n\nAtualizar\nTodos\nAtivo\nInadimplente\nQuitado\nCancelado\nTodos\nEmpréstimos\nLimpa Nome\nInvestidor\nModalidade:\nTodas\n🏪 Comércio\n🏢 CLT\n🔒 Garantia\n✨ Limpa Nome\n🏍️ Moto\n📈 Investidor\n\nPedro Henrique Martins\n\nAtivo\n🏢 CLT\n\n789.012.345-67 · 5541921098765\n\nValor\n\nR$ 9.000",
+  "contratos_ovf": 0,
+  "detalhe_ovf": 0,
+  "contrato_ficha_sem_referencias": true,
+  "editar_ovf": 0,
+  "editar_tem_campos": true,
+  "cliente_painel_ovf": 0,
+  "cliente_bloqueado_admin": true,
+  "erros_js": []
+ },
+ "768": {
+  "clientes_ovf": 0,
+  "busca_nome": true,
+  "busca_cpf": true,
+  "busca_tel": true,
+  "acao_visivel_sem_rolar": true,
+  "ficha_ovf": 0,
+  "ficha_sem_referencias": true,
+  "busca_mantida": true,
+  "dbg_links": [
+   true
+  ],
+  "dbg_url": "http://127.0.0.1:4331/#/admin/contracts",
+  "dbg_txt": "PRINCIPAL\n\nDashboard\nClientes\nContratos\nSolicitações\nSolicitações de Investidores\nFinanciamento de Celulares\niPhones da Empresa (MDM)\nMigração de Contratos\nRéguas de Cobrança\nImportar Contatos\nInvestigação\nParceiros\n\nFINANCEIRO\n\nCentral Financeira\n🎮\n\nCOMUNICAÇÃO\n\nCentral de Comunicação\n\nANÁLISES\n\nCe",
+  "contratos_ovf": 0,
+  "detalhe_ovf": 0,
+  "contrato_ficha_sem_referencias": true,
+  "editar_ovf": 0,
+  "editar_tem_campos": true,
+  "cliente_painel_ovf": 0,
+  "cliente_bloqueado_admin": true,
+  "erros_js": []
+ },
+ "1024": {
+  "clientes_ovf": 0,
+  "busca_nome": true,
+  "busca_cpf": true,
+  "busca_tel": true,
+  "acao_visivel_sem_rolar": true,
+  "ficha_ovf": 0,
+  "ficha_sem_referencias": true,
+  "busca_mantida": true,
+  "dbg_links": [
+   true
+  ],
+  "dbg_url": "http://127.0.0.1:4331/#/admin/contracts",
+  "dbg_txt": "PRINCIPAL\n\nDashboard\nClientes\nContratos\nSolicitações\nSolicitações de Investidores\nFinanciamento de Celulares\niPhones da Empresa (MDM)\nMigração de Contratos\nRéguas de Cobrança\nImportar Contatos\nInvestigação\nParceiros\n\nFINANCEIRO\n\nCentral Financeira\n🎮\n\nCOMUNICAÇÃO\n\nCentral de Comunicação\n\nANÁLISES\n\nCe",
+  "contratos_ovf": 0,
+  "detalhe_ovf": 0,
+  "contrato_ficha_sem_referencias": true,
+  "editar_ovf": 0,
+  "editar_tem_campos": true,
+  "cliente_painel_ovf": 0,
+  "cliente_bloqueado_admin": true,
+  "erros_js": []
+ },
+ "1280": {
+  "clientes_ovf": 0,
+  "busca_nome": true,
+  "busca_cpf": true,
+  "busca_tel": true,
+  "acao_visivel_sem_rolar": true,
+  "ficha_ovf": 0,
+  "ficha_sem_referencias": true,
+  "busca_mantida": true,
+  "dbg_links": [
+   true
+  ],
+  "dbg_url": "http://127.0.0.1:4331/#/admin/contracts",
+  "dbg_txt": "PRINCIPAL\n\nDashboard\nClientes\nContratos\nSolicitações\nSolicitações de Investidores\nFinanciamento de Celulares\niPhones da Empresa (MDM)\nMigração de Contratos\nRéguas de Cobrança\nImportar Contatos\nInvestigação\nParceiros\n\nFINANCEIRO\n\nCentral Financeira\n🎮\n\nCOMUNICAÇÃO\n\nCentral de Comunicação\n\nANÁLISES\n\nCe",
+  "contratos_ovf": 0,
+  "detalhe_ovf": 0,
+  "contrato_ficha_sem_referencias": true,
+  "editar_ovf": 0,
+  "editar_tem_campos": true,
+  "cliente_painel_ovf": 0,
+  "cliente_bloqueado_admin": true,
+  "erros_js": []
+ },
+ "1440": {
+  "clientes_ovf": 0,
+  "busca_nome": true,
+  "busca_cpf": true,
+  "busca_tel": true,
+  "acao_visivel_sem_rolar": true,
+  "ficha_ovf": 0,
+  "ficha_sem_referencias": true,
+  "busca_mantida": true,
+  "dbg_links": [
+   true
+  ],
+  "dbg_url": "http://127.0.0.1:4331/#/admin/contracts",
+  "dbg_txt": "PRINCIPAL\n\nDashboard\nClientes\nContratos\nSolicitações\nSolicitações de Investidores\nFinanciamento de Celulares\niPhones da Empresa (MDM)\nMigração de Contratos\nRéguas de Cobrança\nImportar Contatos\nInvestigação\nParceiros\n\nFINANCEIRO\n\nCentral Financeira\n🎮\n\nCOMUNICAÇÃO\n\nCentral de Comunicação\n\nANÁLISES\n\nCe",
+  "contratos_ovf": 0,
+  "detalhe_ovf": 0,
+  "contrato_ficha_sem_referencias": true,
+  "editar_ovf": 0,
+  "editar_tem_campos": true,
+  "cliente_painel_ovf": 0,
+  "cliente_bloqueado_admin": true,
+  "erros_js": []
+ }
+}
