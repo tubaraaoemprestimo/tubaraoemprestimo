@@ -10,6 +10,7 @@ import { Customer, SystemSettings } from '../../types';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
 import { api } from '../../services/apiClient';
+import { CustomerQuickAccess } from '../../components/admin/CustomerQuickAccess';
 import {
   getProfileType,
   getDisplayMode,
@@ -18,11 +19,21 @@ import {
   INTEREST_STATE_LABEL,
 } from '../../utils/modalityDisplay';
 
+// Busca e filtros sobrevivem a sair e voltar da tela (pedido do operador, 23/11/2026).
+const CUSTOMERS_STATE_KEY = 'tubarao.admin.customers.state';
+const savedState = (): Record<string, any> => {
+  try { return JSON.parse(sessionStorage.getItem(CUSTOMERS_STATE_KEY) || '{}'); } catch { return {}; }
+};
+const normalizeText = (s?: string | null) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const onlyDigits = (s?: string | null) => (s || '').replace(/\D/g, '');
+const PAGE_STEP = 50;
+
 export const Customers: React.FC = () => {
   const { addToast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('');
+  const [filter, setFilter] = useState<string>(() => savedState().filter || '');
+  const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
 
   // Message Modal State
   const [msgModalOpen, setMsgModalOpen] = useState(false);
@@ -57,9 +68,14 @@ export const Customers: React.FC = () => {
   const [isEditingOffer, setIsEditingOffer] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'BLOCKED'>('ALL');
-  const [originFilter, setOriginFilter] = useState<'ALL' | 'IMPORTED' | 'ORGANIC'>('ALL');
-  const [clientTypeFilter, setClientTypeFilter] = useState<'ALL' | 'NEVER_REQUESTED' | 'ACTIVE_CLIENTS' | 'INACTIVE_CLIENTS' | 'WHATSAPP'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'BLOCKED'>(() => savedState().statusFilter || 'ALL');
+  const [originFilter, setOriginFilter] = useState<'ALL' | 'IMPORTED' | 'ORGANIC'>(() => savedState().originFilter || 'ALL');
+  const [clientTypeFilter, setClientTypeFilter] = useState<'ALL' | 'NEVER_REQUESTED' | 'ACTIVE_CLIENTS' | 'INACTIVE_CLIENTS' | 'WHATSAPP'>(() => savedState().clientTypeFilter || 'ALL');
+
+  useEffect(() => {
+    try { sessionStorage.setItem(CUSTOMERS_STATE_KEY, JSON.stringify({ filter, statusFilter, originFilter, clientTypeFilter })); } catch { /* modo privado */ }
+    setVisibleCount(PAGE_STEP);
+  }, [filter, statusFilter, originFilter, clientTypeFilter]);
 
   // History Modal
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
@@ -84,11 +100,15 @@ export const Customers: React.FC = () => {
   const [newUserPassword, setNewUserPassword] = useState('');
 
   // 1. Definição de Dados Derivados
+  const textQuery = normalizeText(filter.trim());
+  const digitQuery = onlyDigits(filter);
   const filteredCustomers = customers.filter(c => {
-    const matchesText = c.name.toLowerCase().includes(filter.toLowerCase()) ||
-      c.cpf.includes(filter) ||
-      c.email.toLowerCase().includes(filter.toLowerCase()) ||
-      c.phone.includes(filter);
+    // Sem acento/maiúscula; CPF e telefone com ou sem máscara.
+    const matchesText = !textQuery ||
+      normalizeText(c.name).includes(textQuery) ||
+      normalizeText(c.email).includes(textQuery) ||
+      (digitQuery.length >= 3 && (onlyDigits(c.cpf).includes(digitQuery) || onlyDigits(c.phone).includes(digitQuery))) ||
+      (c.cpf || '').includes(filter.trim());
 
     const matchesStatus = statusFilter === 'ALL' || c.status === statusFilter;
 
@@ -117,6 +137,8 @@ export const Customers: React.FC = () => {
   const whatsappOnboardingCount = customers.filter(c => c.source === 'WHATSAPP_ONBOARDING').length;
 
   const totalImported = customers.filter(c => c.email.includes('@whatsapp.lead')).length;
+  // Renderiza em lotes: 2.600+ linhas de uma vez travavam o celular.
+  const visibleCustomers = filteredCustomers.slice(0, visibleCount);
 
   // Selection Logic
   const toggleSelectAll = () => {
@@ -601,6 +623,8 @@ export const Customers: React.FC = () => {
     }
   };
 
+  const closeHistoryModal = React.useCallback(() => setHistoryModalOpen(false), []);
+
   const openHistoryModal = async (cust: Customer) => {
     setHistoryCustomer(null);
     setHistoryModalOpen(true);
@@ -732,7 +756,80 @@ export const Customers: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
+      {/* ===== Celular: cartões, nome sempre junto das ações ===== */}
+      <div className="md:hidden space-y-3" aria-label="Lista de clientes">
+        {loading ? (
+          <p className="p-8 text-center text-zinc-500">Carregando carteira de clientes...</p>
+        ) : filteredCustomers.length === 0 ? (
+          <p className="p-8 text-center text-zinc-500">Nenhum cliente encontrado.</p>
+        ) : (
+          <>
+            <label className="flex items-center gap-2 text-sm text-zinc-400 px-1">
+              <input type="checkbox" checked={selectedIds.length === filteredCustomers.length} onChange={toggleSelectAll}
+                className="h-5 w-5 rounded bg-zinc-800 border-zinc-700 text-[#D4AF37]" />
+              Selecionar todos ({filteredCustomers.length})
+            </label>
+            {visibleCustomers.map(cust => (
+              <article key={cust.id} className={`bg-zinc-900 border rounded-2xl p-4 space-y-3 ${selectedIds.includes(cust.id) ? 'border-[#D4AF37]/60' : 'border-zinc-800'}`}>
+                <div className="flex items-start gap-3">
+                  <input type="checkbox" checked={selectedIds.includes(cust.id)} onChange={() => toggleSelectOne(cust.id)}
+                    aria-label={`Selecionar ${cust.name}`} className="mt-1 h-5 w-5 shrink-0 rounded bg-zinc-800 border-zinc-700 text-[#D4AF37]" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-white break-words">{cust.name}</p>
+                    <p className="text-xs text-zinc-500 break-all">{cust.cpf} • {formatPhone(cust.phone)}</p>
+                  </div>
+                  <span className={`shrink-0 px-2 py-1 rounded-full text-xs font-bold ${cust.status === 'ACTIVE' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+                    {cust.status === 'ACTIVE' ? 'Ativo' : 'Bloqueado'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400">
+                  {(cust.activeLoansCount || 0) > 0 && <span className="text-green-400">{cust.activeLoansCount} contrato(s) ativo(s)</span>}
+                  {(cust.loanRequestsCount || 0) > 0 && <span>{cust.loanRequestsCount} solicitação(ões)</span>}
+                  {cust.joinedAt && !Number.isNaN(new Date(cust.joinedAt).getTime()) && <span>Desde {new Date(cust.joinedAt).toLocaleDateString('pt-BR')}</span>}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => openHistoryModal(cust)}
+                    className="min-h-[48px] col-span-2 inline-flex items-center justify-center gap-2 rounded-xl bg-[#D4AF37] text-black font-bold">
+                    <BarChart2 size={18} aria-hidden="true" /> Ficha completa
+                  </button>
+                  {cust.phone && (
+                    <a href={`https://wa.me/${onlyDigits(cust.phone).startsWith('55') ? onlyDigits(cust.phone) : `55${onlyDigits(cust.phone)}`}`} target="_blank" rel="noopener noreferrer"
+                      className="min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-green-700 text-white text-sm font-semibold">
+                      <MessageSquare size={16} aria-hidden="true" /> WhatsApp
+                    </a>
+                  )}
+                  <details className="group relative">
+                    <summary className="min-h-[44px] list-none cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-zinc-800 text-sm text-zinc-200">Mais ações</summary>
+                    <div className="absolute right-0 z-20 mt-2 w-60 rounded-xl border border-zinc-700 bg-zinc-950 p-2 shadow-2xl flex flex-col">
+                      {[
+                        { label: 'Configurar taxas', icon: <Percent size={16} />, run: () => openRatesModal(cust) },
+                        { label: 'Enviar pré-aprovação', icon: <DollarSign size={16} />, run: () => openPreApproveModal(cust) },
+                        { label: 'Oferta de parcelamento', icon: <Calculator size={16} />, run: () => openInstallmentOfferModal(cust) },
+                        ...(cust.installmentOffer ? [
+                          { label: 'Editar oferta', icon: <Edit2 size={16} />, run: () => openInstallmentOfferModal(cust, true) },
+                          { label: 'Remover oferta', icon: <Trash2 size={16} />, run: () => handleDeleteOffer(cust) },
+                        ] : []),
+                        { label: 'Editar cliente', icon: <Edit2 size={16} />, run: () => openEditModal(cust) },
+                        { label: 'Criar acesso do cliente', icon: <UserPlus size={16} />, run: () => openCreateUserModal(cust) },
+                        { label: 'Mensagem pelo sistema', icon: <MessageSquare size={16} />, run: () => openMessageModal(cust) },
+                        { label: cust.status === 'ACTIVE' ? 'Bloquear cliente' : 'Desbloquear cliente', icon: cust.status === 'ACTIVE' ? <ShieldAlert size={16} /> : <ShieldCheck size={16} />, run: () => handleToggleStatus(cust), danger: cust.status === 'ACTIVE' },
+                      ].map(a => (
+                        <button key={a.label} type="button"
+                          onClick={e => { (e.currentTarget.closest('details') as HTMLDetailsElement).open = false; a.run(); }}
+                          className={`min-h-[44px] flex items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-zinc-800 ${a.danger ? 'text-red-400' : 'text-zinc-200'}`}>
+                          {a.icon} {a.label}
+                        </button>
+                      ))}
+                    </div>
+                  </details>
+                </div>
+              </article>
+            ))}
+          </>
+        )}
+      </div>
+
+      <div className="hidden md:block bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[800px]">
             <thead className="bg-zinc-950 text-zinc-400 text-sm uppercase tracking-wider">
@@ -764,7 +861,7 @@ export const Customers: React.FC = () => {
                   <td colSpan={7} className="p-8 text-center text-zinc-500">Nenhum cliente encontrado.</td>
                 </tr>
               ) : (
-                filteredCustomers.map((cust) => (
+                visibleCustomers.map((cust) => (
                   <tr key={cust.id} className={`hover:bg-zinc-800/50 transition-colors group ${selectedIds.includes(cust.id) ? 'bg-zinc-800/30' : ''}`}>
                     <td className="p-4">
                       <input
@@ -774,7 +871,7 @@ export const Customers: React.FC = () => {
                         className="rounded bg-zinc-800 border-zinc-700 text-[#D4AF37] focus:ring-[#D4AF37]"
                       />
                     </td>
-                    <td className="p-4">
+                    <td className="p-4 sticky left-0 bg-zinc-900 z-[1]">
                       <div className="font-bold text-white flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-[#D4AF37] text-xs">
                           {cust.name.substring(0, 2).toUpperCase()}
@@ -819,17 +916,15 @@ export const Customers: React.FC = () => {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-2">
-                        {(cust.loanRequestsCount || 0) > 0 && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => openHistoryModal(cust)}
-                            title="Ver Histórico Completo"
-                            className="text-amber-400 hover:text-amber-300 bg-amber-900/20 border border-amber-700/50"
-                          >
-                            <BarChart2 size={16} />
-                          </Button>
-                        )}
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => openHistoryModal(cust)}
+                          title="Ficha completa do cliente"
+                          className="text-black bg-[#D4AF37] hover:bg-[#B5942F] font-bold"
+                        >
+                          <BarChart2 size={16} className="mr-1" /> Ficha
+                        </Button>
                         <Button
                           size="sm"
                           variant="secondary"
@@ -919,6 +1014,14 @@ export const Customers: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {!loading && visibleCount < filteredCustomers.length && (
+        <div className="mt-4 flex justify-center">
+          <Button variant="secondary" className="min-h-[48px] w-full md:w-auto" onClick={() => setVisibleCount(v => v + PAGE_STEP)}>
+            Mostrar mais ({filteredCustomers.length - visibleCount} restantes)
+          </Button>
+        </div>
+      )}
 
       {/* Message Modal */}
       {msgModalOpen && selectedCustomer && (
@@ -1351,7 +1454,7 @@ export const Customers: React.FC = () => {
         <HistoryModal
           customer={historyCustomer}
           loading={historyLoading}
-          onClose={() => setHistoryModalOpen(false)}
+          onClose={closeHistoryModal}
         />
       )}
       {/* ===== MODAL: ONBOARDING VIA WHATSAPP ===== */}
@@ -1823,27 +1926,58 @@ const HistoryModal: React.FC<{ customer: any; loading: boolean; onClose: () => v
     return Array.isArray(v) ? v[0] : v;
   };
 
+  // ESC fecha; a lista por trás não perde busca nem filtros.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [onClose]);
+
+  const loans: any[] = customer?.loans || [];
+  const openInstallments = loans.flatMap((l: any) => (l.installments || []).filter((i: any) => ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'].includes(i.status)));
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const overdue = openInstallments.filter((i: any) => new Date(i.dueDate) < today);
+  const nextDue = openInstallments.map((i: any) => i.dueDate).filter((d: string) => new Date(d) >= today).sort()[0];
+
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-start justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-4xl shadow-2xl my-4">
-        <div className="sticky top-0 bg-zinc-900 flex justify-between items-center p-6 border-b border-zinc-800 z-10 rounded-t-2xl">
-          <h3 className="text-xl font-bold text-[#D4AF37] flex items-center gap-2">
-            <BarChart2 size={20} /> Histórico Completo
-            {customer && <span className="text-zinc-400 font-normal text-base ml-2">— {customer.name}</span>}
-          </h3>
-          <div className="flex items-center gap-3">
-            {customer?.cpf && <CapivaraPanel cpf={customer.cpf} />}
-            <button onClick={onClose} className="text-zinc-500 hover:text-white p-1"><X /></button>
+    <div role="dialog" aria-modal="true" aria-label="Ficha completa do cliente"
+      className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-start justify-center z-50 md:p-4 overflow-y-auto overscroll-contain">
+      <div className="bg-zinc-900 md:border border-zinc-800 md:rounded-2xl w-full max-w-4xl shadow-2xl min-h-full md:min-h-0 md:my-4">
+        <div className="sticky top-0 bg-zinc-900 flex items-center gap-2 px-3 py-3 md:p-6 border-b border-zinc-800 z-10 md:rounded-t-2xl" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
+          <button onClick={onClose} aria-label="Voltar para a lista" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1 rounded-lg bg-zinc-800 px-3 text-sm text-white md:hidden">
+            ← Voltar
+          </button>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base md:text-xl font-bold text-[#D4AF37] flex items-center gap-2">
+              <BarChart2 size={20} aria-hidden="true" className="hidden md:block" /> Ficha completa
+            </h3>
+            {customer && <p className="text-white text-sm font-semibold truncate">{customer.name}</p>}
           </div>
+          {customer?.cpf && <div className="hidden md:block"><CapivaraPanel cpf={customer.cpf} /></div>}
+          <button onClick={onClose} aria-label="Fechar ficha" className="hidden md:inline-flex text-zinc-500 hover:text-white p-1"><X /></button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-3 md:p-6 space-y-5" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           {loading ? (
-            <div className="text-center text-zinc-500 py-16">Carregando histórico...</div>
+            <div className="text-center text-zinc-500 py-16">Carregando ficha...</div>
           ) : !customer ? (
             <div className="text-center text-zinc-500 py-16">Nenhum dado encontrado.</div>
           ) : (
             <>
+              {/* ── Resumo (só contagens de dados registrados; valores devidos ficam no contrato) ── */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                <div className="bg-zinc-950 rounded-xl p-3"><p className="text-zinc-500 text-xs">Cadastro</p><p className={`font-bold ${customer.status === 'ACTIVE' ? 'text-green-400' : 'text-red-400'}`}>{customer.status === 'ACTIVE' ? 'Ativo' : 'Bloqueado'}</p></div>
+                <div className="bg-zinc-950 rounded-xl p-3"><p className="text-zinc-500 text-xs">Contratos</p><p className="font-bold text-white">{loans.length}</p></div>
+                <div className="bg-zinc-950 rounded-xl p-3"><p className="text-zinc-500 text-xs">Cobranças vencidas</p><p className={`font-bold ${overdue.length ? 'text-red-400' : 'text-white'}`}>{overdue.length}</p></div>
+                <div className="bg-zinc-950 rounded-xl p-3"><p className="text-zinc-500 text-xs">Próximo vencimento</p><p className="font-bold text-white">{nextDue ? fmtDate(nextDue) : '—'}</p></div>
+              </div>
+
+              <CustomerQuickAccess customer={customer} renderDoc={(url, label) => <DocViewer url={url} label={label} />} />
+
+              {customer.cpf && <div className="md:hidden"><CapivaraPanel cpf={customer.cpf} /></div>}
+
               {/* ── Dados Pessoais ── */}
               <SectionCard title="👤 Dados Pessoais">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
@@ -1889,9 +2023,13 @@ const HistoryModal: React.FC<{ customer: any; loading: boolean; onClose: () => v
                   <div className="space-y-3">
                     {customer.loans.map((loan: any) => (
                       <div key={loan.id} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center justify-between gap-2 mb-3">
                           <span className={`px-2 py-1 rounded-full text-xs font-bold ${statusColor(loan.status)}`}>{loan.status}</span>
-                          <span className="text-zinc-500 text-xs">{fmtDate(loan.startDate || loan.createdAt)}</span>
+                          <span className="text-zinc-500 text-xs flex-1">{fmtDate(loan.startDate || loan.createdAt)}</span>
+                          {/* Abre o contrato direto (saldo atualizado, comprovantes, pagamentos e edição). */}
+                          <a href={`#/admin/contracts?loan=${loan.id}`} className="min-h-[40px] inline-flex items-center rounded-lg bg-[#D4AF37] px-3 text-xs font-bold text-black">
+                            Abrir contrato
+                          </a>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm mb-3">
                           <Field label="Valor" value={fmt(loan.amount)} />

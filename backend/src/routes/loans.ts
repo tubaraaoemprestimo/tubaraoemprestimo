@@ -469,16 +469,36 @@ loansRouter.put('/:loanId/admin-edit', requireAdmin, async (req: Request, res: R
         const { loanId } = req.params;
         const { adminNotes, dailyInstallmentAmount, nextPaymentDate } = req.body;
 
-        const updated = await prisma.loan.update({
-            where: { id: loanId },
-            data: {
-                ...(adminNotes !== undefined && { adminNotes }),
-                ...(dailyInstallmentAmount !== undefined && { dailyInstallmentAmount: parseFloat(dailyInstallmentAmount) }),
-                ...(nextPaymentDate && { nextPaymentDate: new Date(nextPaymentDate) })
-            }
-        });
+        const data: Record<string, any> = {};
+        if (adminNotes !== undefined) data.adminNotes = adminNotes;
+        if (dailyInstallmentAmount !== undefined && dailyInstallmentAmount !== '') {
+            const v = parseFloat(dailyInstallmentAmount);
+            if (!Number.isFinite(v) || v < 0) { res.status(400).json({ error: 'Valor da parcela inválido' }); return; }
+            data.dailyInstallmentAmount = v;
+        }
+        if (nextPaymentDate) {
+            const d = new Date(nextPaymentDate);
+            if (Number.isNaN(d.getTime())) { res.status(400).json({ error: 'Data de vencimento inválida' }); return; }
+            data.nextPaymentDate = d;
+        }
 
-        res.json({ success: true, loan: updated });
+        const before = await prisma.loan.findUnique({ where: { id: loanId }, select: { adminNotes: true, dailyInstallmentAmount: true, nextPaymentDate: true } });
+        if (!before) { res.status(404).json({ error: 'Contrato não encontrado' }); return; }
+        const changes = Object.keys(data).filter(k => String((before as any)[k] ?? '') !== String(data[k] ?? ''))
+            .map(k => ({ field: k, from: (before as any)[k] ?? null, to: data[k] }));
+
+        // Edição + auditoria juntas: sem registro de auditoria, sem alteração.
+        const [updated] = await prisma.$transaction([
+            prisma.loan.update({ where: { id: loanId }, data }),
+            ...(changes.length ? [prisma.auditLog.create({
+                data: {
+                    userId: req.user!.id, userName: req.user!.name, action: 'LOAN_ADMIN_EDIT', entity: 'LOAN', entityId: loanId,
+                    details: JSON.stringify(changes), ipAddress: req.ip,
+                }
+            })] : []),
+        ]);
+
+        res.json({ success: true, loan: updated, changes });
     } catch (err) {
         console.error('[Loans] admin-edit error:', err);
         res.status(500).json({ error: 'Erro ao editar contrato' });

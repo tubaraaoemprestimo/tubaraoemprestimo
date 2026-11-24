@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { CustomerQuickAccess } from '../../components/admin/CustomerQuickAccess';
 import {
   FileText, Search, X, ChevronDown, ChevronUp, Eye, DollarSign,
   Edit2, CheckCircle, Clock, AlertTriangle, RefreshCw, Save, Upload,
@@ -155,6 +157,9 @@ const fmtAddress = (customer?: Contract['customer']) => {
   return parts.length ? parts.join(' · ') : '—';
 };
 const STATUS_FILTER_STORAGE_KEY = 'tubarao.admin.contracts.statusFilter';
+const SEARCH_STORAGE_KEY = 'tubarao.admin.contracts.search';
+const TYPE_STORAGE_KEY = 'tubarao.admin.contracts.type';
+const MODALITY_STORAGE_KEY = 'tubarao.admin.contracts.modality';
 const getInitialStatusFilter = () => {
   if (typeof window === 'undefined') return 'ALL';
   return sessionStorage.getItem(STATUS_FILTER_STORAGE_KEY) || 'ALL';
@@ -204,10 +209,10 @@ export const Contracts: React.FC = () => {
   const { addToast } = useToast();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => sessionStorage.getItem(SEARCH_STORAGE_KEY) || '');
   const [statusFilter, setStatusFilter] = useState(getInitialStatusFilter);
-  const [typeFilter, setTypeFilter] = useState('ALL');
-  const [modalityFilter, setModalityFilter] = useState('ALL');
+  const [typeFilter, setTypeFilter] = useState(() => sessionStorage.getItem(TYPE_STORAGE_KEY) || 'ALL');
+  const [modalityFilter, setModalityFilter] = useState(() => sessionStorage.getItem(MODALITY_STORAGE_KEY) || 'ALL');
   const [page, setPage] = useState(1);
   const [totalContracts, setTotalContracts] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -320,7 +325,10 @@ export const Contracts: React.FC = () => {
 
   useEffect(() => {
     sessionStorage.setItem(STATUS_FILTER_STORAGE_KEY, statusFilter);
-  }, [statusFilter]);
+    sessionStorage.setItem(SEARCH_STORAGE_KEY, search);
+    sessionStorage.setItem(TYPE_STORAGE_KEY, typeFilter);
+    sessionStorage.setItem(MODALITY_STORAGE_KEY, modalityFilter);
+  }, [statusFilter, search, typeFilter, modalityFilter]);
 
   useEffect(() => {
     const t = setTimeout(load, 300);
@@ -355,6 +363,31 @@ export const Contracts: React.FC = () => {
     setDetailsLoading(false);
     setLoadingDetailPayoffBalance(false);
   };
+
+  // Link direto vindo da ficha do cliente: #/admin/contracts?loan=<id>
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const loanId = new URLSearchParams(location.search).get('loan');
+    if (!loanId) return;
+    openDetails({ id: loanId } as Contract);
+    navigate('/admin/contracts', { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
+
+  // Ficha do cliente dentro do contrato: contatos, referências, Instagram, fotos e vídeos.
+  const [customerInfo, setCustomerInfo] = useState<any | null>(null);
+  const [customerInfoLoading, setCustomerInfoLoading] = useState(false);
+  const toggleCustomerInfo = async () => {
+    if (customerInfo) { setCustomerInfo(null); return; }
+    const id = selected?.customer?.id;
+    if (!id) return;
+    setCustomerInfoLoading(true);
+    try { setCustomerInfo(await apiService.getCustomer(id)); }
+    catch (e: any) { addToast(e.message || 'Erro ao carregar ficha do cliente', 'error'); }
+    finally { setCustomerInfoLoading(false); }
+  };
+  useEffect(() => { setCustomerInfo(null); }, [selected?.id]);
 
   const reloadLoanReceipts = useCallback(async () => {
     if (!selected) return;
@@ -883,14 +916,30 @@ export const Contracts: React.FC = () => {
 
       {/* ===== MODAL DETALHES ===== */}
       {detailsOpen && selected && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-              <h2 className="font-bold text-lg">Detalhes do Contrato</h2>
-              <button onClick={() => setDetailsOpen(false)} className="text-zinc-400 hover:text-white"><X size={20} /></button>
+        <div role="dialog" aria-modal="true" aria-label="Detalhes do contrato" className="fixed inset-0 bg-black/80 z-50 flex items-stretch md:items-center justify-center md:p-4">
+          <div className="bg-zinc-950 md:border border-zinc-800 md:rounded-2xl w-full max-w-2xl h-full md:h-auto md:max-h-[90vh] overflow-y-auto overscroll-contain">
+            <div className="sticky top-0 z-10 bg-zinc-950 flex items-center justify-between gap-2 px-3 py-3 md:p-5 border-b border-zinc-800" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
+              <button onClick={() => setDetailsOpen(false)} aria-label="Voltar para a lista" className="md:hidden min-h-[44px] rounded-lg bg-zinc-800 px-3 text-sm text-white">← Voltar</button>
+              <h2 className="font-bold text-lg flex-1 truncate">{selected.customer?.name || 'Detalhes do Contrato'}</h2>
+              <button onClick={() => setDetailsOpen(false)} aria-label="Fechar" className="hidden md:block text-zinc-400 hover:text-white"><X size={20} /></button>
             </div>
 
-            <div className="p-5 space-y-5">
+            <div className="p-3 md:p-5 space-y-5" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
+              {selected.customer?.id && (
+                <div>
+                  <button type="button" onClick={toggleCustomerInfo} disabled={customerInfoLoading} aria-expanded={!!customerInfo}
+                    className="min-h-[48px] w-full rounded-xl bg-[#D4AF37] font-bold text-black disabled:opacity-60">
+                    {customerInfoLoading ? 'Carregando ficha...' : customerInfo ? 'Ocultar ficha do cliente' : 'Ficha do cliente: contatos, referências, fotos e vídeos'}
+                  </button>
+                  {customerInfo && (
+                    <div className="mt-3">
+                      <CustomerQuickAccess customer={customerInfo} renderDoc={(url, label) => (
+                        <a href={url} target="_blank" rel="noopener noreferrer" className="min-h-[40px] inline-flex items-center rounded-lg bg-zinc-800 px-3 text-xs text-zinc-200 hover:bg-zinc-700">{label}</a>
+                      )} />
+                    </div>
+                  )}
+                </div>
+              )}
               {detailsLoading && (
                 <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-300">
                   Carregando detalhes completos...

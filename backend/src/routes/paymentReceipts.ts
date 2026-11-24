@@ -34,6 +34,11 @@ paymentReceiptsRouter.post('/', async (req: Request, res: Response) => {
             res.status(404).json({ error: 'Cliente não encontrado' });
             return;
         }
+        // Cliente só envia comprovante da própria parcela (mesma resposta de "não encontrada").
+        if (req.user!.role !== 'ADMIN' && customer.userId !== req.user!.id) {
+            res.status(404).json({ error: 'Parcela não encontrada' });
+            return;
+        }
 
         const receipt = await prisma.paymentReceipt.create({
             data: {
@@ -146,11 +151,24 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
 
         const existingReceipt = await prisma.paymentReceipt.findUnique({
             where: { id: req.params.id as string },
-            select: { notes: true, amount: true }
+            select: { notes: true, amount: true, status: true, installmentId: true }
         });
         if (!existingReceipt) {
             res.status(404).json({ error: 'Comprovante não encontrado' });
             return;
+        }
+        if (existingReceipt.status !== 'PENDING') {
+            res.status(409).json({ error: `Comprovante já ${existingReceipt.status === 'APPROVED' ? 'aprovado' : 'rejeitado'}`, code: 'ALREADY_REVIEWED' });
+            return;
+        }
+        // Parcela já paga: aprovar geraria crédito em dobro (e, na rolagem, uma nova parcela de juros).
+        // Quitação total continua permitida (fecha o restante do contrato).
+        if (!isDischarge) {
+            const inst = await prisma.installment.findUnique({ where: { id: existingReceipt.installmentId }, select: { status: true } });
+            if (inst?.status === 'PAID') {
+                res.status(409).json({ error: 'Esta parcela já está paga. Rejeite o comprovante ou registre como pagamento avulso no contrato.', code: 'INSTALLMENT_ALREADY_PAID' });
+                return;
+            }
         }
 
         const approvedAmount = amount !== undefined ? Number(amount) : Number(existingReceipt.amount);
@@ -163,8 +181,9 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
             ? [existingReceipt.notes, req.body.notes].filter(Boolean).join(' | review: ')
             : existingReceipt.notes || null;
 
-        const receipt = await prisma.paymentReceipt.update({
-            where: { id: req.params.id as string },
+        // Reivindicação atômica: dois cliques/abas simultâneos não aplicam o pagamento duas vezes.
+        const claimed = await prisma.paymentReceipt.updateMany({
+            where: { id: req.params.id as string, status: 'PENDING' },
             data: {
                 amount: approvedAmount,
                 status: 'APPROVED',
@@ -173,6 +192,11 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
                 notes: nextNotes
             }
         });
+        if (claimed.count !== 1) {
+            res.status(409).json({ error: 'Comprovante já foi revisado', code: 'ALREADY_REVIEWED' });
+            return;
+        }
+        const receipt = await prisma.paymentReceipt.findUniqueOrThrow({ where: { id: req.params.id as string } });
 
         const result = await applyApprovedPayment(receipt, { isDischarge, isInterestOnly });
         if (result === 'INSTALLMENT_NOT_FOUND') {
@@ -190,8 +214,9 @@ paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res
 // PUT /api/payment-receipts/:id/reject — Admin rejeita comprovante
 paymentReceiptsRouter.put('/:id/reject', requireAdmin, async (req: Request, res: Response) => {
     try {
-        const receipt = await prisma.paymentReceipt.update({
-            where: { id: req.params.id as string },
+        // Só rejeita pendente: nunca desfaz um pagamento já aprovado.
+        const claimed = await prisma.paymentReceipt.updateMany({
+            where: { id: req.params.id as string, status: 'PENDING' },
             data: {
                 status: 'REJECTED',
                 reviewedBy: req.user!.id,
@@ -199,6 +224,11 @@ paymentReceiptsRouter.put('/:id/reject', requireAdmin, async (req: Request, res:
                 notes: req.body.notes || 'Comprovante não aceito'
             }
         });
+        if (claimed.count !== 1) {
+            res.status(409).json({ error: 'Comprovante não está pendente', code: 'ALREADY_REVIEWED' });
+            return;
+        }
+        const receipt = await prisma.paymentReceipt.findUniqueOrThrow({ where: { id: req.params.id as string } });
 
         const customer = await prisma.customer.findUnique({ where: { id: receipt.customerId } });
         if (customer) {

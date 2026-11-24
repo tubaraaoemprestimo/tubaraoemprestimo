@@ -5,8 +5,8 @@ import { authenticate, requireAdmin } from '../middleware/auth';
 export const customersRouter = Router();
 customersRouter.use(authenticate);
 
-// GET /api/customers — Listar clientes
-customersRouter.get('/', async (_req: Request, res: Response) => {
+// GET /api/customers — Listar clientes (só admin: lista CPF/telefone de todos)
+customersRouter.get('/', requireAdmin, async (_req: Request, res: Response) => {
     try {
         const customers = await prisma.customer.findMany({
             orderBy: { joinedAt: 'desc' },
@@ -128,8 +128,8 @@ customersRouter.get('/locations/:email', requireAdmin, async (req: Request, res:
     }
 });
 
-// GET /api/customers/:id — Buscar cliente por ID
-customersRouter.get('/:id', async (req: Request, res: Response) => {
+// GET /api/customers/:id — Buscar cliente por ID (ficha completa com documentos: só admin)
+customersRouter.get('/:id', requireAdmin, async (req: Request, res: Response) => {
     try {
         const customer = await prisma.customer.findUnique({
             where: { id: req.params.id as string },
