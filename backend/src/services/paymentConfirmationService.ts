@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import { sendWhatsAppMessage } from './whatsapp';
 import { sendPushToUser } from '../routes/push';
@@ -18,17 +19,24 @@ export async function applyApprovedPayment(
     receipt: any,
     opts: { isDischarge?: boolean; isInterestOnly?: boolean } = {}
 ): Promise<'OK' | 'INSTALLMENT_NOT_FOUND'> {
-    const { isDischarge, isInterestOnly } = opts;
+    // Baixa inteira numa transação: ou tudo (parcela, contrato, lançamento) ou nada.
+    const result = await prisma.$transaction(tx => applyPaymentInTransaction(tx, receipt, opts), { timeout: 20000 });
+    if (!result) return 'INSTALLMENT_NOT_FOUND';
+    await notifyApprovedPayment(receipt, result, opts);
+    return 'OK';
+}
 
-    const installment = await prisma.installment.findUnique({
+export async function applyPaymentInTransaction(tx: Prisma.TransactionClient, receipt: any, opts: { isDischarge?: boolean; isInterestOnly?: boolean }) {
+    const { isDischarge, isInterestOnly } = opts;
+    const installment = await tx.installment.findUnique({
         where: { id: receipt.installmentId }
     });
     if (!installment) {
-        return 'INSTALLMENT_NOT_FOUND';
+        return null;
     }
 
     // Atualizar remainingAmount do loan
-    const loan = await prisma.loan.findUnique({
+    const loan = await tx.loan.findUnique({
         where: { id: installment.loanId },
         include: { installments: true, customer: true }
     });
@@ -36,7 +44,7 @@ export async function applyApprovedPayment(
     // Buscar o profileType do LoanRequest vinculado
     let profileType = '';
     if (loan) {
-        const loanRequest = await prisma.loanRequest.findUnique({
+        const loanRequest = await tx.loanRequest.findUnique({
             where: { id: loan.requestId },
             select: { profileType: true }
         });
@@ -49,7 +57,7 @@ export async function applyApprovedPayment(
         // Se for quitação total
         if (isDischarge) {
             // Marcar TODAS as parcelas como pagas
-            await prisma.installment.updateMany({
+            await tx.installment.updateMany({
                 where: {
                     loanId: loan.id,
                     status: { not: 'PAID' }
@@ -66,14 +74,14 @@ export async function applyApprovedPayment(
                 .reduce((sum: number, i: any) => sum + Number(i.amount), 0);
 
             // Marcar loan/request como quitado
-            await prisma.loan.update({
+            await tx.loan.update({
                 where: { id: loan.id },
                 data: {
                     remainingAmount: 0,
                     status: 'COMPLETED'
                 }
             });
-            await prisma.loanRequest.update({
+            await tx.loanRequest.update({
                 where: { id: loan.requestId },
                 data: { status: 'COMPLETED' }
             });
@@ -88,7 +96,7 @@ export async function applyApprovedPayment(
             // ============================================================
             const paidAmount = Number(receipt.amount);
 
-            await prisma.loan.update({
+            await tx.loan.update({
                 where: { id: loan.id },
                 data: {
                     lastPaymentDate: new Date()
@@ -97,7 +105,7 @@ export async function applyApprovedPayment(
             });
 
             // Marca o registro pago como pagamento de juros de rolagem (não é amortização)
-            await prisma.installment.update({
+            await tx.installment.update({
                 where: { id: installment.id },
                 data: { status: 'PAID', paidAt: new Date(), proofUrl: receipt.receiptUrl, isInterestPayment: true }
             });
@@ -112,7 +120,7 @@ export async function applyApprovedPayment(
                 nextDueDate.setDate(new Date(installment.dueDate).getDate());
             }
 
-            await prisma.installment.create({
+            await tx.installment.create({
                 data: {
                     loanId: loan.id,
                     amount: nextInterestAmount,
@@ -129,7 +137,7 @@ export async function applyApprovedPayment(
             // Cada pagamento reduz o remainingAmount
             // ============================================================
             const paidAmount = Number(receipt.amount);
-            const balance = await getLoanPayoffBalance(loan.id);
+            const balance = await getLoanPayoffBalance(loan.id, tx);
             const waterfall = applyPaymentWaterfall({
                 paymentAmount: paidAmount,
                 principalBalance: balance.principalBalance,
@@ -138,7 +146,7 @@ export async function applyApprovedPayment(
             });
             const now = new Date();
 
-            await prisma.$transaction(async (tx: any) => {
+            {
                 let remainingFeeReduction = waterfall.appliedToFees;
                 const pendingInstallments = await tx.installment.findMany({
                     where: { id: { in: balance.pendingInstallmentIds } },
@@ -172,13 +180,13 @@ export async function applyApprovedPayment(
                         status: waterfall.remainingTotalBalance <= 0 ? 'COMPLETED' : loan.status
                     }
                 });
-            });
+            }
 
             console.log(`[PaymentReceipts] Loan ${loan.id} AMORTIZAÇÃO/WATERFALL: pago R$ ${paidAmount.toFixed(2)} fees=${waterfall.appliedToFees} principal=${waterfall.appliedToPrincipal} => remainingAmount = R$ ${waterfall.remainingPrincipalBalance.toFixed(2)}`);
         }
 
         // Criar transação de entrada
-        await prisma.transaction.create({
+        await tx.transaction.create({
             data: {
                 type: 'IN',
                 description: `Pagamento confirmado - ${loan.id.substring(0, 8)}`,
@@ -186,9 +194,15 @@ export async function applyApprovedPayment(
                 category: 'PAYMENT',
                 date: new Date()
             }
-        }).catch(() => {});
+        });
     }
 
+    return loan ? { installment, loan } : null;
+}
+
+export async function notifyApprovedPayment(receipt: any, result: NonNullable<Awaited<ReturnType<typeof applyPaymentInTransaction>>>, opts: { isDischarge?: boolean }) {
+    const { installment, loan } = result;
+    const { isDischarge } = opts;
     // Busca dados do cliente
     const customer = await prisma.customer.findUnique({ where: { id: receipt.customerId } });
 

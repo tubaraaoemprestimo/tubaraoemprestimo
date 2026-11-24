@@ -34,6 +34,32 @@ function match(url: string, pattern: RegExp): RegExpMatchArray | null {
 }
 
 /** Remove query string para comparação de rota */
+// Solicitação demo no formato de contrato de GET /api/loans/admin/all (dados fictícios).
+function demoAdminLoan(r: any): any {
+  const amount = r.approvedAmount || r.amount || 0;
+  return {
+    id: r.id,
+    amount,
+    principalAmount: amount,
+    remainingAmount: Math.round(amount * 0.65),
+    installmentsCount: r.installments || 6,
+    totalInstallments: r.installments || 6,
+    dailyInstallmentAmount: null,
+    status: r.status === 'ACTIVE' ? 'ACTIVE' : r.status,
+    startDate: r.approvedAt || r.createdAt,
+    createdAt: r.createdAt,
+    daysOverdue: 0,
+    nextPaymentDate: new Date(Date.now() + 7 * 86400000).toISOString(),
+    paymentFrequency: 'MONTHLY',
+    interestRate: r.interestRate || 30,
+    adminNotes: r.adminNotes || null,
+    isService: false, isInvestment: false, isLoan: true,
+    customer: { id: r.customerId || r.id, name: r.clientName, cpf: r.cpf, phone: r.phone, email: r.email, address: r.address, city: r.city, state: r.state },
+    loanRequest: { profileType: r.profileType, monthlyRate: r.interestRate || 30, contractMonths: r.installments || 6 },
+    installmentsSummary: { paidCount: 2, totalCount: r.installments || 6, interestState: 'EM_ABERTO', maxDaysOverdue: 0 },
+  };
+}
+
 function path(url: string): string {
   return url.split('?')[0];
 }
@@ -327,34 +353,34 @@ async function handleRequest(method: string, url: string, body?: any): Promise<a
       const qStatus = url.includes('status=') ? new URLSearchParams(url.split('?')[1]).get('status') : null;
       return qStatus ? r.status === qStatus : r.status === 'ACTIVE';
     });
-    return activeRequests.map((r) => ({
-      ...r,
-      loanId: r.id,
-      principal: r.approvedAmount || r.amount,
-      remaining: Math.round((r.approvedAmount || r.amount) * 0.65),
-      paidInstallments: 2,
-      totalInstallments: r.totalInstallments || 10,
-      nextDueDate: new Date(Date.now() + 7 * 86400000).toISOString(),
-    }));
+    // Mesmo formato de GET /api/loans/admin/all no backend (items + paginação).
+    const items = activeRequests.map(demoAdminLoan);
+    return { items, page: 1, limit: 50, total: items.length, totalPages: 1 };
   }
 
   if (method === 'GET' && match(url, /\/loans\/([^/]+)\/admin-details$/)) {
     const loanId = url.split('/')[2];
     const req = store().requests.find((r) => r.id === loanId);
     if (!req) return null;
+    const base = demoAdminLoan(req);
+    const n = req.totalInstallments || 6;
     return {
-      ...req,
-      loanId: req.id,
-      principal: req.approvedAmount || req.amount,
-      remaining: Math.round((req.approvedAmount || req.amount) * 0.65),
-      installments: Array.from({ length: req.totalInstallments || 6 }, (_, i) => ({
+      ...base,
+      installments: Array.from({ length: n }, (_, i) => ({
         id: `inst-${i + 1}`,
-        number: i + 1,
-        dueDate: new Date(Date.now() + (i + 1) * 30 * 86400000).toISOString(),
-        amount: req.dailyInstallmentAmount || Math.round((req.approvedAmount || req.amount) / (req.totalInstallments || 6)),
-        status: i < 2 ? 'PAID' : 'PENDING',
+        dueDate: new Date(Date.now() + (i - 1) * 30 * 86400000).toISOString(),
+        amount: Math.round(base.amount / n),
+        status: i < 2 ? 'PAID' : 'OPEN',
+        lateFeeAmount: 0,
       })),
+      paymentReceipts: [],
     };
+  }
+
+  if (method === 'GET' && match(url, /\/loans\/([^/]+)\/payoff-balance$/)) {
+    const req = store().requests.find((r) => r.id === url.split('/')[2]);
+    const principal = req ? demoAdminLoan(req).remainingAmount : 0;
+    return { success: true, balance: { principalBalance: principal, interestBalance: 0, feeBalance: 0, cycleChargeBalance: 0, totalPayoffBalance: principal, pendingInstallmentIds: [] } };
   }
 
   if (method === 'PUT' && match(url, /\/loans\/([^/]+)\/admin-edit$/)) {

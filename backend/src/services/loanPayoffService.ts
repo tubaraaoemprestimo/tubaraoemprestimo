@@ -103,8 +103,8 @@ export function applyPaymentWaterfall(input: PaymentWaterfallInput): PaymentWate
  *   (CLT/GARANTIA/GARANTIA_VEICULO ou installment.isInterestPayment).
  * - Em AUTONOMO/Comércio, installment.amount é agenda/diária operacional; capital vivo fica em remainingAmount.
  */
-export async function getLoanPayoffBalance(loanId: string): Promise<LoanPayoffBalance> {
-  const loan = await prisma.loan.findUnique({
+export async function getLoanPayoffBalance(loanId: string, db: Pick<typeof prisma, 'loan'> = prisma): Promise<LoanPayoffBalance> {
+  const loan = await db.loan.findUnique({
     where: { id: loanId },
     include: {
       loanRequest: { select: { profileType: true } },

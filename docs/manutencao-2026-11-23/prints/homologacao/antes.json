@@ -1,0 +1,272 @@
+{
+  "375": {
+    "engine": "chromium",
+    "errors": [],
+    "checks": {
+      "clientes": {
+        "url": "http://127.0.0.1:4322/#/admin/customers",
+        "textLength": 1195,
+        "overflow": false
+      },
+      "historico": {
+        "error": "Locator.click: Timeout 7000ms exceeded.\nCall log:\n  - waiting for locator(\"button[title='Ficha completa do cliente'], button[title='Ver Histórico Completo']\").first\n"
+      },
+      "contratos": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 0,
+        "overflow": false
+      },
+      "detalhes": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 1112,
+        "overflow": false
+      },
+      "editar": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 560,
+        "overflow": false
+      },
+      "financeiro": {
+        "url": "http://127.0.0.1:4322/#/admin/finance",
+        "textLength": 0,
+        "overflow": false
+      },
+      "central-financeira": {
+        "url": "http://127.0.0.1:4322/#/admin/finance-hub",
+        "textLength": 494,
+        "overflow": false
+      },
+      "cliente-dashboard": {
+        "url": "http://127.0.0.1:4322/#/client/dashboard",
+        "textLength": 263,
+        "overflow": false
+      },
+      "cliente-contratos": {
+        "url": "http://127.0.0.1:4322/#/client/contracts",
+        "textLength": 124,
+        "overflow": false
+      },
+      "cliente-tenta-admin": {
+        "url": "http://127.0.0.1:4322/#/login",
+        "textLength": 138,
+        "overflow": false
+      }
+    }
+  },
+  "390": {
+    "engine": "chromium",
+    "errors": [],
+    "checks": {
+      "clientes": {
+        "url": "http://127.0.0.1:4322/#/admin/customers",
+        "textLength": 1195,
+        "overflow": false
+      },
+      "historico": {
+        "error": "Locator.click: Timeout 7000ms exceeded.\nCall log:\n  - waiting for locator(\"button[title='Ficha completa do cliente'], button[title='Ver Histórico Completo']\").first\n"
+      },
+      "contratos": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 0,
+        "overflow": false
+      },
+      "detalhes": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 1112,
+        "overflow": false
+      },
+      "editar": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 560,
+        "overflow": false
+      },
+      "financeiro": {
+        "url": "http://127.0.0.1:4322/#/admin/finance",
+        "textLength": 0,
+        "overflow": false
+      },
+      "central-financeira": {
+        "url": "http://127.0.0.1:4322/#/admin/finance-hub",
+        "textLength": 494,
+        "overflow": false
+      },
+      "cliente-dashboard": {
+        "url": "http://127.0.0.1:4322/#/client/dashboard",
+        "textLength": 263,
+        "overflow": false
+      },
+      "cliente-contratos": {
+        "url": "http://127.0.0.1:4322/#/client/contracts",
+        "textLength": 124,
+        "overflow": false
+      },
+      "cliente-tenta-admin": {
+        "url": "http://127.0.0.1:4322/#/login",
+        "textLength": 138,
+        "overflow": false
+      }
+    }
+  },
+  "430": {
+    "engine": "chromium",
+    "errors": [],
+    "checks": {
+      "clientes": {
+        "url": "http://127.0.0.1:4322/#/admin/customers",
+        "textLength": 1195,
+        "overflow": false
+      },
+      "historico": {
+        "error": "Locator.click: Timeout 7000ms exceeded.\nCall log:\n  - waiting for locator(\"button[title='Ficha completa do cliente'], button[title='Ver Histórico Completo']\").first\n"
+      },
+      "contratos": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 0,
+        "overflow": false
+      },
+      "detalhes": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 1112,
+        "overflow": false
+      },
+      "editar": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 560,
+        "overflow": false
+      },
+      "financeiro": {
+        "url": "http://127.0.0.1:4322/#/admin/finance",
+        "textLength": 0,
+        "overflow": false
+      },
+      "central-financeira": {
+        "url": "http://127.0.0.1:4322/#/admin/finance-hub",
+        "textLength": 494,
+        "overflow": false
+      },
+      "cliente-dashboard": {
+        "url": "http://127.0.0.1:4322/#/client/dashboard",
+        "textLength": 263,
+        "overflow": false
+      },
+      "cliente-contratos": {
+        "url": "http://127.0.0.1:4322/#/client/contracts",
+        "textLength": 124,
+        "overflow": false
+      },
+      "cliente-tenta-admin": {
+        "url": "http://127.0.0.1:4322/#/login",
+        "textLength": 138,
+        "overflow": false
+      }
+    }
+  },
+  "768": {
+    "engine": "chromium",
+    "errors": [],
+    "checks": {
+      "clientes": {
+        "url": "http://127.0.0.1:4322/#/admin/customers",
+        "textLength": 1649,
+        "overflow": false
+      },
+      "historico": {
+        "error": "Locator.click: Timeout 7000ms exceeded.\nCall log:\n  - waiting for locator(\"button[title='Ficha completa do cliente'], button[title='Ver Histórico Completo']\").first\n"
+      },
+      "contratos": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 0,
+        "overflow": false
+      },
+      "detalhes": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 1566,
+        "overflow": false
+      },
+      "editar": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 1014,
+        "overflow": false
+      },
+      "financeiro": {
+        "url": "http://127.0.0.1:4322/#/admin/finance",
+        "textLength": 0,
+        "overflow": false
+      },
+      "central-financeira": {
+        "url": "http://127.0.0.1:4322/#/admin/finance-hub",
+        "textLength": 1014,
+        "overflow": false
+      },
+      "cliente-dashboard": {
+        "url": "http://127.0.0.1:4322/#/client/dashboard",
+        "textLength": 228,
+        "overflow": false
+      },
+      "cliente-contratos": {
+        "url": "http://127.0.0.1:4322/#/client/contracts",
+        "textLength": 205,
+        "overflow": false
+      },
+      "cliente-tenta-admin": {
+        "url": "http://127.0.0.1:4322/#/login",
+        "textLength": 138,
+        "overflow": false
+      }
+    }
+  },
+  "1440": {
+    "engine": "chromium",
+    "errors": [],
+    "checks": {
+      "clientes": {
+        "url": "http://127.0.0.1:4322/#/admin/customers",
+        "textLength": 1649,
+        "overflow": false
+      },
+      "historico": {
+        "error": "Locator.click: Timeout 7000ms exceeded.\nCall log:\n  - waiting for locator(\"button[title='Ficha completa do cliente'], button[title='Ver Histórico Completo']\").first\n"
+      },
+      "contratos": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 0,
+        "overflow": false
+      },
+      "detalhes": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 1566,
+        "overflow": false
+      },
+      "editar": {
+        "url": "http://127.0.0.1:4322/#/admin/contracts",
+        "textLength": 1014,
+        "overflow": false
+      },
+      "financeiro": {
+        "url": "http://127.0.0.1:4322/#/admin/finance",
+        "textLength": 0,
+        "overflow": false
+      },
+      "central-financeira": {
+        "url": "http://127.0.0.1:4322/#/admin/finance-hub",
+        "textLength": 1014,
+        "overflow": false
+      },
+      "cliente-dashboard": {
+        "url": "http://127.0.0.1:4322/#/client/dashboard",
+        "textLength": 228,
+        "overflow": false
+      },
+      "cliente-contratos": {
+        "url": "http://127.0.0.1:4322/#/client/contracts",
+        "textLength": 205,
+        "overflow": false
+      },
+      "cliente-tenta-admin": {
+        "url": "http://127.0.0.1:4322/#/login",
+        "textLength": 138,
+        "overflow": false
+      }
+    }
+  }
+}

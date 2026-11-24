@@ -148,7 +148,8 @@ const MODALITY_FILTERS = [
 ];
 
 const PAGE_SIZE = 50;
-const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+// Valor ausente vira "—" em vez de derrubar a tela inteira.
+const fmt = (v?: number | null) => (typeof v === 'number' && Number.isFinite(v) ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—');
 const installmentTotal = (inst: ContractInstallment) => inst.totalAmount ?? (Number(inst.amount || 0) + Number(inst.lateFeeAmount || 0));
 const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
 const fmtAddress = (customer?: Contract['customer']) => {
@@ -651,9 +652,11 @@ export const Contracts: React.FC = () => {
 
   // Conta apenas parcelas amortizadoras pagas (exclui pagamentos de juros de rolagem).
   // Conceitualmente válido só para MOTO — a decisão de exibir é feita por profileType.
-  const paidCount = (c: Contract) => c.installmentsSummary?.paidCount ?? countAmortizingPaid(c.installments || []);
+  // Array.isArray: o mock do modo demo devolve `installments` como número.
+  const instList = (c: Contract) => (Array.isArray(c.installments) ? c.installments : []);
+  const paidCount = (c: Contract) => c.installmentsSummary?.paidCount ?? countAmortizingPaid(instList(c));
   const totalCount = (c: Contract) => c.installmentsSummary?.totalCount ?? c.totalInstallments ?? c.installmentsCount;
-  const interestState = (c: Contract) => c.installmentsSummary?.interestState ?? getInterestState(c.installments || []);
+  const interestState = (c: Contract) => c.installmentsSummary?.interestState ?? getInterestState(instList(c));
   const selectedPaymentReceipts = loanReceipts.length > 0 ? loanReceipts : (selected?.paymentReceipts || []);
 
   return (

@@ -4,7 +4,7 @@ import { authenticate, requireAdmin } from '../middleware/auth';
 import { emailService } from '../services/email';
 import { sendWhatsAppMessage } from '../services/whatsapp';
 import { sendPushToUser, sendPushToRole } from './push';
-import { applyApprovedPayment } from '../services/paymentConfirmationService';
+import { applyPaymentInTransaction, notifyApprovedPayment } from '../services/paymentConfirmationService';
 
 export const paymentReceiptsRouter = Router();
 paymentReceiptsRouter.use(authenticate);
@@ -144,69 +144,70 @@ paymentReceiptsRouter.get('/', async (req: Request, res: Response) => {
     }
 });
 
+class ReviewConflict extends Error {
+    constructor(readonly status: number, message: string, readonly code: string) { super(message); }
+}
+
 // PUT /api/payment-receipts/:id/approve — Admin confirma pagamento
 paymentReceiptsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: Response) => {
     try {
         const { isDischarge, isInterestOnly, amount } = req.body; // flags: quitação total ou só juros
 
-        const existingReceipt = await prisma.paymentReceipt.findUnique({
-            where: { id: req.params.id as string },
-            select: { notes: true, amount: true, status: true, installmentId: true }
-        });
-        if (!existingReceipt) {
-            res.status(404).json({ error: 'Comprovante não encontrado' });
-            return;
-        }
-        if (existingReceipt.status !== 'PENDING') {
-            res.status(409).json({ error: `Comprovante já ${existingReceipt.status === 'APPROVED' ? 'aprovado' : 'rejeitado'}`, code: 'ALREADY_REVIEWED' });
-            return;
-        }
-        // Parcela já paga: aprovar geraria crédito em dobro (e, na rolagem, uma nova parcela de juros).
-        // Quitação total continua permitida (fecha o restante do contrato).
-        if (!isDischarge) {
-            const inst = await prisma.installment.findUnique({ where: { id: existingReceipt.installmentId }, select: { status: true } });
-            if (inst?.status === 'PAID') {
-                res.status(409).json({ error: 'Esta parcela já está paga. Rejeite o comprovante ou registre como pagamento avulso no contrato.', code: 'INSTALLMENT_ALREADY_PAID' });
-                return;
+        const reviewed = await prisma.$transaction(async tx => {
+            const existingReceipt = await tx.paymentReceipt.findUnique({
+                where: { id: req.params.id as string },
+                select: { notes: true, amount: true, status: true, installmentId: true }
+            });
+            if (!existingReceipt) {
+                throw new ReviewConflict(404, 'Comprovante não encontrado', 'INVALID');
             }
-        }
-
-        const approvedAmount = amount !== undefined ? Number(amount) : Number(existingReceipt.amount);
-        if (!Number.isFinite(approvedAmount) || approvedAmount <= 0) {
-            res.status(400).json({ error: 'Informe o valor do comprovante antes de aprovar' });
-            return;
-        }
-
-        const nextNotes = req.body.notes
-            ? [existingReceipt.notes, req.body.notes].filter(Boolean).join(' | review: ')
-            : existingReceipt.notes || null;
-
-        // Reivindicação atômica: dois cliques/abas simultâneos não aplicam o pagamento duas vezes.
-        const claimed = await prisma.paymentReceipt.updateMany({
-            where: { id: req.params.id as string, status: 'PENDING' },
-            data: {
-                amount: approvedAmount,
-                status: 'APPROVED',
-                reviewedBy: req.user!.id,
-                reviewedAt: new Date(),
-                notes: nextNotes
+            if (existingReceipt.status !== 'PENDING') {
+                throw new ReviewConflict(409, `Comprovante já ${existingReceipt.status === 'APPROVED' ? 'aprovado' : 'rejeitado'}`, 'ALREADY_REVIEWED');
             }
-        });
-        if (claimed.count !== 1) {
-            res.status(409).json({ error: 'Comprovante já foi revisado', code: 'ALREADY_REVIEWED' });
-            return;
-        }
-        const receipt = await prisma.paymentReceipt.findUniqueOrThrow({ where: { id: req.params.id as string } });
+            // Parcela já paga: aprovar geraria crédito em dobro (e, na rolagem, uma nova parcela de juros).
+            // Quitação total continua permitida (fecha o restante do contrato).
+            if (!isDischarge) {
+                const inst = await tx.installment.findUnique({ where: { id: existingReceipt.installmentId }, select: { status: true } });
+                if (inst?.status === 'PAID') {
+                    throw new ReviewConflict(409, 'Esta parcela já está paga. Rejeite o comprovante ou registre como pagamento avulso no contrato.', 'INSTALLMENT_ALREADY_PAID');
+                }
+            }
 
-        const result = await applyApprovedPayment(receipt, { isDischarge, isInterestOnly });
-        if (result === 'INSTALLMENT_NOT_FOUND') {
-            res.status(404).json({ error: 'Parcela não encontrada' });
-            return;
-        }
+            const approvedAmount = amount !== undefined ? Number(amount) : Number(existingReceipt.amount);
+            if (!Number.isFinite(approvedAmount) || approvedAmount <= 0) {
+                throw new ReviewConflict(400, 'Informe o valor do comprovante antes de aprovar', 'INVALID');
+            }
 
+            const nextNotes = req.body.notes
+                ? [existingReceipt.notes, req.body.notes].filter(Boolean).join(' | review: ')
+                : existingReceipt.notes || null;
+
+            // Reivindicação atômica: dois cliques/abas simultâneos não aplicam o pagamento duas vezes.
+            const claimed = await tx.paymentReceipt.updateMany({
+                where: { id: req.params.id as string, status: 'PENDING' },
+                data: {
+                    amount: approvedAmount,
+                    status: 'APPROVED',
+                    reviewedBy: req.user!.id,
+                    reviewedAt: new Date(),
+                    notes: nextNotes
+                }
+            });
+            if (claimed.count !== 1) {
+                throw new ReviewConflict(409, 'Comprovante já foi revisado', 'ALREADY_REVIEWED');
+            }
+            const receipt = await tx.paymentReceipt.findUniqueOrThrow({ where: { id: req.params.id as string } });
+
+            const result = await applyPaymentInTransaction(tx, receipt, { isDischarge, isInterestOnly });
+            if (!result) throw new ReviewConflict(404, 'Parcela não encontrada', 'INSTALLMENT_NOT_FOUND');
+            return { receipt, result };
+        }, { isolationLevel: 'Serializable', timeout: 20000 });
+        await notifyApprovedPayment(reviewed.receipt, reviewed.result, { isDischarge }).catch(() => console.error('[PaymentReceipts] Falha na notificação após baixa confirmada'));
         res.json({ success: true });
     } catch (error: any) {
-        console.error('[PaymentReceipts] Approve error:', error);
+        if (error instanceof ReviewConflict) { res.status(error.status).json({ error: error.message, code: error.code }); return; }
+        if (error?.code === 'P2034') { res.status(409).json({ error: 'Revisão concorrente. Atualize antes de tentar novamente.' }); return; }
+        console.error('[PaymentReceipts] Falha na aprovação (nada foi aplicado):', error?.message);
         res.status(500).json({ error: 'Erro ao aprovar comprovante' });
     }
 });

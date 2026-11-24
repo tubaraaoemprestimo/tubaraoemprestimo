@@ -1,0 +1,307 @@
+{
+  "375": {
+    "engine": "chromium",
+    "errors": [],
+    "checks": {
+      "clientes": {
+        "url": "http://127.0.0.1:4321/#/admin/customers",
+        "textLength": 1114,
+        "overflow": false
+      },
+      "historico": {
+        "url": "http://127.0.0.1:4321/#/admin/customers",
+        "textLength": 1158,
+        "overflow": false
+      },
+      "contratos": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 0,
+        "overflow": false
+      },
+      "detalhes": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 1179,
+        "overflow": false
+      },
+      "contrato-ficha": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 1363,
+        "overflow": false
+      },
+      "editar": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 560,
+        "overflow": false
+      },
+      "financeiro": {
+        "url": "http://127.0.0.1:4321/#/admin/finance",
+        "textLength": 0,
+        "overflow": false
+      },
+      "central-financeira": {
+        "url": "http://127.0.0.1:4321/#/admin/finance-hub",
+        "textLength": 494,
+        "overflow": false
+      },
+      "cliente-dashboard": {
+        "url": "http://127.0.0.1:4321/#/client/dashboard",
+        "textLength": 263,
+        "overflow": false
+      },
+      "cliente-contratos": {
+        "url": "http://127.0.0.1:4321/#/client/contracts",
+        "textLength": 124,
+        "overflow": false
+      },
+      "cliente-tenta-admin": {
+        "url": "http://127.0.0.1:4321/#/login",
+        "textLength": 138,
+        "overflow": false
+      }
+    }
+  },
+  "390": {
+    "engine": "chromium",
+    "errors": [],
+    "checks": {
+      "clientes": {
+        "url": "http://127.0.0.1:4321/#/admin/customers",
+        "textLength": 1114,
+        "overflow": false
+      },
+      "historico": {
+        "url": "http://127.0.0.1:4321/#/admin/customers",
+        "textLength": 1158,
+        "overflow": false
+      },
+      "contratos": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 0,
+        "overflow": false
+      },
+      "detalhes": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 1179,
+        "overflow": false
+      },
+      "contrato-ficha": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 1363,
+        "overflow": false
+      },
+      "editar": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 560,
+        "overflow": false
+      },
+      "financeiro": {
+        "url": "http://127.0.0.1:4321/#/admin/finance",
+        "textLength": 0,
+        "overflow": false
+      },
+      "central-financeira": {
+        "url": "http://127.0.0.1:4321/#/admin/finance-hub",
+        "textLength": 494,
+        "overflow": false
+      },
+      "cliente-dashboard": {
+        "url": "http://127.0.0.1:4321/#/client/dashboard",
+        "textLength": 263,
+        "overflow": false
+      },
+      "cliente-contratos": {
+        "url": "http://127.0.0.1:4321/#/client/contracts",
+        "textLength": 124,
+        "overflow": false
+      },
+      "cliente-tenta-admin": {
+        "url": "http://127.0.0.1:4321/#/login",
+        "textLength": 138,
+        "overflow": false
+      }
+    }
+  },
+  "430": {
+    "engine": "chromium",
+    "errors": [],
+    "checks": {
+      "clientes": {
+        "url": "http://127.0.0.1:4321/#/admin/customers",
+        "textLength": 1114,
+        "overflow": false
+      },
+      "historico": {
+        "url": "http://127.0.0.1:4321/#/admin/customers",
+        "textLength": 1158,
+        "overflow": false
+      },
+      "contratos": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 0,
+        "overflow": false
+      },
+      "detalhes": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 1179,
+        "overflow": false
+      },
+      "contrato-ficha": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 1363,
+        "overflow": false
+      },
+      "editar": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 560,
+        "overflow": false
+      },
+      "financeiro": {
+        "url": "http://127.0.0.1:4321/#/admin/finance",
+        "textLength": 0,
+        "overflow": false
+      },
+      "central-financeira": {
+        "url": "http://127.0.0.1:4321/#/admin/finance-hub",
+        "textLength": 494,
+        "overflow": false
+      },
+      "cliente-dashboard": {
+        "url": "http://127.0.0.1:4321/#/client/dashboard",
+        "textLength": 263,
+        "overflow": false
+      },
+      "cliente-contratos": {
+        "url": "http://127.0.0.1:4321/#/client/contracts",
+        "textLength": 124,
+        "overflow": false
+      },
+      "cliente-tenta-admin": {
+        "url": "http://127.0.0.1:4321/#/login",
+        "textLength": 138,
+        "overflow": false
+      }
+    }
+  },
+  "768": {
+    "engine": "chromium",
+    "errors": [],
+    "checks": {
+      "clientes": {
+        "url": "http://127.0.0.1:4321/#/admin/customers",
+        "textLength": 1568,
+        "overflow": false
+      },
+      "historico": {
+        "url": "http://127.0.0.1:4321/#/admin/customers",
+        "textLength": 1603,
+        "overflow": false
+      },
+      "contratos": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 0,
+        "overflow": false
+      },
+      "detalhes": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 1624,
+        "overflow": false
+      },
+      "contrato-ficha": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 1808,
+        "overflow": false
+      },
+      "editar": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 1014,
+        "overflow": false
+      },
+      "financeiro": {
+        "url": "http://127.0.0.1:4321/#/admin/finance",
+        "textLength": 0,
+        "overflow": false
+      },
+      "central-financeira": {
+        "url": "http://127.0.0.1:4321/#/admin/finance-hub",
+        "textLength": 1014,
+        "overflow": false
+      },
+      "cliente-dashboard": {
+        "url": "http://127.0.0.1:4321/#/client/dashboard",
+        "textLength": 228,
+        "overflow": false
+      },
+      "cliente-contratos": {
+        "url": "http://127.0.0.1:4321/#/client/contracts",
+        "textLength": 205,
+        "overflow": false
+      },
+      "cliente-tenta-admin": {
+        "url": "http://127.0.0.1:4321/#/login",
+        "textLength": 138,
+        "overflow": false
+      }
+    }
+  },
+  "1440": {
+    "engine": "chromium",
+    "errors": [],
+    "checks": {
+      "clientes": {
+        "url": "http://127.0.0.1:4321/#/admin/customers",
+        "textLength": 1697,
+        "overflow": false
+      },
+      "historico": {
+        "url": "http://127.0.0.1:4321/#/admin/customers",
+        "textLength": 1732,
+        "overflow": false
+      },
+      "contratos": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 0,
+        "overflow": false
+      },
+      "detalhes": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 1624,
+        "overflow": false
+      },
+      "contrato-ficha": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 1808,
+        "overflow": false
+      },
+      "editar": {
+        "url": "http://127.0.0.1:4321/#/admin/contracts",
+        "textLength": 1014,
+        "overflow": false
+      },
+      "financeiro": {
+        "url": "http://127.0.0.1:4321/#/admin/finance",
+        "textLength": 0,
+        "overflow": false
+      },
+      "central-financeira": {
+        "url": "http://127.0.0.1:4321/#/admin/finance-hub",
+        "textLength": 1014,
+        "overflow": false
+      },
+      "cliente-dashboard": {
+        "url": "http://127.0.0.1:4321/#/client/dashboard",
+        "textLength": 228,
+        "overflow": false
+      },
+      "cliente-contratos": {
+        "url": "http://127.0.0.1:4321/#/client/contracts",
+        "textLength": 205,
+        "overflow": false
+      },
+      "cliente-tenta-admin": {
+        "url": "http://127.0.0.1:4321/#/login",
+        "textLength": 138,
+        "overflow": false
+      }
+    }
+  }
+}

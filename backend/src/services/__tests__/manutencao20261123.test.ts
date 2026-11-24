@@ -14,7 +14,11 @@ vi.mock('../email', () => ({ emailService: { send: async () => {} } }));
 vi.mock('../whatsapp', () => ({ sendWhatsAppMessage: async () => true }));
 vi.mock('../../routes/push', () => ({ sendPushToUser: async () => {}, sendPushToRole: async () => {} }));
 const applied: any[] = [];
-vi.mock('../paymentConfirmationService', () => ({ applyApprovedPayment: async (r: any) => { applied.push(r.id); return 'OK'; } }));
+let paymentFails = false;
+vi.mock('../paymentConfirmationService', () => ({
+    applyPaymentInTransaction: async (_tx: any, r: any) => { if (paymentFails) throw new Error('falha financeira simulada'); applied.push(r.id); return 'OK'; },
+    notifyApprovedPayment: async () => {},
+}));
 
 const ADMIN = { id: 'adm', name: 'Admin', role: 'ADMIN' };
 const CLIENT = { id: 'u1', name: 'Cli', role: 'CLIENT' };
@@ -49,6 +53,8 @@ describe('comprovantes', () => {
     let receipt: any;
     beforeEach(() => {
         applied.length = 0;
+        paymentFails = false;
+        db.$transaction = async (fn: any) => fn(db);
         receipt = { id: 'r1', status: 'PENDING', amount: 505, notes: null, installmentId: 'i1', customerId: 'c1' };
         db.paymentReceipt = {
             findUnique: async () => ({ ...receipt }),
@@ -92,6 +98,20 @@ describe('comprovantes', () => {
         const { paymentReceiptsRouter } = await import('../../routes/paymentReceipts');
         const r = await call(paymentReceiptsRouter, '/api/payment-receipts', 'POST', '/', CLIENT, { installmentId: 'i1', receiptUrl: 'https://x/y.jpg' });
         expect(r.status).toBe(404);
+    });
+    it('se a baixa financeira falhar, o comprovante não fica preso em APPROVED e pode ser tentado de novo', async () => {
+        db.$transaction = async (fn: any) => {
+            const snap = { ...receipt };
+            try { return await fn(db); } catch (e) { Object.assign(receipt, snap); throw e; }
+        };
+        paymentFails = true;
+        const { paymentReceiptsRouter } = await import('../../routes/paymentReceipts');
+        expect((await call(paymentReceiptsRouter, '/api/payment-receipts', 'PUT', '/r1/approve', ADMIN, {})).status).toBe(500);
+        expect(receipt.status).toBe('PENDING');
+        paymentFails = false;
+        expect((await call(paymentReceiptsRouter, '/api/payment-receipts', 'PUT', '/r1/approve', ADMIN, {})).status).toBe(200);
+        expect(applied).toEqual(['r1']);
+        expect(receipt.status).toBe('APPROVED');
     });
 });
 

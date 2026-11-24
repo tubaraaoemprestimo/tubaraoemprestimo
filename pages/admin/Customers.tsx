@@ -757,14 +757,15 @@ export const Customers: React.FC = () => {
       </div>
 
       {/* ===== Celular: cartões, nome sempre junto das ações ===== */}
-      <div className="md:hidden space-y-3" aria-label="Lista de clientes">
+      {/* Cartões até 1024 px: no tablet o menu lateral fixo deixa a tabela sem espaço para as ações. */}
+      <div className="lg:hidden space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0" aria-label="Lista de clientes">
         {loading ? (
           <p className="p-8 text-center text-zinc-500">Carregando carteira de clientes...</p>
         ) : filteredCustomers.length === 0 ? (
           <p className="p-8 text-center text-zinc-500">Nenhum cliente encontrado.</p>
         ) : (
           <>
-            <label className="flex items-center gap-2 text-sm text-zinc-400 px-1">
+            <label className="flex items-center gap-2 text-sm text-zinc-400 px-1 md:col-span-2">
               <input type="checkbox" checked={selectedIds.length === filteredCustomers.length} onChange={toggleSelectAll}
                 className="h-5 w-5 rounded bg-zinc-800 border-zinc-700 text-[#D4AF37]" />
               Selecionar todos ({filteredCustomers.length})
@@ -829,7 +830,7 @@ export const Customers: React.FC = () => {
         )}
       </div>
 
-      <div className="hidden md:block bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
+      <div className="hidden lg:block bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[800px]">
             <thead className="bg-zinc-950 text-zinc-400 text-sm uppercase tracking-wider">
