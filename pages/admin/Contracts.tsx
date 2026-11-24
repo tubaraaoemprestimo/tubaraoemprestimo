@@ -376,7 +376,7 @@ export const Contracts: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
 
-  // Ficha do cliente dentro do contrato: contatos, referências, Instagram, fotos e vídeos.
+  // Ficha do cliente dentro do contrato: contato do titular e documentos de identificação.
   const [customerInfo, setCustomerInfo] = useState<any | null>(null);
   const [customerInfoLoading, setCustomerInfoLoading] = useState(false);
   const toggleCustomerInfo = async () => {
@@ -932,7 +932,7 @@ export const Contracts: React.FC = () => {
                 <div>
                   <button type="button" onClick={toggleCustomerInfo} disabled={customerInfoLoading} aria-expanded={!!customerInfo}
                     className="min-h-[48px] w-full rounded-xl bg-[#D4AF37] font-bold text-black disabled:opacity-60">
-                    {customerInfoLoading ? 'Carregando ficha...' : customerInfo ? 'Ocultar ficha do cliente' : 'Ficha do cliente: contatos, referências, fotos e vídeos'}
+                    {customerInfoLoading ? 'Carregando ficha...' : customerInfo ? 'Ocultar ficha do cliente' : 'Ficha do cliente: contato e documentos'}
                   </button>
                   {customerInfo && (
                     <div className="mt-3">
