@@ -119,6 +119,9 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   PAID: { label: 'Pago', color: 'bg-blue-900 text-blue-300' },
 };
 
+// Contratos encerrados: sem próximo vencimento e sem ações financeiras.
+const CLOSED_STATUSES = new Set(['COMPLETED', 'CANCELLED', 'PAID']);
+
 const FREQ_LABELS: Record<string, string> = {
   DAILY: 'Diária',
   WEEKLY: 'Semanal',
@@ -626,7 +629,17 @@ export const Contracts: React.FC = () => {
     }
     
     const totalPending = pending.reduce((sum, i) => sum + i.amount, 0);
-    if (!window.confirm(`Confirmar quitação total de ${pending.length} parcela(s) no valor de ${fmt(totalPending)}?`)) return;
+    // Quitação encerra o contrato (saldo zera) e não tem botão de desfazer.
+    // Pagamento só de juros (CLT/Garantia) é "Baixa ✓" na cobrança ou comprovante "Juros do Mês".
+    const typed = window.prompt(
+      `ATENÇÃO: QUITAÇÃO TOTAL encerra o contrato e zera o saldo (${fmt(selected.remainingAmount)}).\n` +
+      `Use só se o cliente pagou TUDO. Se pagou apenas os juros do mês, cancele e use "Baixa ✓" na cobrança.\n\n` +
+      `${pending.length} cobrança(s) em aberto: ${fmt(totalPending)}.\n\nDigite QUITAR para confirmar:`
+    );
+    if ((typed || '').trim().toUpperCase() !== 'QUITAR') {
+      addToast('Quitação cancelada.', 'info');
+      return;
+    }
     
     setSettlingAll(true);
     try {
@@ -843,7 +856,7 @@ export const Contracts: React.FC = () => {
                     ) : displayMode === 'SALDO_JUROS' ? (
                       <div>
                         <p className="text-xs text-zinc-500">Juros do mês</p>
-                        {(() => {
+                        {CLOSED_STATUSES.has(c.status) ? <p className="font-bold text-zinc-400">Encerrado</p> : (() => {
                           const state = interestState(c);
                           const color = state === 'ATRASADO' ? 'text-red-400' : state === 'EM_ABERTO' ? 'text-yellow-400' : 'text-green-400';
                           return <p className={`font-bold ${color}`}>{INTEREST_STATE_LABEL[state]}</p>;
@@ -862,9 +875,14 @@ export const Contracts: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Vencimento / Atraso */}
+                  {/* Vencimento / Atraso. Encerrado não tem próximo vencimento: a data gravada é histórica. */}
                   <div className="text-sm">
-                    {c.daysOverdue > 0 ? (
+                    {CLOSED_STATUSES.has(c.status) ? (
+                      <div className="flex items-center gap-1 text-zinc-400">
+                        <CheckCircle size={14} />
+                        <span>{c.status === 'CANCELLED' ? 'Cancelado' : `Quitado${c.lastPaymentDate ? ` em ${fmtDate(c.lastPaymentDate)}` : ''}`}</span>
+                      </div>
+                    ) : c.daysOverdue > 0 ? (
                       <div className="flex items-center gap-1 text-red-400">
                         <AlertTriangle size={14} />
                         <span className="font-bold">{c.daysOverdue}d atraso</span>
@@ -1177,10 +1195,12 @@ export const Contracts: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
                 <Button variant="secondary" onClick={() => setDetailsOpen(false)} className="w-full">Fechar</Button>
-                <Button onClick={() => openPartialPayment(selected)} className="w-full bg-[#D4AF37] hover:bg-yellow-500 text-black">
-                  <DollarSign size={16} /> Registrar Pagamento Parcial/Avulso
-                </Button>
-                {(selected.installments || []).some(i => i.status === 'OPEN' || i.status === 'LATE' || i.status === 'AWAITING_CONFIRMATION') && (
+                {!CLOSED_STATUSES.has(selected.status) && (
+                  <Button onClick={() => openPartialPayment(selected)} className="w-full bg-[#D4AF37] hover:bg-yellow-500 text-black">
+                    <DollarSign size={16} /> Registrar Pagamento Parcial/Avulso
+                  </Button>
+                )}
+                {!CLOSED_STATUSES.has(selected.status) && (selected.installments || []).some(i => i.status === 'OPEN' || i.status === 'LATE' || i.status === 'AWAITING_CONFIRMATION') && (
                   <Button
                     onClick={handleSettleAll}
                     disabled={settlingAll}
