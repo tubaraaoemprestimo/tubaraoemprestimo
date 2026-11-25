@@ -1,5 +1,26 @@
 import cron from 'node-cron';
 import { collectionAutomationService, CollectionStats } from '../services/collectionAutomationService';
+import { prisma } from '../services/prisma';
+
+// Trava no PostgreSQL (vale entre processos e servidores, não só neste Node).
+// Chave fixa e exclusiva da régua de empréstimos.
+const COLLECTION_LOCK_KEY = 72016001;
+
+/**
+ * Executa `fn` só se conseguir a trava; sem a trava, não roda.
+ * Trava de transação (pg_try_advisory_xact_lock): liberada sozinha no fim da
+ * transação, inclusive se o processo cair — não fica presa.
+ * ponytail: ocupa 1 conexão do pool durante a régua (minutos, 1×/dia).
+ */
+export async function withCollectionLock<T>(fn: () => Promise<T>, db: any = prisma): Promise<{ ran: true; value: T } | { ran: false }> {
+  return db.$transaction(async (tx: any) => {
+    const rows = await tx.$queryRawUnsafe(`SELECT pg_try_advisory_xact_lock(${COLLECTION_LOCK_KEY}) AS ok`);
+    if (!rows?.[0]?.ok) return { ran: false as const };
+    // A régua usa o cliente normal (várias transações próprias); a trava fica
+    // presa nesta transação até `fn` terminar e é liberada no commit/rollback.
+    return { ran: true as const, value: await fn() };
+  }, { timeout: 30 * 60 * 1000, maxWait: 10000 });
+}
 
 /**
  * Cron Job para Réguas de Cobrança Automatizadas
@@ -22,7 +43,12 @@ export function startCollectionCron() {
     console.log('[CollectionCron] ========== INICIANDO CRON DE COBRANÇA ==========');
 
     try {
-      const stats = await collectionAutomationService.runCollectionAutomation();
+      const r = await withCollectionLock(() => collectionAutomationService.runCollectionAutomation());
+      if (!r.ran) {
+        console.log('[CollectionCron] Outra execução (outro processo) já está rodando; pulando.');
+        return;
+      }
+      const stats = r.value;
 
       console.log('[CollectionCron] ========== CRON CONCLUÍDO ==========');
       console.log(`[CollectionCron] Total de mensagens enviadas: ${stats.totalSent}`);
@@ -74,8 +100,9 @@ export async function runCollectionManually() {
   console.log('[CollectionCron] Executando manualmente...');
 
   try {
-    const stats = await collectionAutomationService.runCollectionAutomation();
-    return { success: true, stats };
+    const r = await withCollectionLock(() => collectionAutomationService.runCollectionAutomation());
+    if (!r.ran) return { success: false, message: 'Outra execução já está rodando' };
+    return { success: true, stats: r.value };
   } catch (error) {
     console.error('[CollectionCron] Erro:', error);
     return { success: false, error };

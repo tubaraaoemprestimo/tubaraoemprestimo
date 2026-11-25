@@ -115,6 +115,18 @@ describe('comprovantes', () => {
     });
 });
 
+describe('automação de cobrança: só admin', () => {
+    it('cliente não executa a régua nem lê estatísticas/histórico; conciliação também só admin', async () => {
+        vi.doMock('../../cron/collectionCron', () => ({ runCollectionManually: async () => ({ success: true, stats: {} }) }));
+        const { default: collectionRouter } = await import('../../routes/collectionAutomation');
+        for (const [m, p] of [['POST', '/run'], ['GET', '/stats'], ['GET', '/history'], ['GET', '/templates']] as const) {
+            expect((await call(collectionRouter, '/api/collection-automation', m, p, CLIENT)).status).toBe(403);
+        }
+        const { paymentReceiptsRouter } = await import('../../routes/paymentReceipts');
+        expect((await call(paymentReceiptsRouter, '/api/payment-receipts', 'GET', '/reconciliation', CLIENT)).status).toBe(403);
+    });
+});
+
 describe('edição de contrato', () => {
     it('registra auditoria com valor anterior e novo; recusa data inválida', async () => {
         const audits: any[] = [];

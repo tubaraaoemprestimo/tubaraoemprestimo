@@ -176,7 +176,7 @@ function getPublicBaseUrl(req: Request): string {
     return host ? `${proto}://${host}` : '';
 }
 
-function publicMediaUrl(url: unknown, req: Request): string {
+export function publicMediaUrl(url: unknown, req: Request): string {
     const value = String(url || '').trim();
     if (!value || value.startsWith('data:') || /^https?:\/\//i.test(value)) return value;
     const baseUrl = getPublicBaseUrl(req);

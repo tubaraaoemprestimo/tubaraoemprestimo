@@ -15,8 +15,9 @@ import { loanSettingsService } from '../../services/loanSettingsService';
 import { LoanRequest, PaymentReceipt } from '../../types';
 import { useToast } from '../../components/Toast';
 import { autoNotificationService } from '../../services/autoNotificationService';
+import { ReceiptReconciliation } from '../../components/admin/ReceiptReconciliation';
 
-type TabType = 'overview' | 'payments' | 'receipts' | 'ranking';
+type TabType = 'overview' | 'payments' | 'receipts' | 'reconciliation' | 'ranking';
 
 interface ClientRanking {
     id: string;
@@ -65,7 +66,7 @@ export const FinanceHub: React.FC = () => {
     // Read tab from URL on mount and when URL changes
     useEffect(() => {
         const tabParam = searchParams.get('tab');
-        if (tabParam === 'overview' || tabParam === 'payments' || tabParam === 'receipts' || tabParam === 'ranking') {
+        if (tabParam === 'overview' || tabParam === 'payments' || tabParam === 'receipts' || tabParam === 'reconciliation' || tabParam === 'ranking') {
             setActiveTab(tabParam);
         }
     }, [searchParams]);
@@ -340,6 +341,7 @@ export const FinanceHub: React.FC = () => {
         { id: 'overview', label: 'Visão Geral', icon: <TrendingUp size={18} /> },
         { id: 'payments', label: 'Pagamentos', icon: <DollarSign size={18} />, badge: payments.filter(p => (p as any).status === 'PENDING').length },
         { id: 'receipts', label: 'Comprovantes', icon: <Receipt size={18} />, badge: receipts.filter(r => r.status === 'PENDING').length },
+        { id: 'reconciliation', label: 'Conciliação', icon: <CheckCircle2 size={18} /> },
         { id: 'ranking', label: 'Ranking', icon: <Trophy size={18} /> },
     ] as const;
 
@@ -735,6 +737,8 @@ export const FinanceHub: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {activeTab === 'reconciliation' && <ReceiptReconciliation />}
 
             {/* Ranking Tab */}
             {activeTab === 'ranking' && (

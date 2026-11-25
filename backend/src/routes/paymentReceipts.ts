@@ -4,6 +4,8 @@ import { authenticate, requireAdmin } from '../middleware/auth';
 import { emailService } from '../services/email';
 import { sendWhatsAppMessage } from '../services/whatsapp';
 import { sendPushToUser, sendPushToRole } from './push';
+import { publicMediaUrl } from './loans';
+import { buildReconciliationReport } from '../services/receiptReconciliation';
 import { applyPaymentInTransaction, notifyApprovedPayment } from '../services/paymentConfirmationService';
 
 export const paymentReceiptsRouter = Router();
@@ -141,6 +143,18 @@ paymentReceiptsRouter.get('/', async (req: Request, res: Response) => {
         res.json(enriched);
     } catch (error) {
         res.status(500).json({ error: 'Erro ao buscar comprovantes' });
+    }
+});
+
+// GET /api/payment-receipts/reconciliation — comprovantes pendentes de parcelas já pagas,
+// classificados. Somente leitura (não altera saldo nem status).
+paymentReceiptsRouter.get('/reconciliation', requireAdmin, async (req: Request, res: Response) => {
+    try {
+        const items = await buildReconciliationReport(prisma);
+        res.json({ items: items.map(i => ({ ...i, receiptUrl: publicMediaUrl(i.receiptUrl, req) })) });
+    } catch (error: any) {
+        console.error('[PaymentReceipts] Conciliação:', error?.message);
+        res.status(500).json({ error: 'Erro ao montar conciliação' });
     }
 });
 
