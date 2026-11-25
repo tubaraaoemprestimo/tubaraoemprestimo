@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { sendWhatsAppMessage } from '../services/whatsapp';
+import { sendClientWhatsApp } from '../services/communication';
 import { computeCharge, resolveMonthlyRate } from '../services/interestEngine';
 import { applyPaymentWaterfall, getLoanPayoffBalance } from '../services/loanPayoffService';
 
@@ -781,15 +782,11 @@ loansRouter.post('/:loanId/settle-all', requireAdmin, async (req: Request, res: 
         if (!settled) { res.status(409).json({ error: 'O contrato mudou ou já foi quitado. Atualize a tela.' }); return; }
 
         // Notificar cliente via WhatsApp
-        if (loan.customer?.phone) {
-            try {
-                await sendWhatsAppMessage(
-                    loan.customer.phone,
-                    `✅ *Contrato Quitado!*\n\nOlá ${loan.customer.name}, seu contrato foi totalmente quitado.\n\nObrigado por confiar na Tubarão Empréstimos! 🦈`
-                );
-            } catch {
-                // falha no WhatsApp não deve bloquear a quitação
-            }
+        if (loan.customer?.id) {
+            // Respeita preferências/pausa na hora do envio; falha não bloqueia a quitação.
+            await sendClientWhatsApp(loan.customer.id, 'SETTLED',
+                `✅ *Contrato Quitado!*\n\nOlá ${loan.customer.name.split(' ')[0]}, seu contrato foi totalmente quitado.\n\nObrigado por confiar na Tubarão Empréstimos! 🦈`
+            ).catch(() => {});
         }
 
         res.json({ success: true, installmentsSettled: pendingInstallments.length, totalPaid });

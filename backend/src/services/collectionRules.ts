@@ -70,34 +70,55 @@ export async function setLastRunDate(value: string, db: any = prisma) {
     await db.systemSetting.upsert({ where: { key: LAST_RUN_KEY }, update: { value }, create: { key: LAST_RUN_KEY, value } });
 }
 
-/** WhatsApp só para o próprio titular, com telefone válido, sem opt-out e sem marca de telefone inválido. */
+/** Comunicação do titular suspensa temporariamente (até a data, ou sem prazo se só tiver motivo). */
+export function commSuspended(customer: any, now = new Date()): boolean {
+    if (!customer) return false;
+    if (customer.commSuspendedUntil) return new Date(customer.commSuspendedUntil) > now;
+    return !!customer.commSuspendedReason;
+}
+
+/** WhatsApp só para o próprio titular, com telefone válido, sem opt-out, sem suspensão e sem marca de telefone inválido. */
 export function whatsappAllowed(customer: any): boolean {
-    if (!customer || customer.whatsappOptOut || customer.activationStatus === 'TELEFONE_INVALIDO') return false;
+    if (!customer || customer.whatsappOptOut || customer.activationStatus === 'TELEFONE_INVALIDO' || commSuspended(customer)) return false;
     let d = String(customer.phone || '').replace(/\D/g, '');
     if (d.length === 10 || d.length === 11) d = `55${d}`;
     return /^55\d{10,11}$/.test(d);
 }
 
-export type SkipReason = 'CONTRATO_ENCERRADO' | 'SALDO_ZERO' | 'SALDO_NAO_CONFIRMADO' | 'COMUNICACAO_SUSPENSA' | 'PAGAMENTO_EM_CONFERENCIA' | 'JA_ENVIADO';
+export type SkipReason = 'CONTRATO_ENCERRADO' | 'SALDO_ZERO' | 'SALDO_NAO_CONFIRMADO' | 'COMUNICACAO_SUSPENSA' | 'CLIENTE_SUSPENSO' | 'CONTESTACAO_ABERTA' | 'PAGAMENTO_EM_CONFERENCIA' | 'JA_ENVIADO';
 
 export const SKIP_LABEL: Record<SkipReason, string> = {
     CONTRATO_ENCERRADO: 'Contrato quitado/cancelado',
     SALDO_ZERO: 'Saldo zero',
     SALDO_NAO_CONFIRMADO: 'Saldo antigo não conferido',
     COMUNICACAO_SUSPENSA: 'Mensagens pausadas no contrato',
+    CLIENTE_SUSPENSO: 'Comunicação do cliente suspensa',
+    CONTESTACAO_ABERTA: 'Contestação aberta',
     PAGAMENTO_EM_CONFERENCIA: 'Pagamento aguardando conferência',
     JA_ENVIADO: 'Já enviado',
 };
 
-/** null = pode enviar; senão o motivo de não enviar. */
+export const OPEN_DISPUTE = ['OPEN', 'IN_REVIEW', 'WAITING_DOCS'];
+
+/**
+ * null = pode enviar; senão o motivo de não enviar.
+ * Relê contrato, cobrança e cliente do banco NA HORA do envio: um bloqueio feito
+ * depois do início da rodada (pausa, contestação, opt-out, quitação) vale na hora.
+ */
 export async function collectionGate(installment: any, trigger: string, db: any = prisma): Promise<SkipReason | null> {
-    const loan = installment?.loan;
+    const fresh = installment?.id && db.installment?.findUnique
+        ? await db.installment.findUnique({ where: { id: installment.id }, include: { loan: { include: { customer: true } } } })
+        : installment;
+    const loan = fresh?.loan;
+    if (fresh && installment?.loan) installment.loan.customer = loan?.customer ?? installment.loan.customer; // envio usa as preferências atuais
     let reason: SkipReason | null = null;
-    if (!loan || !['ACTIVE'].includes(loan.status)) reason = 'CONTRATO_ENCERRADO';
+    if (!loan || !['ACTIVE'].includes(loan.status) || !['OPEN', 'LATE', 'AWAITING_CONFIRMATION'].includes(fresh.status)) reason = 'CONTRATO_ENCERRADO';
     else if (Number(loan.remainingAmount) <= 0) reason = 'SALDO_ZERO';
     else if (loan.collectionSuspended) reason = 'SALDO_NAO_CONFIRMADO';
     else if (loan.messagesSuspended) reason = 'COMUNICACAO_SUSPENSA';
-    else if (installment.status === 'AWAITING_CONFIRMATION'
+    else if (commSuspended(loan.customer)) reason = 'CLIENTE_SUSPENSO';
+    else if (await db.dispute?.count?.({ where: { loanId: loan.id, status: { in: OPEN_DISPUTE }, OR: [{ installmentId: null }, { installmentId: fresh.id }] } })) reason = 'CONTESTACAO_ABERTA';
+    else if (fresh.status === 'AWAITING_CONFIRMATION'
         || await db.paymentReceipt.count({ where: { installmentId: installment.id, status: 'PENDING' } })) reason = 'PAGAMENTO_EM_CONFERENCIA';
     else if (await db.collectionDispatch.count({ where: { installmentId: installment.id, triggerEvent: trigger, dueDate: installment.dueDate, status: 'SENT' } })) reason = 'JA_ENVIADO';
     if (reason) console.log(`[CollectionRules] ${trigger} cobrança ${String(installment?.id).slice(0, 8)} não enviada: ${reason}`);

@@ -194,6 +194,14 @@ model Customer {
   activationStatus      String?        @map("activation_status")
   isLegacy              Boolean        @default(false) @map("is_legacy")
   whatsappOptOut        Boolean        @default(false) @map("whatsapp_opt_out")
+  inviteOptOut          Boolean        @default(false) @map("invite_opt_out")
+  promoOptOut           Boolean        @default(false) @map("promo_opt_out")
+  phoneConfirmed        Boolean        @default(false) @map("phone_confirmed")
+  commSuspendedUntil    DateTime?      @map("comm_suspended_until")
+  commSuspendedReason   String?        @map("comm_suspended_reason")
+  commPrefsUpdatedAt    DateTime?      @map("comm_prefs_updated_at")
+  investments           InvestmentRecord[]
+  disputes              Dispute[]
   activationInvites     ActivationInvite[]
   coupons               Coupon[]
   partner               User?          @relation("CustomerPartner", fields: [partnerId], references: [id])
@@ -405,6 +413,9 @@ model Loan {
   legacyBalanceConfirmed  Boolean       @default(false) @map("legacy_balance_confirmed")
   collectionSuspended     Boolean       @default(false) @map("collection_suspended")
   messagesSuspended       Boolean       @default(false) @map("messages_suspended")
+  legacyDocumentUrl       String?       @map("legacy_document_url")
+  legacyDevice            LegacyDeviceFinancing?
+  disputes                Dispute[]
   installments            Installment[]
   customer                Customer      @relation(fields: [customerId], references: [id])
   loanRequest             LoanRequest   @relation(fields: [requestId], references: [id])
@@ -1719,4 +1730,95 @@ model CollectionDispatch {
   @@index([loanId, createdAt], map: "idx_collection_dispatch_loan")
   @@index([createdAt], map: "idx_collection_dispatch_created")
   @@map("collection_dispatches")
+}
+
+// Celular vendido antes do sistema (sem venda nova, sem baixa de estoque).
+model LegacyDeviceFinancing {
+  id                   String    @id @default(uuid())
+  loanId               String    @unique @map("loan_id")
+  brand                String?
+  model                String?
+  deviceIdentifier     String?   @map("device_identifier")
+  originalSaleDate     DateTime? @map("original_sale_date")
+  originalPrice        Float?    @map("original_price")
+  downPayment          Float?    @map("down_payment")
+  financedAmount       Float?    @map("financed_amount")
+  originalInstallments Int?      @map("original_installments")
+  paidInstallments     Int?      @map("paid_installments")
+  positionDate         DateTime? @map("position_date")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  loan                 Loan      @relation(fields: [loanId], references: [id])
+
+  @@map("legacy_device_financings")
+}
+
+// Investimento (a empresa deve ao investidor). Fora da régua de cobrança.
+model InvestmentRecord {
+  id               String              @id @default(uuid())
+  customerId       String              @map("customer_id")
+  isLegacy         Boolean             @default(true) @map("is_legacy")
+  reference        String?
+  originalDate     DateTime?           @map("original_date")
+  amount           Float
+  yieldTerms       String?             @map("yield_terms")
+  monthlyRate      Float?              @map("monthly_rate")
+  payoutFrequency  String?             @map("payout_frequency")
+  paidYieldsTotal  Float?              @map("paid_yields_total")
+  pendingConfirmed Float?              @map("pending_confirmed")
+  nextPayoutDate   DateTime?           @map("next_payout_date")
+  maturityDate     DateTime?           @map("maturity_date")
+  status           String              @default("ACTIVE")
+  contractUrl      String?             @map("contract_url")
+  notes            String?
+  createdBy        String              @map("created_by")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @default(now()) @updatedAt @map("updated_at")
+  customer         Customer            @relation(fields: [customerId], references: [id])
+  payouts          InvestmentPayout[]
+
+  @@index([customerId], map: "idx_investment_customer")
+  @@map("investment_records")
+}
+
+model InvestmentPayout {
+  id            String           @id @default(uuid())
+  investmentId  String           @map("investment_id")
+  paidAt        DateTime         @map("paid_at")
+  amount        Float
+  receiptUrl    String?          @map("receipt_url")
+  transactionId String?          @map("transaction_id")
+  notes         String?
+  createdBy     String           @map("created_by")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  investment    InvestmentRecord @relation(fields: [investmentId], references: [id])
+
+  @@index([investmentId, paidAt], map: "idx_investment_payouts")
+  @@map("investment_payouts")
+}
+
+// Contestação: suspende lembretes/cobranças da obrigação enquanto aberta; não mexe no saldo.
+model Dispute {
+  id            String    @id @default(uuid())
+  customerId    String    @map("customer_id")
+  loanId        String    @map("loan_id")
+  installmentId String?   @map("installment_id")
+  receiptId     String?   @map("receipt_id")
+  reason        String
+  description   String?
+  status        String    @default("OPEN")
+  openedBy      String    @map("opened_by")
+  openedByRole  String    @map("opened_by_role")
+  documentUrls  Json?     @map("document_urls")
+  history       Json?
+  resolution    String?
+  resolvedBy    String?   @map("resolved_by")
+  resolvedAt    DateTime? @map("resolved_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+  customer      Customer  @relation(fields: [customerId], references: [id])
+  loan          Loan      @relation(fields: [loanId], references: [id])
+
+  @@index([loanId, status], map: "idx_disputes_loan_status")
+  @@index([status, createdAt], map: "idx_disputes_status")
+  @@map("disputes")
 }

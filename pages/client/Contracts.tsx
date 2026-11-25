@@ -7,6 +7,7 @@ import { ReceiptModal } from '../../components/ReceiptModal';
 import { apiService } from '../../services/apiService';
 import { Loan, Installment } from '../../types';
 import { useToast } from '../../components/Toast';
+import { DisputeButton } from '../../components/DisputeButton';
 import {
    getProfileType,
    getDisplayMode,
@@ -251,8 +252,10 @@ export const Contracts: React.FC = () => {
                               })()}
                            </div>
 
+                           <DisputeButton loanId={selectedLoan.id} />
+
                            {/* ===== BOTÕES DE PAGAMENTO: só para contratos ATIVOS ===== */}
-                           {selectedLoan.status !== 'PAID' && (
+                           {!['PAID', 'COMPLETED', 'CANCELLED'].includes(selectedLoan.status) && (
                               <div className="grid grid-cols-2 gap-3">
                                  <button
                                     onClick={() => setIsPaymentChoiceOpen(true)}

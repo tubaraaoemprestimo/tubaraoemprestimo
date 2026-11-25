@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import { sendWhatsAppMessage } from './whatsapp';
+import { sendClientWhatsApp } from './communication';
 import { sendPushToUser } from '../routes/push';
 import { applyPaymentWaterfall, getLoanPayoffBalance } from './loanPayoffService';
 
@@ -311,7 +312,18 @@ Acesse o app para ver sua declaração de quitação.
 _Tubarão Empréstimos 🦈_`
                 : `✅ *Pagamento Confirmado!*\n\nOlá, ${customer.name.split(' ')[0]}!\n\nSeu pagamento de R$ ${Number(receipt.amount).toFixed(2)} foi confirmado.\n\nAcesse o app para ver seu recibo.\n\n_Tubarão Empréstimos 🦈_`;
 
-            sendWhatsAppMessage(customer.phone, waMsg).catch(() => {});
+            // Valor só vai para telefone confirmado (cliente com conta ou telefone conferido).
+            const safeMsg = customer.userId || customer.phoneConfirmed ? waMsg
+                : (isDischarge ? `🎉 *Contrato quitado!*
+
+Olá, ${customer.name.split(' ')[0]}! Seu contrato foi quitado. Os detalhes estão no app.
+
+_Tubarão Empréstimos 🦈_` : `✅ *Pagamento confirmado!*
+
+Olá, ${customer.name.split(' ')[0]}! Recebemos seu pagamento. Os detalhes estão no app.
+
+_Tubarão Empréstimos 🦈_`);
+            sendClientWhatsApp(customer.id, isDischarge ? 'SETTLED' : 'PAYMENT_CONFIRMED', safeMsg).catch(() => {});
         }
 
         // Push

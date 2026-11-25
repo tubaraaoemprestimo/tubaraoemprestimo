@@ -3,8 +3,8 @@ import { createHash, randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
-import { sendWhatsAppMessage } from '../services/whatsapp';
-import { whatsappAllowed } from '../services/collectionRules';
+import { getCommunicationSettings, sendClientWhatsApp } from '../services/communication';
+import { whatsappAllowed, OPEN_DISPUTE } from '../services/collectionRules';
 
 /**
  * Clientes antigos (anteriores à plataforma): pré-cadastro pelo admin, contrato
@@ -92,9 +92,12 @@ legacyClientsRouter.get('/services', async (_req, res) => {
         AUTONOMO: { kind: 'INSTALLMENTS', note: 'Comércio/autônomo: diárias ou parcelas que abatem o saldo.' },
         MOTO: { kind: 'INSTALLMENTS', note: 'Parcelas fixas até quitar.' },
         LIMPA_NOME: { kind: 'INSTALLMENTS', note: 'Serviço: parcelas do valor combinado, sem juros de mora.' },
-        FINANCIAMENTO_CELULAR: { kind: 'UNSUPPORTED', note: 'Tem módulo próprio (aparelho e contrato jurídico); registro antigo ainda não suportado.' },
+        FINANCIAMENTO_CELULAR: { kind: 'DEVICE', note: 'Aparelho já vendido: marca, modelo, entrada, parcelas pagas e restantes. Sem venda nova nem baixa de estoque.' },
     };
-    res.json({ services: rows.map(r => ({ code: r.code, label: r.label, active: r.active, ...(RULE[r.code] || { kind: 'INSTALLMENTS', note: '' }) })) });
+    const services = rows.map(r => ({ code: r.code, label: r.label, active: r.active, ...(RULE[r.code] || { kind: 'INSTALLMENTS', note: '' }) }));
+    // Investidor não é serviço do catálogo (é o programa de investimento): opção própria, fora da cobrança.
+    services.push({ code: 'INVESTIDOR', label: 'Investidor (aporte antigo)', active: true, kind: 'INVESTMENT', note: 'A empresa paga o investidor: não entra na régua de cobrança nem gera lançamento de caixa.' });
+    res.json({ services });
 });
 
 /** Busca de possíveis duplicidades antes de cadastrar. Não funde nada. */
@@ -161,13 +164,14 @@ legacyClientsRouter.get('/', async (req, res) => {
     const page = Math.max(1, Number(req.query.page || 1));
     const take = 30;
     const status = str(req.query.status, 30);
-    const legacyScope = { OR: [{ isLegacy: true }, { loans: { some: { isLegacy: true } } }] };
+    const legacyScope = { OR: [{ isLegacy: true }, { loans: { some: { isLegacy: true } } }, { investments: { some: { isLegacy: true } } }] };
     const where: any = { AND: [legacyScope, ...(status ? [{ activationStatus: status }] : [])] };
     const [items, total, byStatus] = await Promise.all([
         prisma.customer.findMany({
             where, orderBy: { joinedAt: 'desc' }, skip: (page - 1) * take, take,
             select: { id: true, name: true, phone: true, activationStatus: true, whatsappOptOut: true, userId: true, joinedAt: true,
-                loans: { select: { id: true, status: true, remainingAmount: true, isLegacy: true, legacyBalanceConfirmed: true, collectionSuspended: true, messagesSuspended: true, nextPaymentDate: true, loanRequest: { select: { profileType: true } } } } },
+                loans: { select: { id: true, status: true, remainingAmount: true, isLegacy: true, legacyBalanceConfirmed: true, collectionSuspended: true, messagesSuspended: true, nextPaymentDate: true, legacyDevice: { select: { brand: true, model: true } }, disputes: { where: { status: { in: OPEN_DISPUTE } }, select: { id: true } }, loanRequest: { select: { profileType: true } } } },
+                investments: { select: { id: true, amount: true, status: true, nextPayoutDate: true } } },
         }),
         prisma.customer.count({ where }),
         prisma.customer.groupBy({ by: ['activationStatus'], where: legacyScope, _count: true }),
@@ -192,7 +196,7 @@ legacyClientsRouter.post('/:customerId/contracts', async (req, res) => {
     if (!service) { res.status(400).json({ error: 'Serviço inválido' }); return; }
     // Celular tem módulo e regras próprias (aparelho, Tabela Price, MDM): não vira empréstimo genérico.
     if (service.code === 'FINANCIAMENTO_CELULAR') {
-        res.status(400).json({ error: 'Celular antigo ainda não pode ser registrado aqui: o financiamento de celulares tem regras próprias (aparelho, contrato jurídico). Registre na observação e trate pelo módulo de celulares.', code: 'SERVICE_RULES_PENDING' }); return;
+        res.status(400).json({ error: 'Celular antigo tem cadastro próprio (dados do aparelho): use "Celular antigo".', code: 'USE_DEVICE_FLOW' }); return;
     }
     const amount = money(req.body?.amount);
     const balance = money(req.body?.balance);
@@ -279,8 +283,8 @@ function inviteText(name: string, link: string) {
 
 /** Gera convite (revoga os anteriores pendentes) e devolve link + texto. Envia por WhatsApp só se habilitado. */
 legacyClientsRouter.post('/:customerId/invite', async (req, res) => {
-    const customer = await prisma.customer.findFirst({ where: { id: String(req.params.customerId), isLegacy: true } });
-    if (!customer) { res.status(404).json({ error: 'Cliente antigo não encontrado' }); return; }
+    const customer = await prisma.customer.findUnique({ where: { id: String(req.params.customerId) } });
+    if (!customer) { res.status(404).json({ error: 'Cliente não encontrado' }); return; }
     if (customer.userId) { res.status(409).json({ error: 'Cliente já tem conta ativa', code: 'ALREADY_ACTIVE' }); return; }
     const phone = normalizePhoneBR(customer.phone);
     if (!phone) { res.status(400).json({ error: 'Telefone inválido no cadastro', code: 'INVALID_PHONE' }); return; }
@@ -294,15 +298,15 @@ legacyClientsRouter.post('/:customerId/invite', async (req, res) => {
     });
     const link = `${APP_URL()}/#/ativar?c=${token}`;
     const text = inviteText(customer.name, link);
-    const sendEnabled = process.env.LEGACY_WHATSAPP_ENABLED === 'true';
-    let sent = false;
-    if (sendEnabled && req.body?.send === true && !customer.whatsappOptOut) {
-        sent = await sendWhatsAppMessage(phone, text).catch(() => false);
-        if (sent) await prisma.activationInvite.update({ where: { id: invite.id }, data: { sentAt: new Date() } });
+    const settings = await getCommunicationSettings();
+    let sent = false, blocked: string | null = null, testMode = false;
+    if (settings.inviteWhatsapp && req.body?.send === true) {
+        ({ sent, blocked, testMode } = await sendClientWhatsApp(customer.id, 'INVITE', text));
+        if (sent && !testMode) await prisma.activationInvite.update({ where: { id: invite.id }, data: { sentAt: new Date() } });
     }
     await prisma.customer.update({ where: { id: customer.id }, data: { activationStatus: 'CONVITE_ENVIADO' } });
-    await audit(req, 'LEGACY_INVITE_CREATED', 'CUSTOMER', customer.id, { inviteId: invite.id, whatsappSent: sent, simulation: !sendEnabled });
-    res.status(201).json({ link, text, expiresAt: invite.expiresAt, whatsappSent: sent, simulation: !sendEnabled });
+    await audit(req, 'LEGACY_INVITE_CREATED', 'CUSTOMER', customer.id, { inviteId: invite.id, whatsappSent: sent, testMode, blocked, simulation: !settings.inviteWhatsapp });
+    res.status(201).json({ link, text, expiresAt: invite.expiresAt, whatsappSent: sent, testMode, blocked, simulation: !settings.inviteWhatsapp });
 });
 
 /**
@@ -316,17 +320,19 @@ legacyClientsRouter.post('/contracts/:loanId/regularize-message', async (req, re
         : Number(loan.remainingAmount) <= 0 ? 'Saldo zero.'
         : loan.collectionSuspended ? 'Saldo antigo ainda não conferido.'
         : loan.messagesSuspended ? 'Mensagens pausadas neste contrato.'
-        : !whatsappAllowed(loan.customer) ? 'Telefone inválido ou cliente pediu para não receber WhatsApp.' : null;
+        : await prisma.dispute.count({ where: { loanId: loan.id, status: { in: OPEN_DISPUTE } } }) ? 'Há contestação aberta neste contrato.'
+        : !whatsappAllowed(loan.customer) ? 'Telefone inválido, comunicação suspensa ou cliente pediu para não receber WhatsApp.' : null;
     if (blocked) { res.status(409).json({ error: blocked, code: 'NOT_ELIGIBLE' }); return; }
     const c = loan.customer;
     const access = c.userId ? `${APP_URL()}/#/login` : null;
     const text = `Olá, ${c.name.split(' ')[0]}! Tudo bem?\n\nPassando para lembrar que você tem um serviço em andamento com a Tubarão Empréstimos.\n\n`
         + (access ? `Consulte os detalhes e pague com segurança entrando no aplicativo:\n${access}\n\n` : `Para consultar os detalhes, fale com a gente por aqui ou peça seu link de acesso ao aplicativo.\n\n`)
         + `Se já pagou, desconsidere esta mensagem. Qualquer dúvida, responda esta mensagem que nosso atendimento ajuda você.`;
-    const sendEnabled = process.env.LEGACY_WHATSAPP_ENABLED === 'true';
-    const sent = sendEnabled && req.body?.send === true ? await sendWhatsAppMessage(c.phone, text).catch(() => false) : false;
-    await audit(req, 'REGULARIZE_MESSAGE', 'LOAN', loan.id, { whatsappSent: sent, simulation: !sendEnabled });
-    res.json({ text, whatsappSent: sent, simulation: !sendEnabled, phone: normalizePhoneBR(c.phone) });
+    const settings = await getCommunicationSettings();
+    let sent = false, sendBlocked: string | null = null, testMode = false;
+    if (settings.inviteWhatsapp && req.body?.send === true) ({ sent, blocked: sendBlocked, testMode } = await sendClientWhatsApp(c.id, 'REGULARIZE', text));
+    await audit(req, 'REGULARIZE_MESSAGE', 'LOAN', loan.id, { whatsappSent: sent, testMode, blocked: sendBlocked, simulation: !settings.inviteWhatsapp });
+    res.json({ text, whatsappSent: sent, testMode, blocked: sendBlocked, simulation: !settings.inviteWhatsapp, phone: normalizePhoneBR(c.phone) });
 });
 
 legacyClientsRouter.post('/invites/:inviteId/revoke', async (req, res) => {

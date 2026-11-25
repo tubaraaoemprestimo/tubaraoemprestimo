@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
+import { whatsappAllowed } from '../services/collectionRules';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import axios from 'axios';
 import { emailService } from '../services/email';
@@ -246,8 +247,11 @@ campaignsRouter.post('/send', requireAdmin, async (req: Request, res: Response) 
         // Envia em background (não bloqueia a resposta)
         (async () => {
             for (const customer of targetCustomers) {
-                // WhatsApp
-                if (customer.phone && waEnabled) {
+                // WhatsApp promocional: confere as preferências do titular NA HORA do envio
+                // (bloqueio feito depois do início do disparo também vale).
+                const prefs = await prisma.customer.findUnique({ where: { id: customer.id }, select: { promoOptOut: true, whatsappOptOut: true, commSuspendedUntil: true, commSuspendedReason: true, activationStatus: true, phone: true } });
+                const waOk = !!prefs && !prefs.promoOptOut && whatsappAllowed(prefs);
+                if (customer.phone && waEnabled && waOk) {
                     try {
                         let success = false;
                         // Se é cupom com imagem, envia imagem + legenda

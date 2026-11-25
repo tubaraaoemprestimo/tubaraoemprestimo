@@ -39,6 +39,30 @@ describe('régua — regras configuráveis', () => {
     });
 });
 
+describe('régua — contestação, suspensão e bloqueio na hora do envio', () => {
+    const fresh = (over: any = {}, disputes = 0) => ({
+        paymentReceipt: { count: async () => 0 },
+        collectionDispatch: { count: async () => 0 },
+        dispute: { count: async () => disputes },
+        installment: { findUnique: async () => ({ id: 'i1', status: 'OPEN', dueDate: new Date('2099-01-10'), loan: { id: 'l1', status: 'ACTIVE', remainingAmount: 100, collectionSuspended: false, messagesSuspended: false, customer: { phone: '11987654321' }, ...over } }) },
+    });
+    it('contestação aberta bloqueia', async () => {
+        expect(await collectionGate(inst({}), 'T', fresh({}, 1))).toBe('CONTESTACAO_ABERTA');
+        expect(await collectionGate(inst({}), 'T', fresh({}, 0))).toBeNull();
+    });
+    it('relê o banco: pausa/quitação feitas depois do início da rodada valem na hora', async () => {
+        const stale = inst({}); // carregado "antes", sem bloqueio
+        expect(await collectionGate(stale, 'T', fresh({ messagesSuspended: true }))).toBe('COMUNICACAO_SUSPENSA');
+        expect(await collectionGate(stale, 'T', fresh({ status: 'COMPLETED' }))).toBe('CONTRATO_ENCERRADO');
+        expect(await collectionGate(stale, 'T', fresh({ customer: { phone: '11987654321', commSuspendedReason: 'pediu pausa' } }))).toBe('CLIENTE_SUSPENSO');
+    });
+    it('suspensão temporária vence sozinha; sem prazo vale até retomar', () => {
+        expect(whatsappAllowed({ phone: '11987654321', commSuspendedReason: 'x', commSuspendedUntil: new Date(Date.now() + 86400000) })).toBe(false);
+        expect(whatsappAllowed({ phone: '11987654321', commSuspendedReason: 'x', commSuspendedUntil: new Date(Date.now() - 86400000) })).toBe(true);
+        expect(whatsappAllowed({ phone: '11987654321', commSuspendedReason: 'x' })).toBe(false);
+    });
+});
+
 describe('contrato antigo — vencimentos das parcelas restantes', () => {
     it('mensal mantém o dia (fim de mês ajusta), diária pula domingo, semanal +7', () => {
         const m = scheduleDates(new Date(2026, 0, 31), 3, 'MONTHLY').map(d => d.getDate());

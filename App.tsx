@@ -5,7 +5,7 @@ import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate, useNa
 // Pages - Client
 import { Wizard } from './pages/client/Wizard';
 import { ClientWelcome } from './pages/client/ClientWelcome';
-import { ReturningClientForm } from './pages/client/ReturningClientForm';
+import { ReturningClientNotice } from './pages/client/ReturningClientNotice';
 import { Login } from './pages/auth/Login';
 import { ClientDashboard } from './pages/client/ClientDashboard';
 import { Contracts } from './pages/client/Contracts';
@@ -40,7 +40,6 @@ import { CommunicationHub } from './pages/admin/CommunicationHub';
 import { SecurityHub } from './pages/admin/SecurityHub';
 import { AIHub } from './pages/admin/AIHub';
 import { AnalyticsHub } from './pages/admin/AnalyticsHub';
-import { ContractMigrations } from './pages/admin/ContractMigrations';
 import { LegacyClients } from './pages/admin/LegacyClients';
 import { ActivateAccount } from './pages/ActivateAccount';
 import { CollectionAutomationPanel } from './pages/admin/CollectionAutomationPanel';
@@ -226,7 +225,6 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <Link to="/admin/phone-financing" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/phone-financing')}`}><Smartphone size={18} /> Financiamento de Celulares</Link>
         <Link to="/admin/phone-financing/mdm" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/phone-financing/mdm')}`}><Smartphone size={18} /> iPhones da Empresa (MDM)</Link>
         <Link to="/admin/legacy-clients" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/legacy-clients')}`}><UserPlus size={18} /> Clientes Antigos</Link>
-        <Link to="/admin/contract-migrations" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/contract-migrations')}`}><Users size={18} /> Migração de Contratos</Link>
         <Link to="/admin/collection-automation" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/collection-automation')}`}><TrendingUp size={18} /> Réguas de Cobrança</Link>
         <Link to="/admin/import-contacts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/import-contacts')}`}><Upload size={18} /> Importar Contatos</Link>
         <Link to="/admin/data-search" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/data-search')}`}><Search size={18} /> Investigação</Link>
@@ -565,7 +563,7 @@ function App() {
 
             {/* Client Welcome & Onboarding */}
             <Route path="/client/welcome" element={<BiometricAccessGate><PermissionGate><ClientWelcome /></PermissionGate></BiometricAccessGate>} />
-            <Route path="/client/returning" element={<BiometricAccessGate><PermissionGate><ReturningClientForm /></PermissionGate></BiometricAccessGate>} />
+            <Route path="/client/returning" element={<BiometricAccessGate><PermissionGate><ReturningClientNotice /></PermissionGate></BiometricAccessGate>} />
             <Route path="/client/wizard" element={<BiometricAccessGate><PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
 
             {/* Client Protected */}
@@ -588,7 +586,7 @@ function App() {
             <Route path="/admin/customers" element={<AdminLayout><Customers /></AdminLayout>} />
             <Route path="/admin/contracts" element={<AdminLayout><AdminContracts /></AdminLayout>} />
             <Route path="/admin/investors" element={<AdminLayout><Investors /></AdminLayout>} />
-            <Route path="/admin/contract-migrations" element={<AdminLayout><ContractMigrations /></AdminLayout>} />
+            <Route path="/admin/contract-migrations" element={<Navigate to="/admin/legacy-clients" replace />} />
             <Route path="/admin/legacy-clients" element={<AdminLayout><LegacyClients /></AdminLayout>} />
             <Route path="/admin/collection-automation" element={<AdminLayout><CollectionAutomationPanel /></AdminLayout>} />
             <Route path="/admin/import-contacts" element={<AdminLayout><ImportContacts /></AdminLayout>} />

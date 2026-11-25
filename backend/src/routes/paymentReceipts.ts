@@ -3,6 +3,7 @@ import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { emailService } from '../services/email';
 import { sendWhatsAppMessage } from '../services/whatsapp';
+import { sendClientWhatsApp } from '../services/communication';
 import { sendPushToUser, sendPushToRole } from './push';
 import { publicMediaUrl } from './loans';
 import { buildReconciliationReport } from '../services/receiptReconciliation';
@@ -277,8 +278,8 @@ paymentReceiptsRouter.put('/:id/reject', requireAdmin, async (req: Request, res:
                 emailService.send(customer.email, '⚠️ Comprovante Não Aceito — Tubarão Empréstimos', html).catch(err => console.error('[PaymentReceipts] Email rejection failed:', err.message));
             }
 
-            if (customer.phone) {
-                sendWhatsAppMessage(customer.phone,
+            if (customer.id) {
+                sendClientWhatsApp(customer.id, 'PAYMENT_REJECTED',
                     `⚠️ *Comprovante Não Aceito*\n\nOlá, ${customer.name.split(' ')[0]}.\n\nSeu comprovante de pagamento não foi aceito.\nMotivo: ${req.body.notes || 'Envie um novo comprovante.'}\n\nAcesse o app para enviar novamente.\n\n_Tubarão Empréstimos 🦈_`
                 ).catch(() => {});
             }

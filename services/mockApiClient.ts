@@ -1248,14 +1248,33 @@ async function handleRequest(method: string, url: string, body?: any): Promise<a
   // ── CLIENTES ANTIGOS (dados fictícios) ──────────────────────────────────────
 
   if (method === 'GET' && match(url, /\/legacy-clients\/services/)) {
-    const rule: Record<string, [string, string]> = { CLT: ['ROLLOVER', 'Juros mensal; o principal só é cobrado na quitação.'], GARANTIA: ['ROLLOVER', 'Juros mensal; o principal só é cobrado na quitação.'], AUTONOMO: ['INSTALLMENTS', 'Comércio/autônomo: diárias ou parcelas que abatem o saldo.'], MOTO: ['INSTALLMENTS', 'Parcelas fixas até quitar.'], LIMPA_NOME: ['INSTALLMENTS', 'Serviço: parcelas do valor combinado, sem juros de mora.'], FINANCIAMENTO_CELULAR: ['UNSUPPORTED', 'Tem módulo próprio; registro antigo ainda não suportado.'] };
-    return { services: [['CLT', 'Empréstimo CLT'], ['AUTONOMO', 'Capital de giro para comércio'], ['GARANTIA', 'Empréstimo com garantia'], ['MOTO', 'Financiamento de moto'], ['LIMPA_NOME', 'Limpar nome'], ['FINANCIAMENTO_CELULAR', 'Financiamento de Celulares']].map(([code, label]) => ({ code, label, active: code !== 'FINANCIAMENTO_CELULAR', kind: rule[code][0], note: rule[code][1] })) };
+    const rule: Record<string, [string, string]> = { CLT: ['ROLLOVER', 'Juros mensal; o principal só é cobrado na quitação.'], GARANTIA: ['ROLLOVER', 'Juros mensal; o principal só é cobrado na quitação.'], AUTONOMO: ['INSTALLMENTS', 'Comércio/autônomo: diárias ou parcelas que abatem o saldo.'], MOTO: ['INSTALLMENTS', 'Parcelas fixas até quitar.'], LIMPA_NOME: ['INSTALLMENTS', 'Serviço: parcelas do valor combinado, sem juros de mora.'], FINANCIAMENTO_CELULAR: ['DEVICE', 'Aparelho já vendido: sem venda nova nem baixa de estoque.'], INVESTIDOR: ['INVESTMENT', 'A empresa paga o investidor: fora da régua de cobrança.'] };
+    return { services: [['CLT', 'Empréstimo CLT'], ['AUTONOMO', 'Capital de giro para comércio'], ['GARANTIA', 'Empréstimo com garantia'], ['MOTO', 'Financiamento de moto'], ['LIMPA_NOME', 'Limpar nome'], ['FINANCIAMENTO_CELULAR', 'Financiamento de Celulares'], ['INVESTIDOR', 'Investidor (aporte antigo)']].map(([code, label]) => ({ code, label, active: code !== 'FINANCIAMENTO_CELULAR', kind: rule[code][0], note: rule[code][1] })) };
   }
   if (method === 'POST' && match(url, /\/legacy-clients\/[^/]+\/invite/)) {
     const link = 'https://www.tubaraoemprestimo.com.br/#/ativar?c=DEMO';
     return { link, text: `Olá! Tudo bem?\n\nAgora você pode acompanhar seus serviços diretamente pelo aplicativo oficial Tubarão Empréstimos.\n\nAtive seu cadastro:\n${link}\n\nO link vale 7 dias.`, whatsappSent: false, simulation: true };
   }
   if (method === 'GET' && match(url, /\/legacy-clients\/lookup/)) return { matches: [] };
+  if (method === 'POST' && match(url, /\/legacy-clients\/?$/)) return { customer: { id: 'novo-cliente', name: body?.name || 'Cliente', phone: body?.phone || '' } };
+  if (method === 'POST' && match(url, /\/legacy-clients\/[^/]+\/contracts/)) return { loan: { id: 'novo', status: 'ACTIVE', collectionSuspended: !body?.balanceConfirmed } };
+  if (method === 'GET' && match(url, /\/legacy-ops\/dashboard/)) return { total: 4, withAccount: 1, waiting: 3, invitesSent: 2, activeLoans: 3, settledLoans: 1, devices: 1, investments: 1, pendingReview: 1, openDisputes: 1, suspendedComm: 1, remindersScheduled: 2, sent30: 2, failed30: 1 };
+  if (method === 'GET' && match(url, /\/legacy-ops\/disputes/)) {
+    return { items: [{ id: 'dp1', loanId: 'll2', status: 'OPEN', reason: 'Parcela já paga', description: 'Cliente diz que pagou a parcela de 05/12 pelo Pix.', openedByRole: 'CLIENT', createdAt: new Date().toISOString(), customer: { name: 'Cliente Demo Dois' }, history: [{ at: new Date().toISOString(), by: 'Cliente', action: 'ABERTA' }] }] };
+  }
+  if (method === 'PATCH' && match(url, /\/legacy-ops\/disputes\//)) return { dispute: { id: 'dp1', status: body?.status } };
+  if (method === 'POST' && match(url, /\/legacy-ops\/(disputes|customers\/[^/]+\/(devices|investments))/)) return { loan: { id: 'novo', status: 'ACTIVE', collectionSuspended: false }, investment: { id: 'inv' }, missing: [] };
+  if (method === 'GET' && match(url, /\/legacy-ops\/customers\/[^/]+\/communication/)) return { preferences: { whatsappOptOut: false, inviteOptOut: false, promoOptOut: true, phoneConfirmed: true, phoneInvalid: false, commSuspendedUntil: null, commSuspendedReason: null, commPrefsUpdatedAt: new Date().toISOString() } };
+  if (method === 'PATCH' && match(url, /\/legacy-ops\/customers\/[^/]+\/communication/)) return { ok: true };
+  if (method === 'GET' && match(url, /\/legacy-ops\/automation/)) {
+    return { settings: { automationEnabled: true, inviteWhatsapp: false, testPhone: '' }, provider: { name: 'Evolution API', instance: 'Tubarao', connected: true }, last30: [],
+      recent: [{ createdAt: new Date().toISOString(), subject: 'PAYMENT_CONFIRMED', status: 'SENT', errorMessage: null, customerName: 'Cliente Demo Dois' }, { createdAt: new Date().toISOString(), subject: 'INVITE', status: 'BLOCKED', errorMessage: 'Cliente não quer receber convite', customerName: 'Cliente Demo Três' }] };
+  }
+  if (method === 'PUT' && match(url, /\/legacy-ops\/automation/)) return { settings: body };
+  if (method === 'GET' && match(url, /\/my-disputes\/investments/)) return { items: [] };
+  if (method === 'GET' && match(url, /\/my-disputes/)) return { items: [] };
+  if (method === 'POST' && match(url, /\/my-disputes/)) return { dispute: { id: 'x', status: 'OPEN' } };
+  if (method === 'POST' && match(url, /\/returning-clients\/contact/)) return { ok: true };
   if (method === 'GET' && match(url, /\/legacy-clients/)) {
     const loan = (id: string, status: string, remainingAmount: number, collectionSuspended: boolean, nextPaymentDate: string | null, profileType: string) =>
       ({ id, status, remainingAmount, legacyBalanceConfirmed: !collectionSuspended, collectionSuspended, nextPaymentDate, loanRequest: { profileType } });

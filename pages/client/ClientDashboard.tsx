@@ -14,6 +14,7 @@ import { Logo } from '../../components/Logo';
 import { referralService } from '../../services/referralService';
 import { locationTrackingService } from '../../services/locationTrackingService';
 import { antifraudService } from '../../services/antifraudService';
+import { MyInvestments } from '../../components/MyInvestments';
 
 export const ClientDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -593,6 +594,8 @@ if (user) {
             PAGAR AGORA <ChevronRight size={18} />
           </button>
         </div>
+
+        <MyInvestments />
 
         {/* ── MEUS SERVIÇOS ── */}
         <div className="px-4 mb-1">

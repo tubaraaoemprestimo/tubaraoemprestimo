@@ -11,6 +11,7 @@ import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
 import { api } from '../../services/apiClient';
 import { CustomerQuickAccess } from '../../components/admin/CustomerQuickAccess';
+import { CommunicationPreferences } from './LegacyClients';
 import {
   getProfileType,
   getDisplayMode,
@@ -1981,6 +1982,11 @@ const HistoryModal: React.FC<{ customer: any; loading: boolean; onClose: () => v
               </div>
 
               <CustomerQuickAccess customer={customer} renderDoc={(url, label) => <DocViewer url={url} label={label} />} />
+
+              {/* ── Preferências de comunicação (respeitadas por todo envio automático) ── */}
+              <SectionCard title="📵 Preferências de comunicação">
+                <CommunicationPreferences customerId={customer.id} />
+              </SectionCard>
 
               {customer.cpf && <div className="md:hidden"><CapivaraPanel cpf={customer.cpf} /></div>}
 

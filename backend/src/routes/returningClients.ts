@@ -6,7 +6,24 @@ const router = Router();
 const prisma = new PrismaClient();
 
 /**
- * POST /api/returning-clients
+ * POST /api/returning-clients/contact
+ * "Já sou cliente" (substitui o formulário antigo, que dependia da tabela contract_migrations,
+ * nunca criada). Só avisa a equipe; o contrato é registrado em Clientes Antigos e ligado
+ * à conta pelo convite seguro. Não cria cliente, pedido nem cobrança.
+ */
+router.post('/contact', authenticate, async (req, res) => {
+  const message = typeof req.body?.message === 'string' ? req.body.message.trim().slice(0, 500) : '';
+  const recent = await prisma.notification.count({ where: { title: '👋 Cliente antigo pediu ativação', message: { contains: req.user!.email }, createdAt: { gte: new Date(Date.now() - 86400000) } } });
+  if (recent) { res.json({ ok: true }); return; } // 1 aviso por dia por pessoa
+  await prisma.notification.create({
+    data: { title: '👋 Cliente antigo pediu ativação', message: `${req.user!.name} (${req.user!.email}) diz que já era cliente. Registre em Clientes Antigos e gere o convite.${message ? ` Recado: ${message}` : ''}`, type: 'INFO' },
+  });
+  res.json({ ok: true });
+});
+
+/**
+ * [DESATIVADO NO APP] POST /api/returning-clients
+ * Fluxo antigo: dependia da tabela contract_migrations, que não existe. Mantido só para não quebrar chamadas antigas.
  * Criar solicitação de cliente recorrente (já foi cliente antes do sistema)
  *
  * Fluxo:

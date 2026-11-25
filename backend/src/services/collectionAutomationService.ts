@@ -2,6 +2,7 @@ import { prisma } from './prisma';
 import { templateService } from './templateService';
 import { getLoanPayoffBalance } from './loanPayoffService';
 import { collectionGate, sendCollection, getCollectionRules, reminderTrigger } from './collectionRules';
+import { getCommunicationSettings } from './communication';
 import {
   computeCharge,
   resolveMonthlyRate,
@@ -1049,6 +1050,10 @@ export async function runCollectionAutomation(): Promise<CollectionStats> {
     // Mensagens: só com a régua ligada no painel. Dias de antecedência e templates vêm do painel
     // (padrão 7 e 3; o 5 entra quando configurado ou com COLLECTION_DUE_5_DAYS_ENABLED=true).
     const rules = await getCollectionRules();
+    if (!(await getCommunicationSettings()).automationEnabled) {
+      console.log('[CollectionAutomation] Automações PAUSADAS no painel: nenhuma mensagem enviada (multas/juros atualizados).');
+      return stats;
+    }
     if (!rules.enabled) {
       console.log('[CollectionAutomation] Régua DESLIGADA no painel: nenhuma mensagem enviada (multas/juros atualizados).');
       return stats;
