@@ -1,6 +1,7 @@
 import { prisma } from './prisma';
 import { templateService } from './templateService';
 import { getLoanPayoffBalance } from './loanPayoffService';
+import { collectionGate, sendCollection, getCollectionRules, reminderTrigger } from './collectionRules';
 import {
   computeCharge,
   resolveMonthlyRate,
@@ -455,7 +456,7 @@ function getCollectionContext(installment: any) {
  * Lembrete de vencimento N dias antes (7, 5 e 3). Template: INSTALLMENT_DUE_<N>_DAYS.
  * Sem template ativo cadastrado para o gatilho, nada é enviado.
  */
-async function processDueInDays(days: number): Promise<number> {
+async function processDueInDays(days: number, trigger = `INSTALLMENT_DUE_${days}_DAYS`): Promise<number> {
   const targetDate = new Date();
   targetDate.setDate(targetDate.getDate() + days);
   targetDate.setHours(0, 0, 0, 0);
@@ -489,9 +490,10 @@ async function processDueInDays(days: number): Promise<number> {
   for (const installment of installments) {
     try {
       const customer = installment.loan.customer;
+      if (await collectionGate(installment, trigger)) continue;
 
-      await templateService.triggerTemplate(
-        `INSTALLMENT_DUE_${days}_DAYS`,
+      const delivered = await sendCollection(installment,
+        trigger,
         {
           email: customer.email,
           phone: customer.whatsappOptOut ? '' : customer.phone,
@@ -506,7 +508,7 @@ async function processDueInDays(days: number): Promise<number> {
         }
       );
 
-      sent++;
+      if (delivered.success) sent++;
       await new Promise(resolve => setTimeout(resolve, 1500)); // Delay anti-spam
     } catch (error) {
       console.error(`[CollectionAutomation] Erro ao enviar lembrete ${days} dias:`, error);
@@ -552,8 +554,9 @@ async function processDueToday(): Promise<number> {
   for (const installment of installments) {
     try {
       const customer = installment.loan.customer;
+      if (await collectionGate(installment, 'INSTALLMENT_DUE_TODAY')) continue;
 
-      await templateService.triggerTemplate(
+      const delivered = await sendCollection(installment,
         'INSTALLMENT_DUE_TODAY',
         {
           email: customer.email,
@@ -569,7 +572,7 @@ async function processDueToday(): Promise<number> {
         }
       );
 
-      sent++;
+      if (delivered.success) sent++;
       await new Promise(resolve => setTimeout(resolve, 1500));
     } catch (error) {
       console.error('[CollectionAutomation] Erro ao enviar lembrete hoje:', error);
@@ -624,11 +627,12 @@ async function processOverdue1Day(): Promise<number> {
       }
 
       const customer = installment.loan.customer;
+      if (await collectionGate(installment, 'INSTALLMENT_OVERDUE_1_DAY')) continue;
       const daysOverdue = Math.max(1, calcDaysOverdue(installment.dueDate, new Date()));
       const collectionContext = getCollectionContext(installment);
       const charge = buildOverdueCharge(installment, daysOverdue, collectionContext.chargeAmount, systemSettingRate, sundayFinePolicy);
 
-      await templateService.triggerTemplate(
+      const delivered = await sendCollection(installment,
         'INSTALLMENT_OVERDUE_1_DAY',
         {
           email: customer.email,
@@ -650,6 +654,8 @@ async function processOverdue1Day(): Promise<number> {
           pix_key: await getAdminPixKey(customer, installment.loanId)
         }
       );
+
+      if (!delivered.success) continue;
 
       await markCollectionMessageSent(installment.loanId);
       sent++;
@@ -707,11 +713,12 @@ async function processOverdue3Days(): Promise<number> {
       }
 
       const customer = installment.loan.customer;
+      if (await collectionGate(installment, 'INSTALLMENT_OVERDUE_3_DAYS')) continue;
       const daysOverdue = Math.max(3, calcDaysOverdue(installment.dueDate, new Date()));
       const collectionContext = getCollectionContext(installment);
       const charge = buildOverdueCharge(installment, daysOverdue, collectionContext.chargeAmount, systemSettingRate, sundayFinePolicy);
 
-      await templateService.triggerTemplate(
+      const delivered = await sendCollection(installment,
         'INSTALLMENT_OVERDUE_3_DAYS',
         {
           email: customer.email,
@@ -733,6 +740,8 @@ async function processOverdue3Days(): Promise<number> {
           pix_key: await getAdminPixKey(customer, installment.loanId)
         }
       );
+
+      if (!delivered.success) continue;
 
       await markCollectionMessageSent(installment.loanId);
       sent++;
@@ -790,12 +799,13 @@ async function processOverdue7Days(): Promise<number> {
       }
 
       const customer = installment.loan.customer;
+      if (await collectionGate(installment, 'INSTALLMENT_OVERDUE_7_DAYS')) continue;
       const daysOverdue = Math.floor((Date.now() - installment.dueDate.getTime()) / (1000 * 60 * 60 * 24));
       const collectionContext = getCollectionContext(installment);
       // Engine = única fonte de verdade do valor_com_juros (substitui o 10% antigo).
       const charge = buildOverdueCharge(installment, daysOverdue, collectionContext.chargeAmount, systemSettingRate, sundayFinePolicy);
 
-      await templateService.triggerTemplate(
+      const delivered = await sendCollection(installment,
         'INSTALLMENT_OVERDUE_7_DAYS',
         {
           email: customer.email,
@@ -817,6 +827,8 @@ async function processOverdue7Days(): Promise<number> {
           telefone_suporte: process.env.SUPPORT_PHONE || '(11) 99999-9999'
         }
       );
+
+      if (!delivered.success) continue;
 
       await markCollectionMessageSent(installment.loanId);
       sent++;
@@ -874,12 +886,13 @@ async function processOverdue15Days(): Promise<number> {
       }
 
       const customer = installment.loan.customer;
+      if (await collectionGate(installment, 'INSTALLMENT_OVERDUE_15_DAYS')) continue;
       const daysOverdue = Math.floor((Date.now() - installment.dueDate.getTime()) / (1000 * 60 * 60 * 24));
       const collectionContext = getCollectionContext(installment);
       // Engine = única fonte de verdade do valor_com_juros (substitui o 10% antigo).
       const charge = buildOverdueCharge(installment, daysOverdue, collectionContext.chargeAmount, systemSettingRate, sundayFinePolicy);
 
-      await templateService.triggerTemplate(
+      const delivered = await sendCollection(installment,
         'INSTALLMENT_OVERDUE_15_DAYS',
         {
           email: customer.email,
@@ -901,6 +914,8 @@ async function processOverdue15Days(): Promise<number> {
           telefone_suporte: process.env.SUPPORT_PHONE || '(11) 99999-9999'
         }
       );
+
+      if (!delivered.success) continue;
 
       await markCollectionMessageSent(installment.loanId);
       sent++;
@@ -958,12 +973,13 @@ async function processOverdue30Days(): Promise<number> {
       }
 
       const customer = installment.loan.customer;
+      if (await collectionGate(installment, 'INSTALLMENT_OVERDUE_30_DAYS')) continue;
       const daysOverdue = Math.floor((Date.now() - installment.dueDate.getTime()) / (1000 * 60 * 60 * 24));
       const collectionContext = getCollectionContext(installment);
       // Engine = única fonte de verdade do valor_com_juros (substitui o 10% antigo).
       const charge = buildOverdueCharge(installment, daysOverdue, collectionContext.chargeAmount, systemSettingRate, sundayFinePolicy);
 
-      await templateService.triggerTemplate(
+      const delivered = await sendCollection(installment,
         'INSTALLMENT_OVERDUE_30_DAYS',
         {
           email: customer.email,
@@ -985,6 +1001,8 @@ async function processOverdue30Days(): Promise<number> {
           telefone_suporte: process.env.SUPPORT_PHONE || '(11) 99999-9999'
         }
       );
+
+      if (!delivered.success) continue;
 
       await markCollectionMessageSent(installment.loanId);
       sent++;
@@ -1028,11 +1046,18 @@ export async function runCollectionAutomation(): Promise<CollectionStats> {
     // 1. MULTA CUMULATIVA R$20/dia — atualiza saldo devedor ANTES dos disparos
     await applyDailyLateFees();
 
-    // Lembretes de vencimento
-    stats.dueIn7Days = await processDueInDays(7);
-    // Aviso de 5 dias (pedido do dono 25/11/2026). Liga com COLLECTION_DUE_5_DAYS_ENABLED=true após homologar o template.
-    stats.dueIn5Days = process.env.COLLECTION_DUE_5_DAYS_ENABLED === 'true' ? await processDueInDays(5) : 0;
-    stats.dueIn3Days = await processDueInDays(3);
+    // Mensagens: só com a régua ligada no painel. Dias de antecedência e templates vêm do painel
+    // (padrão 7 e 3; o 5 entra quando configurado ou com COLLECTION_DUE_5_DAYS_ENABLED=true).
+    const rules = await getCollectionRules();
+    if (!rules.enabled) {
+      console.log('[CollectionAutomation] Régua DESLIGADA no painel: nenhuma mensagem enviada (multas/juros atualizados).');
+      return stats;
+    }
+    const reminders: Record<number, number> = {};
+    for (const d of rules.reminderDays) reminders[d] = await processDueInDays(d, reminderTrigger(rules, d));
+    stats.dueIn7Days = reminders[7] || 0;
+    stats.dueIn5Days = reminders[5] || 0;
+    stats.dueIn3Days = reminders[3] || 0;
     stats.dueToday = await processDueToday();
 
     // Cobranças de atraso
@@ -1042,7 +1067,7 @@ export async function runCollectionAutomation(): Promise<CollectionStats> {
     stats.overdue15Days = await processOverdue15Days();
     stats.overdue30Days = await processOverdue30Days();
 
-    stats.totalSent = stats.dueIn7Days + stats.dueIn5Days + stats.dueIn3Days + stats.dueToday +
+    stats.totalSent = Object.values(reminders).reduce((a, b) => a + b, 0) + stats.dueToday +
                       stats.overdue1Day + stats.overdue3Days + stats.overdue7Days +
                       stats.overdue15Days + stats.overdue30Days;
 

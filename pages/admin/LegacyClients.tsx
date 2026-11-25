@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { UserPlus, Upload, Send, Copy, CheckCircle, FileText, RefreshCw, X } from 'lucide-react';
+import { UserPlus, Upload, Send, Copy, CheckCircle, FileText, RefreshCw, X, Search, PauseCircle, PlayCircle } from 'lucide-react';
 import { api } from '../../services/apiClient';
 
 // Clientes antigos: pré-cadastro por telefone, contrato legado (sem caixa) e convite de ativação.
 // Nada aqui envia mensagem sozinho: o convite volta como texto/link para o admin mandar.
 
-type Service = { code: string; label: string; active: boolean };
-type LegacyLoan = { id: string; status: string; remainingAmount: number; legacyBalanceConfirmed: boolean; collectionSuspended: boolean; nextPaymentDate: string | null; loanRequest?: { profileType?: string } };
+type Service = { code: string; label: string; active: boolean; kind?: string; note?: string };
+type Match = { id: string; name: string; phone: string; cpfMasked: string | null; hasAccount: boolean; isLegacy: boolean; contracts: number; matchedBy: string };
+type LegacyLoan = { id: string; status: string; remainingAmount: number; legacyBalanceConfirmed: boolean; collectionSuspended: boolean; messagesSuspended?: boolean; isLegacy?: boolean; nextPaymentDate: string | null; loanRequest?: { profileType?: string } };
 type LegacyCustomer = { id: string; name: string; phone: string; activationStatus: string | null; whatsappOptOut: boolean; userId: string | null; joinedAt: string; loans: LegacyLoan[] };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -18,7 +19,7 @@ const errMsg = (e: any) => (typeof e === 'string' ? e : e?.error || 'Erro inespe
 const input = 'w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-base focus:border-[#D4AF37] outline-none';
 const btn = 'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-semibold min-h-[44px] disabled:opacity-50';
 
-const emptyContract = { serviceCode: '', amount: '', balance: '', paidAmount: '', installmentAmount: '', nextDueDate: '', frequency: 'MONTHLY', interestRate: '', reference: '', originalDate: '', balanceConfirmed: false, notes: '' };
+const emptyContract = { serviceCode: '', amount: '', balance: '', paidAmount: '', installmentAmount: '', remainingInstallments: '1', nextDueDate: '', frequency: 'MONTHLY', interestRate: '', reference: '', originalDate: '', balanceConfirmed: false, notes: '' };
 
 export function LegacyClients() {
   const [services, setServices] = useState<Service[]>([]);
@@ -28,6 +29,8 @@ export function LegacyClients() {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ phone: '', name: '', cpf: '', origin: '' });
   const [phoneConflict, setPhoneConflict] = useState(false);
+  const [matches, setMatches] = useState<Match[] | null>(null);
+  const [regularize, setRegularize] = useState<{ name: string; phone: string; text: string; simulation: boolean } | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [contractFor, setContractFor] = useState<LegacyCustomer | null>(null);
   const [contract, setContract] = useState(emptyContract);
@@ -43,6 +46,13 @@ export function LegacyClients() {
   useEffect(() => { api.get<any>('/legacy-clients/services').then(r => r.data && setServices(r.data.services)); }, []);
   useEffect(() => { load(); }, [filter]);
 
+  const lookup = async () => {
+    setMsg(null);
+    const { data, error } = await api.get<any>(`/legacy-clients/lookup?phone=${encodeURIComponent(form.phone)}&cpf=${encodeURIComponent(form.cpf)}`);
+    if (error) { setMsg({ ok: false, text: errMsg(error) }); return; }
+    setMatches(data.matches);
+  };
+
   const createCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
@@ -50,6 +60,9 @@ export function LegacyClients() {
     if (error?.code === 'PHONE_IN_USE') { setPhoneConflict(true); setMsg({ ok: false, text: 'Já existe cliente com este telefone. Se for outra pessoa, clique em salvar de novo para confirmar.' }); return; }
     if (error) { setMsg({ ok: false, text: errMsg(error) }); return; }
     setMsg({ ok: true, text: `Cliente ${data.customer.name} pré-cadastrado. Agora registre o contrato antigo.` });
+    setContractFor({ id: data.customer.id, name: data.customer.name, phone: data.customer.phone, activationStatus: 'PRE_CADASTRO', whatsappOptOut: false, userId: null, joinedAt: '', loans: [] });
+    setContract(emptyContract);
+    setMatches(null);
     setForm({ phone: '', name: '', cpf: '', origin: '' });
     setPhoneConflict(false);
     load();
@@ -71,12 +84,33 @@ export function LegacyClients() {
     load();
   };
 
+  const toggleMessages = async (l: LegacyLoan) => {
+    const { error } = await api.patch<any>(`/collection-automation/loans/${l.id}/messages`, { suspended: !l.messagesSuspended });
+    setMsg(error ? { ok: false, text: errMsg(error) } : { ok: true, text: l.messagesSuspended ? 'Mensagens automáticas retomadas.' : 'Mensagens automáticas pausadas neste contrato.' });
+    load();
+  };
+
+  const makeRegularize = async (c: LegacyCustomer, l: LegacyLoan) => {
+    const { data, error } = await api.post<any>(`/legacy-clients/contracts/${l.id}/regularize-message`, { send: true });
+    if (error) { setMsg({ ok: false, text: errMsg(error) }); return; }
+    setRegularize({ name: c.name, phone: data.phone || c.phone, text: data.text, simulation: data.simulation });
+  };
+
   const makeInvite = async (c: LegacyCustomer) => {
     const { data, error } = await api.post<any>(`/legacy-clients/${c.id}/invite`, { send: true });
     if (error) { setMsg({ ok: false, text: errMsg(error) }); return; }
     setInvite({ name: c.name, phone: c.phone, ...data });
     load();
   };
+
+  const selectedService = services.find(s => s.code === contract.serviceCode);
+  const rollover = selectedService?.kind === 'ROLLOVER';
+  const scheduleHint = (() => {
+    const n = Number(contract.remainingInstallments), v = Number(contract.installmentAmount), b = Number(contract.balance);
+    if (!n || !v || !b) return null;
+    const total = n * v;
+    return Math.abs(total - b) <= 0.01 * n ? { ok: true, text: `${n} × ${brl(v)} = ${brl(total)} (confere com o saldo)` } : { ok: false, text: `${n} × ${brl(v)} = ${brl(total)} — precisa somar o saldo ${brl(b)}` };
+  })();
 
   const counters = [['', 'Todos', Object.values(byStatus).reduce((a, b) => a + b, 0)], ...Object.keys(STATUS_LABEL).map(k => [k, STATUS_LABEL[k], byStatus[k] || 0])] as [string, string, number][];
 
@@ -111,7 +145,22 @@ export function LegacyClients() {
         <label className="text-sm">Nome<input className={input} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label>
         <label className="text-sm">CPF (se tiver)<input inputMode="numeric" className={input} value={form.cpf} onChange={e => setForm({ ...form, cpf: e.target.value })} /></label>
         <label className="text-sm">Origem<input className={input} value={form.origin} onChange={e => setForm({ ...form, origin: e.target.value })} placeholder="Ex.: caderno, indicação" /></label>
-        <button className={`${btn} md:col-span-4 bg-[#D4AF37] text-black hover:bg-[#c9a432]`}>{phoneConflict ? 'Confirmar: é outra pessoa' : 'Salvar pré-cadastro'}</button>
+        <div className="md:col-span-4 flex flex-col sm:flex-row gap-2">
+          <button type="button" onClick={lookup} disabled={!form.phone && !form.cpf} className={`${btn} bg-zinc-800 hover:bg-zinc-700`}><Search size={18} /> Consultar se já existe</button>
+          <button className={`${btn} flex-1 bg-[#D4AF37] text-black hover:bg-[#c9a432]`}>{phoneConflict ? 'Confirmar: é outra pessoa' : 'Salvar e registrar contrato'}</button>
+        </div>
+        {matches && (
+          <div className="md:col-span-4 text-sm bg-zinc-950 border border-zinc-800 rounded-lg p-3 space-y-2" role="status">
+            {matches.length === 0 ? <p className="text-green-300">Nenhum cadastro com este telefone/CPF. Pode cadastrar.</p> : <>
+              <p className="text-amber-300">Já existe cadastro. Se for a mesma pessoa, registre o contrato antigo nele (não crie outro):</p>
+              {matches.map(m => (
+                <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 pt-2">
+                  <span>{m.name} · {m.phone}{m.cpfMasked ? ` · CPF ${m.cpfMasked}` : ''} · {m.contracts} contrato(s){m.hasAccount ? ' · tem conta no app' : ''}</span>
+                  <button type="button" onClick={() => { setContractFor({ id: m.id, name: m.name, phone: m.phone, activationStatus: null, whatsappOptOut: false, userId: m.hasAccount ? 'x' : null, joinedAt: '', loans: [] }); setContract(emptyContract); }} className={`${btn} bg-zinc-800 text-sm`}><FileText size={16} /> Registrar contrato neste cliente</button>
+                </div>))}
+            </>}
+          </div>
+        )}
       </form>
 
       <section className="space-y-3" aria-busy={loading}>
@@ -130,8 +179,12 @@ export function LegacyClients() {
                   {' · '}{l.status === 'COMPLETED' ? 'Quitado' : `Saldo ${brl(l.remainingAmount)}`}
                   {l.nextPaymentDate && l.status !== 'COMPLETED' ? ` · vence ${new Date(l.nextPaymentDate).toLocaleDateString('pt-BR')}` : ''}</span>
                 {l.status === 'ACTIVE' && (l.collectionSuspended
-                  ? <button onClick={() => confirmBalance(l.id)} className="text-amber-300 underline">Cobrança suspensa — confirmar saldo</button>
-                  : <span className="text-green-400 flex items-center gap-1"><CheckCircle size={14} /> Na régua</span>)}
+                  ? <button onClick={() => confirmBalance(l.id)} className="text-amber-300 underline min-h-[44px]">Cobrança suspensa — confirmar saldo</button>
+                  : <span className="flex flex-wrap items-center gap-2">
+                      <span className={`flex items-center gap-1 ${l.messagesSuspended ? 'text-zinc-400' : 'text-green-400'}`}><CheckCircle size={14} /> {l.messagesSuspended ? 'Mensagens pausadas' : 'Na régua'}</span>
+                      <button onClick={() => toggleMessages(l)} className="text-zinc-300 underline min-h-[44px] inline-flex items-center gap-1">{l.messagesSuspended ? <><PlayCircle size={14} /> Retomar</> : <><PauseCircle size={14} /> Pausar mensagens</>}</button>
+                      {!l.messagesSuspended && !c.whatsappOptOut && <button onClick={() => makeRegularize(c, l)} className="text-[#D4AF37] underline min-h-[44px]">Consultar/regularizar</button>}
+                    </span>)}
               </div>
             ))}
             <div className="flex flex-wrap gap-2">
@@ -148,13 +201,16 @@ export function LegacyClients() {
             <label className="text-sm sm:col-span-2">Serviço contratado *
               <select required className={input} value={contract.serviceCode} onChange={e => setContract({ ...contract, serviceCode: e.target.value })}>
                 <option value="">Selecione…</option>
-                {services.map(s => <option key={s.code} value={s.code}>{s.label}{s.active ? '' : ' (inativo)'}</option>)}
-              </select></label>
+                {services.map(s => <option key={s.code} value={s.code} disabled={s.kind === 'UNSUPPORTED'}>{s.label}{s.active ? '' : ' (inativo)'}{s.kind === 'UNSUPPORTED' ? ' — ainda não suportado' : ''}</option>)}
+              </select>
+              {selectedService?.note && <span className="block text-xs text-zinc-400 mt-1">{selectedService.note}</span>}</label>
             <Num label="Valor contratado *" v={contract.amount} set={v => setContract({ ...contract, amount: v })} required />
             <Num label="Saldo em aberto * (0 = quitado)" v={contract.balance} set={v => setContract({ ...contract, balance: v })} required />
             <Num label="Já pago (informativo)" v={contract.paidAmount} set={v => setContract({ ...contract, paidAmount: v })} />
-            <Num label="Valor da próxima cobrança" v={contract.installmentAmount} set={v => setContract({ ...contract, installmentAmount: v })} />
-            <label className="text-sm">Próximo vencimento<input type="date" className={input} value={contract.nextDueDate} onChange={e => setContract({ ...contract, nextDueDate: e.target.value })} /></label>
+            <Num label={rollover ? 'Juros do mês (valor)' : 'Valor de cada parcela'} v={contract.installmentAmount} set={v => setContract({ ...contract, installmentAmount: v })} />
+            {!rollover && <label className="text-sm">Parcelas restantes<input type="number" min="1" max="360" inputMode="numeric" className={input} value={contract.remainingInstallments} onChange={e => setContract({ ...contract, remainingInstallments: e.target.value })} />
+              {scheduleHint && <span className={`block text-xs mt-1 ${scheduleHint.ok ? 'text-zinc-400' : 'text-red-300'}`}>{scheduleHint.text}</span>}</label>}
+            <label className="text-sm">{rollover ? 'Vencimento dos juros' : 'Vencimento da próxima parcela'}<input type="date" className={input} value={contract.nextDueDate} onChange={e => setContract({ ...contract, nextDueDate: e.target.value })} /></label>
             <label className="text-sm">Periodicidade<select className={input} value={contract.frequency} onChange={e => setContract({ ...contract, frequency: e.target.value })}>
               <option value="MONTHLY">Mensal</option><option value="WEEKLY">Semanal</option><option value="DAILY">Diária</option></select></label>
             <Num label="Taxa de juros ao mês (%)" v={contract.interestRate} set={v => setContract({ ...contract, interestRate: v })} />
@@ -172,6 +228,7 @@ export function LegacyClients() {
       )}
 
       {invite && <InviteModal invite={invite} onClose={() => setInvite(null)} />}
+      {regularize && <InviteModal invite={{ ...regularize, link: '' }} title="Mensagem de regularização" onClose={() => setRegularize(null)} />}
       {showImport && <ImportModal services={services} onClose={() => { setShowImport(false); load(); }} />}
     </div>
   );
@@ -192,13 +249,13 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-function InviteModal({ invite, onClose }: { invite: { name: string; phone: string; text: string; link: string; simulation: boolean }; onClose: () => void }) {
+function InviteModal({ invite, onClose, title = 'Convite' }: { invite: { name: string; phone: string; text: string; link: string; simulation: boolean }; onClose: () => void; title?: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => { try { await navigator.clipboard.writeText(invite.text); setCopied(true); } catch { /* sem permissão de área de transferência */ } };
   const wa = `https://wa.me/${invite.phone.replace(/\D/g, '')}?text=${encodeURIComponent(invite.text)}`;
   return (
-    <Modal title={`Convite — ${invite.name}`} onClose={onClose}>
-      <p className="text-sm text-zinc-400">{invite.simulation ? 'Envio automático desligado: mande você mesmo pelo WhatsApp.' : 'Mensagem enviada pelo WhatsApp da empresa.'} O link vale 7 dias, serve uma vez e gerar outro cancela este.</p>
+    <Modal title={`${title} — ${invite.name}`} onClose={onClose}>
+      <p className="text-sm text-zinc-400">{invite.simulation ? 'Envio automático desligado: mande você mesmo pelo WhatsApp.' : 'Mensagem enviada pelo WhatsApp da empresa.'}{invite.link ? ' O link vale 7 dias, serve uma vez e gerar outro cancela este.' : ' A mensagem não leva valores nem dados pessoais: o cliente vê os detalhes ao entrar no app.'}</p>
       <pre className="whitespace-pre-wrap bg-zinc-900 rounded-lg p-3 text-sm">{invite.text}</pre>
       <div className="flex flex-wrap gap-2">
         <button onClick={copy} className={`${btn} bg-zinc-800`}><Copy size={16} /> {copied ? 'Copiado' : 'Copiar mensagem'}</button>

@@ -680,7 +680,12 @@ export const Customers: React.FC = () => {
     <div className="p-4 md:p-8 bg-black min-h-screen text-white">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[#D4AF37]">Gestão de Clientes</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-bold text-[#D4AF37]">Gestão de Clientes</h1>
+            <a href="#/admin/legacy-clients" className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-[#D4AF37] px-4 text-sm font-bold text-black hover:bg-[#c9a432]">
+              <UserPlus size={18} /> Cadastrar cliente antigo
+            </a>
+          </div>
           <p className="text-zinc-500 text-sm mt-1">
             {customers.length} total • {filteredCustomers.length} visíveis • {totalImported} importados
           </p>

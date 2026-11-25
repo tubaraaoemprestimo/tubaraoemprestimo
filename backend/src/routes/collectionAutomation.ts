@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { runCollectionManually } from '../cron/collectionCron';
 import { prisma } from '../services/prisma';
+import { getCollectionRules, saveCollectionRules, previewScheduled } from '../services/collectionRules';
 
 const router = Router();
 
@@ -56,31 +57,31 @@ router.get('/stats', authenticate, requireAdmin, async (req, res) => {
 
     const stats = {
       dueIn7Days: await prisma.installment.count({
-        where: { dueDate: { gte: dueIn7Days, lt: dueIn7DaysNext }, status: 'PENDING' }
+        where: { dueDate: { gte: dueIn7Days, lt: dueIn7DaysNext }, status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }, loan: { status: 'ACTIVE' } }
       }),
       dueIn3Days: await prisma.installment.count({
-        where: { dueDate: { gte: dueIn3Days, lt: dueIn3DaysNext }, status: 'PENDING' }
+        where: { dueDate: { gte: dueIn3Days, lt: dueIn3DaysNext }, status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }, loan: { status: 'ACTIVE' } }
       }),
       dueToday: await prisma.installment.count({
-        where: { dueDate: { gte: today, lt: tomorrow }, status: 'PENDING' }
+        where: { dueDate: { gte: today, lt: tomorrow }, status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }, loan: { status: 'ACTIVE' } }
       }),
       overdue1Day: await prisma.installment.count({
-        where: { dueDate: { gte: overdue1Day, lt: today }, status: 'PENDING' }
+        where: { dueDate: { gte: overdue1Day, lt: today }, status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }, loan: { status: 'ACTIVE' } }
       }),
       overdue3Days: await prisma.installment.count({
-        where: { dueDate: { gte: overdue3Days, lt: overdue3DaysNext }, status: 'PENDING' }
+        where: { dueDate: { gte: overdue3Days, lt: overdue3DaysNext }, status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }, loan: { status: 'ACTIVE' } }
       }),
       overdue7Days: await prisma.installment.count({
-        where: { dueDate: { gte: overdue7Days, lt: overdue7DaysNext }, status: 'PENDING' }
+        where: { dueDate: { gte: overdue7Days, lt: overdue7DaysNext }, status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }, loan: { status: 'ACTIVE' } }
       }),
       overdue15Days: await prisma.installment.count({
-        where: { dueDate: { gte: overdue15Days, lt: overdue15DaysNext }, status: 'PENDING' }
+        where: { dueDate: { gte: overdue15Days, lt: overdue15DaysNext }, status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }, loan: { status: 'ACTIVE' } }
       }),
       overdue30Days: await prisma.installment.count({
-        where: { dueDate: { gte: overdue30Days, lt: overdue30DaysNext }, status: 'PENDING' }
+        where: { dueDate: { gte: overdue30Days, lt: overdue30DaysNext }, status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }, loan: { status: 'ACTIVE' } }
       }),
       totalOverdue: await prisma.installment.count({
-        where: { dueDate: { lt: today }, status: 'PENDING' }
+        where: { dueDate: { lt: today }, status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] }, loan: { status: 'ACTIVE' } }
       })
     };
 
@@ -182,6 +183,62 @@ router.get('/history', authenticate, requireAdmin, async (req, res) => {
     console.error('Erro ao buscar histórico:', error);
     res.status(500).json({ error: 'Erro ao buscar histórico' });
   }
+});
+
+/** Regras configuráveis (liga/desliga, dias de antecedência, hora, templates). */
+router.get('/rules', authenticate, requireAdmin, async (_req, res) => {
+  const rules = await getCollectionRules();
+  const triggers = await prisma.messageTemplate.findMany({ where: { isActive: true, triggerEvent: { startsWith: 'INSTALLMENT_' } }, select: { triggerEvent: true, channel: true, name: true }, orderBy: { triggerEvent: 'asc' } });
+  const whatsapp = await prisma.whatsappConfig.findFirst({ select: { isConnected: true } }).catch(() => null);
+  res.json({ rules, templates: triggers, whatsappConnected: !!whatsapp?.isConnected });
+});
+
+router.put('/rules', authenticate, requireAdmin, async (req, res) => {
+  const before = await getCollectionRules();
+  const rules = await saveCollectionRules({ ...before, ...req.body });
+  await prisma.auditLog.create({ data: { userId: req.user!.id, userName: req.user!.name, action: 'COLLECTION_RULES_UPDATED', entity: 'SETTINGS', entityId: 'collection_rules', details: JSON.stringify({ before, after: rules }), ipAddress: req.ip } }).catch(() => {});
+  res.json({ rules });
+});
+
+/** Mensagens programadas (próximos dias) com motivo quando não sairão. Somente leitura. */
+router.get('/scheduled', authenticate, requireAdmin, async (req, res) => {
+  const days = Math.min(30, Math.max(1, Number(req.query.days || 7)));
+  res.json(await previewScheduled(days));
+});
+
+/** Envios registrados (enviados e falhas), com filtros. */
+router.get('/dispatches', authenticate, requireAdmin, async (req, res) => {
+  const status = ['SENT', 'FAILED'].includes(String(req.query.status)) ? String(req.query.status) : undefined;
+  const loanId = typeof req.query.loanId === 'string' ? req.query.loanId : undefined;
+  const take = Math.min(200, Math.max(1, Number(req.query.limit || 50)));
+  const where: any = { ...(status ? { status } : {}), ...(loanId ? { loanId } : {}) };
+  const [items, total, byStatus] = await Promise.all([
+    prisma.collectionDispatch.findMany({ where, orderBy: { createdAt: 'desc' }, take }),
+    prisma.collectionDispatch.count({ where }),
+    prisma.collectionDispatch.groupBy({ by: ['status'], _count: true }),
+  ]);
+  const names = Object.fromEntries((await prisma.customer.findMany({ where: { id: { in: [...new Set(items.map(i => i.customerId))] } }, select: { id: true, name: true } })).map(c => [c.id, c.name]));
+  res.json({ items: items.map(i => ({ ...i, customerName: names[i.customerId] || null })), total, byStatus: Object.fromEntries(byStatus.map(b => [b.status, b._count])) });
+});
+
+/** Pausar/retomar mensagens automáticas de um contrato (cobrança financeira não muda). */
+router.patch('/loans/:loanId/messages', authenticate, requireAdmin, async (req, res) => {
+  const suspended = req.body?.suspended === true;
+  const loan = await prisma.loan.findUnique({ where: { id: String(req.params.loanId) }, select: { id: true } });
+  if (!loan) { res.status(404).json({ error: 'Contrato não encontrado' }); return; }
+  await prisma.loan.update({ where: { id: loan.id }, data: { messagesSuspended: suspended } });
+  await prisma.auditLog.create({ data: { userId: req.user!.id, userName: req.user!.name, action: suspended ? 'COLLECTION_MESSAGES_PAUSED' : 'COLLECTION_MESSAGES_RESUMED', entity: 'LOAN', entityId: loan.id, details: JSON.stringify({ reason: String(req.body?.reason || '').slice(0, 300) || undefined }), ipAddress: req.ip } }).catch(() => {});
+  res.json({ loanId: loan.id, messagesSuspended: suspended });
+});
+
+/** Opt-out de WhatsApp do titular (a pedido do cliente). */
+router.patch('/customers/:customerId/whatsapp', authenticate, requireAdmin, async (req, res) => {
+  const optOut = req.body?.optOut === true;
+  const c = await prisma.customer.findUnique({ where: { id: String(req.params.customerId) }, select: { id: true } });
+  if (!c) { res.status(404).json({ error: 'Cliente não encontrado' }); return; }
+  await prisma.customer.update({ where: { id: c.id }, data: { whatsappOptOut: optOut } });
+  await prisma.auditLog.create({ data: { userId: req.user!.id, userName: req.user!.name, action: optOut ? 'WHATSAPP_OPT_OUT' : 'WHATSAPP_OPT_IN', entity: 'CUSTOMER', entityId: c.id, ipAddress: req.ip } }).catch(() => {});
+  res.json({ customerId: c.id, whatsappOptOut: optOut });
 });
 
 export default router;

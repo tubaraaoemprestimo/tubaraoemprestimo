@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Clock, TrendingUp, Mail, MessageSquare, Bell, Calendar, DollarSign, AlertCircle, CheckCircle, XCircle, RefreshCw, Play } from 'lucide-react';
 import { api } from '../../services/apiClient';
 import { useToast } from '../../components/Toast';
+import { CollectionRulesPanel } from '../../components/admin/CollectionRulesPanel';
 
 interface CollectionStats {
   dueIn7Days: number;
+  dueIn5Days?: number;
   dueIn3Days: number;
   dueToday: number;
   overdue1Day: number;
@@ -42,6 +44,15 @@ export function CollectionAutomationPanel() {
       channels: ['Email', 'WhatsApp', 'Push'],
       icon: <Calendar className="w-5 h-5" />,
       color: 'text-blue-500'
+    },
+    {
+      id: '9',
+      name: 'Lembrete 5 dias antes',
+      description: 'Lembrete 5 dias antes do vencimento (ativado na configuração)',
+      trigger: 'Vence em 5 dias',
+      channels: ['Email', 'WhatsApp', 'Push'],
+      icon: <Calendar className="w-5 h-5" />,
+      color: 'text-sky-500'
     },
     {
       id: '2',
@@ -144,7 +155,7 @@ export function CollectionAutomationPanel() {
         addToast(`Réguas executadas! ${response.data.stats.totalSent} mensagens enviadas`, 'success');
         await loadStats();
       } else {
-        addToast('Erro ao executar réguas', 'error');
+        addToast(response.data?.message || (response as any).error?.message || 'Erro ao executar réguas', 'error');
       }
     } catch (error: any) {
       console.error('Erro ao executar réguas:', error);
@@ -164,6 +175,7 @@ export function CollectionAutomationPanel() {
 
     switch (ruleId) {
       case '1': return stats.dueIn7Days;
+      case '9': return stats.dueIn5Days || 0;
       case '2': return stats.dueIn3Days;
       case '3': return stats.dueToday;
       case '4': return stats.overdue1Day;
@@ -184,11 +196,12 @@ export function CollectionAutomationPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="min-h-screen bg-black text-white p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
+        <div className="mb-8"><CollectionRulesPanel /></div>
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
               <h1 className="text-3xl font-bold flex items-center gap-3">
                 <TrendingUp className="w-8 h-8 text-[#D4AF37]" />

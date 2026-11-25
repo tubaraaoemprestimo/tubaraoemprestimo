@@ -404,6 +404,7 @@ model Loan {
   // Só saldo conferido pelo admin entra na régua de cobrança.
   legacyBalanceConfirmed  Boolean       @default(false) @map("legacy_balance_confirmed")
   collectionSuspended     Boolean       @default(false) @map("collection_suspended")
+  messagesSuspended       Boolean       @default(false) @map("messages_suspended")
   installments            Installment[]
   customer                Customer      @relation(fields: [customerId], references: [id])
   loanRequest             LoanRequest   @relation(fields: [requestId], references: [id])
@@ -1697,4 +1698,25 @@ model ActivationInvite {
 
   @@index([customerId, createdAt])
   @@map("activation_invites")
+}
+
+// Registro dos lembretes/cobranças automáticas (idempotência + histórico). Sem FKs, aditiva.
+model CollectionDispatch {
+  id            String   @id @default(uuid())
+  loanId        String   @map("loan_id")
+  installmentId String   @map("installment_id")
+  customerId    String   @map("customer_id")
+  triggerEvent  String   @map("trigger_event")
+  dueDate       DateTime @map("due_date")
+  status        String
+  channels      Json?
+  error         String?
+  attempts      Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([installmentId, triggerEvent, dueDate], map: "uq_collection_dispatch")
+  @@index([loanId, createdAt], map: "idx_collection_dispatch_loan")
+  @@index([createdAt], map: "idx_collection_dispatch_created")
+  @@map("collection_dispatches")
 }

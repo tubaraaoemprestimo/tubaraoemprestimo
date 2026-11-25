@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { collectionAutomationService, CollectionStats } from '../services/collectionAutomationService';
 import { prisma } from '../services/prisma';
+import { getCollectionRules, brDate, getLastRunDate, setLastRunDate } from '../services/collectionRules';
 
 // Trava no PostgreSQL (vale entre processos e servidores, não só neste Node).
 // Chave fixa e exclusiva da régua de empréstimos.
@@ -32,20 +33,29 @@ export async function withCollectionLock<T>(fn: () => Promise<T>, db: any = pris
 let isRunning = false;
 
 export function startCollectionCron() {
-  // Executa todos os dias às 9h da manhã
-  cron.schedule('0 9 * * *', async () => {
+  // Confere toda hora cheia; roda 1×/dia na hora definida no painel (padrão 9h, Brasília).
+  cron.schedule('0 * * * *', async () => {
     if (isRunning) {
       console.log('[CollectionCron] Já está executando, pulando...');
       return;
     }
+    const rules = await getCollectionRules().catch(() => null);
+    const hourBR = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
+    if (!rules || hourBR !== rules.sendHour) return;
 
     isRunning = true;
     console.log('[CollectionCron] ========== INICIANDO CRON DE COBRANÇA ==========');
 
     try {
-      const r = await withCollectionLock(() => collectionAutomationService.runCollectionAutomation());
-      if (!r.ran) {
-        console.log('[CollectionCron] Outra execução (outro processo) já está rodando; pulando.');
+      const today = brDate();
+      const r = await withCollectionLock(async () => {
+        // Dentro da trava: se a rodada de hoje já aconteceu (outro processo, mudança de hora), não repete.
+        if (await getLastRunDate() === today) return null;
+        await setLastRunDate(today);
+        return collectionAutomationService.runCollectionAutomation();
+      });
+      if (!r.ran || !r.value) {
+        console.log('[CollectionCron] Rodada de hoje já feita ou em andamento em outro processo; pulando.');
         return;
       }
       const stats = r.value;
@@ -63,7 +73,7 @@ export function startCollectionCron() {
     timezone: 'America/Sao_Paulo'
   });
 
-  console.log('[CollectionCron] ✅ Cron de cobrança iniciado - Executa diariamente às 9h');
+  console.log('[CollectionCron] ✅ Cron de cobrança iniciado - 1×/dia na hora definida no painel (padrão 9h)');
 
   // Régua do financiamento de celulares: job separado, só roda com a flag ligada.
   // Não chama nem altera a régua de empréstimos acima.
@@ -100,8 +110,15 @@ export async function runCollectionManually() {
   console.log('[CollectionCron] Executando manualmente...');
 
   try {
-    const r = await withCollectionLock(() => collectionAutomationService.runCollectionAutomation());
+    // Mesma trava diária da rodada automática: o "Executar agora" não repete mensagens do dia.
+    const today = brDate();
+    const r = await withCollectionLock(async () => {
+      if (await getLastRunDate() === today) return null;
+      await setLastRunDate(today);
+      return collectionAutomationService.runCollectionAutomation();
+    });
     if (!r.ran) return { success: false, message: 'Outra execução já está rodando' };
+    if (!r.value) return { success: false, message: 'A régua de hoje já rodou. Ela roda de novo amanhã.' };
     return { success: true, stats: r.value };
   } catch (error) {
     console.error('[CollectionCron] Erro:', error);

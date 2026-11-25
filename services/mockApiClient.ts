@@ -1248,12 +1248,14 @@ async function handleRequest(method: string, url: string, body?: any): Promise<a
   // ── CLIENTES ANTIGOS (dados fictícios) ──────────────────────────────────────
 
   if (method === 'GET' && match(url, /\/legacy-clients\/services/)) {
-    return { services: [['CLT', 'Empréstimo CLT'], ['AUTONOMO', 'Capital de giro para comércio'], ['GARANTIA', 'Empréstimo com garantia'], ['MOTO', 'Financiamento de moto'], ['LIMPA_NOME', 'Limpar nome']].map(([code, label]) => ({ code, label, active: true })) };
+    const rule: Record<string, [string, string]> = { CLT: ['ROLLOVER', 'Juros mensal; o principal só é cobrado na quitação.'], GARANTIA: ['ROLLOVER', 'Juros mensal; o principal só é cobrado na quitação.'], AUTONOMO: ['INSTALLMENTS', 'Comércio/autônomo: diárias ou parcelas que abatem o saldo.'], MOTO: ['INSTALLMENTS', 'Parcelas fixas até quitar.'], LIMPA_NOME: ['INSTALLMENTS', 'Serviço: parcelas do valor combinado, sem juros de mora.'], FINANCIAMENTO_CELULAR: ['UNSUPPORTED', 'Tem módulo próprio; registro antigo ainda não suportado.'] };
+    return { services: [['CLT', 'Empréstimo CLT'], ['AUTONOMO', 'Capital de giro para comércio'], ['GARANTIA', 'Empréstimo com garantia'], ['MOTO', 'Financiamento de moto'], ['LIMPA_NOME', 'Limpar nome'], ['FINANCIAMENTO_CELULAR', 'Financiamento de Celulares']].map(([code, label]) => ({ code, label, active: code !== 'FINANCIAMENTO_CELULAR', kind: rule[code][0], note: rule[code][1] })) };
   }
   if (method === 'POST' && match(url, /\/legacy-clients\/[^/]+\/invite/)) {
     const link = 'https://www.tubaraoemprestimo.com.br/#/ativar?c=DEMO';
     return { link, text: `Olá! Tudo bem?\n\nAgora você pode acompanhar seus serviços diretamente pelo aplicativo oficial Tubarão Empréstimos.\n\nAtive seu cadastro:\n${link}\n\nO link vale 7 dias.`, whatsappSent: false, simulation: true };
   }
+  if (method === 'GET' && match(url, /\/legacy-clients\/lookup/)) return { matches: [] };
   if (method === 'GET' && match(url, /\/legacy-clients/)) {
     const loan = (id: string, status: string, remainingAmount: number, collectionSuspended: boolean, nextPaymentDate: string | null, profileType: string) =>
       ({ id, status, remainingAmount, legacyBalanceConfirmed: !collectionSuspended, collectionSuspended, nextPaymentDate, loanRequest: { profileType } });
@@ -1267,6 +1269,33 @@ async function handleRequest(method: string, url: string, body?: any): Promise<a
     };
   }
   if (method === 'POST' && match(url, /\/activation\/check/)) return { firstName: 'Cliente', needsCpf: false };
+  if (method === 'POST' && match(url, /\/activation\/complete/)) return { ok: true };
+  if (method === 'POST' && match(url, /\/legacy-clients\/contracts\/[^/]+\/regularize-message/)) {
+    return { phone: '5521900002222', simulation: true, text: 'Olá, Cliente! Tudo bem?\n\nPassando para lembrar que você tem um serviço em andamento com a Tubarão Empréstimos.\n\nConsulte os detalhes e pague com segurança entrando no aplicativo:\nhttps://www.tubaraoemprestimo.com.br/#/login\n\nSe já pagou, desconsidere esta mensagem.' };
+  }
+  if (method === 'GET' && match(url, /\/collection-automation\/rules/)) {
+    return { rules: { enabled: true, reminderDays: [7, 5, 3], sendHour: 9, templates: {} }, whatsappConnected: true,
+      templates: ['INSTALLMENT_DUE_7_DAYS', 'INSTALLMENT_DUE_5_DAYS', 'INSTALLMENT_DUE_3_DAYS', 'INSTALLMENT_DUE_TODAY'].flatMap(t => [{ triggerEvent: t, channel: 'whatsapp', name: t }, { triggerEvent: t, channel: 'email', name: t }]) };
+  }
+  if (method === 'PUT' && match(url, /\/collection-automation\/rules/)) return { rules: body };
+  if (method === 'GET' && match(url, /\/collection-automation\/scheduled/)) {
+    const d = (n: number) => { const x = new Date(); x.setDate(x.getDate() + n); return x.toISOString(); };
+    return { items: [
+      { sendOn: d(0), dueDate: d(7), trigger: 'INSTALLMENT_DUE_7_DAYS', daysBefore: 7, amount: 500, loanId: 'll2', customerName: 'Cliente Demo Dois', whatsapp: true, status: 'PROGRAMADA', reason: null },
+      { sendOn: d(1), dueDate: d(6), trigger: 'INSTALLMENT_DUE_5_DAYS', daysBefore: 5, amount: 300, loanId: 'll1', customerName: 'Cliente Demo Um', whatsapp: true, status: 'SALDO_NAO_CONFIRMADO', reason: 'Saldo antigo não conferido' },
+      { sendOn: d(2), dueDate: d(5), trigger: 'INSTALLMENT_DUE_3_DAYS', daysBefore: 3, amount: 450, loanId: 'll4', customerName: 'Cliente Demo Quatro', whatsapp: false, status: 'PROGRAMADA', reason: null },
+      { sendOn: d(3), dueDate: d(6), trigger: 'INSTALLMENT_DUE_3_DAYS', daysBefore: 3, amount: 200, loanId: 'll5', customerName: 'Cliente Demo Cinco', whatsapp: true, status: 'PAGAMENTO_EM_CONFERENCIA', reason: 'Pagamento aguardando conferência' },
+    ] };
+  }
+  if (method === 'GET' && match(url, /\/collection-automation\/dispatches/)) {
+    const t = (h: number) => new Date(Date.now() - h * 3600000).toISOString();
+    return { byStatus: { SENT: 2, FAILED: 1 }, items: [
+      { id: 'd1', createdAt: t(2), triggerEvent: 'INSTALLMENT_DUE_7_DAYS', dueDate: t(-168), status: 'SENT', error: null, attempts: 1, customerName: 'Cliente Demo Dois', loanId: 'll2', channels: { whatsapp: true } },
+      { id: 'd2', createdAt: t(26), triggerEvent: 'INSTALLMENT_DUE_5_DAYS', dueDate: t(-96), status: 'SENT', error: null, attempts: 1, customerName: 'Cliente Demo Um', loanId: 'll1', channels: { whatsapp: true } },
+      { id: 'd3', createdAt: t(27), triggerEvent: 'INSTALLMENT_DUE_3_DAYS', dueDate: t(-48), status: 'FAILED', error: 'Nenhum canal entregou (WhatsApp desconectado)', attempts: 1, customerName: 'Cliente Demo Quatro', loanId: 'll4', channels: {} },
+    ] };
+  }
+  if (method === 'PATCH' && match(url, /\/collection-automation\/loans\/[^/]+\/messages/)) return { messagesSuspended: !!body?.suspended };
 
   // ── RETURNING CLIENTS / MIGRAÇÃO ─────────────────────────────────────────────
 

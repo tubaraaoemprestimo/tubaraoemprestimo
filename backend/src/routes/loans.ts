@@ -738,42 +738,47 @@ loansRouter.post('/:loanId/settle-all', requireAdmin, async (req: Request, res: 
             return;
         }
 
+        // Confirmação no servidor (a tela pede digitar QUITAR); evita quitação por chamada acidental.
+        if (String(req.body?.confirm || '').trim().toUpperCase() !== 'QUITAR') {
+            res.status(400).json({ error: 'Confirmação obrigatória: envie confirm="QUITAR"', code: 'CONFIRM_REQUIRED' });
+            return;
+        }
+
         const now = new Date();
         const totalPaid = pendingInstallments.length > 0
             ? pendingInstallments.reduce((sum, i) => sum + i.amount, 0)
             : Number(loan.remainingAmount);
 
-        // Marcar todas as parcelas pendentes como PAID
-        await prisma.installment.updateMany({
-            where: { id: { in: pendingInstallments.map(i => i.id) } },
-            data: { status: 'PAID', paidAt: now }
+        // Tudo numa transação; o update condicional do contrato barra o segundo clique/pedido simultâneo.
+        const settled = await prisma.$transaction(async (tx) => {
+            const claim = await tx.loan.updateMany({
+                where: { id: loanId, status: loan.status, remainingAmount: loan.remainingAmount },
+                data: { remainingAmount: 0, lastPaymentDate: now, status: 'COMPLETED', daysOverdue: 0 }
+            });
+            if (claim.count !== 1) return false;
+            await tx.installment.updateMany({
+                where: { id: { in: pendingInstallments.map(i => i.id) } },
+                data: { status: 'PAID', paidAt: now }
+            });
+            await tx.loanRequest.update({ where: { id: loan.requestId }, data: { status: 'COMPLETED' } });
+            await tx.transaction.create({
+                data: {
+                    type: 'IN',
+                    description: `Quitação total — ${loan.customer?.name || String(loanId).substring(0, 8)} (${pendingInstallments.length} parcelas)`,
+                    amount: totalPaid,
+                    category: 'PAYMENT',
+                    date: now
+                }
+            });
+            await tx.auditLog.create({
+                data: {
+                    userId: req.user!.id, userName: req.user!.name, action: 'LOAN_SETTLE_ALL', entity: 'LOAN', entityId: loanId, ipAddress: req.ip,
+                    details: JSON.stringify({ before: { status: loan.status, remainingAmount: loan.remainingAmount }, installmentsSettled: pendingInstallments.map(i => i.id), totalPaid })
+                }
+            });
+            return true;
         });
-
-        // Atualizar loan/request: remainingAmount = 0, status = COMPLETED
-        await prisma.loan.update({
-            where: { id: loanId },
-            data: {
-                remainingAmount: 0,
-                lastPaymentDate: now,
-                status: 'COMPLETED',
-                daysOverdue: 0
-            }
-        });
-        await prisma.loanRequest.update({
-            where: { id: loan.requestId },
-            data: { status: 'COMPLETED' }
-        });
-
-        // Criar transação de quitação
-        await prisma.transaction.create({
-            data: {
-                type: 'IN',
-                description: `Quitação total — ${loan.customer?.name || String(loanId).substring(0, 8)} (${pendingInstallments.length} parcelas)`,
-                amount: totalPaid,
-                category: 'PAYMENT',
-                date: now
-            }
-        });
+        if (!settled) { res.status(409).json({ error: 'O contrato mudou ou já foi quitado. Atualize a tela.' }); return; }
 
         // Notificar cliente via WhatsApp
         if (loan.customer?.phone) {
@@ -827,7 +832,8 @@ loansRouter.get('/', async (req: Request, res: Response) => {
 });
 
 // PUT /api/loans/:loanId/installments/:installmentId/proof — Upload comprovante
-loansRouter.put('/:loanId/installments/:installmentId/proof', async (req: Request, res: Response) => {
+// Só admin: marca a parcela como PAGA sem conferência. Cliente envia comprovante por /payment-receipts (fica PENDING).
+loansRouter.put('/:loanId/installments/:installmentId/proof', requireAdmin, async (req: Request, res: Response) => {
     try {
         const { proofUrl } = req.body;
         const installment = await prisma.installment.update({

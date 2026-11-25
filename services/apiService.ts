@@ -672,7 +672,7 @@ export const apiService = {
     },
 
     async settleAllInstallments(loanId: string) {
-        const { data, error } = await api.post(`/loans/${loanId}/settle-all`, {});
+        const { data, error } = await api.post(`/loans/${loanId}/settle-all`, { confirm: 'QUITAR' });
         if (error) throw new Error(error.error || 'Erro ao quitar contrato');
         return data;
     },

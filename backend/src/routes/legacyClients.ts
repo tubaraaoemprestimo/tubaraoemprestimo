@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { sendWhatsAppMessage } from '../services/whatsapp';
+import { whatsappAllowed } from '../services/collectionRules';
 
 /**
  * Clientes antigos (anteriores à plataforma): pré-cadastro pelo admin, contrato
@@ -47,6 +48,21 @@ export function isValidCpf(raw: unknown): boolean {
     return dv(9) === Number(c[9]) && dv(10) === Number(c[10]);
 }
 
+/** Vencimentos das parcelas restantes. Diária pula domingo (mesma regra do contrato novo). */
+export function scheduleDates(first: Date, count: number, frequency: string): Date[] {
+    const out: Date[] = [];
+    const day = first.getDate();
+    let d = new Date(first);
+    if (frequency === 'DAILY') while (d.getDay() === 0) d.setDate(d.getDate() + 1);
+    for (let i = 0; i < count; i++) {
+        out.push(new Date(d));
+        if (frequency === 'DAILY') { do d.setDate(d.getDate() + 1); while (d.getDay() === 0); }
+        else if (frequency === 'WEEKLY') d.setDate(d.getDate() + 7);
+        else { const n = new Date(first); n.setDate(1); n.setMonth(first.getMonth() + i + 1); n.setDate(Math.min(day, new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate())); d = n; }
+    }
+    return out;
+}
+
 const str = (v: unknown, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const money = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null; };
 const date = (v: unknown) => { if (!v) return null; const d = new Date(String(v)); return Number.isNaN(d.getTime()) ? null : d; };
@@ -69,7 +85,16 @@ legacyClientsRouter.use(authenticate, requireAdmin);
 /** Catálogo real de serviços (sem lista fixa no código). */
 legacyClientsRouter.get('/services', async (_req, res) => {
     const rows = await prisma.serviceCatalogEntry.findMany({ orderBy: { sortOrder: 'asc' } });
-    res.json({ services: rows.map(r => ({ code: r.code, label: r.label, active: r.active })) });
+    // Regra de cobrança de cada serviço (mostrada no formulário; vem das regras já existentes do sistema).
+    const RULE: Record<string, { kind: string; note: string }> = {
+        CLT: { kind: 'ROLLOVER', note: 'Juros mensal; o principal só é cobrado na quitação.' },
+        GARANTIA: { kind: 'ROLLOVER', note: 'Juros mensal; o principal só é cobrado na quitação.' },
+        AUTONOMO: { kind: 'INSTALLMENTS', note: 'Comércio/autônomo: diárias ou parcelas que abatem o saldo.' },
+        MOTO: { kind: 'INSTALLMENTS', note: 'Parcelas fixas até quitar.' },
+        LIMPA_NOME: { kind: 'INSTALLMENTS', note: 'Serviço: parcelas do valor combinado, sem juros de mora.' },
+        FINANCIAMENTO_CELULAR: { kind: 'UNSUPPORTED', note: 'Tem módulo próprio (aparelho e contrato jurídico); registro antigo ainda não suportado.' },
+    };
+    res.json({ services: rows.map(r => ({ code: r.code, label: r.label, active: r.active, ...(RULE[r.code] || { kind: 'INSTALLMENTS', note: '' }) })) });
 });
 
 /** Busca de possíveis duplicidades antes de cadastrar. Não funde nada. */
@@ -136,15 +161,16 @@ legacyClientsRouter.get('/', async (req, res) => {
     const page = Math.max(1, Number(req.query.page || 1));
     const take = 30;
     const status = str(req.query.status, 30);
-    const where: any = { isLegacy: true, ...(status ? { activationStatus: status } : {}) };
+    const legacyScope = { OR: [{ isLegacy: true }, { loans: { some: { isLegacy: true } } }] };
+    const where: any = { AND: [legacyScope, ...(status ? [{ activationStatus: status }] : [])] };
     const [items, total, byStatus] = await Promise.all([
         prisma.customer.findMany({
             where, orderBy: { joinedAt: 'desc' }, skip: (page - 1) * take, take,
             select: { id: true, name: true, phone: true, activationStatus: true, whatsappOptOut: true, userId: true, joinedAt: true,
-                loans: { select: { id: true, status: true, remainingAmount: true, isLegacy: true, legacyBalanceConfirmed: true, collectionSuspended: true, nextPaymentDate: true, loanRequest: { select: { profileType: true } } } } },
+                loans: { select: { id: true, status: true, remainingAmount: true, isLegacy: true, legacyBalanceConfirmed: true, collectionSuspended: true, messagesSuspended: true, nextPaymentDate: true, loanRequest: { select: { profileType: true } } } } },
         }),
         prisma.customer.count({ where }),
-        prisma.customer.groupBy({ by: ['activationStatus'], where: { isLegacy: true }, _count: true }),
+        prisma.customer.groupBy({ by: ['activationStatus'], where: legacyScope, _count: true }),
     ]);
     res.json({ items, total, page, totalPages: Math.max(1, Math.ceil(total / take)), byStatus: Object.fromEntries(byStatus.map(b => [b.activationStatus || 'SEM', b._count])) });
 });
@@ -157,12 +183,17 @@ legacyClientsRouter.get('/', async (req, res) => {
  */
 legacyClientsRouter.post('/:customerId/contracts', async (req, res) => {
     const customerId = String(req.params.customerId);
-    const customer = await prisma.customer.findFirst({ where: { id: customerId, isLegacy: true } });
-    if (!customer) { res.status(404).json({ error: 'Cliente antigo não encontrado' }); return; }
+    // Vale também para cliente que já existe (achado na busca): o contrato antigo entra no cadastro dele, sem duplicar pessoa.
+    const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) { res.status(404).json({ error: 'Cliente não encontrado' }); return; }
 
     const serviceCode = str(req.body?.serviceCode, 40);
     const service = await prisma.serviceCatalogEntry.findUnique({ where: { code: serviceCode } });
     if (!service) { res.status(400).json({ error: 'Serviço inválido' }); return; }
+    // Celular tem módulo e regras próprias (aparelho, Tabela Price, MDM): não vira empréstimo genérico.
+    if (service.code === 'FINANCIAMENTO_CELULAR') {
+        res.status(400).json({ error: 'Celular antigo ainda não pode ser registrado aqui: o financiamento de celulares tem regras próprias (aparelho, contrato jurídico). Registre na observação e trate pelo módulo de celulares.', code: 'SERVICE_RULES_PENDING' }); return;
+    }
     const amount = money(req.body?.amount);
     const balance = money(req.body?.balance);
     const paid = money(req.body?.paidAmount);
@@ -180,6 +211,16 @@ legacyClientsRouter.post('/:customerId/contracts', async (req, res) => {
     if (!settled && nextDue! < new Date(new Date().setHours(0, 0, 0, 0))) { res.status(400).json({ error: 'O próximo vencimento não pode estar no passado' }); return; }
     if (!settled && installmentAmount! > balance) { res.status(400).json({ error: 'A cobrança não pode ser maior que o saldo' }); return; }
     const confirmed = req.body?.balanceConfirmed === true;
+    // CLT/Garantia: juros mensal com rolagem automática (1 cobrança; a próxima nasce no pagamento).
+    // Demais: parcelas restantes que somam o saldo informado — nada inventado além do que o admin digitou.
+    const rollover = ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'].includes(service.code);
+    const count = rollover || settled ? (settled ? 0 : 1) : Math.trunc(Number(req.body?.remainingInstallments || 1));
+    if (!rollover && !settled && (!Number.isInteger(count) || count < 1 || count > 360)) { res.status(400).json({ error: 'Parcelas restantes: de 1 a 360' }); return; }
+    if (!rollover && !settled && Math.abs(count * installmentAmount! - balance) > 0.01 * count) {
+        res.status(400).json({ error: `Parcelas restantes × valor (${(count * installmentAmount!).toFixed(2)}) precisam somar o saldo (${balance.toFixed(2)})`, code: 'SCHEDULE_MISMATCH' }); return;
+    }
+    if (!rollover && !settled && count === 1 && installmentAmount! < balance) { res.status(400).json({ error: 'Com 1 parcela restante, o valor da parcela deve ser o saldo' }); return; }
+    const dueDates = scheduleDates(nextDue!, count, frequency);
 
     if (reference) {
         const dup = await prisma.loan.findFirst({ where: { customerId, legacyReference: reference }, select: { id: true } });
@@ -197,7 +238,7 @@ legacyClientsRouter.post('/:customerId/contracts', async (req, res) => {
         });
         const created = await tx.loan.create({
             data: {
-                customerId, requestId: request.id, amount, principalAmount: amount, remainingAmount: balance, installmentsCount: 1,
+                customerId, requestId: request.id, amount, principalAmount: amount, remainingAmount: balance, installmentsCount: Math.max(1, count), totalInstallments: Math.max(1, count),
                 status: settled ? 'COMPLETED' : 'ACTIVE', startDate: date(req.body?.originalDate) || new Date(),
                 paymentFrequency: frequency, interestRate, dailyInstallmentAmount: frequency === 'DAILY' ? installmentAmount : null,
                 nextPaymentDate: settled ? null : nextDue, source: 'LEGADO', isLoan: request.isLoan, isService: request.isService,
@@ -209,9 +250,8 @@ legacyClientsRouter.post('/:customerId/contracts', async (req, res) => {
             },
         });
         if (!settled) {
-            await tx.installment.create({
-                data: { loanId: created.id, amount: installmentAmount!, dueDate: nextDue!, status: 'OPEN',
-                    isInterestPayment: ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'].includes(service.code) },
+            await tx.installment.createMany({
+                data: dueDates.map(dueDate => ({ loanId: created.id, amount: installmentAmount!, dueDate, status: 'OPEN', isInterestPayment: rollover })),
             });
         }
         return created;
@@ -263,6 +303,30 @@ legacyClientsRouter.post('/:customerId/invite', async (req, res) => {
     await prisma.customer.update({ where: { id: customer.id }, data: { activationStatus: 'CONVITE_ENVIADO' } });
     await audit(req, 'LEGACY_INVITE_CREATED', 'CUSTOMER', customer.id, { inviteId: invite.id, whatsappSent: sent, simulation: !sendEnabled });
     res.status(201).json({ link, text, expiresAt: invite.expiresAt, whatsappSent: sent, simulation: !sendEnabled });
+});
+
+/**
+ * "Consultar ou regularizar contrato": só com obrigação confirmada e elegível. A mensagem
+ * não traz valor, CPF nem documento: leva para o login (área autenticada) e para o atendimento.
+ */
+legacyClientsRouter.post('/contracts/:loanId/regularize-message', async (req, res) => {
+    const loan = await prisma.loan.findUnique({ where: { id: String(req.params.loanId) }, include: { customer: true } });
+    if (!loan) { res.status(404).json({ error: 'Contrato não encontrado' }); return; }
+    const blocked = loan.status !== 'ACTIVE' ? 'Contrato quitado ou cancelado: não se envia cobrança.'
+        : Number(loan.remainingAmount) <= 0 ? 'Saldo zero.'
+        : loan.collectionSuspended ? 'Saldo antigo ainda não conferido.'
+        : loan.messagesSuspended ? 'Mensagens pausadas neste contrato.'
+        : !whatsappAllowed(loan.customer) ? 'Telefone inválido ou cliente pediu para não receber WhatsApp.' : null;
+    if (blocked) { res.status(409).json({ error: blocked, code: 'NOT_ELIGIBLE' }); return; }
+    const c = loan.customer;
+    const access = c.userId ? `${APP_URL()}/#/login` : null;
+    const text = `Olá, ${c.name.split(' ')[0]}! Tudo bem?\n\nPassando para lembrar que você tem um serviço em andamento com a Tubarão Empréstimos.\n\n`
+        + (access ? `Consulte os detalhes e pague com segurança entrando no aplicativo:\n${access}\n\n` : `Para consultar os detalhes, fale com a gente por aqui ou peça seu link de acesso ao aplicativo.\n\n`)
+        + `Se já pagou, desconsidere esta mensagem. Qualquer dúvida, responda esta mensagem que nosso atendimento ajuda você.`;
+    const sendEnabled = process.env.LEGACY_WHATSAPP_ENABLED === 'true';
+    const sent = sendEnabled && req.body?.send === true ? await sendWhatsAppMessage(c.phone, text).catch(() => false) : false;
+    await audit(req, 'REGULARIZE_MESSAGE', 'LOAN', loan.id, { whatsappSent: sent, simulation: !sendEnabled });
+    res.json({ text, whatsappSent: sent, simulation: !sendEnabled, phone: normalizePhoneBR(c.phone) });
 });
 
 legacyClientsRouter.post('/invites/:inviteId/revoke', async (req, res) => {
