@@ -51,6 +51,7 @@ async function getAdminPixKey(customer?: any, loanId?: string): Promise<string> 
 
 export interface CollectionStats {
   dueIn7Days: number;
+  dueIn5Days: number;
   dueIn3Days: number;
   dueToday: number;
   overdue1Day: number;
@@ -309,6 +310,7 @@ export async function catchUpInterestOnlyRolloverInstallments(today = new Date()
   const loans = await prisma.loan.findMany({
     where: {
       status: 'ACTIVE',
+      collectionSuspended: false,
       remainingAmount: { gt: 0 },
       nextPaymentDate: { lt: todayStart },
       loanRequest: { profileType: { in: ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'] } },
@@ -375,6 +377,7 @@ async function ensureInterestOnlyOpenInstallments(): Promise<number> {
   const loans = await prisma.loan.findMany({
     where: {
       status: 'ACTIVE',
+      collectionSuspended: false,
       remainingAmount: { gt: 0 },
       loanRequest: { profileType: { in: ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'] } },
       installments: { none: { status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] } } }
@@ -424,7 +427,9 @@ function getCollectionContext(installment: any) {
   const isInterestOnly = ['CLT', 'GARANTIA', 'GARANTIA_VEICULO'].includes(profileType);
   const openInstallments = loan?.installments?.filter((i: any) => ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'].includes(i.status)) || [];
   const isLastOpenInstallment = openInstallments.length <= 1 || openInstallments.every((i: any) => i.id === installment.id || new Date(i.dueDate) <= new Date(installment.dueDate));
-  const shouldChargeTotal = !isInterestOnly && isLastOpenInstallment;
+  // Contrato legado tem só a próxima cobrança cadastrada: não é a "última parcela", salvo se ela cobre o saldo.
+  const legacyPartial = loan?.isLegacy && Number(loan.remainingAmount) > Number(installment.amount);
+  const shouldChargeTotal = !isInterestOnly && isLastOpenInstallment && !legacyPartial;
   const chargeAmount = shouldChargeTotal ? Number(loan.remainingAmount || installment.amount) : Number(installment.amount);
 
   // Terminologia oficial por modalidade (CLT/GARANTIA → juros de rolagem;
@@ -447,11 +452,12 @@ function getCollectionContext(installment: any) {
 }
 
 /**
- * Processa lembretes de vencimento (7 dias antes)
+ * Lembrete de vencimento N dias antes (7, 5 e 3). Template: INSTALLMENT_DUE_<N>_DAYS.
+ * Sem template ativo cadastrado para o gatilho, nada é enviado.
  */
-async function processDueIn7Days(): Promise<number> {
+async function processDueInDays(days: number): Promise<number> {
   const targetDate = new Date();
-  targetDate.setDate(targetDate.getDate() + 7);
+  targetDate.setDate(targetDate.getDate() + days);
   targetDate.setHours(0, 0, 0, 0);
 
   const nextDay = new Date(targetDate);
@@ -464,7 +470,7 @@ async function processDueIn7Days(): Promise<number> {
         lt: nextDay
       },
       status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
-      loan: { status: 'ACTIVE' }
+      loan: { status: 'ACTIVE', collectionSuspended: false }
     },
     include: {
       loan: {
@@ -477,7 +483,7 @@ async function processDueIn7Days(): Promise<number> {
     }
   });
 
-  console.log(`[CollectionAutomation] Encontradas ${installments.length} parcelas vencendo em 7 dias`);
+  console.log(`[CollectionAutomation] Encontradas ${installments.length} parcelas vencendo em ${days} dias`);
 
   let sent = 0;
   for (const installment of installments) {
@@ -485,10 +491,10 @@ async function processDueIn7Days(): Promise<number> {
       const customer = installment.loan.customer;
 
       await templateService.triggerTemplate(
-        'INSTALLMENT_DUE_7_DAYS',
+        `INSTALLMENT_DUE_${days}_DAYS`,
         {
           email: customer.email,
-          phone: customer.phone,
+          phone: customer.whatsappOptOut ? '' : customer.phone,
           userId: customer.id,
           customerId: customer.id
         },
@@ -503,71 +509,7 @@ async function processDueIn7Days(): Promise<number> {
       sent++;
       await new Promise(resolve => setTimeout(resolve, 1500)); // Delay anti-spam
     } catch (error) {
-      console.error('[CollectionAutomation] Erro ao enviar lembrete 7 dias:', error);
-    }
-  }
-
-  return sent;
-}
-
-/**
- * Processa lembretes de vencimento (3 dias antes)
- */
-async function processDueIn3Days(): Promise<number> {
-  const targetDate = new Date();
-  targetDate.setDate(targetDate.getDate() + 3);
-  targetDate.setHours(0, 0, 0, 0);
-
-  const nextDay = new Date(targetDate);
-  nextDay.setDate(nextDay.getDate() + 1);
-
-  const installments = await prisma.installment.findMany({
-    where: {
-      dueDate: {
-        gte: targetDate,
-        lt: nextDay
-      },
-      status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
-      loan: { status: 'ACTIVE' }
-    },
-    include: {
-      loan: {
-        include: {
-          customer: true,
-          loanRequest: { select: { profileType: true } },
-          installments: { where: { status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] } }, orderBy: { dueDate: 'asc' } }
-        }
-      }
-    }
-  });
-
-  console.log(`[CollectionAutomation] Encontradas ${installments.length} parcelas vencendo em 3 dias`);
-
-  let sent = 0;
-  for (const installment of installments) {
-    try {
-      const customer = installment.loan.customer;
-
-      await templateService.triggerTemplate(
-        'INSTALLMENT_DUE_3_DAYS',
-        {
-          email: customer.email,
-          phone: customer.phone,
-          userId: customer.id,
-          customerId: customer.id
-        },
-        {
-          nome: customer.name,
-          ...getCollectionContext(installment),
-          data_vencimento: formatDate(installment.dueDate),
-          pix_key: await getAdminPixKey(customer, installment.loanId)
-        }
-      );
-
-      sent++;
-      await new Promise(resolve => setTimeout(resolve, 1500));
-    } catch (error) {
-      console.error('[CollectionAutomation] Erro ao enviar lembrete 3 dias:', error);
+      console.error(`[CollectionAutomation] Erro ao enviar lembrete ${days} dias:`, error);
     }
   }
 
@@ -591,7 +533,7 @@ async function processDueToday(): Promise<number> {
         lt: tomorrow
       },
       status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
-      loan: { status: 'ACTIVE' }
+      loan: { status: 'ACTIVE', collectionSuspended: false }
     },
     include: {
       loan: {
@@ -615,7 +557,7 @@ async function processDueToday(): Promise<number> {
         'INSTALLMENT_DUE_TODAY',
         {
           email: customer.email,
-          phone: customer.phone,
+          phone: customer.whatsappOptOut ? '' : customer.phone,
           userId: customer.id,
           customerId: customer.id
         },
@@ -655,7 +597,7 @@ async function processOverdue1Day(): Promise<number> {
         lt: today
       },
       status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
-      loan: { status: 'ACTIVE' }
+      loan: { status: 'ACTIVE', collectionSuspended: false }
     },
     include: {
       loan: {
@@ -690,7 +632,7 @@ async function processOverdue1Day(): Promise<number> {
         'INSTALLMENT_OVERDUE_1_DAY',
         {
           email: customer.email,
-          phone: customer.phone,
+          phone: customer.whatsappOptOut ? '' : customer.phone,
           userId: customer.id,
           customerId: customer.id
         },
@@ -738,7 +680,7 @@ async function processOverdue3Days(): Promise<number> {
         lt: nextDay
       },
       status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
-      loan: { status: 'ACTIVE' }
+      loan: { status: 'ACTIVE', collectionSuspended: false }
     },
     include: {
       loan: {
@@ -773,7 +715,7 @@ async function processOverdue3Days(): Promise<number> {
         'INSTALLMENT_OVERDUE_3_DAYS',
         {
           email: customer.email,
-          phone: customer.phone,
+          phone: customer.whatsappOptOut ? '' : customer.phone,
           userId: customer.id,
           customerId: customer.id
         },
@@ -821,7 +763,7 @@ async function processOverdue7Days(): Promise<number> {
         lt: nextDay
       },
       status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
-      loan: { status: 'ACTIVE' }
+      loan: { status: 'ACTIVE', collectionSuspended: false }
     },
     include: {
       loan: {
@@ -857,7 +799,7 @@ async function processOverdue7Days(): Promise<number> {
         'INSTALLMENT_OVERDUE_7_DAYS',
         {
           email: customer.email,
-          phone: customer.phone,
+          phone: customer.whatsappOptOut ? '' : customer.phone,
           userId: customer.id,
           customerId: customer.id
         },
@@ -905,7 +847,7 @@ async function processOverdue15Days(): Promise<number> {
         lt: nextDay
       },
       status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
-      loan: { status: 'ACTIVE' }
+      loan: { status: 'ACTIVE', collectionSuspended: false }
     },
     include: {
       loan: {
@@ -941,7 +883,7 @@ async function processOverdue15Days(): Promise<number> {
         'INSTALLMENT_OVERDUE_15_DAYS',
         {
           email: customer.email,
-          phone: customer.phone,
+          phone: customer.whatsappOptOut ? '' : customer.phone,
           userId: customer.id,
           customerId: customer.id
         },
@@ -989,7 +931,7 @@ async function processOverdue30Days(): Promise<number> {
         lt: nextDay
       },
       status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
-      loan: { status: 'ACTIVE' }
+      loan: { status: 'ACTIVE', collectionSuspended: false }
     },
     include: {
       loan: {
@@ -1025,7 +967,7 @@ async function processOverdue30Days(): Promise<number> {
         'INSTALLMENT_OVERDUE_30_DAYS',
         {
           email: customer.email,
-          phone: customer.phone,
+          phone: customer.whatsappOptOut ? '' : customer.phone,
           userId: customer.id,
           customerId: customer.id
         },
@@ -1064,6 +1006,7 @@ export async function runCollectionAutomation(): Promise<CollectionStats> {
 
   const stats: CollectionStats = {
     dueIn7Days: 0,
+    dueIn5Days: 0,
     dueIn3Days: 0,
     dueToday: 0,
     overdue1Day: 0,
@@ -1086,8 +1029,10 @@ export async function runCollectionAutomation(): Promise<CollectionStats> {
     await applyDailyLateFees();
 
     // Lembretes de vencimento
-    stats.dueIn7Days = await processDueIn7Days();
-    stats.dueIn3Days = await processDueIn3Days();
+    stats.dueIn7Days = await processDueInDays(7);
+    // Aviso de 5 dias (pedido do dono 25/11/2026). Liga com COLLECTION_DUE_5_DAYS_ENABLED=true após homologar o template.
+    stats.dueIn5Days = process.env.COLLECTION_DUE_5_DAYS_ENABLED === 'true' ? await processDueInDays(5) : 0;
+    stats.dueIn3Days = await processDueInDays(3);
     stats.dueToday = await processDueToday();
 
     // Cobranças de atraso
@@ -1097,12 +1042,13 @@ export async function runCollectionAutomation(): Promise<CollectionStats> {
     stats.overdue15Days = await processOverdue15Days();
     stats.overdue30Days = await processOverdue30Days();
 
-    stats.totalSent = stats.dueIn7Days + stats.dueIn3Days + stats.dueToday +
+    stats.totalSent = stats.dueIn7Days + stats.dueIn5Days + stats.dueIn3Days + stats.dueToday +
                       stats.overdue1Day + stats.overdue3Days + stats.overdue7Days +
                       stats.overdue15Days + stats.overdue30Days;
 
     console.log('[CollectionAutomation] ========== RESUMO ==========');
     console.log(`[CollectionAutomation] Vencendo em 7 dias: ${stats.dueIn7Days}`);
+    console.log(`[CollectionAutomation] Vencendo em 5 dias: ${stats.dueIn5Days}`);
     console.log(`[CollectionAutomation] Vencendo em 3 dias: ${stats.dueIn3Days}`);
     console.log(`[CollectionAutomation] Vencendo hoje: ${stats.dueToday}`);
     console.log(`[CollectionAutomation] Atraso 1 dia: ${stats.overdue1Day}`);
@@ -1164,7 +1110,7 @@ export async function applyDailyLateFees(): Promise<number> {
   const overdueInstallments = await prisma.installment.findMany({
     where: {
       status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] },
-      loan: { status: 'ACTIVE' },
+      loan: { status: 'ACTIVE', collectionSuspended: false },
       dueDate: { lte: today },
     },
     include: {

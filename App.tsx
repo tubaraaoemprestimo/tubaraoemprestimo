@@ -41,6 +41,8 @@ import { SecurityHub } from './pages/admin/SecurityHub';
 import { AIHub } from './pages/admin/AIHub';
 import { AnalyticsHub } from './pages/admin/AnalyticsHub';
 import { ContractMigrations } from './pages/admin/ContractMigrations';
+import { LegacyClients } from './pages/admin/LegacyClients';
+import { ActivateAccount } from './pages/ActivateAccount';
 import { CollectionAutomationPanel } from './pages/admin/CollectionAutomationPanel';
 
 // Pages - Admin (mantidas para rotas legadas)
@@ -79,7 +81,7 @@ import {
   LayoutDashboard, FileText, Settings as SettingsIcon, LogOut, Users, Bot, Menu, X,
   UserCog, Home as HomeIcon, PieChart, User as UserIcon, Megaphone, BarChart3,
   Calendar, Ban, FileCheck, DollarSign, MessageSquare, Star, ChevronDown, ChevronRight,
-  MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload, Search, Handshake, TrendingUp, BookOpen, Smartphone
+  MapPin, Landmark, Receipt, Gift, Camera, Shield, Upload, Search, Handshake, TrendingUp, BookOpen, Smartphone, UserPlus
 } from 'lucide-react';
 import { Logo } from './components/Logo';
 import { apiService } from './services/apiService';
@@ -223,6 +225,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <Link to="/admin/investors" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/investors')}`}><Landmark size={18} /> Solicitações de Investidores</Link>
         <Link to="/admin/phone-financing" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/phone-financing')}`}><Smartphone size={18} /> Financiamento de Celulares</Link>
         <Link to="/admin/phone-financing/mdm" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/phone-financing/mdm')}`}><Smartphone size={18} /> iPhones da Empresa (MDM)</Link>
+        <Link to="/admin/legacy-clients" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/legacy-clients')}`}><UserPlus size={18} /> Clientes Antigos</Link>
         <Link to="/admin/contract-migrations" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/contract-migrations')}`}><Users size={18} /> Migração de Contratos</Link>
         <Link to="/admin/collection-automation" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/collection-automation')}`}><TrendingUp size={18} /> Réguas de Cobrança</Link>
         <Link to="/admin/import-contacts" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all ${isActive('/admin/import-contacts')}`}><Upload size={18} /> Importar Contatos</Link>
@@ -553,6 +556,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/ativar" element={<ActivateAccount />} />
             <Route path="/wizard" element={<BiometricAccessGate><PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/demo" element={<DemoSimulator />} />
 
@@ -585,6 +589,7 @@ function App() {
             <Route path="/admin/contracts" element={<AdminLayout><AdminContracts /></AdminLayout>} />
             <Route path="/admin/investors" element={<AdminLayout><Investors /></AdminLayout>} />
             <Route path="/admin/contract-migrations" element={<AdminLayout><ContractMigrations /></AdminLayout>} />
+            <Route path="/admin/legacy-clients" element={<AdminLayout><LegacyClients /></AdminLayout>} />
             <Route path="/admin/collection-automation" element={<AdminLayout><CollectionAutomationPanel /></AdminLayout>} />
             <Route path="/admin/import-contacts" element={<AdminLayout><ImportContacts /></AdminLayout>} />
             <Route path="/admin/data-search" element={<AdminLayout><DataSearchNew /></AdminLayout>} />

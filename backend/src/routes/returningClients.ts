@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticate } from '../middleware/auth';
+import { authenticate, requireAdmin } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -164,7 +164,7 @@ router.post('/', authenticate, async (req, res) => {
  * GET /api/returning-clients
  * Listar todas as solicitações de clientes recorrentes pendentes
  */
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, requireAdmin, async (req, res) => {
   try {
     const { status } = req.query;
 
@@ -194,7 +194,7 @@ router.get('/', authenticate, async (req, res) => {
  * GET /api/returning-clients/:id
  * Buscar detalhes de uma solicitação específica
  */
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -225,7 +225,7 @@ router.get('/:id', authenticate, async (req, res) => {
  * PATCH /api/returning-clients/:id/validate
  * Validar e ativar contrato de cliente recorrente
  */
-router.patch('/:id/validate', authenticate, async (req, res) => {
+router.patch('/:id/validate', authenticate, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { adjustedAmount, adjustedRate, adjustedDueDate } = req.body;
@@ -306,7 +306,7 @@ router.patch('/:id/validate', authenticate, async (req, res) => {
  * PATCH /api/returning-clients/:id/reject
  * Rejeitar solicitação de cliente recorrente
  */
-router.patch('/:id/reject', authenticate, async (req, res) => {
+router.patch('/:id/reject', authenticate, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;

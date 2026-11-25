@@ -1245,6 +1245,29 @@ async function handleRequest(method: string, url: string, body?: any): Promise<a
     return { success: true, processed: 3, sent: 3 };
   }
 
+  // ── CLIENTES ANTIGOS (dados fictícios) ──────────────────────────────────────
+
+  if (method === 'GET' && match(url, /\/legacy-clients\/services/)) {
+    return { services: [['CLT', 'Empréstimo CLT'], ['AUTONOMO', 'Capital de giro para comércio'], ['GARANTIA', 'Empréstimo com garantia'], ['MOTO', 'Financiamento de moto'], ['LIMPA_NOME', 'Limpar nome']].map(([code, label]) => ({ code, label, active: true })) };
+  }
+  if (method === 'POST' && match(url, /\/legacy-clients\/[^/]+\/invite/)) {
+    const link = 'https://www.tubaraoemprestimo.com.br/#/ativar?c=DEMO';
+    return { link, text: `Olá! Tudo bem?\n\nAgora você pode acompanhar seus serviços diretamente pelo aplicativo oficial Tubarão Empréstimos.\n\nAtive seu cadastro:\n${link}\n\nO link vale 7 dias.`, whatsappSent: false, simulation: true };
+  }
+  if (method === 'GET' && match(url, /\/legacy-clients/)) {
+    const loan = (id: string, status: string, remainingAmount: number, collectionSuspended: boolean, nextPaymentDate: string | null, profileType: string) =>
+      ({ id, status, remainingAmount, legacyBalanceConfirmed: !collectionSuspended, collectionSuspended, nextPaymentDate, loanRequest: { profileType } });
+    return {
+      items: [
+        { id: 'lc1', name: 'Cliente Demo Um', phone: '5511900001111', activationStatus: 'PRE_CADASTRO', whatsappOptOut: false, userId: null, joinedAt: '2026-11-25', loans: [loan('ll1', 'ACTIVE', 1000, true, '2026-12-20', 'CLT')] },
+        { id: 'lc2', name: 'Cliente Demo Dois', phone: '5521900002222', activationStatus: 'CONVITE_ENVIADO', whatsappOptOut: false, userId: null, joinedAt: '2026-11-25', loans: [loan('ll2', 'ACTIVE', 450, false, '2026-12-05', 'AUTONOMO'), loan('ll3', 'COMPLETED', 0, false, null, 'MOTO')] },
+        { id: 'lc3', name: 'Cliente Demo Três', phone: '5531900003333', activationStatus: 'CONTA_ATIVA', whatsappOptOut: true, userId: 'u3', joinedAt: '2026-11-25', loans: [] },
+      ],
+      total: 3, page: 1, totalPages: 1, byStatus: { PRE_CADASTRO: 1, CONVITE_ENVIADO: 1, CONTA_ATIVA: 1 },
+    };
+  }
+  if (method === 'POST' && match(url, /\/activation\/check/)) return { firstName: 'Cliente', needsCpf: false };
+
   // ── RETURNING CLIENTS / MIGRAÇÃO ─────────────────────────────────────────────
 
   if (method === 'GET' && match(url, /\/api\/returning-clients|\/returning-clients/)) {

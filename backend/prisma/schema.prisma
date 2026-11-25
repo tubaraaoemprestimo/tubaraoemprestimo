@@ -190,6 +190,11 @@ model Customer {
   partnerCommissionRate Float?         @map("partner_commission_rate")
   contractTermsAccepted Boolean        @default(false) @map("contract_terms_accepted")
   source_detail         String?
+  // Clientes antigos (migração 20261125): ativação independe da situação financeira.
+  activationStatus      String?        @map("activation_status")
+  isLegacy              Boolean        @default(false) @map("is_legacy")
+  whatsappOptOut        Boolean        @default(false) @map("whatsapp_opt_out")
+  activationInvites     ActivationInvite[]
   coupons               Coupon[]
   partner               User?          @relation("CustomerPartner", fields: [partnerId], references: [id])
   user                  User?          @relation("CustomerUser", fields: [userId], references: [id])
@@ -390,6 +395,15 @@ model Loan {
   adminNotes              String?       @map("admin_notes")
   source                  String?       @default("MANUAL")
   billing_type            String        @default("MONTHLY") @db.VarChar(20)
+  // Contrato anterior à plataforma (migração 20261125). Não gera desembolso nem caixa.
+  isLegacy                Boolean       @default(false) @map("is_legacy")
+  legacyReference         String?       @map("legacy_reference")
+  legacyOriginalDate      DateTime?     @map("legacy_original_date")
+  legacyPaidAmount        Float?        @map("legacy_paid_amount")
+  legacyBalanceDate       DateTime?     @map("legacy_balance_date")
+  // Só saldo conferido pelo admin entra na régua de cobrança.
+  legacyBalanceConfirmed  Boolean       @default(false) @map("legacy_balance_confirmed")
+  collectionSuspended     Boolean       @default(false) @map("collection_suspended")
   installments            Installment[]
   customer                Customer      @relation(fields: [customerId], references: [id])
   loanRequest             LoanRequest   @relation(fields: [requestId], references: [id])
@@ -1663,4 +1677,24 @@ model DeviceCustodyEvent {
   unit      PhoneInventoryUnit @relation(fields: [unitId], references: [id])
 
   @@map("device_custody_events")
+}
+
+// Convite de ativação de conta para cliente antigo (migração 20261125).
+// Só o hash do token fica no banco; o token aparece uma única vez no link.
+model ActivationInvite {
+  id         String    @id @default(uuid())
+  customerId String    @map("customer_id")
+  tokenHash  String    @unique @map("token_hash")
+  status     String    @default("PENDING") // PENDING | USED | REVOKED | EXPIRED
+  expiresAt  DateTime  @map("expires_at")
+  createdBy  String    @map("created_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  usedAt     DateTime? @map("used_at")
+  revokedAt  DateTime? @map("revoked_at")
+  attempts   Int       @default(0)
+  sentAt     DateTime? @map("sent_at")
+  customer   Customer  @relation(fields: [customerId], references: [id])
+
+  @@index([customerId, createdAt])
+  @@map("activation_invites")
 }
