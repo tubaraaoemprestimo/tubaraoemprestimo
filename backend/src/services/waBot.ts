@@ -7,6 +7,7 @@ import { saveBufferToStorage } from './storageService';
 import { submitLoanRequest } from '../routes/loanRequests';
 import { ChargeError, getInfinitePayService } from './infinitepay/infinitepayService';
 import { adminFor, handleAdmin } from './waAdmin';
+import { TOPICS, HUMAN_TOPICS, INFO_TEXT, APP_TEXT, pixKey, requestAttendant } from './waHelp';
 import { BotEvent, Button, Card, numbered, whaileysSend } from './whaileys';
 import { Answers, Profile, PROFILES, PROFILE_LABEL, Step, buildPayload, guaranteeOk, isErr, nextStep, summary, CepLookup } from './waBotSteps';
 
@@ -55,8 +56,17 @@ async function ask(ctx: Ctx, s: Session, text: string, opts: Button[] = [], list
 
 async function menu(ctx: Ctx, s: Session, greet = true) {
     s.step = 'MENU'; s.data = { phone: s.data.phone };
-    const opts: Button[] = [{ id: 'svc:DEBT', title: '🧮 Quanto devo?', description: 'Juros, atraso e valor para pagar' } as Button, { id: 'svc:LOANS', title: '💳 Pagar com Pix', description: 'Gerar link de pagamento' } as Button, ...PROFILES.map(p => ({ id: `svc:${p.id}`, title: p.title, description: p.description }) as Button), { id: 'svc:STATUS', title: '📋 Minhas solicitações' }];
-    await ask(ctx, s, `${greet ? '🦈 Olá! Aqui é a *Tubarão Empréstimos*.\n' : ''}O que você deseja fazer? Toque em uma opção ou responda com o número.`, opts, 'Serviços');
+    // Ordem pelo que mais se pergunta (análise de 26/11/2026). Todos os serviços continuam em "Nova solicitação".
+    const opts: Button[] = [
+        { id: 'req:new', title: '📝 Nova solicitação', description: 'Empréstimo, moto, limpa nome, investir' } as Button,
+        { id: 'svc:STATUS', title: '📋 Minhas solicitações', description: 'Ver andamento' } as Button,
+        { id: 'svc:DEBT', title: '🧮 Quanto devo?', description: 'Juros, atraso, quitação' } as Button,
+        { id: 'svc:LOANS', title: '💳 Pagar com Pix', description: 'Link de pagamento' } as Button,
+        { id: 'pay:receipt', title: '📎 Já paguei', description: 'Enviar comprovante' } as Button,
+        { id: 'help:topics', title: '💬 Outros assuntos', description: 'App, contrato, horário…' } as Button,
+        { id: 'help:human', title: '👤 Falar com atendente', description: 'Pessoa da equipe' } as Button,
+    ];
+    await ask(ctx, s, `${greet ? '🦈 Olá! Aqui é a *Tubarão Empréstimos*.\n' : ''}O que você deseja fazer? Toque em uma opção ou responda com o número.`, opts, 'Menu');
 }
 
 // ───────── Identificação (código por e-mail ou conta nova) ─────────
@@ -314,6 +324,110 @@ async function submit(ctx: Ctx, s: Session, db: any) {
     await ask(ctx, s, `⚠️ Não foi possível enviar: ${r.body?.error || 'erro inesperado'}.`, [{ id: 'cancel', title: '🏠 Voltar ao menu' }]);
 }
 
+// ───────── Atendimento por assunto (sem IA) ─────────
+async function helpMenu(ctx: Ctx, s: Session) {
+    s.step = 'HELP'; s.data = { phone: s.data.phone };
+    await ask(ctx, s, '💬 *Como podemos ajudar?* Escolha o assunto:', TOPICS.map(t => ({ id: t.id, title: t.title, description: t.description }) as Button), 'Assuntos');
+}
+
+async function newRequestMenu(ctx: Ctx, s: Session) {
+    s.step = 'MENU'; s.data = { phone: s.data.phone };
+    await ask(ctx, s, '📝 *Nova solicitação* — escolha o serviço:', PROFILES.map(p => ({ id: `svc:${p.id}`, title: p.title, description: p.description }) as Button), 'Serviços');
+}
+
+async function humanStart(ctx: Ctx, s: Session) {
+    s.step = 'HUMAN_TOPIC'; s.data = { phone: s.data.phone };
+    await ask(ctx, s, '👤 *Falar com atendente*\nQual é o assunto? Assim a pessoa certa já te responde.', HUMAN_TOPICS, 'Assuntos');
+}
+
+async function helpStep(ev: BotEvent, ctx: Ctx, s: Session, db: any) {
+    const id = ev.kind === 'action' ? ev.id : '';
+    const text = ev.kind === 'text' ? ev.text.trim() : '';
+
+    // Atendente: assunto → descrição curta → fila
+    if (s.step === 'HUMAN_TOPIC') {
+        if (!id.startsWith('hum:')) return humanStart(ctx, s);
+        s.data.topic = id.slice(4); s.step = 'HUMAN_DETAIL';
+        return ask(ctx, s, `Assunto: *${s.data.topic}*.\nEscreva em uma mensagem o que você precisa (ou toque em *Enviar assim*).`, [{ id: 'hum:send', title: '➡️ Enviar assim' }]);
+    }
+    if (s.step === 'HUMAN_DETAIL') {
+        const detail = id === 'hum:send' ? null : text || (ev.kind === 'media' ? '[enviou arquivo]' : null);
+        if (!detail && id !== 'hum:send') return ask(ctx, s, 'Escreva o que precisa ou toque em *Enviar assim*.', [{ id: 'hum:send', title: '➡️ Enviar assim' }]);
+        const user = s.userId ? await db.user.findUnique({ where: { id: s.userId }, select: { name: true } }).catch(() => null) : null;
+        const open = await requestAttendant(ctx.phone, s.data.topic, detail, { userId: s.userId, name: user?.name }, db, ctx.now);
+        s.step = 'HUMAN_WAIT'; s.data = { phone: s.data.phone, topic: s.data.topic, at: (ctx.now || new Date()).toISOString() };
+        await ctx.send({ text: open
+            ? `✅ Pronto! Um atendente vai te responder *por este WhatsApp* em instantes.\nAssunto: *${s.data.topic}*.`
+            : `✅ Pedido registrado! Estamos fora do horário agora; um atendente te responde *por este WhatsApp* no próximo horário de atendimento.\n\n${INFO_TEXT.split('\n\n')[0]}` });
+        return ask(ctx, s, 'Enquanto isso, quer resolver algo pelo menu?', [{ id: 'help:menu', title: '📋 Ver menu' }]);
+    }
+    if (s.step === 'HUMAN_WAIT') {
+        if (id === 'help:menu') return menu(ctx, s, false);
+        // Mensagem enquanto aguarda: não repete a fila; registra para o atendente.
+        if (text || ev.kind === 'media') await db.auditLog.create({ data: { userId: s.userId || 'system', userName: 'WhatsApp', action: 'WA_BOT_HUMAN_MESSAGE', entity: 'WA_BOT', entityId: ctx.phone.slice(-4), details: text.slice(0, 500) || '[arquivo]' } }).catch(() => {});
+        return ask(ctx, s, '⏳ Seu pedido já está com a equipe. Recebemos sua mensagem e o atendente vai ver.\nQuer usar o menu enquanto aguarda?', [{ id: 'help:menu', title: '📋 Ver menu' }]);
+    }
+
+    // Comprovante: escolhe contrato/parcela → foto ou PDF → vai para conferência (mesma fila do app)
+    if (s.step === 'RECEIPT') {
+        if (ev.kind !== 'media' || !['image', 'document'].includes(ev.media)) return ask(ctx, s, 'Envie a *foto* ou o *PDF* do comprovante.', [{ id: 'help:menu', title: '⬅️ Voltar' }]);
+        if (!ctx.media?.data) return ctx.send({ text: 'Não consegui baixar o arquivo. Envie de novo, por favor.' });
+        const mime = String(ctx.media.mimetype || '').split(';')[0];
+        if (!/^(image\/(jpeg|png|webp|heic)|application\/pdf)$/.test(mime)) return ctx.send({ text: 'Formato não aceito. Envie foto ou PDF.' });
+        const inst = await db.installment.findUnique({ where: { id: s.data.installmentId }, include: { loan: { select: { customerId: true } } } });
+        const customer = await db.customer.findFirst({ where: { userId: s.userId } });
+        if (!inst || !customer || inst.loan?.customerId !== customer.id) return helpMenu(ctx, s);
+        const dup = await db.paymentReceipt.count({ where: { installmentId: inst.id, status: 'PENDING' } });
+        if (dup) { await ctx.send({ text: '📎 Já existe um comprovante desta parcela em conferência. Assim que a equipe conferir, você recebe o aviso.' }); return menu(ctx, s, false); }
+        const url = await saveBufferToStorage(Buffer.from(ctx.media.data, 'base64'), mime, `comprovantes/${customer.id}`, 'whatsapp-comprovante');
+        await db.paymentReceipt.create({ data: { installmentId: inst.id, customerId: customer.id, receiptUrl: url, amount: inst.amount, status: 'PENDING' } });
+        await db.notification.create({ data: { title: '💳 Comprovante Recebido', message: `${customer.name} enviou comprovante pelo WhatsApp (botões)`, type: 'INFO' } }).catch(() => {});
+        try { const { sendPushToRole } = await import('../routes/push'); await sendPushToRole('ADMIN', '💳 Comprovante Recebido', `${customer.name} enviou comprovante pelo WhatsApp`); } catch { /* ok */ }
+        await ctx.send({ text: '✅ *Comprovante recebido!* Ele foi para conferência da equipe. Assim que for confirmado, a parcela é baixada e você recebe o aviso.' });
+        return menu(ctx, s, false);
+    }
+
+    // Assuntos
+    switch (id) {
+        case 'help:menu': return menu(ctx, s, false);
+        case 'help:human': return humanStart(ctx, s);
+        case 'help:info': await ctx.send({ text: INFO_TEXT }); return helpMenu(ctx, s);
+        case 'help:app': await ctx.send({ text: APP_TEXT }); return ask(ctx, s, 'Resolveu?', [{ id: 'help:menu', title: '✅ Sim, voltar' }, { id: 'hum:App', title: '👤 Falar com atendente' }]);
+        case 'help:payment': s.step = 'HELP'; return ask(ctx, s, '💸 *Pagamento e Pix* — o que você precisa?', [{ id: 'svc:LOANS', title: '🔗 Link para pagar' }, { id: 'pay:key', title: '🔑 Chave Pix' }, { id: 'pay:receipt', title: '📎 Já paguei (comprovante)' }]);
+        case 'help:debt': s.step = 'HELP'; return ask(ctx, s, '🧮 *Dívida e quitação* — escolha:', [{ id: 'svc:DEBT', title: '🧮 Quanto devo / quitar' }, { id: 'hum:Renegociação', title: '🤝 Renegociar / atraso' }]);
+        case 'help:request': s.step = 'HELP'; return ask(ctx, s, '📋 *Minha solicitação* — escolha:', [{ id: 'svc:STATUS', title: '🔎 Ver andamento' }, { id: 'req:new', title: '📝 Nova solicitação' }, { id: 'hum:Solicitação', title: '👤 Falar sobre ela' }]);
+        case 'help:contract': await ctx.send({ text: `📄 *Contrato e extrato*\nNo app você vê o contrato, as parcelas pagas e o extrato completo:\n${APP_URL}` }); return ask(ctx, s, 'Precisa de mais alguma coisa?', [{ id: 'help:menu', title: '✅ Voltar ao menu' }, { id: 'hum:Contrato', title: '👤 Falar com atendente' }]);
+        case 'help:dispute': s.step = 'HUMAN_DETAIL'; s.data.topic = 'Cobrança indevida'; return ask(ctx, s, '⚖️ *Cobrança indevida*\nConte o que aconteceu (qual cobrança, data e valor). Se tiver comprovante, um atendente vai pedir na conversa.', [{ id: 'hum:send', title: '➡️ Enviar assim' }]);
+        case 'req:new': return newRequestMenu(ctx, s);
+        case 'pay:key': {
+            const key = await pixKey(db);
+            await ctx.send({ text: key
+                ? `🔑 *Chave Pix da Tubarão:*\n${key}\n\nDepois de pagar, toque em *Já paguei* e envie o comprovante para dar baixa.\n_Prefere baixa automática? Use o *Link para pagar*._`
+                : '🔑 Chave Pix indisponível no momento. Use o *Link para pagar* (Pix ou cartão, baixa automática).' });
+            return ask(ctx, s, 'E agora?', [{ id: 'pay:receipt', title: '📎 Enviar comprovante' }, { id: 'svc:LOANS', title: '🔗 Link para pagar' }, { id: 'help:menu', title: '⬅️ Menu' }]);
+        }
+        case 'pay:receipt': return receiptPick(ctx, s, db);
+    }
+    if (id.startsWith('hum:')) { s.step = 'HUMAN_TOPIC'; return helpStep(ev, ctx, s, db); }
+    if (/^rcl:\d$/.test(id)) {
+        const inst = s.data.insts?.[Number(id.slice(4))];
+        if (!inst) return receiptPick(ctx, s, db);
+        s.step = 'RECEIPT'; s.data.installmentId = inst.id;
+        return ask(ctx, s, `📎 Parcela de ${brl(inst.amount)} (venc. ${new Date(inst.dueDate).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}).\nEnvie agora a *foto* ou o *PDF* do comprovante.`, [{ id: 'help:menu', title: '⬅️ Voltar' }]);
+    }
+    return helpMenu(ctx, s);
+}
+
+/** Lista as parcelas em aberto do cliente para anexar o comprovante. */
+async function receiptPick(ctx: Ctx, s: Session, db: any) {
+    const customer = await db.customer.findFirst({ where: { userId: s.userId }, select: { id: true } });
+    const insts = customer ? await db.installment.findMany({ where: { loan: { customerId: customer.id, status: { in: OPEN_LOAN } }, status: { in: ['OPEN', 'LATE', 'AWAITING_CONFIRMATION'] } }, orderBy: { dueDate: 'asc' }, take: 9, select: { id: true, amount: true, dueDate: true } }) : [];
+    if (!insts.length) { await ctx.send({ text: 'Não encontrei parcela em aberto no seu cadastro. Se você acabou de pagar, a baixa pode já ter sido feita. 🎉' }); return menu(ctx, s, false); }
+    s.step = 'HELP'; s.data = { phone: s.data.phone, insts: insts.map((i: any) => ({ id: i.id, amount: i.amount, dueDate: i.dueDate })) };
+    if (insts.length === 1) return helpStep({ kind: 'action', id: 'rcl:0' }, ctx, s, db);
+    return ask(ctx, s, '📎 De qual parcela é o comprovante?', insts.map((i: any, n: number) => ({ id: `rcl:${n}`, title: `${new Date(i.dueDate).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} ${brl(i.amount)}` })), 'Parcelas');
+}
+
 /** Uma mensagem recebida. Sempre responde algo; nunca lança para o webhook. */
 export async function handleBotMessage(ev: BotEvent, ctx: Ctx) {
     const db = ctx.db || prisma;
@@ -332,9 +446,21 @@ export async function handleBotMessage(ev: BotEvent, ctx: Ctx) {
     try {
         if (s.step === 'SUBMITTING') return void (await ctx.send({ text: '⏳ Estou enviando sua solicitação, um instante…' }));
         if (CANCEL_WORDS.test(text) || (ev.kind === 'action' && ev.id === 'cancel')) { await ctx.send({ text: 'Cancelado. Nada foi enviado.' }); await menu(ctx, s, false); return; }
-        if (MENU_WORDS.test(text) && !s.step.startsWith('ID_')) { await menu(ctx, s); return; }
+        if (MENU_WORDS.test(text) && !s.step.startsWith('ID_') && s.step !== 'HUMAN_DETAIL') { await menu(ctx, s); return; }
+        // "Quero falar com atendente" digitado em qualquer momento (fora de um formulário em andamento).
+        if (/(atendente|falar com (algu[eé]m|uma pessoa|humano)|pessoa real)/i.test(text) && !['FLOW', 'CONFIRM'].includes(s.step) && !s.step.startsWith('HUMAN_')) { await humanStart(ctx, s); return; }
+        const helpId = ev.kind === 'action' ? ev.id : '';
+        if (helpId === 'help:topics') { await helpMenu(ctx, s); return; }
+        if (helpId === 'req:new' && !s.step.startsWith('ID_')) { await newRequestMenu(ctx, s); return; }
+        // Assuntos que não precisam de identificação
+        if (['help:human', 'help:info', 'help:app', 'help:contract', 'help:dispute', 'help:menu', 'help:payment', 'help:debt', 'help:request', 'pay:key'].includes(helpId) || /^hum:/.test(helpId) || s.step.startsWith('HUMAN_')) return await helpStep(ev, ctx, s, db);
+        // Assuntos que mexem em dados do cliente: pedem identificação (mesmo caminho dos serviços)
+        // Comprovante mexe em parcela do cliente: exige identificação (chave Pix é pública e vai direto).
+        if (helpId === 'pay:receipt' && !s.verified) { s.step = 'MENU'; s.data.pendingService = helpId; }
+        else if (helpId === 'pay:receipt') { s.step = 'HELP'; return await helpStep(ev, ctx, s, db); }
+        if ((s.step === 'HELP' || s.step === 'RECEIPT') && s.verified) return await helpStep(ev, ctx, s, db);
         if (s.step === 'MENU' || s.step.startsWith('ID_')) {
-            const choice = ev.kind === 'action' && ev.id.startsWith('svc:') ? ev.id.slice(4) : s.data.pendingService;
+            const choice = ev.kind === 'action' && ev.id.startsWith('svc:') ? ev.id.slice(4) : ev.kind === 'action' && ev.id === 'pay:receipt' ? ev.id : s.data.pendingService;
             if (!choice) { await menu(ctx, s); return; }
             s.data.pendingService = choice;
             if (!(await identify(ev, ctx, s, db))) return;
@@ -342,6 +468,7 @@ export async function handleBotMessage(ev: BotEvent, ctx: Ctx) {
             if (choice === 'STATUS') return await myRequests(ctx, s, db);
             if (choice === 'LOANS') return await myLoans(ctx, s, db);
             if (choice === 'DEBT') return await myLoans(ctx, s, db);
+            if (choice === 'pay:receipt') { s.step = 'HELP'; return await helpStep({ kind: 'action', id: choice }, ctx, s, db); }
             if (!PROFILES.some(p => p.id === choice)) { await menu(ctx, s); return; }
             s.step = 'FLOW'; s.data = { phone: s.data.phone, profile: choice };
             await ctx.send({ text: `Ótimo! Vamos fazer sua solicitação de *${PROFILE_LABEL[choice as Profile]}*.\nA qualquer momento digite *cancelar* para sair.` });

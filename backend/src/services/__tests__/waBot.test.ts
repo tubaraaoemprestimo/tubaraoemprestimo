@@ -65,14 +65,16 @@ describe('Autoatendimento por botões', () => {
 
     it('menu com botões numerados; texto "1" vale como clique', async () => {
         await say({ conversation: 'oi' });
-        expect(out[0].sections[0].rows.length).toBe(9);
-        expect(last()).toMatch(/1\. 🧮 Quanto devo\?[\s\S]*2\. 💳 Pagar com Pix[\s\S]*3\. 💼 Empréstimo CLT/);
+        expect(out[0].sections[0].rows.length).toBe(7);
+        expect(last()).toMatch(/1\. 📝 Nova solicitação[\s\S]*3\. 🧮 Quanto devo\?[\s\S]*7\. 👤 Falar com atendente/);
+        await say({ conversation: '1' });
+        expect(last()).toMatch(/1\. 💼 Empréstimo CLT/);
         await say({ conversation: '1' });
         expect(last()).toMatch(/confirmar quem é você/);
     });
 
     it('não segue sem provar o e-mail; código errado conta tentativa; e-mail de admin é recusado', async () => {
-        await say({ conversation: 'oi' }); await say({ conversation: '7' });
+        await say({ conversation: 'oi' }); await say({ buttonsResponseMessage: { selectedButtonId: 'svc:LIMPA_NOME' } });
         await say({ buttonsResponseMessage: { selectedButtonId: 'id:have' } });
         await say({ conversation: 'adm@x.com' });
         expect(last()).toMatch(/não pode ser usado/);
@@ -87,7 +89,7 @@ describe('Autoatendimento por botões', () => {
     });
 
     it('LIMPA_NOME completo: termos, dados, assinatura, resumo, envio único', async () => {
-        await say({ conversation: 'oi' }); await say({ conversation: '7' });
+        await say({ conversation: 'oi' }); await say({ buttonsResponseMessage: { selectedButtonId: 'svc:LIMPA_NOME' } });
         await say({ buttonsResponseMessage: { selectedButtonId: 'id:have' } }); await say({ conversation: 'cli@x.com' }); await say({ conversation: code() });
         await say({ conversation: '1' }); // aceito
         await say({ conversation: 'Maria da Silva' });
@@ -119,7 +121,7 @@ describe('Autoatendimento por botões', () => {
     });
 
     it('CLT com menos de 3 meses encerra sem gravar nada', async () => {
-        await say({ conversation: 'oi' }); await say({ conversation: '3' });
+        await say({ conversation: 'oi' }); await say({ buttonsResponseMessage: { selectedButtonId: 'svc:CLT' } });
         await say({ buttonsResponseMessage: { selectedButtonId: 'id:have' } }); await say({ conversation: 'cli@x.com' }); await say({ conversation: code() });
         await say({ conversation: '2' }); // não é cliente
         await say({ conversation: '50' }); expect(last()).toMatch(/entre R\$ 300/);
@@ -131,7 +133,7 @@ describe('Autoatendimento por botões', () => {
     });
 
     it('quanto devo: mostra juros, atraso e totais pelo cálculo oficial; pagar gera link InfinitePay', async () => {
-        await say({ conversation: 'oi' }); await say({ conversation: '1' });
+        await say({ conversation: 'oi' }); await say({ buttonsResponseMessage: { selectedButtonId: 'svc:DEBT' } });
         await say({ buttonsResponseMessage: { selectedButtonId: 'id:have' } }); await say({ conversation: 'cli@x.com' }); await say({ conversation: code() });
         const calc = last();
         expect(calc).toMatch(/Quanto está sua dívida/);
@@ -150,7 +152,7 @@ describe('Autoatendimento por botões', () => {
     });
 
     it('cancelar a qualquer momento não envia', async () => {
-        await say({ conversation: 'oi' }); await say({ conversation: '7' });
+        await say({ conversation: 'oi' }); await say({ buttonsResponseMessage: { selectedButtonId: 'svc:LIMPA_NOME' } });
         await say({ conversation: 'cancelar' });
         expect(out.some(c => /Nada foi enviado/.test(c.text))).toBe(true);
         expect(submitted).toHaveLength(0);
