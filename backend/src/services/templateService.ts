@@ -114,7 +114,7 @@ async function sendWhatsApp(phone: string, message: string): Promise<boolean> {
 
     const url = `${config.apiUrl}/message/sendText/${config.instanceName}`;
 
-    await axios.post(url, {
+    const resp = await axios.post(url, {
       number: normalizePhone(phone),
       text: message,
       options: { delay: 1500, presence: 'composing', linkPreview: false }
@@ -122,6 +122,7 @@ async function sendWhatsApp(phone: string, message: string): Promise<boolean> {
       headers: { apikey: config.apiKey },
       timeout: 15000
     });
+    import('./inbox').then(m => m.recordOutgoing({ to: normalizePhone(phone), text: message, origin: 'AUTOMACAO', response: resp.data })).catch(() => {});
 
     return true;
   } catch (error) {

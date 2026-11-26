@@ -1822,3 +1822,76 @@ model Dispute {
   @@index([status, createdAt], map: "idx_disputes_status")
   @@map("disputes")
 }
+
+// ───────── Central WhatsApp (tempo real) ─────────
+model WaConversation {
+  id                 String      @id @default(uuid())
+  instance           String
+  remoteJid          String      @map("remote_jid")
+  phone              String?
+  name               String?
+  profilePicUrl      String?     @map("profile_pic_url")
+  customerId         String?     @map("customer_id")
+  mode               String      @default("AI_ACTIVE")
+  assignedTo         String?     @map("assigned_to")
+  assignedAt         DateTime?   @map("assigned_at")
+  waitingSince       DateTime?   @map("waiting_since")
+  archived           Boolean     @default(false)
+  unreadCount        Int         @default(0) @map("unread_count")
+  lastMessageAt      DateTime?   @map("last_message_at")
+  lastMessagePreview String?     @map("last_message_preview")
+  lastMessageFromMe  Boolean?    @map("last_message_from_me")
+  version            Int         @default(0)
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @default(now()) @updatedAt @map("updated_at")
+  messages           WaMessage[]
+
+  @@unique([instance, remoteJid], map: "uq_wa_conv_jid")
+  @@index([lastMessageAt(sort: Desc)], map: "idx_wa_conv_last")
+  @@index([mode, assignedTo], map: "idx_wa_conv_mode")
+  @@index([updatedAt], map: "idx_wa_conv_updated")
+  @@index([phone], map: "idx_wa_conv_phone")
+  @@map("wa_conversations")
+}
+
+model WaMessage {
+  id               String         @id @default(uuid())
+  conversationId   String         @map("conversation_id")
+  instance         String
+  externalId       String         @map("external_id")
+  fromMe           Boolean        @map("from_me")
+  origin           String
+  senderUserId     String?        @map("sender_user_id")
+  type             String
+  text             String?
+  mediaMime        String?        @map("media_mime")
+  mediaName        String?        @map("media_name")
+  quotedExternalId String?        @map("quoted_external_id")
+  status           String         @default("UNKNOWN")
+  statusRank       Int            @default(0) @map("status_rank")
+  error            String?
+  clientRequestId  String?        @map("client_request_id")
+  imported         Boolean        @default(false)
+  timestamp        DateTime
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @default(now()) @updatedAt @map("updated_at")
+  conversation     WaConversation @relation(fields: [conversationId], references: [id])
+
+  @@unique([instance, externalId], map: "uq_wa_msg_external")
+  @@index([conversationId, timestamp(sort: Desc)], map: "idx_wa_msg_conv_ts")
+  @@index([updatedAt], map: "idx_wa_msg_updated")
+  @@index([timestamp], map: "idx_wa_msg_ts")
+  @@map("wa_messages")
+}
+
+model WaQuickReply {
+  id        String   @id @default(uuid())
+  title     String
+  body      String
+  active    Boolean  @default(true)
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("wa_quick_replies")
+}

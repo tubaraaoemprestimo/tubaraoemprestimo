@@ -617,7 +617,7 @@ chatbotRouter.get('/history/:phone', authenticate, async (req: Request, res: Res
 });
 
 // POST /api/chatbot/message - Processar mensagem com IA
-chatbotRouter.post('/message', authenticate, async (req: Request, res: Response) => {
+chatbotRouter.post('/message', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         const { phone, message, customerContext } = req.body;
 

@@ -85,7 +85,7 @@ export function whatsappAllowed(customer: any): boolean {
     return /^55\d{10,11}$/.test(d);
 }
 
-export type SkipReason = 'CONTRATO_ENCERRADO' | 'SALDO_ZERO' | 'SALDO_NAO_CONFIRMADO' | 'COMUNICACAO_SUSPENSA' | 'CLIENTE_SUSPENSO' | 'CONTESTACAO_ABERTA' | 'PAGAMENTO_EM_CONFERENCIA' | 'JA_ENVIADO';
+export type SkipReason = 'CONTRATO_ENCERRADO' | 'SALDO_ZERO' | 'SALDO_NAO_CONFIRMADO' | 'COMUNICACAO_SUSPENSA' | 'CLIENTE_SUSPENSO' | 'EM_ATENDIMENTO_HUMANO' | 'CONTESTACAO_ABERTA' | 'PAGAMENTO_EM_CONFERENCIA' | 'JA_ENVIADO';
 
 export const SKIP_LABEL: Record<SkipReason, string> = {
     CONTRATO_ENCERRADO: 'Contrato quitado/cancelado',
@@ -93,6 +93,7 @@ export const SKIP_LABEL: Record<SkipReason, string> = {
     SALDO_NAO_CONFIRMADO: 'Saldo antigo não conferido',
     COMUNICACAO_SUSPENSA: 'Mensagens pausadas no contrato',
     CLIENTE_SUSPENSO: 'Comunicação do cliente suspensa',
+    EM_ATENDIMENTO_HUMANO: 'Cliente em atendimento humano (lembretes pausados)',
     CONTESTACAO_ABERTA: 'Contestação aberta',
     PAGAMENTO_EM_CONFERENCIA: 'Pagamento aguardando conferência',
     JA_ENVIADO: 'Já enviado',
@@ -117,6 +118,7 @@ export async function collectionGate(installment: any, trigger: string, db: any 
     else if (loan.collectionSuspended) reason = 'SALDO_NAO_CONFIRMADO';
     else if (loan.messagesSuspended) reason = 'COMUNICACAO_SUSPENSA';
     else if (commSuspended(loan.customer)) reason = 'CLIENTE_SUSPENSO';
+    else if (trigger.startsWith('INSTALLMENT_DUE_') && await inHumanService(loan.customer, db)) reason = 'EM_ATENDIMENTO_HUMANO';
     else if (await db.dispute?.count?.({ where: { loanId: loan.id, status: { in: OPEN_DISPUTE }, OR: [{ installmentId: null }, { installmentId: fresh.id }] } })) reason = 'CONTESTACAO_ABERTA';
     else if (fresh.status === 'AWAITING_CONFIRMATION'
         || await db.paymentReceipt.count({ where: { installmentId: installment.id, status: 'PENDING' } })) reason = 'PAGAMENTO_EM_CONFERENCIA';
@@ -172,4 +174,19 @@ export async function previewScheduled(daysAhead = 7, db: any = prisma) {
     }
     items.sort((a, b) => +a.sendOn - +b.sendOn);
     return { rules, items };
+}
+
+/**
+ * Opcional (Central WhatsApp → Configurações): lembretes de vencimento (não as cobranças de atraso)
+ * esperam enquanto o cliente está sendo atendido por um humano. Desligado por padrão.
+ */
+async function inHumanService(customer: any, db: any): Promise<boolean> {
+    if (!customer?.phone || !db.waConversation?.findFirst) return false;
+    const settings = await db.systemSetting?.findUnique?.({ where: { key: 'inbox_settings' } }).catch(() => null);
+    if (!settings) return false;
+    try { if (JSON.parse(settings.value).pauseRemindersDuringHuman !== true) return false; } catch { return false; }
+    let d = String(customer.phone).replace(/\D/g, '');
+    if (d.length === 10 || d.length === 11) d = `55${d}`;
+    const conv = await db.waConversation.findFirst({ where: { phone: d, mode: { in: ['HUMAN_ACTIVE', 'WAITING_HUMAN'] } }, select: { id: true } }).catch(() => null);
+    return !!conv;
 }

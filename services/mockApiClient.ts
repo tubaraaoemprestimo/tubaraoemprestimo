@@ -1256,6 +1256,51 @@ async function handleRequest(method: string, url: string, body?: any): Promise<a
     return { link, text: `Olá! Tudo bem?\n\nAgora você pode acompanhar seus serviços diretamente pelo aplicativo oficial Tubarão Empréstimos.\n\nAtive seu cadastro:\n${link}\n\nO link vale 7 dias.`, whatsappSent: false, simulation: true };
   }
   if (method === 'GET' && match(url, /\/legacy-clients\/lookup/)) return { matches: [] };
+  // ── CENTRAL WHATSAPP (dados fictícios) ──
+  if (match(url, /\/inbox\//)) {
+    const now = Date.now(); const t = (min: number) => new Date(now - min * 60000).toISOString();
+    const convs = [
+      { id: 'c1', remoteJid: '5511900001111@s.whatsapp.net', phone: '5511900001111', name: 'Maria Fictícia', profilePicUrl: null, mode: 'WAITING_HUMAN', assignedTo: null, operatorName: null, unreadCount: 3, lastMessageAt: t(2), lastMessagePreview: 'Quero falar com um atendente, por favor', lastMessageFromMe: false, archived: false, version: 1, customer: { id: 'lc1', name: 'Maria Fictícia', isLegacy: true, hasAccount: false, confirmed: true } },
+      { id: 'c2', remoteJid: '5521900002222@s.whatsapp.net', phone: '5521900002222', name: 'João Exemplo', profilePicUrl: null, mode: 'HUMAN_ACTIVE', assignedTo: 'admin-demo', operatorName: 'Admin Demo', unreadCount: 0, lastMessageAt: t(12), lastMessagePreview: 'Perfeito, vou mandar o comprovante agora', lastMessageFromMe: false, archived: false, version: 3, customer: { id: 'lc2', name: 'João Exemplo', isLegacy: false, hasAccount: true, confirmed: true } },
+      { id: 'c3', remoteJid: '5531900003333@s.whatsapp.net', phone: '5531900003333', name: 'Ana Teste', profilePicUrl: null, mode: 'AI_ACTIVE', assignedTo: null, operatorName: null, unreadCount: 0, lastMessageAt: t(40), lastMessagePreview: 'Seu pagamento foi confirmado ✅', lastMessageFromMe: true, archived: false, version: 0, customer: null },
+      { id: 'c4', remoteJid: '123456789012345@lid', phone: null, name: 'Contato Novo', profilePicUrl: null, mode: 'AI_ACTIVE', assignedTo: null, operatorName: null, unreadCount: 1, lastMessageAt: t(95), lastMessagePreview: '🎤 Áudio', lastMessageFromMe: false, archived: false, version: 0, customer: null },
+      { id: 'c5', remoteJid: '5541900005555@s.whatsapp.net', phone: '5541900005555', name: 'Pedro Demo', profilePicUrl: null, mode: 'CLOSED', assignedTo: null, operatorName: null, unreadCount: 0, lastMessageAt: t(600), lastMessagePreview: 'Obrigado!', lastMessageFromMe: false, archived: true, version: 5, customer: null },
+    ];
+    const msg = (id: string, conv: string, min: number, fromMe: boolean, origin: string, text: string | null, extra: any = {}) => ({ id, conversationId: conv, externalId: `ext-${id}`, fromMe, origin, senderName: origin === 'HUMANO' ? 'Admin Demo' : null, type: 'text', text, mediaMime: null, mediaName: null, quotedExternalId: null, status: fromMe ? 'READ' : 'DELIVERED', error: null, timestamp: t(min), imported: false, ...extra });
+    const msgs: Record<string, any[]> = {
+      c1: [msg('m1', 'c1', 30, false, 'CLIENTE', 'Oi, boa tarde!'), msg('m2', 'c1', 29, true, 'IA', 'Olá, Maria! Sou o assistente da Tubarão. Como posso ajudar?'), msg('m3', 'c1', 5, false, 'CLIENTE', 'Tenho uma dúvida sobre minha parcela'), msg('m4', 'c1', 4, true, 'IA', 'Certo! Encaminhei sua conversa para nossa equipe. Assim que um atendente estiver disponível, ele responde por aqui.'), msg('m5', 'c1', 2, false, 'CLIENTE', 'Quero falar com um atendente, por favor')],
+      c2: [msg('n1', 'c2', 60, false, 'CLIENTE', 'Bom dia, quanto falta para quitar?'), msg('n2', 'c2', 58, true, 'AUTOMACAO', 'Olá João! Seu lembrete: a próxima parcela vence em 5 dias. Pague pelo app.'), msg('n3', 'c2', 20, true, 'HUMANO', 'Bom dia, João! Sou o Admin. Os valores atualizados estão no app, na aba Contratos.', { quotedExternalId: 'ext-n1' }), msg('n4', 'c2', 15, false, 'CLIENTE', null, { type: 'audio', mediaMime: 'audio/ogg' }), msg('n5', 'c2', 13, true, 'HUMANO', 'Recebi seu áudio, pode mandar o comprovante por aqui mesmo.', { status: 'DELIVERED' }), msg('n6', 'c2', 12, false, 'CLIENTE', 'Perfeito, vou mandar o comprovante agora')],
+      c3: [msg('o1', 'c3', 45, false, 'CLIENTE', 'Já paguei pelo Pix'), msg('o2', 'c3', 40, true, 'AUTOMACAO', 'Seu pagamento foi confirmado ✅')],
+      c4: [msg('p1', 'c4', 95, false, 'CLIENTE', null, { type: 'audio', mediaMime: 'audio/ogg' })],
+      c5: [msg('q1', 'c5', 610, true, 'DISPOSITIVO_EXTERNO', 'Pronto, já resolvi pelo celular.'), msg('q2', 'c5', 600, false, 'CLIENTE', 'Obrigado!')],
+    };
+    const id = (url.match(/conversations\/([^/?]+)/) || [])[1];
+    if (method === 'GET' && match(url, /\/inbox\/conversations\?|\/inbox\/conversations$/)) {
+      const f = (url.match(/filter=(\w+)/) || [])[1] || 'all';
+      const by: Record<string, (c: any) => boolean> = { all: c => !c.archived, unread: c => c.unreadCount > 0, waiting: c => c.mode === 'WAITING_HUMAN', ai: c => c.mode === 'AI_ACTIVE', human: c => c.mode === 'HUMAN_ACTIVE', mine: c => c.mode === 'HUMAN_ACTIVE', unassigned: c => !c.assignedTo && c.mode !== 'AI_ACTIVE' && c.mode !== 'CLOSED', closed: c => c.mode === 'CLOSED', archived: c => c.archived };
+      return { items: convs.filter(by[f] || by.all), nextBefore: null };
+    }
+    if (method === 'GET' && match(url, /\/messages\?/)) return { items: msgs[id] || [], hasMore: false };
+    if (method === 'GET' && match(url, /\/contact$/)) {
+      const c = convs.find(x => x.id === id);
+      return { conversation: c, pendingReceipts: c?.customer ? 1 : 0, history: c?.mode === 'HUMAN_ACTIVE' ? [{ action: 'WA_ASSUME', userName: 'Admin Demo', timestamp: t(25) }] : [],
+        customer: c?.customer ? { id: c.customer.id, name: c.customer.name, status: 'ACTIVE', isLegacy: c.customer.isLegacy, userId: c.customer.hasAccount ? 'u' : null, whatsappOptOut: false, promoOptOut: true, phoneConfirmed: true, commSuspendedReason: null,
+          loans: [{ id: 'll1', status: 'ACTIVE', remainingAmount: 1000, isLegacy: c.customer.isLegacy, loanRequest: { profileType: 'CLT' }, installments: [{ id: 'i1', dueDate: t(-60 * 24 * 5), amount: 300, status: 'OPEN' }] }], disputes: [] } : null };
+    }
+    if (method === 'GET' && match(url, /\/inbox\/conversations\/[^/]+$/)) return { conversation: convs.find(x => x.id === id) };
+    if (method === 'GET' && match(url, /\/inbox\/health/)) return { state: url.includes('offline') ? 'close' : 'open', lastWebhookAt: t(1), lastInboundAt: t(2), lastOutboundAt: t(4), import: { status: 'DONE', scanned: 3400, imported: 2980, skipped: 420, finishedAt: t(30) }, realtimeClients: 1 };
+    if (method === 'GET' && match(url, /\/inbox\/dashboard/)) return { total: 5, unread: 2, waiting: 1, ai: 2, human: 1, closed: 1, receivedToday: 14, sentToday: 9, failed: 0, avgFirstResponseSec: 180, avgWaitingSec: 120, perOperator: [{ name: 'Admin Demo', messages: 2 }] };
+    if (method === 'GET' && match(url, /\/inbox\/settings/)) return { settings: { reopenMode: 'AI_ACTIVE', pauseRemindersDuringHuman: false, handoffMessage: 'Certo! Encaminhei sua conversa para nossa equipe. Assim que um atendente estiver disponível, ele responde por aqui.' } };
+    if (method === 'GET' && match(url, /\/inbox\/quick-replies/)) return { items: [{ id: 'q1', title: 'Saudação', body: 'Olá, {primeiro_nome}! Tudo bem? Em que posso ajudar?', active: true }, { id: 'q2', title: 'Comprovante', body: 'Pode enviar o comprovante por aqui mesmo que a equipe confere.', active: true }] };
+    if (method === 'GET' && match(url, /\/inbox\/operators/)) return { items: [{ id: 'admin-demo', name: 'Admin Demo' }, { id: 'op2', name: 'Operador Dois' }] };
+    if (method === 'GET' && match(url, /\/inbox\/changes/)) return { conversations: [], messages: [], cursor: new Date().toISOString() };
+    if (method === 'POST' && match(url, /\/(assume|reopen)$/)) return { conversation: { ...convs.find(x => x.id === id), mode: 'HUMAN_ACTIVE', assignedTo: 'admin-demo', operatorName: 'Admin Demo', version: 9 } };
+    if (method === 'POST' && match(url, /\/return-ai$/)) return { conversation: { ...convs.find(x => x.id === id), mode: 'AI_ACTIVE', assignedTo: null, operatorName: null, version: 9 } };
+    if (method === 'POST' && match(url, /\/transfer$/)) return { conversation: { ...convs.find(x => x.id === id), assignedTo: body?.toUserId, operatorName: 'Operador Dois', version: 9 } };
+    if (method === 'POST' && match(url, /\/close$/)) return { conversation: { ...convs.find(x => x.id === id), mode: 'CLOSED', assignedTo: null, operatorName: null, version: 9 } };
+    if (method === 'POST' && match(url, /\/send$/)) return { message: msg(`s${now}`, id, 0, true, 'HUMANO', body?.text || null, { status: 'SENT', ...(body?.media ? { type: body.media.kind, mediaMime: body.media.mimetype, externalId: `local:${now}` } : {}) }) };
+    return { ok: true };
+  }
   if (method === 'POST' && match(url, /\/legacy-clients\/?$/)) return { customer: { id: 'novo-cliente', name: body?.name || 'Cliente', phone: body?.phone || '' } };
   if (method === 'POST' && match(url, /\/legacy-clients\/[^/]+\/contracts/)) return { loan: { id: 'novo', status: 'ACTIVE', collectionSuspended: !body?.balanceConfirmed } };
   if (method === 'GET' && match(url, /\/legacy-ops\/dashboard/)) return { total: 4, withAccount: 1, waiting: 3, invitesSent: 2, activeLoans: 3, settledLoans: 1, devices: 1, investments: 1, pendingReview: 1, openDisputes: 1, suspendedComm: 1, remindersScheduled: 2, sent30: 2, failed30: 1 };

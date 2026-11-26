@@ -11,10 +11,11 @@ import { Button } from '../../components/Button';
 import { aiChatbotService } from '../../services/aiChatbotService';
 import { apiService } from '../../services/apiService';
 import { useToast } from '../../components/Toast';
+import { WhatsAppInbox, InboxSettingsPanel } from '../../components/admin/WhatsAppInbox';
 import { api } from '../../services/apiClient';
 import { InteractionLog } from '../../types';
 
-type TabType = 'config' | 'conversations' | 'logs' | 'test';
+type TabType = 'config' | 'conversations' | 'inbox-settings' | 'logs' | 'test';
 
 interface ChatbotConfig {
   id: string;
@@ -116,7 +117,7 @@ export const AIHub: React.FC = () => {
     // Read tab from URL on mount and when URL changes
     useEffect(() => {
         const tabParam = searchParams.get('tab');
-        if (tabParam === 'config' || tabParam === 'conversations' || tabParam === 'logs' || tabParam === 'test') {
+        if (tabParam === 'config' || tabParam === 'conversations' || tabParam === 'inbox-settings' || tabParam === 'logs' || tabParam === 'test') {
             setActiveTab(tabParam);
         }
     }, [searchParams]);
@@ -259,7 +260,8 @@ export const AIHub: React.FC = () => {
 
     const tabs = [
         { id: 'config', label: 'Configurar', icon: <Settings2 size={18} /> },
-        { id: 'conversations', label: 'Conversas', icon: <MessageSquare size={18} />, badge: stats.totalConversations },
+        { id: 'conversations', label: 'Conversas', icon: <MessageSquare size={18} /> },
+        { id: 'inbox-settings', label: 'Central WhatsApp', icon: <Settings2 size={18} /> },
         { id: 'logs', label: 'Logs', icon: <Terminal size={18} />, badge: stats.logCount },
         { id: 'test', label: 'Testar', icon: <TestTube size={18} /> },
     ] as const;
@@ -275,9 +277,9 @@ export const AIHub: React.FC = () => {
     );
 
     return (
-        <div className="p-4 md:p-8 bg-black min-h-screen text-white pb-32">
+        <div className={activeTab === 'conversations' ? 'flex h-full min-h-0 flex-col overflow-hidden p-2 md:p-4 bg-black text-white' : 'p-4 md:p-8 bg-black min-h-screen text-white pb-32'}>
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div className={`${activeTab === 'conversations' ? 'hidden md:flex mb-3' : 'flex mb-8'} flex-col md:flex-row justify-between items-start md:items-center gap-4`}>
                 <div>
                     <h1 className="text-3xl font-bold text-[#D4AF37] flex items-center gap-2">
                         <Bot size={32} /> Central de IA
@@ -292,7 +294,7 @@ export const AIHub: React.FC = () => {
             </div>
 
             {/* KPIs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className={`${activeTab === 'conversations' ? 'hidden' : 'grid'} grid-cols-2 md:grid-cols-4 gap-4 mb-6`}>
                 <div className="bg-gradient-to-br from-purple-500/20 to-purple-900/10 border border-purple-500/30 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-1">
                         <MessageSquare size={16} className="text-purple-400" />
@@ -326,7 +328,7 @@ export const AIHub: React.FC = () => {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+            <div className={`flex gap-2 ${activeTab === 'conversations' ? 'mb-2' : 'mb-6'} overflow-x-auto pb-2`}>
                 {tabs.map(tab => (
                     <button
                         key={tab.id}
@@ -506,105 +508,9 @@ export const AIHub: React.FC = () => {
                 </div>
             )}
 
-            {/* Conversations Tab */}
-            {activeTab === 'conversations' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Conversation List */}
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-                        <div className="p-4 border-b border-zinc-800">
-                            <div className="relative">
-                                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar conversas..."
-                                    value={conversationSearch}
-                                    onChange={e => setConversationSearch(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 bg-black border border-zinc-700 rounded-lg text-white focus:border-[#D4AF37] outline-none"
-                                />
-                            </div>
-                        </div>
-                        <div className="max-h-[500px] overflow-y-auto">
-                            {filteredConversations.map(conv => (
-                                <button
-                                    key={conv.phone}
-                                    onClick={() => setSelectedConversation(conv)}
-                                    className={`w-full p-4 text-left border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${selectedConversation?.phone === conv.phone ? 'bg-zinc-800' : ''
-                                        }`}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-gradient-to-br from-[#D4AF37] to-yellow-600 rounded-full flex items-center justify-center">
-                                            <Phone size={16} className="text-black" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-bold text-white text-sm truncate">{formatPhone(conv.phone)}</p>
-                                            <p className="text-xs text-zinc-500 truncate">{conv.lastMessage}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-xs text-zinc-500">{formatDate(conv.lastMessageTime)}</p>
-                                            <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">
-                                                {conv.messages.length}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </button>
-                            ))}
-                            {filteredConversations.length === 0 && (
-                                <div className="p-8 text-center text-zinc-500">
-                                    <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
-                                    <p>Nenhuma conversa</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Conversation Detail */}
-                    <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-                        {selectedConversation ? (
-                            <>
-                                <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-gradient-to-br from-[#D4AF37] to-yellow-600 rounded-full flex items-center justify-center">
-                                            <Phone size={16} className="text-black" />
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-white">{formatPhone(selectedConversation.phone)}</p>
-                                            <p className="text-xs text-zinc-500">{selectedConversation.messages.length} mensagens</p>
-                                        </div>
-                                    </div>
-                                    <Button variant="danger" size="sm" onClick={() => handleClearHistory(selectedConversation.phone)}>
-                                        <Trash2 size={14} /> Limpar
-                                    </Button>
-                                </div>
-                                <div className="p-4 max-h-[400px] overflow-y-auto space-y-3">
-                                    {selectedConversation.messages.map(msg => (
-                                        <div
-                                            key={msg.id}
-                                            className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}
-                                        >
-                                            <div className={`max-w-[80%] p-3 rounded-2xl ${msg.role === 'user'
-                                                ? 'bg-zinc-800 text-white rounded-bl-none'
-                                                : 'bg-[#D4AF37] text-black rounded-br-none'
-                                                }`}>
-                                                <p className="text-sm">{msg.message}</p>
-                                                <p className={`text-xs mt-1 ${msg.role === 'user' ? 'text-zinc-500' : 'text-black/60'}`}>
-                                                    {new Date(msg.created_at).toLocaleString('pt-BR')}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-zinc-500">
-                                <div className="text-center">
-                                    <MessageSquare size={48} className="mx-auto mb-4 opacity-50" />
-                                    <p>Selecione uma conversa</p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
+            {/* Conversations Tab — Central WhatsApp em tempo real */}
+            {activeTab === 'conversations' && <WhatsAppInbox />}
+            {activeTab === 'inbox-settings' && <InboxSettingsPanel />}
 
             {/* Logs Tab */}
             {activeTab === 'logs' && (

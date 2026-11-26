@@ -67,7 +67,7 @@ export async function sendWhatsAppMessage(to: string, message: string): Promise<
             return false;
         }
 
-        await axios.post(url, {
+        const resp = await axios.post(url, {
             number,
             text: message,
             options: { delay: 1200, presence: 'composing', linkPreview: false }
@@ -79,6 +79,8 @@ export async function sendWhatsAppMessage(to: string, message: string): Promise<
             timeout: 15000
         });
         console.log(`[WhatsApp] ✅ Message sent to ${number}`);
+        // Central WhatsApp: mensagem automática aparece no histórico da conversa (alertas a admins também, como na Evolution).
+        import('./inbox').then(m => m.recordOutgoing({ to: number, text: message, origin: 'AUTOMACAO', response: resp.data })).catch(() => {});
         return true;
     } catch (error: any) {
         const errMsg = error?.response?.data?.message || error.message;

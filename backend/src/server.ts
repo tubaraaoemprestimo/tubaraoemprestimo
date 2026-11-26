@@ -15,6 +15,7 @@ import { loansRouter } from './routes/loans';
 import { settingsRouter } from './routes/settings';
 import { uploadRouter } from './routes/upload';
 import { webhookRouter } from './routes/webhook';
+import { inboxRouter } from './routes/inbox';
 import { campaignsRouter } from './routes/campaigns';
 import { antifraudRouter } from './routes/antifraud';
 import { notificationsRouter } from './routes/notifications';
@@ -76,8 +77,7 @@ app.use(cors({
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
-            console.log(`[CORS] Blocked origin: ${origin}`);
-            callback(null, true); // Allow all in case of misconfigured reverse proxy
+            callback(null, false);
         }
     },
     credentials: true,
@@ -128,6 +128,7 @@ app.use('/api/loans', loansRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/webhook', webhookRouter);
+app.use('/api/inbox', inboxRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/antifraud', antifraudRouter);
 app.use('/api/notifications', notificationsRouter);
