@@ -1908,6 +1908,8 @@ model WaBotSession {
   otpHash    String?  @map("otp_hash")
   otpTries   Int      @default(0) @map("otp_tries")
   otpExpires DateTime? @map("otp_expires")
+  signHash   String?  @unique @map("sign_hash")
+  signExpires DateTime? @map("sign_expires")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
 

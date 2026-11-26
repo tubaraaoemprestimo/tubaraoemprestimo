@@ -10,9 +10,12 @@ CREATE TABLE IF NOT EXISTS "wa_bot_sessions" (
   "otp_hash" TEXT,
   "otp_tries" INTEGER NOT NULL DEFAULT 0,
   "otp_expires" TIMESTAMP(3),
+  "sign_hash" TEXT,
+  "sign_expires" TIMESTAMP(3),
   "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE UNIQUE INDEX IF NOT EXISTS "wa_bot_sessions_sign_hash_key" ON "wa_bot_sessions"("sign_hash");
 CREATE INDEX IF NOT EXISTS "wa_bot_sessions_user_id_idx" ON "wa_bot_sessions"("user_id");
 CREATE TABLE IF NOT EXISTS "wa_bot_inbound" (
   "id" TEXT PRIMARY KEY,

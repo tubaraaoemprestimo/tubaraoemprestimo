@@ -7,7 +7,7 @@ const mails: string[] = [];
 vi.mock('../email', () => ({ emailService: { send: vi.fn(async (_to: string, _s: string, html: string) => { mails.push(html); return true; }) } }));
 vi.mock('../prisma', () => ({ prisma: {} }));
 
-import { handleBotMessage } from '../waBot';
+import { handleBotMessage, signSubmit, signInfo, signTokenHash } from '../waBot';
 import { parseIncoming } from '../whaileys';
 import { nextStep, parseMoney, parseBirth, buildPayload } from '../waBotSteps';
 import { validateRequestByProfile } from '../../routes/loanRequests';
@@ -22,7 +22,8 @@ function fakeDb() {
         waBotSession: {
             upsert: async ({ where, create }: any) => { if (!sessions.has(where.phone)) sessions.set(where.phone, { step: 'MENU', data: {}, options: [], verified: false, userId: null, otpHash: null, otpTries: 0, otpExpires: null, ...create }); return structuredClone(sessions.get(where.phone)); },
             update: async ({ where, data }: any) => { sessions.set(where.phone, { ...sessions.get(where.phone), ...structuredClone(data) }); },
-            updateMany: async ({ where, data }: any) => { const s = sessions.get(where.phone); if (s?.step !== where.step) return { count: 0 }; Object.assign(s, data); return { count: 1 }; },
+            updateMany: async ({ where, data }: any) => { const s = sessions.get(where.phone); if (!s || Object.entries(where).some(([k, v]) => k !== 'phone' && s[k] !== v)) return { count: 0 }; Object.assign(s, data); return { count: 1 }; },
+            findUnique: async ({ where }: any) => [...sessions.entries()].map(([phone, v]) => ({ phone, ...v })).find(x => x.signHash === where.signHash) || null,
         },
         user: {
             findUnique: async ({ where }: any) => (where.email ? users.get(where.email) : byId(where.id)) || null,
@@ -38,6 +39,7 @@ function fakeDb() {
 describe('Autoatendimento por botões', () => {
     let db: any, out: any[];
     const phone = '5511988887777';
+    const NOW = new Date('2026-11-26T12:00:00Z');
     const say = async (msg: any, media?: any) => {
         const opts = db.sessions.get(phone)?.options || [];
         await handleBotMessage(parseIncoming(msg, opts), { phone, messageId: `m${Math.random()}`, media, send: async (c: any) => { out.push(c); }, db, cep: async () => ({ street: 'Rua A', neighborhood: 'Centro', city: 'São Paulo', state: 'SP' }), now: new Date('2026-11-26T12:00:00Z') });
@@ -78,14 +80,25 @@ describe('Autoatendimento por botões', () => {
         await say({ conversation: '529.982.247-25' });
         await say({ conversation: '31/12/2015' }); expect(last()).toMatch(/menor de 18/);
         await say({ conversation: '25/03/1990' });
-        expect(last()).toMatch(/Assinatura/);
-        await say({ conversation: 'texto' }); expect(last()).toMatch(/Assinatura/);
-        await say({ imageMessage: { mimetype: 'image/jpeg' } }, { mimetype: 'image/jpeg', data: Buffer.from('x').toString('base64') });
+        expect(last()).toMatch(/assinatura[\s\S]*#\/assinar\/[A-Za-z0-9_-]{20,}/);
+        const token = last().match(/#\/assinar\/([A-Za-z0-9_-]+)/)![1];
+        await say({ conversation: 'texto' }); expect(last()).toMatch(/aguardando a assinatura/);
+        expect(db.sessions.get(phone).signHash).toBe(signTokenHash(token));
+        expect(await signInfo(token, db, NOW)).toEqual({ name: 'Maria da Silva', service: '🧾 Limpar nome' });
+        const png = 'data:image/png;base64,' + Buffer.from('sig').toString('base64');
+        const jpg = 'data:image/jpeg;base64,' + Buffer.from('foto').toString('base64');
+        const send = () => async (c: any) => { out.push(c); };
+        await expect(signSubmit(token, { signature: png, photo: jpg }, { ip: '1.2.3.4', ua: 'x' }, { db, send, now: NOW })).rejects.toThrow(/Localização/);
+        await expect(signSubmit(token, { signature: png, lat: -23.5, lng: -46.6 }, { ip: '1.2.3.4', ua: 'x' }, { db, send, now: NOW })).rejects.toThrow(/Foto/);
+        await signSubmit(token, { signature: png, photo: jpg, lat: -23.5, lng: -46.6, accuracy: 12 }, { ip: '1.2.3.4', ua: 'x' }, { db, send, now: NOW });
+        await expect(signSubmit(token, { signature: png, photo: jpg, lat: 1, lng: 1 }, { ip: '1.2.3.4', ua: 'x' }, { db, send, now: NOW })).rejects.toThrow(/expirou|usado/);
         expect(last()).toMatch(/Confira sua solicitação[\s\S]*\*\*\*4725/);
         await say({ buttonsResponseMessage: { selectedButtonId: 'confirm' } });
         await say({ buttonsResponseMessage: { selectedButtonId: 'confirm' } });
         expect(submitted).toHaveLength(1);
         expect(submitted[0]).toMatchObject({ profileType: 'LIMPA_NOME', cpf: '52998224725', clientName: 'Maria da Silva', email: 'cli@x.com', phone: '11988887777' });
+        expect(submitted[0].signatureUrl).toMatch(/whatsapp-assinatura/);
+        expect(JSON.parse(submitted[0].supplementalDescription).signature).toMatchObject({ latitude: -23.5, longitude: -46.6, ip: '1.2.3.4' });
         expect(validateRequestByProfile(submitted[0])).toBeNull();
         expect(out.filter(c => /Solicitação enviada/.test(c.text))).toHaveLength(1);
     });
@@ -126,7 +139,7 @@ describe('Etapas e regras do app', () => {
             instagram: '', cep: '01001000', street: 'Rua A', neighborhood: 'Centro', city: 'SP', state: 'SP', number: '10', income: 3000, occupation: 'Vendedor', companyName: 'Loja X',
             ref1Name: 'Ana', ref1Phone: '11911112222', ref1Rel: 'Mãe', ref2Name: 'Rui', ref2Phone: '11933334444', ref2Rel: 'Pai',
             selfie: f('s'), idFront: f('f'), idBack: f('b'), proofAddress: f('a'), proofIncome: f('i'), housePhotos: f('h'), billInName: f('c'), videoHouse: f('vh'), videoSelfie: f('vs'), workCard: f('w'),
-            location: { lat: -23.5, lng: -46.6 }, bankName: 'Nubank', pixKeyType: 'cpf', pixKey: '52998224725', accountHolderName: 'João Souza', accountHolderCpf: '52998224725', signature: f('sig'),
+            location: { lat: -23.5, lng: -46.6 }, bankName: 'Nubank', pixKeyType: 'cpf', pixKey: '52998224725', accountHolderName: 'João Souza', accountHolderCpf: '52998224725', signature: { url: 'https://r2.test/sig', photoUrl: 'https://r2.test/foto', lat: -23.5, lng: -46.6 },
         };
         expect(nextStep('CLT', a)).toBeNull();
         const body = buildPayload('CLT', a, { email: 'j@x.com', acceptedAt: 'now', messageId: 'm1' });

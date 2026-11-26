@@ -2,14 +2,14 @@ import express, { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { parseIncoming, verifySignature, whaileysConnect, whaileysEnabled, whaileysLogout, whaileysStatus } from '../services/whaileys';
-import { botSender, handleBotMessage, viaCep } from '../services/waBot';
+import { botSender, handleBotMessage, viaCep, signInfo, signSubmit, SignError } from '../services/waBot';
 
 /**
  * WhatsApp por botões (Whaileys): número separado da Evolution, sem IA.
  * Webhook: HMAC + janela de 5 min → dedupe por key.id (tabela) → 200 → processa.
  */
 export const whaileysWebhookRouter = Router();
-whaileysWebhookRouter.post('/', express.raw({ type: '*/*', limit: '30mb' }), async (req: Request, res: Response) => {
+whaileysWebhookRouter.post('/', express.raw({ type: '*/*', limit: '45mb' }), async (req: Request, res: Response) => {
     if (!whaileysEnabled()) { res.sendStatus(503); return; }
     const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '';
     if (!verifySignature(raw, req.get('x-whaileys-timestamp'), req.get('x-whaileys-signature'))) { res.sendStatus(401); return; }
@@ -63,4 +63,30 @@ whaileysAdminRouter.post('/disconnect', async (req, res) => {
         await prisma.auditLog.create({ data: { userId: req.user!.id, userName: req.user!.name, action: 'WHAILEYS_LOGOUT', entity: 'WHATSAPP', entityId: 'whaileys', details: '' } }).catch(() => {});
         res.json({ ok: true });
     } catch (e) { fail(res, e); }
+});
+
+/**
+ * Página pública de assinatura (link enviado no WhatsApp). O token de uso único é a única credencial.
+ * ponytail: limite de tentativas em memória por IP (1 processo PM2); com cluster, mover para o banco.
+ */
+export const signRouter = Router();
+const hits = new Map<string, { n: number; at: number }>();
+function limited(ip: string, max = 30) {
+    const now = Date.now(), h = hits.get(ip);
+    if (!h || now - h.at > 10 * 60000) { hits.set(ip, { n: 1, at: now }); if (hits.size > 5000) hits.clear(); return false; }
+    return ++h.n > max;
+}
+const ipOf = (req: Request) => String(req.get('cf-connecting-ip') || req.socket.remoteAddress || '');
+const signFail = (res: Response, e: any) => {
+    if (e instanceof SignError) { res.status(e.status).json({ error: e.message }); return; }
+    console.error('[WaBot] assinatura:', e?.message);
+    res.status(500).json({ error: 'Não foi possível concluir. Tente de novo.' });
+};
+signRouter.get('/:token', async (req, res) => {
+    if (limited(ipOf(req))) { res.status(429).json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }); return; }
+    try { res.json(await signInfo(req.params.token)); } catch (e) { signFail(res, e); }
+});
+signRouter.post('/:token', express.json({ limit: '15mb' }), async (req, res) => {
+    if (limited(ipOf(req), 10)) { res.status(429).json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }); return; }
+    try { res.json(await signSubmit(req.params.token, req.body, { ip: ipOf(req), ua: String(req.get('user-agent') || '') })); } catch (e) { signFail(res, e); }
 });

@@ -18,7 +18,8 @@ export type Step =
     | { kind: 'text'; key: string; text: string; parse: (s: string, a: Answers, cep?: CepLookup) => Parsed | Promise<Parsed>; optional?: boolean }
     | { kind: 'file'; key: string; text: string; accept: Media[]; multi?: boolean; optional?: boolean }
     | { kind: 'location'; key: string; text: string }
-    | { kind: 'info'; key: string; text: string };
+    | { kind: 'info'; key: string; text: string }
+    | { kind: 'sign'; key: string; text: string };
 
 export type CepLookup = (cep: string) => Promise<{ street?: string; neighborhood?: string; city?: string; state?: string } | null>;
 
@@ -151,7 +152,8 @@ const bank = (investor = false): Step[] => [
     ...(investor ? [] : [{ kind: 'text', key: 'accountHolderCpf', text: 'CPF do titular da conta.', parse: (t: string) => (isValidCpf(t) ? ok(digits(t)) : err('CPF inválido.')) } as Step]),
 ];
 
-const signature: Step = { kind: 'file', key: 'signature', text: '✍️ *Assinatura*: assine em um papel branco com o mesmo nome do documento e envie a *foto da assinatura*.', accept: ['image'] };
+/** Assinatura pelo link seguro: desenha a assinatura, tira uma selfie e compartilha a localização. */
+const signature: Step = { kind: 'sign', key: 'signature', text: '✍️ *Última etapa: assinatura*\nToque no link abaixo para *assinar*, tirar uma *foto* e confirmar sua *localização*. Ele vale por 24 horas.' };
 
 const TERMS = 'Ao aceitar, você declara que as informações e documentos enviados são verdadeiros e autoriza a Tubarão Empréstimos a consultar seus dados para análise de crédito e a tratá-los conforme a LGPD. A solicitação está sujeita a análise.';
 
@@ -207,6 +209,9 @@ export function guaranteeOk(a: Answers) {
     return total >= Number(a.amount || 0) * 2;
 }
 
+/** Evidências da assinatura pelo link (foto, local, horário, IP). */
+const signMeta = (a: Answers) => a.signature ? { photoUrl: a.signature.photoUrl, latitude: a.signature.lat, longitude: a.signature.lng, accuracy: a.signature.accuracy, at: a.signature.at, ip: a.signature.ip, userAgent: a.signature.ua } : undefined;
+
 /** Corpo igual ao do app (services/apiService.ts submitRequest) para POST /loan-requests. */
 export function buildPayload(p: Profile, a: Answers, meta: { email: string; acceptedAt: string; messageId: string }) {
     const files = (k: string) => (Array.isArray(a[k]) ? a[k] : []);
@@ -217,8 +222,8 @@ export function buildPayload(p: Profile, a: Answers, meta: { email: string; acce
             profileType: p, fullName: a.name, clientName: a.name, cpf: '', birthDate: a.birthDate, email: meta.email, phone: a.phone,
             preferredContactTime: a.contactTime, bankName: a.bankName, pixKey: a.pixKey, pixKeyType: a.pixKeyType, accountHolderName: a.accountHolderName,
             amount: a.amount, investmentAmount: a.amount, investmentTier: tier, payoutMode: a.payoutMode, monthlyRate, termsAccepted: true,
-            signatureUrl: files('signature')[0], declarationAccepted: true,
-            supplementalDescription: JSON.stringify({ channel: 'WHATSAPP_BUTTONS', acceptance: { at: meta.acceptedAt, phone: a.phone, messageId: meta.messageId } }),
+            signatureUrl: a.signature?.url, declarationAccepted: true,
+            supplementalDescription: JSON.stringify({ channel: 'WHATSAPP_BUTTONS', acceptance: { at: meta.acceptedAt, phone: a.phone, messageId: meta.messageId }, signature: signMeta(a) }),
         };
     }
     const count = Number(a.gCount || 1);
@@ -236,6 +241,7 @@ export function buildPayload(p: Profile, a: Answers, meta: { email: string; acce
         contactTrust1Name: a.ref1Name, contactTrust1Relationship: a.ref1Rel, contactTrust2Name: a.ref2Name, contactTrust2Relationship: a.ref2Rel,
         instagram: a.instagram || undefined, occupation: a.occupation, cnpj: a.cnpj || undefined, businessAddress: a.businessAddress,
         accountHolderCpf: a.accountHolderCpf, isReturningClient: a.returning === 'sim',
+        signature: signMeta(a),
     };
     const installments = p === 'LIMPA_NOME' ? 0 : p === 'MOTO' ? 36 : p === 'AUTONOMO' ? Number(a.paymentDays) : 1;
     return {
@@ -247,7 +253,7 @@ export function buildPayload(p: Profile, a: Answers, meta: { email: string; acce
         reference1Name: a.ref1Name, reference1Phone: a.ref1Phone, reference2Name: a.ref2Name, reference2Phone: a.ref2Phone,
         selfieUrl: files('selfie'), idCardUrl: files('idFront'), idCardBackUrl: files('idBack'), proofOfAddressUrl: files('proofAddress'),
         proofIncomeUrl: files('proofIncome'), videoSelfieUrl: files('videoSelfie'), videoHouseUrl: files('videoHouse'),
-        workCardUrl: files('workCard'), signatureUrl: files('signature'),
+        workCardUrl: files('workCard'), signatureUrl: a.signature?.url,
         collateralItems,
         bankName: a.bankName, pixKey: a.pixKey, pixKeyType: a.pixKeyType, accountHolderName: a.accountHolderName,
         latitude: loc.lat ?? null, longitude: loc.lng ?? null,

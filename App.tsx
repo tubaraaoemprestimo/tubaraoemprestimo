@@ -42,6 +42,7 @@ import { AIHub } from './pages/admin/AIHub';
 import { AnalyticsHub } from './pages/admin/AnalyticsHub';
 import { LegacyClients } from './pages/admin/LegacyClients';
 import { ActivateAccount } from './pages/ActivateAccount';
+import { SignByLink } from './pages/public/SignByLink';
 import { CollectionAutomationPanel } from './pages/admin/CollectionAutomationPanel';
 
 // Pages - Admin (mantidas para rotas legadas)
@@ -555,6 +556,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/ativar" element={<ActivateAccount />} />
+            <Route path="/assinar/:token" element={<SignByLink />} />
             <Route path="/wizard" element={<BiometricAccessGate><PermissionGate><ClientLayout><Wizard /></ClientLayout></PermissionGate></BiometricAccessGate>} />
             <Route path="/demo" element={<DemoSimulator />} />
 

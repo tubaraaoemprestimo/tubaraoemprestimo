@@ -1,6 +1,6 @@
 import axios from 'axios';
 import bcrypt from 'bcryptjs';
-import { createHash, randomInt } from 'node:crypto';
+import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { prisma } from './prisma';
 import { emailService } from './email';
 import { saveBufferToStorage } from './storageService';
@@ -15,11 +15,14 @@ import { Answers, Profile, PROFILES, PROFILE_LABEL, Step, buildPayload, guarante
  * Nada é gravado em loan_requests antes da confirmação final; o envio usa a mesma função do app.
  */
 const MAX_FILES = 10;
+const SIGN_HOURS = 24;
+const APP_URL = (process.env.APP_PUBLIC_URL || 'https://www.tubaraoemprestimo.com.br').replace(/\/+$/, '');
+export const signTokenHash = (t: string) => createHash('sha256').update(`sign:${t}`).digest('hex');
 const OTP_MIN = 10;
-const MAX_MEDIA = 16 * 1024 * 1024;
+const MAX_MEDIA = 30 * 1024 * 1024; // igual ao limite de vídeo do motor
 const MIME: Record<string, RegExp> = { image: /^image\/(jpeg|png|webp|heic|heif)$/, video: /^video\/(mp4|3gpp|quicktime|webm)$/, document: /^application\/pdf$|^image\/(jpeg|png)$/ };
 
-type Session = { phone: string; userId: string | null; step: string; data: Answers; options: Button[]; verified: boolean; otpHash: string | null; otpTries: number; otpExpires: Date | null };
+type Session = { phone: string; userId: string | null; step: string; data: Answers; options: Button[]; verified: boolean; otpHash: string | null; otpTries: number; otpExpires: Date | null; signHash?: string | null; signExpires?: Date | null };
 export type Send = (card: Card) => Promise<unknown>;
 export type Ctx = { phone: string; messageId: string; media?: { mimetype: string; data: string }; send: Send; db?: any; cep?: CepLookup; now?: Date };
 
@@ -37,7 +40,7 @@ async function load(db: any, phone: string): Promise<Session> {
     const s = await db.waBotSession.upsert({ where: { phone }, update: {}, create: { phone } });
     return { ...s, data: s.data || {}, options: Array.isArray(s.options) ? s.options : [] };
 }
-const save = (db: any, s: Session) => db.waBotSession.update({ where: { phone: s.phone }, data: { userId: s.userId, step: s.step, data: s.data, options: s.options, verified: s.verified, otpHash: s.otpHash, otpTries: s.otpTries, otpExpires: s.otpExpires } });
+const save = (db: any, s: Session) => db.waBotSession.update({ where: { phone: s.phone }, data: { userId: s.userId, step: s.step, data: s.data, options: s.options, verified: s.verified, otpHash: s.otpHash, otpTries: s.otpTries, otpExpires: s.otpExpires, signHash: s.signHash ?? null, signExpires: s.signExpires ?? null } });
 
 /** Envia o card e lembra as opções (para aceitar "1", "2" ou a palavra). Até 3 botões; mais que isso vira lista. */
 async function ask(ctx: Ctx, s: Session, text: string, opts: Button[] = [], listTitle = 'Opções') {
@@ -124,6 +127,13 @@ async function prompt(ctx: Ctx, s: Session, st: Step) {
         if (st.optional) opts.push({ id: 'skip', title: '⏭️ Pular' });
         return ask(ctx, s, n ? `${st.text}\n_Recebido(s): ${n}._` : st.text, opts);
     }
+    if (st.kind === 'sign') {
+        const token = randomBytes(24).toString('base64url');
+        s.signHash = signTokenHash(token); s.signExpires = new Date((ctx.now || new Date()).getTime() + SIGN_HOURS * 3600000);
+        return ask(ctx, s, `${st.text}
+
+${APP_URL}/#/assinar/${token}`, [{ id: 'newlink', title: '🔁 Novo link' }]);
+    }
     if (st.kind === 'text' && st.optional) return ask(ctx, s, st.text, [{ id: 'skip', title: '⏭️ Pular' }]);
     return ask(ctx, s, st.text);
 }
@@ -168,6 +178,11 @@ async function answer(ev: BotEvent, ctx: Ctx, s: Session): Promise<unknown> {
         return advance(ctx, s);
     }
     if (st.kind === 'info') { if (id !== 'next' && !(ev.kind === 'text')) return prompt(ctx, s, st); s.data[st.key] = true; return advance(ctx, s); }
+    if (st.kind === 'sign') {
+        // A assinatura chega pela página do link (signSubmit). Aqui só reenvia o link.
+        if (id === 'newlink') return prompt(ctx, s, st);
+        return void (await ask(ctx, s, 'Estou aguardando a assinatura pelo link enviado acima. Se ele não abrir, toque em *Novo link*.', [{ id: 'newlink', title: '🔁 Novo link' }]));
+    }
     if (st.kind === 'location') {
         if (ev.kind !== 'location') return void (await ctx.send({ text: 'Preciso da *localização*: toque no 📎 › *Localização* › *Enviar localização atual*.' }));
         s.data.location = { lat: ev.lat, lng: ev.lng }; return advance(ctx, s);
@@ -259,3 +274,52 @@ export async function handleBotMessage(ev: BotEvent, ctx: Ctx) {
 }
 
 export const botSender = (phone: string): Send => (card) => whaileysSend(phone, card);
+
+// ───────── Página pública de assinatura (link de uso único) ─────────
+export class SignError extends Error { constructor(public status: number, msg: string) { super(msg); } }
+
+async function sessionByToken(db: any, token: unknown, now: Date) {
+    if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{20,64}$/.test(token)) throw new SignError(404, 'Link inválido');
+    const s = await db.waBotSession.findUnique({ where: { signHash: signTokenHash(token) } });
+    if (!s || !s.signExpires || s.signExpires < now) throw new SignError(410, 'Este link expirou. Volte ao WhatsApp e toque em "Novo link".');
+    return s;
+}
+
+/** Dados mínimos para a página (nada sensível: nome e serviço). */
+export async function signInfo(token: unknown, db: any = prisma, now = new Date()) {
+    const s = await sessionByToken(db, token, now);
+    const d = s.data || {};
+    return { name: d.name || null, service: PROFILE_LABEL[d.profile as Profile] || null };
+}
+
+const dataUrl = (v: unknown, re: RegExp, max: number) => {
+    const m = typeof v === 'string' ? v.match(/^data:([a-z/+.-]+);base64,([A-Za-z0-9+/=]+)$/) : null;
+    if (!m || !re.test(m[1])) return null;
+    const buf = Buffer.from(m[2], 'base64');
+    return buf.length && buf.length <= max ? { mime: m[1], buf } : null;
+};
+
+/** Recebe assinatura + foto + localização; grava no R2, fecha a etapa e continua no WhatsApp. */
+export async function signSubmit(token: unknown, body: any, meta: { ip: string; ua: string }, deps: { db?: any; send?: (phone: string) => Send; now?: Date } = {}) {
+    const db = deps.db || prisma, now = deps.now || new Date();
+    const row = await sessionByToken(db, token, now);
+    const sig = dataUrl(body?.signature, /^image\/(png|jpeg)$/, 2 * 1024 * 1024);
+    const photo = dataUrl(body?.photo, /^image\/(png|jpeg|webp)$/, 8 * 1024 * 1024);
+    const lat = Number(body?.lat), lng = Number(body?.lng), accuracy = Number(body?.accuracy);
+    if (!sig) throw new SignError(400, 'Assinatura obrigatória');
+    if (!photo) throw new SignError(400, 'Foto obrigatória');
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw new SignError(400, 'Localização obrigatória');
+    // Uso único: só a primeira chamada com este token fecha a etapa.
+    const lock = await db.waBotSession.updateMany({ where: { phone: row.phone, signHash: row.signHash }, data: { signHash: null, signExpires: null } });
+    if (!lock.count) throw new SignError(410, 'Este link já foi usado.');
+    const folder = `solicitacoes/${row.userId || 'whatsapp'}`;
+    const [url, photoUrl] = await Promise.all([saveBufferToStorage(sig.buf, sig.mime, folder, 'whatsapp-assinatura'), saveBufferToStorage(photo.buf, photo.mime, folder, 'whatsapp-foto-assinatura')]);
+    const s: Session = { ...row, data: row.data || {}, options: Array.isArray(row.options) ? row.options : [], signHash: null, signExpires: null };
+    s.data.signature = { url, photoUrl, lat, lng, accuracy: Number.isFinite(accuracy) ? accuracy : null, at: now.toISOString(), ip: meta.ip.slice(0, 64), ua: meta.ua.slice(0, 200) };
+    await db.auditLog.create({ data: { userId: row.userId || 'system', userName: s.data.name || 'WhatsApp', action: 'WA_BOT_SIGNED', entity: 'WA_BOT', entityId: row.phone.slice(-4), details: `lat=${lat.toFixed(5)} lng=${lng.toFixed(5)} ip=${meta.ip.slice(0, 64)}` } }).catch(() => {});
+    const ctx: Ctx = { phone: row.phone, messageId: `sign:${now.getTime()}`, send: (deps.send || botSender)(row.phone), db, now };
+    await ctx.send({ text: '✅ Assinatura recebida!' }).catch(() => {});
+    await advance(ctx, s);
+    await save(db, s);
+    return { ok: true };
+}
