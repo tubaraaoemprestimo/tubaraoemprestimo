@@ -16,7 +16,9 @@ export const authRouter = Router();
 // ============================================
 authRouter.post('/register', async (req: Request, res: Response) => {
     try {
-        const { email, password, name, phone, role, referralCode } = req.body;
+        // Cadastro público é sempre CLIENT: o papel nunca vem do corpo (antes permitia criar ADMIN).
+        const { email, password, name, phone, referralCode } = req.body;
+        const role = 'CLIENT';
 
         if (!email || !password || !name) {
             res.status(400).json({ error: 'Email, senha e nome são obrigatórios' });

@@ -9,6 +9,7 @@ import { themeService, ThemeColors } from '../../services/themeService';
 import { LoanPackage, SystemSettings, CollectionRule, CollectionRuleType, WhatsappConfig, GoalsSettings } from '../../types';
 import { useToast } from '../../components/Toast';
 import { PIXSettings } from './PIXSettings';
+import { WhatsAppButtonsConnect } from '../../components/admin/WhatsAppButtonsConnect';
 
 const inputStyle = "w-full bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none transition-colors";
 
@@ -774,6 +775,8 @@ export const Settings: React.FC = () => {
           )}
         </div>
       </div>
+
+      <WhatsAppButtonsConnect />
 
       {/* Seção de Email */}
       <div className="mt-8 border-t border-zinc-800 pt-8">

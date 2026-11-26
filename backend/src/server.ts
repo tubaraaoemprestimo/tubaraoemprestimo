@@ -16,6 +16,7 @@ import { settingsRouter } from './routes/settings';
 import { uploadRouter } from './routes/upload';
 import { webhookRouter } from './routes/webhook';
 import { inboxRouter } from './routes/inbox';
+import { whaileysWebhookRouter, whaileysAdminRouter } from './routes/whaileys';
 import { campaignsRouter } from './routes/campaigns';
 import { antifraudRouter } from './routes/antifraud';
 import { notificationsRouter } from './routes/notifications';
@@ -87,6 +88,8 @@ app.use(cors({
 
 // IMPORTANTE: Webhook do Stripe precisa do raw body ANTES do express.json()
 app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRouter);
+// WhatsApp por botões: assinatura HMAC sobre o corpo cru (mesma regra)
+app.use('/api/webhooks/whaileys', whaileysWebhookRouter);
 
 // Body parsing (para todas as outras rotas)
 app.use(express.json({ limit: '200mb' }));
@@ -129,6 +132,7 @@ app.use('/api/settings', settingsRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/webhook', webhookRouter);
 app.use('/api/inbox', inboxRouter);
+app.use('/api/whatsapp-buttons', whaileysAdminRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/antifraud', antifraudRouter);
 app.use('/api/notifications', notificationsRouter);

@@ -1895,3 +1895,32 @@ model WaQuickReply {
 
   @@map("wa_quick_replies")
 }
+
+// ───────── WhatsApp por botões (Whaileys): autoatendimento sem IA ─────────
+/// Estado da conversa guiada por telefone. `data` guarda as respostas em andamento (sem binário: só URLs do R2).
+model WaBotSession {
+  phone      String   @id
+  userId     String?  @map("user_id")
+  step       String   @default("MENU")
+  data       Json     @default("{}")
+  options    Json     @default("[]")
+  verified   Boolean  @default(false)
+  otpHash    String?  @map("otp_hash")
+  otpTries   Int      @default(0) @map("otp_tries")
+  otpExpires DateTime? @map("otp_expires")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("wa_bot_sessions")
+}
+
+/// Ids de mensagens já processadas (entrega "pelo menos uma vez" do motor).
+model WaBotInbound {
+  id        String   @id
+  phone     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("wa_bot_inbound")
+}

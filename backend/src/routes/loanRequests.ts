@@ -212,14 +212,20 @@ export function validateRequestByProfile(data: any): string | null {
 
 // POST /api/loan-requests — Nova solicitação
 loanRequestsRouter.post('/', async (req: Request, res: Response) => {
-    try {
-        const data = req.body;
+    const r = await submitLoanRequest(req.body, req.user!);
+    res.status(r.status).json(r.body);
+});
 
+type Submitter = { id: string; email: string; name: string };
+
+/** Envio de solicitação (app e WhatsApp de botões): mesmas validações, gravação e notificações. */
+export async function submitLoanRequest(data: any, user: Submitter): Promise<{ status: number; body: any }> {
+    const req = { user };
+    try {
         // Validação estrita dos campos obrigatórios por tipo de perfil
         const validationError = validateRequestByProfile(data);
         if (validationError) {
-            res.status(400).json({ error: validationError });
-            return;
+            return { status: 400, body: { error: validationError } };
         }
 
         // Verificar se cliente já tem solicitação ativa (prevenção de duplicatas)
@@ -240,11 +246,11 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
         });
 
         if (existingRequest) {
-            return res.status(400).json({
+            return { status: 400, body: {
                 error: 'Você já possui uma solicitação em andamento',
                 existingRequestId: existingRequest.id,
                 status: existingRequest.status
-            });
+            } };
         }
 
         // Busca ou cria customer
@@ -569,12 +575,12 @@ loanRequestsRouter.post('/', async (req: Request, res: Response) => {
             }).catch(() => { });
         }
 
-        res.status(201).json({ success: true, id: request.id });
+        return { status: 201, body: { success: true, id: request.id } };
     } catch (error: any) {
         console.error('[LoanRequests] Submit error:', error);
-        res.status(500).json({ error: 'Erro ao enviar solicitação' });
+        return { status: 500, body: { error: 'Erro ao enviar solicitação' } };
     }
-});
+}
 
 // PUT /api/loan-requests/:id/approve — Aprovar
 loanRequestsRouter.put('/:id/approve', requireAdmin, async (req: Request, res: Response) => {
