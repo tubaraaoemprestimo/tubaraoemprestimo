@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { authenticate } from '../middleware/auth';
+import { authenticate, requireAdmin } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
+// Status agendado é só do admin (antes: qualquer cliente logado criava/apagava; /ready-to-post era público).
+router.use(authenticate, requireAdmin);
+import { prisma } from '../services/prisma';
 
 // Função para gerar legenda com IA usando a imagem
 async function generateCaptionFromImage(imageUrl: string): Promise<string> {

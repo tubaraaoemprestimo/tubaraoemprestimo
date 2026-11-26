@@ -53,6 +53,7 @@ const MENU: Button[] = [
     { id: 'adm:cust', title: '🔎 Buscar cliente' },
     { id: 'adm:late', title: '⚠️ Parcelas em atraso' },
     { id: 'adm:disp', title: '⚖️ Contestações' },
+    { id: 'adm:status', title: '📸 Agendar status' },
     { id: 'adm:more', title: '➕ Mais opções' },
     { id: 'adm:exit', title: '🔒 Sair' },
 ];
@@ -181,6 +182,129 @@ async function showDispute(c: AdminCtx, i: number) {
     await c.ask('Mudar para:', [{ id: 'dsp:IN_REVIEW', title: '🔍 Em análise' }, { id: 'dsp:WAITING_DOCS', title: '📎 Aguardando docs' }, { id: 'dsp:RESOLVED', title: '✅ Resolver' }, { id: 'adm:disp', title: '⬅️ Voltar' }]);
 }
 
+// ───────── Status (stories): agendar enviando foto, vídeo ou texto ─────────
+const SP_TZ = -3; // ponytail: Brasil sem horário de verão desde 2019; se voltar, usar Intl com America/Sao_Paulo.
+/** "hoje 18h", "amanhã 9:30", "28/11 14h", "28/11/2026 14:00" → Date (horário de Brasília). */
+export function parseWhen(input: string, now = new Date()): Date | null {
+    const t = input.trim().toLowerCase().replace(/\s+/g, ' ');
+    const sp = new Date(now.getTime() + SP_TZ * 3600000);
+    let y = sp.getUTCFullYear(), mo = sp.getUTCMonth() + 1, d = sp.getUTCDate();
+    let rest = t;
+    if (/^hoje(\s|$)/.test(t)) rest = t.replace(/^hoje\s*(às|as)?\s*/, '');
+    else if (/^amanh[ãa](\s|$)/.test(t)) { const n = new Date(Date.UTC(y, mo - 1, d + 1)); y = n.getUTCFullYear(); mo = n.getUTCMonth() + 1; d = n.getUTCDate(); rest = t.replace(/^amanh[ãa]\s*(às|as)?\s*/, ''); }
+    else {
+        const m = t.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\s*(?:às|as)?\s*(.*)$/);
+        if (!m) return null;
+        d = Number(m[1]); mo = Number(m[2]); if (m[3]) y = Number(m[3]); rest = m[4];
+    }
+    const h = rest.match(/^(\d{1,2})(?:[:h](\d{2}))?h?$/);
+    if (!h) return null;
+    const hh = Number(h[1]), mm = Number(h[2] || 0);
+    if (hh > 23 || mm > 59) return null;
+    const day = new Date(Date.UTC(y, mo - 1, d));
+    if (day.getUTCDate() !== d || day.getUTCMonth() !== mo - 1) return null; // 31/02 não vira 03/03
+    return new Date(Date.UTC(y, mo - 1, d, hh - SP_TZ, mm));
+}
+const fmtWhen = (d: Date) => d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+async function statusStart(c: AdminCtx) {
+    c.st.step = 'ADM_ST_MEDIA'; c.st.data = {};
+    await c.ask('📸 *Agendar status*\nEnvie a *foto* ou o *vídeo* (até 30 MB) — ou *escreva o texto* do status.', [{ id: 'st:list', title: '📋 Ver agendados' }, { id: 'adm:menu', title: '⬅️ Menu' }]);
+}
+
+async function statusList(c: AdminCtx) {
+    const rows = await c.db.scheduledStatus.findMany({ where: { status: { in: ['PENDING', 'SCHEDULED', 'FAILED'] } }, orderBy: { scheduledAt: 'asc' }, take: 9 });
+    if (!rows.length) { await c.say('Nenhum status agendado.'); return statusStart(c); }
+    c.st.step = 'ADM_ST_LIST'; c.st.data = { ids: rows.map((r: any) => r.id) };
+    const label = (r: any) => `${r.mediaType?.startsWith('video') ? '🎥' : r.mediaType?.startsWith('image') ? '📷' : '📝'} ${fmtWhen(r.nextPostAt || r.scheduledAt)} ${r.channel === 'WHAILEYS' ? '(botões)' : ''}`;
+    await c.say(`📋 *Status agendados*\n\n${rows.map((r: any, i: number) => `${i + 1}. ${label(r)} ${r.status === 'FAILED' ? `⚠️ falhou: ${r.errorMessage || ''}` : ''}\n   ${String(r.caption || r.content || '').slice(0, 60)}`).join('\n')}`);
+    await c.ask('Cancelar qual?', [...rows.map((_: any, i: number) => ({ id: `stx:${i}`, title: `🗑️ Cancelar ${i + 1}` })), { id: 'adm:menu', title: '⬅️ Menu' }]);
+}
+
+async function statusFlow(c: AdminCtx, ev: BotEvent, sensitive: (m: any, p: string, b: any, l: string, back?: string) => Promise<unknown>, media?: { mimetype: string; data: string }) {
+    const id = ev.kind === 'action' ? ev.id : '', text = ev.kind === 'text' ? ev.text.trim() : '';
+    const st = c.st;
+    if (id === 'st:list') return statusList(c);
+    if (st.step === 'ADM_ST_LIST' && /^stx:\d$/.test(id)) {
+        const sid = st.data.ids[Number(id.slice(4))];
+        return sensitive('local', `status-cancel:${sid}`, null, 'Cancelar status agendado', 'status');
+    }
+    if (st.step === 'ADM_ST_MEDIA') {
+        if (ev.kind === 'media' && (ev.media === 'image' || ev.media === 'video')) {
+            if (!media?.data) return c.say(ev.media === 'video' ? 'Não consegui receber o vídeo. Envie um de até 30 MB.' : 'Não consegui baixar a foto. Envie de novo.');
+            const mime = String(media.mimetype || '').split(';')[0];
+            if (!/^(image\/(jpeg|png|webp)|video\/(mp4|3gpp|quicktime))$/.test(mime)) return c.say('Formato não aceito. Use foto JPG/PNG ou vídeo MP4.');
+            const { saveBufferToStorage } = await import('./storageService');
+            const url = await saveBufferToStorage(Buffer.from(media.data, 'base64'), mime, 'status', `status-${ev.media}`);
+            st.data = { mediaType: mime, mediaUrl: url, caption: ev.caption || '' };
+            st.step = 'ADM_ST_CAPTION';
+            return c.ask(`✅ ${ev.media === 'video' ? 'Vídeo' : 'Foto'} recebido.${ev.caption ? `\nLegenda: "${ev.caption}"` : ''}\nEscreva a *legenda* ou toque em uma opção.`, [{ id: 'st:keep', title: ev.caption ? '✅ Manter legenda' : '➡️ Sem legenda' }]);
+        }
+        if (text) { st.data = { mediaType: 'text', content: text.slice(0, 700) }; return statusWhen(c); }
+        return statusStart(c);
+    }
+    if (st.step === 'ADM_ST_CAPTION') {
+        if (id === 'st:keep') return statusWhen(c);
+        if (text) { st.data.caption = text.slice(0, 700); return statusWhen(c); }
+        return c.ask('Escreva a legenda ou toque em uma opção.', [{ id: 'st:keep', title: '➡️ Sem legenda' }]);
+    }
+    if (st.step === 'ADM_ST_WHEN') {
+        const now = c.ctx.now || new Date();
+        let at: Date | null = null;
+        if (id === 'stw:now') at = now;
+        else if (id === 'stw:18') at = parseWhen('hoje 18h', now);
+        else if (id === 'stw:9') at = parseWhen('amanhã 9h', now);
+        else if (text) at = parseWhen(text, now);
+        if (!at) return c.say('Não entendi. Exemplos: *hoje 18h*, *amanhã 9:30*, *28/11 14h*.');
+        if (at.getTime() < now.getTime() - 60000) return c.say('Esse horário já passou. Escolha outro.');
+        if (at.getTime() > now.getTime() + 60 * 86400000) return c.say('Agende até 60 dias à frente.');
+        st.data.at = at.toISOString(); st.step = 'ADM_ST_CHANNEL';
+        const { whaileysEnabled } = await import('./whaileys');
+        if (!whaileysEnabled()) { st.data.channel = 'EVOLUTION'; return statusConfirm(c, sensitive); }
+        return c.ask(`Quando: *${id === 'stw:now' ? 'agora' : fmtWhen(at)}*.\nPublicar em qual número?`, [{ id: 'stc:EVOLUTION', title: '📱 Número principal' }, { id: 'stc:WHAILEYS', title: '🤖 Número de botões' }, { id: 'stc:BOTH', title: '📱+🤖 Os dois' }]);
+    }
+    if (st.step === 'ADM_ST_CHANNEL' && /^stc:(EVOLUTION|WHAILEYS|BOTH)$/.test(id)) { st.data.channel = id.slice(4); return statusConfirm(c, sensitive); }
+    return statusStart(c);
+}
+
+async function statusWhen(c: AdminCtx) {
+    c.st.step = 'ADM_ST_WHEN';
+    await c.ask('Quando publicar? Toque ou escreva (ex.: *28/11 14h*).', [{ id: 'stw:now', title: '⚡ Agora' }, { id: 'stw:18', title: '🕕 Hoje 18h' }, { id: 'stw:9', title: '🌅 Amanhã 9h' }]);
+}
+
+async function statusConfirm(c: AdminCtx, sensitive: (m: any, p: string, b: any, l: string, back?: string) => Promise<unknown>) {
+    const d = c.st.data, at = new Date(d.at);
+    const where = d.channel === 'BOTH' ? 'nos dois números' : d.channel === 'WHAILEYS' ? 'no número de botões' : 'no número principal';
+    const kind = d.mediaType === 'text' ? 'texto' : d.mediaType.startsWith('video') ? 'vídeo' : 'foto';
+    return sensitive('local', 'status-create', d, `Agendar status (${kind}) para ${fmtWhen(at)} ${where}`, 'status');
+}
+
+/** Ações locais (sem rota do painel): criar/cancelar status. Chamadas só depois do PIN. */
+async function statusLocal(c: AdminCtx, path: string, body: any) {
+    if (path === 'status-create') {
+        const at = new Date(body.at);
+        const channels = body.channel === 'BOTH' ? ['EVOLUTION', 'WHAILEYS'] : [body.channel];
+        for (const channel of channels) {
+            await c.db.scheduledStatus.create({ data: {
+                title: 'WhatsApp admin', content: body.mediaType === 'text' ? body.content : (body.caption || null), mediaType: body.mediaType, mediaUrl: body.mediaUrl || null,
+                imageUrl: body.mediaType?.startsWith('image') ? body.mediaUrl : null, caption: body.caption || null,
+                recurrence: 'ONCE', selectedDays: [], postTimes: [], postsPerDay: 1, totalDays: 1, startDate: at, scheduledAt: at, nextPostAt: at,
+                status: 'SCHEDULED', channel, createdBy: c.admin.userId,
+            } });
+        }
+        // "Agora": publica já (não espera o próximo minuto do agendador).
+        if (at.getTime() <= Date.now() + 60000) { const { runDueStatuses } = await import('./statusPublisher'); await runDueStatuses(); }
+        return;
+    }
+    const m = /^status-cancel:(.+)$/.exec(path);
+    if (m) {
+        const r = await c.db.scheduledStatus.updateMany({ where: { id: m[1], status: { in: ['PENDING', 'SCHEDULED', 'FAILED'] } }, data: { status: 'CANCELLED', errorMessage: 'Cancelado pelo WhatsApp (admin)' } });
+        if (!r.count) throw new Error('Status já publicado ou cancelado');
+        return;
+    }
+    throw new Error('Ação desconhecida');
+}
+
 // ───────── Roteamento ─────────
 export async function handleAdmin(ev: BotEvent, ctx: Ctx, st: St, admin: Admin, deps: { db?: any; notifyAdmins?: (t: string, b: string) => Promise<unknown> } = {}) {
     const db = deps.db || prisma;
@@ -231,7 +355,7 @@ export async function handleAdmin(ev: BotEvent, ctx: Ctx, st: St, admin: Admin, 
         if (!(await checkPin(text))) return;
         const p = st.data.pending as { method: any; path: string; body?: any; label: string; back?: string };
         try {
-            await c.api(p.method, p.path, p.body);
+            if (p.method === 'local') await statusLocal(c, p.path, p.body); else await c.api(p.method, p.path, p.body);
             await audit('WA_ADMIN_ACTION', p.path, p.label);
             await notify(`${p.label} (pelo WhatsApp, ***${admin.phone.slice(-4)})`);
             await say(`✅ ${p.label} — feito.`);
@@ -239,6 +363,7 @@ export async function handleAdmin(ev: BotEvent, ctx: Ctx, st: St, admin: Admin, 
         if (p.back === 'req') return listRequests(c);
         if (p.back === 'rcp') return listReceipts(c);
         if (p.back === 'disp') return disputes(c);
+        if (p.back === 'status') return statusList(c);
         if (p.back === 'more') return moreMenu(c);
         return adminMenu(c);
     }
@@ -257,6 +382,8 @@ export async function handleAdmin(ev: BotEvent, ctx: Ctx, st: St, admin: Admin, 
         if (id === 'adm:late') return await lateList(c);
         if (id === 'adm:disp') return await disputes(c);
         if (id === 'adm:more') return await moreMenu(c);
+        if (id === 'adm:status') return await statusStart(c);
+        if (st.step.startsWith('ADM_ST_') || id === 'st:list') return await statusFlow(c, ev, sensitive, ctx.media);
         if (id.startsWith('more:')) return await runMore(c, id.slice(5), sensitive);
 
         if (st.step === 'ADM_REQ' && /^req:\d+$/.test(id)) return await showRequest(c, st.data.ids[Number(id.slice(4))]);

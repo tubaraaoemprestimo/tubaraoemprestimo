@@ -97,3 +97,34 @@ describe('Admin pelo WhatsApp: telas extras', () => {
         expect(calls.find(c => c.method === 'patch')).toMatchObject({ url: '/legacy-ops/disputes/D1', data: { status: 'RESOLVED', confirm: 'RESOLVER', note: 'Cobrança cancelada, valor estornado' } });
     });
 });
+
+describe('Status pelo WhatsApp do admin', () => {
+    it('entende horários em português no fuso de Brasília', async () => {
+        const { parseWhen } = await import('../waAdmin');
+        const now = new Date('2026-11-26T15:00:00Z'); // 12:00 em Brasília
+        expect(parseWhen('hoje 18h', now)!.toISOString()).toBe('2026-11-26T21:00:00.000Z');
+        expect(parseWhen('amanhã 9:30', now)!.toISOString()).toBe('2026-11-27T12:30:00.000Z');
+        expect(parseWhen('28/11 14h', now)!.toISOString()).toBe('2026-11-28T17:00:00.000Z');
+        expect(parseWhen('31/02 10h', now)).toBeNull();
+        expect(parseWhen('qualquer coisa', now)).toBeNull();
+    });
+
+    it('texto → horário → número → PIN → grava agendamento (não publica antes do PIN)', async () => {
+        const NOW = new Date('2026-11-26T15:00:00Z');
+        const admin: any = { phone: '5511900001111', userId: 'a1', pinHash: await bcrypt.hash('482915', 4), pinTries: 0, lockedUntil: null, sessionUntil: new Date(NOW.getTime() + 600000), active: true };
+        const st: any = { step: 'ADM_MENU', data: {}, options: [] };
+        const created: any[] = []; const out: string[] = [];
+        const db: any = { ...fakeDb(admin), scheduledStatus: { create: async ({ data }: any) => { created.push(data); return data; }, findMany: async () => [] } };
+        const say = async (msg: any) => handleAdmin(parseIncoming(msg, st.options), { phone: admin.phone, messageId: 'm', send: async (c: any) => { out.push(c.text); }, now: NOW } as any, st, { ...admin }, { db, notifyAdmins: async () => {} });
+        await say({ buttonsResponseMessage: { selectedButtonId: 'adm:status' } });
+        await say({ conversation: 'Empréstimo na hora, chame no WhatsApp!' });
+        await say({ conversation: 'amanhã 9h' });
+        if (st.step === 'ADM_ST_CHANNEL') await say({ buttonsResponseMessage: { selectedButtonId: 'stc:EVOLUTION' } });
+        expect(out[out.length - 1]).toMatch(/Confirmar: \*Agendar status \(texto\)/);
+        expect(created).toHaveLength(0);
+        await say({ conversation: '482915' });
+        expect(created).toHaveLength(1);
+        expect(created[0]).toMatchObject({ mediaType: 'text', content: 'Empréstimo na hora, chame no WhatsApp!', status: 'SCHEDULED', channel: 'EVOLUTION' });
+        expect(created[0].scheduledAt.toISOString()).toBe('2026-11-27T12:00:00.000Z');
+    });
+});

@@ -540,6 +540,8 @@ model ScheduledStatus {
   postedAt           DateTime? @map("posted_at")
   createdAt          DateTime  @default(now()) @map("created_at")
   createdBy          String?   @map("created_by")
+  /// EVOLUTION (número principal) | WHAILEYS (número de botões)
+  channel            String    @default("EVOLUTION")
 
   @@map("scheduled_status")
 }

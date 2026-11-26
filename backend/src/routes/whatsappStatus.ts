@@ -7,86 +7,6 @@ export const whatsappStatusRouter = Router();
 
 // ============ Helpers ============
 
-/**
- * Posta um status no WhatsApp via Evolution API
- */
-async function postStatusToWhatsApp(
-    config: { apiUrl: string; apiKey: string; instanceName: string },
-    imageUrl: string,
-    caption?: string | null
-): Promise<{ success: boolean; error?: string }> {
-    try {
-        // Buscar contatos via Evolution API usando conexão direta ao PostgreSQL
-        const { Client } = require('pg');
-        const pgClient = new Client({
-            host: '172.18.0.2',
-            port: 5432,
-            database: 'evolution',
-            user: 'evolution',
-            password: 'evolution123'
-        });
-
-        await pgClient.connect();
-
-        const result = await pgClient.query(`
-            SELECT "remoteJid"
-            FROM "Contact"
-            WHERE "instanceId" = (SELECT id FROM "Instance" WHERE name = $1)
-            AND "remoteJid" LIKE '%@s.whatsapp.net'
-            LIMIT 50
-        `, [config.instanceName]);
-
-        await pgClient.end();
-
-        if (!result.rows || result.rows.length === 0) {
-            console.error('[WhatsApp Status] Nenhum contato encontrado');
-            return { success: false, error: 'Nenhum contato encontrado para enviar status' };
-        }
-
-        const statusJidList = result.rows.map((row: any) => row.remoteJid);
-        console.log('[WhatsApp Status] Contatos encontrados:', statusJidList.length);
-
-        // Evolution API endpoint para postar status/stories
-        const url = `${config.apiUrl}/message/sendStatus/${config.instanceName}`;
-
-        console.log('[WhatsApp Status] Posting to Evolution API:', url);
-        console.log('[WhatsApp Status] Image URL:', imageUrl);
-        console.log('[WhatsApp Status] Caption:', caption);
-
-        const response = await axios.post(url, {
-            type: 'image',
-            content: imageUrl,
-            caption: caption || '',
-            statusJidList: statusJidList,
-            backgroundColor: '#000000',
-            font: 1
-        }, {
-            headers: {
-                apikey: config.apiKey,
-                'Content-Type': 'application/json'
-            },
-            timeout: 60000
-        });
-
-        console.log('[WhatsApp Status] ✅ Status postado com sucesso!');
-        console.log('[WhatsApp Status] Response:', JSON.stringify(response.data, null, 2));
-        return { success: true };
-    } catch (error: any) {
-        const errorMsg = error.response?.data?.message || error.message || 'Erro desconhecido ao postar status';
-        console.error('[WhatsApp Status] ❌ Erro ao postar:', errorMsg);
-        console.error('[WhatsApp Status] Error code:', error.code);
-        console.error('[WhatsApp Status] Status code:', error.response?.status);
-        console.error('[WhatsApp Status] Full error:', JSON.stringify(error.response?.data, null, 2) || error.message);
-
-        // Log específico para timeout
-        if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-            console.error('[WhatsApp Status] ⏱️ TIMEOUT após 60 segundos');
-        }
-
-        return { success: false, error: errorMsg };
-    }
-}
-
 // ============ ROUTES ============
 
 // POST /api/whatsapp/schedule-status - Agendar novo status (admin only)
@@ -231,90 +151,9 @@ whatsappStatusRouter.post('/process-queue', async (req: Request, res: Response) 
             return;
         }
 
-        // Busca config do WhatsApp
-        const whatsappConfig = await prisma.whatsappConfig.findFirst();
-        if (!whatsappConfig || !whatsappConfig.isConnected) {
-            res.status(400).json({ error: 'WhatsApp não configurado ou desconectado' });
-            return;
-        }
-
-        // Busca status pendentes que já passaram do horário agendado
-        const now = new Date();
-        const pendingStatuses = await prisma.scheduledStatus.findMany({
-            where: {
-                status: 'PENDING',
-                scheduledAt: { lte: now }
-            },
-            orderBy: { scheduledAt: 'asc' },
-            take: 10 // Processa no máximo 10 por vez
-        });
-
-        if (pendingStatuses.length === 0) {
-            res.json({ success: true, processed: 0, message: 'Nenhum status pendente para processar' });
-            return;
-        }
-
-        let posted = 0;
-        let failed = 0;
-        const results: { id: string; status: string; error?: string }[] = [];
-
-        for (const scheduledStatus of pendingStatuses) {
-            const result = await postStatusToWhatsApp(
-                {
-                    apiUrl: whatsappConfig.apiUrl,
-                    apiKey: whatsappConfig.apiKey,
-                    instanceName: whatsappConfig.instanceName
-                },
-                scheduledStatus.imageUrl,
-                scheduledStatus.caption
-            );
-
-            if (result.success) {
-                await prisma.scheduledStatus.update({
-                    where: { id: scheduledStatus.id },
-                    data: {
-                        status: 'POSTED',
-                        postedAt: new Date()
-                    }
-                });
-                posted++;
-                results.push({ id: scheduledStatus.id, status: 'POSTED' });
-            } else {
-                await prisma.scheduledStatus.update({
-                    where: { id: scheduledStatus.id },
-                    data: {
-                        status: 'FAILED',
-                        errorMessage: result.error || 'Erro desconhecido'
-                    }
-                });
-                failed++;
-                results.push({ id: scheduledStatus.id, status: 'FAILED', error: result.error });
-            }
-
-            // Delay entre posts para evitar rate limiting
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-
-        // Loga no NotificationLog
-        await prisma.notificationLog.create({
-            data: {
-                type: 'WHATSAPP',
-                recipient: 'status-broadcast',
-                subject: 'Processamento de fila de status',
-                content: `Processados: ${pendingStatuses.length} | Postados: ${posted} | Falhas: ${failed}`,
-                status: failed === 0 ? 'SENT' : 'FAILED',
-                errorMessage: failed > 0 ? `${failed} status falharam` : null,
-                metadata: {
-                    processed: pendingStatuses.length,
-                    posted,
-                    failed,
-                    results
-                }
-            }
-        });
-
-        console.log(`[WhatsApp Status] Fila processada: ${posted} postados, ${failed} falhas de ${pendingStatuses.length} total`);
-        res.json({ success: true, processed: pendingStatuses.length, posted, failed, results });
+        const { runDueStatuses } = await import('../services/statusPublisher');
+        await runDueStatuses();
+        res.json({ success: true });
     } catch (error: any) {
         console.error('[WhatsApp Status] Erro ao processar fila:', error);
         res.status(500).json({ error: 'Erro ao processar fila de status' });
@@ -324,52 +163,11 @@ whatsappStatusRouter.post('/process-queue', async (req: Request, res: Response) 
 // POST /api/whatsapp/post-now/:id - Postar status imediatamente (admin only)
 whatsappStatusRouter.post('/post-now/:id', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
-        const idParam = req.params.id;
-        const id = Array.isArray(idParam) ? idParam[0] : idParam;
-
-        const scheduledStatus = await prisma.scheduledStatus.findUnique({ where: { id } });
-        if (!scheduledStatus) {
-            res.status(404).json({ error: 'Status não encontrado' });
-            return;
-        }
-
-        if (scheduledStatus.status === 'POSTED') {
-            res.status(400).json({ error: 'Status já foi postado' });
-            return;
-        }
-
-        // Busca config do WhatsApp
-        const whatsappConfig = await prisma.whatsappConfig.findFirst();
-        if (!whatsappConfig || !whatsappConfig.isConnected) {
-            res.status(400).json({ error: 'WhatsApp não configurado ou desconectado' });
-            return;
-        }
-
-        const result = await postStatusToWhatsApp(
-            {
-                apiUrl: whatsappConfig.apiUrl,
-                apiKey: whatsappConfig.apiKey,
-                instanceName: whatsappConfig.instanceName
-            },
-            scheduledStatus.imageUrl,
-            scheduledStatus.caption
-        );
-
-        if (result.success) {
-            await prisma.scheduledStatus.update({
-                where: { id },
-                data: { status: 'POSTED', postedAt: new Date() }
-            });
-            res.json({ success: true, message: 'Status postado com sucesso' });
-        } else {
-            await prisma.scheduledStatus.update({
-                where: { id },
-                data: { status: 'FAILED', errorMessage: result.error }
-            });
-            res.status(500).json({ error: 'Falha ao postar status', details: result.error });
-        }
-    } catch {
-        res.status(500).json({ error: 'Erro ao postar status' });
+        const { postNow } = await import('../services/statusPublisher');
+        await postNow(String(req.params.id));
+        res.json({ success: true, message: 'Status postado com sucesso' });
+    } catch (e: any) {
+        res.status(400).json({ error: e?.message || 'Erro ao postar status' });
     }
 });
 

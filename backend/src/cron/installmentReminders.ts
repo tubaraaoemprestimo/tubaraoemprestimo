@@ -303,39 +303,15 @@ export const scheduleLatePaymentDetection = () => {
 
 // ============ CRON 3: WhatsApp Status agendado ============
 export const scheduleWhatsAppStatus = () => {
-  const job = new CronJob('*/5 * * * *', async () => {
+  // A cada minuto: publica os vencidos (EVOLUTION ou WHAILEYS). Trava por item evita duplicar.
+  const job = new CronJob('* * * * *', async () => {
     try {
-      const now = new Date();
-      const pendingStatuses = await prisma.scheduledStatus.findMany({
-        where: {
-          status: 'PENDING',
-          scheduledAt: { lte: now }
-        }
-      });
-
-      for (const status of pendingStatuses) {
-        try {
-          const { sendWhatsAppStatus } = await import('../services/whatsapp');
-          await sendWhatsAppStatus(status.imageUrl, status.caption || undefined);
-
-          await prisma.scheduledStatus.update({
-            where: { id: status.id },
-            data: { status: 'POSTED', postedAt: new Date() }
-          });
-          console.log(`[Cron] WhatsApp status posted: ${status.id}`);
-        } catch (err: any) {
-          await prisma.scheduledStatus.update({
-            where: { id: status.id },
-            data: { status: 'FAILED', errorMessage: err.message }
-          });
-          console.error(`[Cron] WhatsApp status failed:`, err.message);
-        }
-      }
-    } catch (e) {
-      console.error('[Cron] WhatsApp status cron error:', e);
+      const { runDueStatuses } = await import('../services/statusPublisher');
+      await runDueStatuses();
+    } catch (e: any) {
+      console.error('[Cron] status agendado:', e?.message);
     }
   });
-
   job.start();
 };
 
@@ -673,7 +649,7 @@ export const initCronJobs = () => {
   // então desligar essas duas não deixa nenhum lembrete sem cobertura.
   // scheduleInstallmentReminders();
   // scheduleLatePaymentDetection();
-  // scheduleWhatsAppStatus(); // Temporariamente desabilitado até migration completa
+  scheduleWhatsAppStatus();
   schedulePartnerBonusEvaluation();
   scheduleCommissionCancellation();
   scheduleCounterOfferReminder();

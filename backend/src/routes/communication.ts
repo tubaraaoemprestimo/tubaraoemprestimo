@@ -183,14 +183,12 @@ communicationRouter.delete('/scheduled-status/:id', async (req: Request, res: Re
 communicationRouter.post('/scheduled-status/:id/post', async (req: Request, res: Response) => {
     try {
         const id = String(req.params.id);
-        // Just mark as posted, actual posting is handled by whatsappStatus router
-        await prisma.scheduledStatus.update({
-            where: { id },
-            data: { status: 'POSTED', postedAt: new Date() }
-        });
+        // Publica de verdade (antes só marcava como postado).
+        const { postNow } = await import('../services/statusPublisher');
+        await postNow(id);
         res.json({ success: true });
-    } catch {
-        res.status(500).json({ error: 'Erro ao postar status' });
+    } catch (e: any) {
+        res.status(400).json({ error: e?.message || 'Erro ao postar status' });
     }
 });
 
