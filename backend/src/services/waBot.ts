@@ -5,6 +5,7 @@ import { prisma } from './prisma';
 import { emailService } from './email';
 import { saveBufferToStorage } from './storageService';
 import { submitLoanRequest } from '../routes/loanRequests';
+import { ChargeError, getInfinitePayService } from './infinitepay/infinitepayService';
 import { BotEvent, Button, Card, numbered, whaileysSend } from './whaileys';
 import { Answers, Profile, PROFILES, PROFILE_LABEL, Step, buildPayload, guaranteeOk, isErr, nextStep, summary, CepLookup } from './waBotSteps';
 
@@ -53,7 +54,7 @@ async function ask(ctx: Ctx, s: Session, text: string, opts: Button[] = [], list
 
 async function menu(ctx: Ctx, s: Session, greet = true) {
     s.step = 'MENU'; s.data = { phone: s.data.phone };
-    const opts: Button[] = [...PROFILES.map(p => ({ id: `svc:${p.id}`, title: p.title, description: p.description }) as Button), { id: 'svc:STATUS', title: '📋 Minhas solicitações' }];
+    const opts: Button[] = [{ id: 'svc:LOANS', title: '💳 Meus empréstimos', description: 'Ver parcelas e pagar' } as Button, ...PROFILES.map(p => ({ id: `svc:${p.id}`, title: p.title, description: p.description }) as Button), { id: 'svc:STATUS', title: '📋 Minhas solicitações' }];
     await ask(ctx, s, `${greet ? '🦈 Olá! Aqui é a *Tubarão Empréstimos*.\n' : ''}O que você deseja fazer? Toque em uma opção ou responda com o número.`, opts, 'Serviços');
 }
 
@@ -206,6 +207,52 @@ async function answer(ev: BotEvent, ctx: Ctx, s: Session): Promise<unknown> {
     return advance(ctx, s);
 }
 
+// ───────── Meus empréstimos e pagamento (InfinitePay, mesma regra do app) ─────────
+const brl = (n: any) => Number(n || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const OPEN_LOAN = ['ACTIVE', 'APPROVED', 'DEFAULT', 'PAUSED'];
+
+async function myLoans(ctx: Ctx, s: Session, db: any) {
+    const customer = await db.customer.findFirst({ where: { userId: s.userId }, select: { id: true } });
+    const loans = customer ? await db.loan.findMany({
+        where: { customerId: customer.id, status: { in: OPEN_LOAN } }, orderBy: { createdAt: 'desc' }, take: 9,
+        select: { id: true, amount: true, remainingAmount: true, status: true, installments: { where: { status: { in: ['OPEN', 'LATE', 'PARTIAL'] } }, orderBy: { dueDate: 'asc' }, take: 1, select: { dueDate: true, amount: true } } },
+    }) : [];
+    if (!loans.length) { await ctx.send({ text: 'Você não tem empréstimos em aberto. 🎉' }); return menu(ctx, s, false); }
+    s.step = 'LOANS'; s.data = { phone: s.data.phone, loanIds: loans.map((l: any) => l.id) };
+    const lines = loans.map((l: any, i: number) => {
+        const n = l.installments[0];
+        const due = n ? `\n   Próximo vencimento: ${new Date(n.dueDate).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} (${brl(n.amount)})` : '';
+        return `*${i + 1}.* Contrato de ${brl(l.amount)} — saldo ${brl(l.remainingAmount)}${due}${l.status === 'DEFAULT' ? '\n   ⚠️ Em atraso' : ''}`;
+    });
+    await ask(ctx, s, `💳 *Seus empréstimos*\n\n${lines.join('\n\n')}\n\nQual deseja pagar?`, loans.map((l: any, i: number) => ({ id: `loan:${i}`, title: `Contrato ${i + 1} (${brl(l.amount)})` })), 'Contratos');
+}
+
+async function loansStep(ev: BotEvent, ctx: Ctx, s: Session, db: any) {
+    const id = ev.kind === 'action' ? ev.id : '';
+    const ids: string[] = s.data.loanIds || [];
+    const pick = /^loan:(\d)$/.exec(id);
+    if (pick && ids[Number(pick[1])]) {
+        s.data.loanId = ids[Number(pick[1])];
+        return ask(ctx, s, 'Como deseja pagar?', [{ id: 'pay:interest_only', title: '💰 Pagar juros' }, { id: 'pay:full', title: '✅ Quitar tudo' }]);
+    }
+    const pay = /^pay:(interest_only|full)$/.exec(id);
+    if (pay && s.data.loanId && ids.includes(s.data.loanId)) {
+        const customer = await db.customer.findFirst({ where: { userId: s.userId } });
+        try {
+            // Mesma função do app: o servidor recalcula o valor, valida a posse do contrato e reaproveita o link se nada mudou.
+            const charge = await getInfinitePayService().createChargeForCustomer(customer, s.data.loanId, pay[1] as any);
+            if (!charge.checkoutUrl) throw new ChargeError('Link indisponível. Tente de novo em instantes.', 'PROVIDER_ERROR' as any);
+            await db.auditLog.create({ data: { userId: s.userId!, userName: customer?.name || 'WhatsApp', action: 'WA_BOT_PAYMENT_LINK', entity: 'LOAN', entityId: s.data.loanId, details: `${pay[1]} ${charge.amount}` } }).catch(() => {});
+            const desc = charge.description ? `${charge.description}\n` : '';
+            await ctx.send({ text: `🔗 *Link de pagamento*\n${desc}Valor: *${brl(charge.amount)}*\n\n${charge.checkoutUrl}\n\nPague por *Pix ou cartão*. A baixa é automática assim que o pagamento for confirmado.` });
+        } catch (e: any) {
+            await ctx.send({ text: `⚠️ ${e instanceof ChargeError ? e.message : 'Não foi possível gerar o link agora. Tente de novo em instantes.'}` });
+        }
+        return menu(ctx, s, false);
+    }
+    return myLoans(ctx, s, db);
+}
+
 async function myRequests(ctx: Ctx, s: Session, db: any) {
     const rows = await db.loanRequest.findMany({ where: { userId: s.userId }, orderBy: { createdAt: 'desc' }, take: 5, select: { profileType: true, status: true, amount: true, createdAt: true } });
     const label: Record<string, string> = { PENDING: '⏳ Em análise', WAITING_DOCS: '📎 Aguardando documentos', PENDING_ACCEPTANCE: '✍️ Aguardando seu aceite', APPROVED: '✅ Aprovada', REJECTED: '❌ Não aprovada', CANCELLED: 'Cancelada' };
@@ -254,11 +301,13 @@ export async function handleBotMessage(ev: BotEvent, ctx: Ctx) {
             if (!(await identify(ev, ctx, s, db))) return;
             delete s.data.pendingService;
             if (choice === 'STATUS') return await myRequests(ctx, s, db);
+            if (choice === 'LOANS') return await myLoans(ctx, s, db);
             if (!PROFILES.some(p => p.id === choice)) { await menu(ctx, s); return; }
             s.step = 'FLOW'; s.data = { phone: s.data.phone, profile: choice };
             await ctx.send({ text: `Ótimo! Vamos fazer sua solicitação de *${PROFILE_LABEL[choice as Profile]}*.\nA qualquer momento digite *cancelar* para sair.` });
             return await advance(ctx, s);
         }
+        if (s.step === 'LOANS') return await loansStep(ev, ctx, s, db);
         if (s.step === 'CONFIRM') {
             if (ev.kind === 'action' && ev.id === 'confirm') { await save(db, s); return await submit(ctx, s, db); }
             return await advance(ctx, s);
