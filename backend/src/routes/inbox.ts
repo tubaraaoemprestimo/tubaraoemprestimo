@@ -3,7 +3,7 @@ import axios from 'axios';
 import { randomUUID } from 'crypto';
 import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
-import { inboxBus, publish, ingestMessage, normalizeMessage, getInboxSettings, saveInboxSettings, instanceName, health, preview, phoneFromJid } from '../services/inbox';
+import { inboxBus, publish, ingestMessage, normalizeMessage, getInboxSettings, saveInboxSettings, instanceName, health, preview, phoneFromJid, clip } from '../services/inbox';
 import { assume, transfer, release, returnToAI, close, reopen, HandoffConflict } from '../services/inboxHandoff';
 import { whatsappAllowed } from '../services/collectionRules';
 
@@ -400,11 +400,13 @@ export async function runImport(days: number, by: string, deps: { http?: any; db
                 if (ts && ts < since) { stop = true; continue; }
                 const n = normalizeMessage(rec);
                 if (!n) { p.skipped++; continue; }
-                const out = await ingestMessage(n, { instance: e.instance, imported: true, db });
+                // Um registro ruim não derruba a importação inteira.
+                const out = await ingestMessage(n, { instance: e.instance, imported: true, db }).catch(() => null);
+                if (!out) { p.failed = (p.failed || 0) + 1; continue; }
                 if (out.created) p.imported++; else p.skipped++;
                 const info = chatInfo.get(n.remoteJid);
                 if (out.created && info && (info.pushName || info.profilePicUrl) && (!out.conversation.name || !out.conversation.profilePicUrl)) {
-                    await db.waConversation.update({ where: { id: out.conversation.id }, data: { name: out.conversation.name || info.pushName || null, profilePicUrl: info.profilePicUrl || out.conversation.profilePicUrl } }).catch(() => {});
+                    await db.waConversation.update({ where: { id: out.conversation.id }, data: { name: out.conversation.name || (info.pushName ? clip(String(info.pushName), 120) : null), profilePicUrl: info.profilePicUrl || out.conversation.profilePicUrl } }).catch(() => {});
                 }
             }
             p.pages = page; page++;

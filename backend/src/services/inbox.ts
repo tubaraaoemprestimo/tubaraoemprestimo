@@ -76,15 +76,20 @@ export function normalizeMessage(rec: any): NormalizedMessage | null {
     const ts = Number(rec.messageTimestamp?.low ?? rec.messageTimestamp ?? 0);
     return {
         externalId: String(key.id), remoteJid: String(key.remoteJid), phone: phoneFromJid(key.remoteJid, key.senderPn || key.remoteJidAlt),
-        fromMe: !!key.fromMe, pushName: rec.pushName || null, type, text: text === null ? null : String(text).slice(0, 8000),
-        mediaMime: mime, mediaName: name, quotedExternalId: ctx?.stanzaId || null,
+        fromMe: !!key.fromMe, pushName: rec.pushName ? clip(String(rec.pushName), 120) : null, type, text: text === null ? null : clip(String(text), 8000),
+        mediaMime: mime, mediaName: name ? clip(String(name), 255) : null, quotedExternalId: ctx?.stanzaId || null,
         timestamp: ts > 0 ? new Date(ts * 1000) : new Date(), source: rec.source || null, statusRaw: rec.status,
     };
 }
 
+/** Corta sem partir emoji (par surrogate) e troca surrogates soltos: o Prisma recusa string UTF-16 inválida. */
+export function clip(s: string, max: number) {
+    return s.slice(0, max).replace(/[\uD800-\uDBFF]$/, '').replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '�');
+}
+
 export function preview(n: { type: string; text: string | null; mediaName?: string | null }) {
     const label: Record<string, string> = { image: '📷 Foto', video: '🎬 Vídeo', audio: '🎤 Áudio', document: '📄 Documento', sticker: 'Figurinha', view_once: 'Visualização única' };
-    return (n.text && n.text.trim()) ? n.text.slice(0, 140) : (label[n.type] || n.mediaName || 'Mensagem');
+    return (n.text && n.text.trim()) ? clip(n.text, 140) : (label[n.type] || n.mediaName || 'Mensagem');
 }
 
 // ───────── Configuração da central ─────────
@@ -187,7 +192,7 @@ export async function recordOutgoing(p: { to: string; text: string; origin: Orig
         if (!isPrivateJid(jid)) return;
         const externalId = key?.id || `sys:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
         await ingestMessage({
-            externalId, remoteJid: jid, phone: phoneFromJid(jid), fromMe: true, pushName: null, type: p.type || 'text', text: p.text?.slice(0, 8000) ?? null,
+            externalId, remoteJid: jid, phone: phoneFromJid(jid), fromMe: true, pushName: null, type: p.type || 'text', text: p.text == null ? null : clip(p.text, 8000),
             mediaMime: p.mediaMime || null, mediaName: p.mediaName || null, quotedExternalId: null,
             timestamp: new Date(), source: 'api', statusRaw: p.response?.status || 'PENDING',
         }, { instance: await instanceName(), origin: p.origin, senderUserId: p.senderUserId || null });

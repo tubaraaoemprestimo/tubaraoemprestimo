@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { normalizeMessage, nextStatus, mapStatus, phoneFromJid, aiAllowed, isPrivateJid } from '../inbox';
+import { normalizeMessage, nextStatus, mapStatus, phoneFromJid, aiAllowed, isPrivateJid, clip, preview } from '../inbox';
 import { trustedWebhook, inboxText } from '../inboxBoundary';
 
 const rec = (message: any) => ({ key: { id: 'ficticio', fromMe: false, remoteJid: '12345@lid' }, messageTimestamp: 1790000000, message });
@@ -37,5 +37,13 @@ describe('Central WhatsApp: contrato do provedor e fronteiras de confiança', ()
     it.each(['WAITING_HUMAN','HUMAN_ACTIVE','CLOSED',null])('IA não envia no estado %s', async mode => {
         const db = { whatsappConfig: { findFirst: async () => ({ instanceName: 'empresa' }) }, waConversation: { findUnique: vi.fn().mockResolvedValue(mode ? { mode } : null) } };
         expect(await aiAllowed('12345@lid', db)).toBe(false);
+    });
+    it('não grava UTF-16 inválido (emoji cortado ou surrogate solto)', () => {
+        const valid = (x: string) => !/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(x);
+        expect(valid(preview({ type: 'text', text: 'a'.repeat(139) + '😀😀' }))).toBe(true);
+        expect(clip('x\uD83D y\uDE00', 50)).toBe('x� y�');
+        expect(clip('ok 😀', 50)).toBe('ok 😀');
+        const n = normalizeMessage({ key: { id: '1', remoteJid: '5511999999999@s.whatsapp.net' }, pushName: 'Ana \uD83D', message: { conversation: 'oi' } });
+        expect(valid(n!.pushName!)).toBe(true);
     });
 });
