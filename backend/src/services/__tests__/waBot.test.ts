@@ -6,6 +6,10 @@ vi.mock('../storageService', () => ({ saveBufferToStorage: vi.fn(async (_b: Buff
 const mails: string[] = [];
 vi.mock('../email', () => ({ emailService: { send: vi.fn(async (_to: string, _s: string, html: string) => { mails.push(html); return true; }) } }));
 vi.mock('../prisma', () => ({ prisma: {} }));
+vi.mock('../../routes/loans', () => ({ computeLoanPaymentQuote: async (_l: any, _c: any, type: string) => ({
+    originalAmount: 1000, remainingAmount: 1000, monthlyRate: 0.3, interestAmount: 300, lateFeeAmount: 90, daysOverdue: 3,
+    targetInstallment: { dueDate: new Date('2026-11-23T12:00:00Z') }, paymentAmount: type === 'full' ? 1390 : 390,
+}) }));
 const charges: any[] = [];
 vi.mock('../infinitepay/infinitepayService', () => {
     class ChargeError extends Error { constructor(msg: string, public code: string) { super(msg); } }
@@ -40,7 +44,8 @@ function fakeDb() {
         },
         loanRequest: { findMany: async () => [] },
         customer: { findFirst: async ({ where }: any) => (where.userId === 'u1' ? { id: 'c1', name: 'Cli' } : null) },
-        loan: { findMany: async ({ where }: any) => (where.customerId === 'c1' ? [{ id: 'L1', amount: 1000, remainingAmount: 1300, status: 'ACTIVE', installments: [{ dueDate: new Date('2026-12-19T12:00:00Z'), amount: 300 }] }] : []) },
+        loan: { findMany: async ({ where }: any) => (where.customerId === 'c1' ? [{ id: 'L1', amount: 1000, remainingAmount: 1300, status: 'ACTIVE', installments: [{ dueDate: new Date('2026-12-19T12:00:00Z'), amount: 300 }] }] : []),
+            findUnique: async ({ where }: any) => (where.id === 'L1' ? { id: 'L1', customerId: 'c1', installments: [], loanRequest: { profileType: 'CLT' } } : null) },
         auditLog: { create: async () => ({}) },
         sessions,
     };
@@ -60,14 +65,14 @@ describe('Autoatendimento por botões', () => {
 
     it('menu com botões numerados; texto "1" vale como clique', async () => {
         await say({ conversation: 'oi' });
-        expect(out[0].sections[0].rows.length).toBe(8);
-        expect(last()).toMatch(/1\. 💳 Meus empréstimos[\s\S]*2\. 💼 Empréstimo CLT/);
+        expect(out[0].sections[0].rows.length).toBe(9);
+        expect(last()).toMatch(/1\. 🧮 Quanto devo\?[\s\S]*2\. 💳 Pagar com Pix[\s\S]*3\. 💼 Empréstimo CLT/);
         await say({ conversation: '1' });
         expect(last()).toMatch(/confirmar quem é você/);
     });
 
     it('não segue sem provar o e-mail; código errado conta tentativa; e-mail de admin é recusado', async () => {
-        await say({ conversation: 'oi' }); await say({ conversation: '6' });
+        await say({ conversation: 'oi' }); await say({ conversation: '7' });
         await say({ buttonsResponseMessage: { selectedButtonId: 'id:have' } });
         await say({ conversation: 'adm@x.com' });
         expect(last()).toMatch(/não pode ser usado/);
@@ -82,7 +87,7 @@ describe('Autoatendimento por botões', () => {
     });
 
     it('LIMPA_NOME completo: termos, dados, assinatura, resumo, envio único', async () => {
-        await say({ conversation: 'oi' }); await say({ conversation: '6' });
+        await say({ conversation: 'oi' }); await say({ conversation: '7' });
         await say({ buttonsResponseMessage: { selectedButtonId: 'id:have' } }); await say({ conversation: 'cli@x.com' }); await say({ conversation: code() });
         await say({ conversation: '1' }); // aceito
         await say({ conversation: 'Maria da Silva' });
@@ -114,7 +119,7 @@ describe('Autoatendimento por botões', () => {
     });
 
     it('CLT com menos de 3 meses encerra sem gravar nada', async () => {
-        await say({ conversation: 'oi' }); await say({ conversation: '2' });
+        await say({ conversation: 'oi' }); await say({ conversation: '3' });
         await say({ buttonsResponseMessage: { selectedButtonId: 'id:have' } }); await say({ conversation: 'cli@x.com' }); await say({ conversation: code() });
         await say({ conversation: '2' }); // não é cliente
         await say({ conversation: '50' }); expect(last()).toMatch(/entre R\$ 300/);
@@ -125,24 +130,27 @@ describe('Autoatendimento por botões', () => {
         expect(db.sessions.get(phone).step).toBe('MENU');
     });
 
-    it('meus empréstimos: escolhe contrato e recebe link da InfinitePay pela mesma regra do app', async () => {
+    it('quanto devo: mostra juros, atraso e totais pelo cálculo oficial; pagar gera link InfinitePay', async () => {
         await say({ conversation: 'oi' }); await say({ conversation: '1' });
         await say({ buttonsResponseMessage: { selectedButtonId: 'id:have' } }); await say({ conversation: 'cli@x.com' }); await say({ conversation: code() });
-        expect(last()).toMatch(/Seus empréstimos[\s\S]*saldo R\$\s?1\.300,00[\s\S]*19\/12\/2026/);
-        await say({ conversation: '1' });
-        expect(last()).toMatch(/Como deseja pagar/);
-        await say({ buttonsResponseMessage: { selectedButtonId: 'pay:interest_only' } });
-        expect(out.some(c => /checkout\.infinitepay\.io[\s\S]*/.test(c.text) && /R\$\s?300,00/.test(c.text))).toBe(true);
+        const calc = last();
+        expect(calc).toMatch(/Quanto está sua dívida/);
+        expect(calc).toMatch(/Juros do mês \(30%\): R\$\s?300,00/);
+        expect(calc).toMatch(/atraso há \*3 dia\(s\)\*/);
+        expect(calc).toMatch(/Multa e juros de atraso: R\$\s?90,00/);
+        expect(calc).toMatch(/só os juros:\* R\$\s?390,00/);
+        expect(calc).toMatch(/quitar tudo:\* R\$\s?1\.390,00/);
+        await say({ conversation: '1' }); // pagar juros
+        expect(out.some(c => /checkout\.infinitepay\.io/.test(c.text))).toBe(true);
         expect(charges).toEqual([{ loanId: 'L1', type: 'interest_only' }]);
-        // id de contrato de outra pessoa não é aceito: só os listados na sessão
-        await say({ buttonsResponseMessage: { selectedButtonId: 'svc:LOANS' } });
+        // contrato de outra pessoa não é aceito: só os listados na sessão
         db.sessions.get(phone).data.loanId = 'OUTRO';
         await say({ buttonsResponseMessage: { selectedButtonId: 'pay:full' } });
         expect(charges).toHaveLength(1);
     });
 
     it('cancelar a qualquer momento não envia', async () => {
-        await say({ conversation: 'oi' }); await say({ conversation: '6' });
+        await say({ conversation: 'oi' }); await say({ conversation: '7' });
         await say({ conversation: 'cancelar' });
         expect(out.some(c => /Nada foi enviado/.test(c.text))).toBe(true);
         expect(submitted).toHaveLength(0);

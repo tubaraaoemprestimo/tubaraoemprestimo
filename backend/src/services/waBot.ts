@@ -55,7 +55,7 @@ async function ask(ctx: Ctx, s: Session, text: string, opts: Button[] = [], list
 
 async function menu(ctx: Ctx, s: Session, greet = true) {
     s.step = 'MENU'; s.data = { phone: s.data.phone };
-    const opts: Button[] = [{ id: 'svc:LOANS', title: '💳 Meus empréstimos', description: 'Ver parcelas e pagar' } as Button, ...PROFILES.map(p => ({ id: `svc:${p.id}`, title: p.title, description: p.description }) as Button), { id: 'svc:STATUS', title: '📋 Minhas solicitações' }];
+    const opts: Button[] = [{ id: 'svc:DEBT', title: '🧮 Quanto devo?', description: 'Juros, atraso e valor para pagar' } as Button, { id: 'svc:LOANS', title: '💳 Pagar com Pix', description: 'Gerar link de pagamento' } as Button, ...PROFILES.map(p => ({ id: `svc:${p.id}`, title: p.title, description: p.description }) as Button), { id: 'svc:STATUS', title: '📋 Minhas solicitações' }];
     await ask(ctx, s, `${greet ? '🦈 Olá! Aqui é a *Tubarão Empréstimos*.\n' : ''}O que você deseja fazer? Toque em uma opção ou responda com o número.`, opts, 'Serviços');
 }
 
@@ -220,6 +220,8 @@ async function myLoans(ctx: Ctx, s: Session, db: any) {
     }) : [];
     if (!loans.length) { await ctx.send({ text: 'Você não tem empréstimos em aberto. 🎉' }); return menu(ctx, s, false); }
     s.step = 'LOANS'; s.data = { phone: s.data.phone, loanIds: loans.map((l: any) => l.id) };
+    // Um contrato só: já mostra o cálculo e os botões de pagamento.
+    if (loans.length === 1) { s.data.loanId = loans[0].id; return loansStep({ kind: 'action', id: 'loan:0' }, ctx, s, db); }
     const lines = loans.map((l: any, i: number) => {
         const n = l.installments[0];
         const due = n ? `\n   Próximo vencimento: ${new Date(n.dueDate).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} (${brl(n.amount)})` : '';
@@ -228,13 +230,40 @@ async function myLoans(ctx: Ctx, s: Session, db: any) {
     await ask(ctx, s, `💳 *Seus empréstimos*\n\n${lines.join('\n\n')}\n\nQual deseja pagar?`, loans.map((l: any, i: number) => ({ id: `loan:${i}`, title: `Contrato ${i + 1} (${brl(l.amount)})` })), 'Contratos');
 }
 
+/**
+ * "Quanto está minha dívida": mesmo cálculo oficial do app, da régua e do link de pagamento
+ * (computeLoanPaymentQuote → interestEngine). Nada é recalculado aqui.
+ */
+export async function debtText(db: any, userId: string, loanId: string) {
+    const customer = await db.customer.findFirst({ where: { userId } });
+    const loan = await db.loan.findUnique({ where: { id: loanId }, include: { installments: true, loanRequest: { select: { profileType: true } } } });
+    if (!customer || !loan || loan.customerId !== customer.id) return null;
+    const { computeLoanPaymentQuote } = await import('../routes/loans');
+    const [interest, full] = await Promise.all([computeLoanPaymentQuote(loan, customer, 'interest_only'), computeLoanPaymentQuote(loan, customer, 'full')]);
+    const inst = interest.targetInstallment;
+    const lines = [
+        '🧮 *Quanto está sua dívida*', '',
+        `Valor emprestado: ${brl(interest.originalAmount)}`,
+        `Saldo devedor: ${brl(interest.remainingAmount)}`,
+    ];
+    if (inst) {
+        lines.push(`Próximo vencimento: ${new Date(inst.dueDate).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`);
+        lines.push('', `Juros do mês (${Math.round(interest.monthlyRate * 100)}%): ${brl(interest.interestAmount)}`);
+        if (interest.daysOverdue > 0) lines.push(`⚠️ Em atraso há *${interest.daysOverdue} dia(s)*`, `Multa e juros de atraso: ${brl(interest.lateFeeAmount)}`);
+    }
+    lines.push('', `💰 *Para pagar só os juros:* ${brl(interest.paymentAmount)}`, `✅ *Para quitar tudo:* ${brl(full.paymentAmount)}`);
+    if (interest.daysOverdue > 0) lines.push('', '_O valor aumenta a cada dia de atraso._');
+    return lines.join('\n');
+}
+
 async function loansStep(ev: BotEvent, ctx: Ctx, s: Session, db: any) {
     const id = ev.kind === 'action' ? ev.id : '';
     const ids: string[] = s.data.loanIds || [];
     const pick = /^loan:(\d)$/.exec(id);
     if (pick && ids[Number(pick[1])]) {
         s.data.loanId = ids[Number(pick[1])];
-        return ask(ctx, s, 'Como deseja pagar?', [{ id: 'pay:interest_only', title: '💰 Pagar juros' }, { id: 'pay:full', title: '✅ Quitar tudo' }]);
+        const text = await debtText(db, s.userId!, s.data.loanId).catch(() => null);
+        return ask(ctx, s, `${text || '💳 Contrato selecionado.'}\n\nComo deseja pagar? O link aceita *Pix ou cartão* e a baixa é automática.`, [{ id: 'pay:interest_only', title: '💰 Pagar juros' }, { id: 'pay:full', title: '✅ Quitar tudo' }, { id: 'svc:LOANS', title: '⬅️ Voltar' }]);
     }
     const pay = /^pay:(interest_only|full)$/.exec(id);
     if (pay && s.data.loanId && ids.includes(s.data.loanId)) {
@@ -312,6 +341,7 @@ export async function handleBotMessage(ev: BotEvent, ctx: Ctx) {
             delete s.data.pendingService;
             if (choice === 'STATUS') return await myRequests(ctx, s, db);
             if (choice === 'LOANS') return await myLoans(ctx, s, db);
+            if (choice === 'DEBT') return await myLoans(ctx, s, db);
             if (!PROFILES.some(p => p.id === choice)) { await menu(ctx, s); return; }
             s.step = 'FLOW'; s.data = { phone: s.data.phone, profile: choice };
             await ctx.send({ text: `Ótimo! Vamos fazer sua solicitação de *${PROFILE_LABEL[choice as Profile]}*.\nA qualquer momento digite *cancelar* para sair.` });
