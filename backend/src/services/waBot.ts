@@ -8,6 +8,7 @@ import { submitLoanRequest } from '../routes/loanRequests';
 import { ChargeError, getInfinitePayService } from './infinitepay/infinitepayService';
 import { adminFor, handleAdmin } from './waAdmin';
 import { TOPICS, HUMAN_TOPICS, INFO_TEXT, APP_TEXT, pixKey, requestAttendant } from './waHelp';
+import { requestPasswordReset } from './passwordReset';
 import { BotEvent, Button, Card, numbered, whaileysSend } from './whaileys';
 import { Answers, Profile, PROFILES, PROFILE_LABEL, Step, buildPayload, guaranteeOk, isErr, nextStep, summary, CepLookup } from './waBotSteps';
 
@@ -33,6 +34,8 @@ const MENU_WORDS = /^(menu|inicio|início|oi|ola|olá|bom dia|boa tarde|boa noit
 const CANCEL_WORDS = /^(cancelar|sair|parar)$/i;
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 const maskEmail = (e: string) => e.replace(/^(.{2}).*(@.*)$/, '$1***$2');
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PWD_BTN: Button = { id: 'pwd:reset', title: '🔑 Esqueci a senha' };
 
 export const viaCep: CepLookup = async (cep) => {
     const r = (await axios.get(`https://viacep.com.br/ws/${cep}/json/`, { timeout: 6000 })).data;
@@ -367,7 +370,7 @@ async function helpStep(ev: BotEvent, ctx: Ctx, s: Session, db: any) {
                     s.step = 'HELP'; s.data.deflected = topic;
                     return ask(ctx, s, '💸 Para pagamento você pode:', [{ id: 'svc:LOANS', title: '🔗 Link para pagar' }, { id: 'pay:receipt', title: '📎 Enviar comprovante' }, still]);
                 case 'App':
-                    await ctx.send({ text: APP_TEXT }); return solved();
+                    await ctx.send({ text: APP_TEXT }); return ask(ctx, s, 'Isso resolveu?', [PWD_BTN, { id: 'help:menu', title: '✅ Sim, resolveu' }, still]);
                 case 'Renegociação': {
                     const key = await pixKey(db).catch(() => null);
                     await ctx.send({ text: `🤝 *Atraso ou renegociação*\n\n• Pagando *só os juros* o contrato fica em dia e o valor principal passa para o próximo mês.\n• Com atraso, juros e multa aumentam a cada dia — pagar logo sai mais barato.\n• Toque em *Quanto devo?* para ver o valor exato de hoje e gerar o link.${key ? `\n\nChave Pix: ${key}` : ''}` });
@@ -402,6 +405,12 @@ async function helpStep(ev: BotEvent, ctx: Ctx, s: Session, db: any) {
         return ask(ctx, s, '⏳ Seu pedido já está com a equipe. Recebemos sua mensagem e o atendente vai ver.\nQuer usar o menu enquanto aguarda?', [{ id: 'help:menu', title: '📋 Ver menu' }]);
     }
 
+    if (s.step === 'PWD_EMAIL') {
+        if (id === 'help:menu') return menu(ctx, s, false);
+        if (!EMAIL_RE.test(text)) return ask(ctx, s, 'Digite o *e-mail do cadastro* (ex.: nome@gmail.com).', [{ id: 'help:menu', title: '⬅️ Voltar' }]);
+        return pwdSent(ctx, s, db, text);
+    }
+
     // Comprovante: escolhe contrato/parcela → foto ou PDF → vai para conferência (mesma fila do app)
     if (s.step === 'RECEIPT') {
         if (ev.kind !== 'media' || !['image', 'document'].includes(ev.media)) return ask(ctx, s, 'Envie a *foto* ou o *PDF* do comprovante.', [{ id: 'help:menu', title: '⬅️ Voltar' }]);
@@ -426,7 +435,14 @@ async function helpStep(ev: BotEvent, ctx: Ctx, s: Session, db: any) {
         case 'help:menu': return menu(ctx, s, false);
         case 'help:human': return humanStart(ctx, s);
         case 'help:info': await ctx.send({ text: INFO_TEXT }); return helpMenu(ctx, s);
-        case 'help:app': await ctx.send({ text: APP_TEXT }); return ask(ctx, s, 'Resolveu?', [{ id: 'help:menu', title: '✅ Sim, voltar' }, { id: 'hum:App', title: '👤 Falar com atendente' }]);
+        case 'help:app': await ctx.send({ text: APP_TEXT }); return ask(ctx, s, 'Resolveu?', [PWD_BTN, { id: 'help:menu', title: '✅ Sim, voltar' }, { id: 'hum:App', title: '👤 Falar com atendente' }]);
+        case 'pwd:retry': s.step = 'PWD_EMAIL'; return ask(ctx, s, 'Digite o *e-mail do cadastro*:', [{ id: 'help:menu', title: '⬅️ Voltar' }]);
+        case 'pwd:reset': {
+            const user = s.verified && s.userId ? await db.user.findUnique({ where: { id: s.userId }, select: { email: true } }).catch(() => null) : null;
+            if (user?.email) return pwdSent(ctx, s, db, user.email);
+            s.step = 'PWD_EMAIL';
+            return ask(ctx, s, '🔑 *Esqueci minha senha*\nDigite o *e-mail do seu cadastro* que eu envio o link para criar uma nova senha.', [{ id: 'help:menu', title: '⬅️ Voltar' }]);
+        }
         case 'help:payment': s.step = 'HELP'; return ask(ctx, s, '💸 *Pagamento e Pix* — o que você precisa?', [{ id: 'svc:LOANS', title: '🔗 Link para pagar' }, { id: 'pay:key', title: '🔑 Chave Pix' }, { id: 'pay:receipt', title: '📎 Já paguei (comprovante)' }]);
         case 'help:debt': s.step = 'HELP'; return ask(ctx, s, '🧮 *Dívida e quitação* — escolha:', [{ id: 'svc:DEBT', title: '🧮 Quanto devo / quitar' }, { id: 'hum:Renegociação', title: '🤝 Renegociar / atraso' }]);
         case 'help:request': s.step = 'HELP'; return ask(ctx, s, '📋 *Minha solicitação* — escolha:', [{ id: 'svc:STATUS', title: '🔎 Ver andamento' }, { id: 'req:new', title: '📝 Nova solicitação' }, { id: 'hum:Solicitação', title: '👤 Falar sobre ela' }]);
@@ -450,6 +466,15 @@ async function helpStep(ev: BotEvent, ctx: Ctx, s: Session, db: any) {
         return ask(ctx, s, `📎 Parcela de ${brl(inst.amount)} (venc. ${new Date(inst.dueDate).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}).\nEnvie agora a *foto* ou o *PDF* do comprovante.`, [{ id: 'help:menu', title: '⬅️ Voltar' }]);
     }
     return helpMenu(ctx, s);
+}
+
+/** Dispara o e-mail de redefinição (mesma lógica do app). Resposta igual exista ou não a conta. */
+async function pwdSent(ctx: Ctx, s: Session, db: any, rawEmail: string) {
+    const email = rawEmail.trim().toLowerCase();
+    await requestPasswordReset(email, db).catch((e: any) => console.error('[WaBot] reset de senha:', e?.message));
+    s.step = 'HELP'; s.data = { phone: s.data.phone, deflected: 'App' };
+    await ctx.send({ text: `📧 Se *${maskEmail(email)}* estiver cadastrado, o link para criar uma nova senha acabou de ser enviado.\n\n• Procure o e-mail *"Redefinir senha — Tubarão Empréstimos"* (veja também *Spam* e *Promoções*).\n• Toque em *Redefinir Senha*, digite a nova senha duas vezes e entre no app.\n• O link vale *1 hora* e funciona *uma vez*.` });
+    return ask(ctx, s, 'Chegou o e-mail?', [{ id: 'help:menu', title: '✅ Sim, voltar' }, { id: 'pwd:retry', title: '🔁 Outro e-mail' }, { id: 'hum:App', title: '👤 Falar com atendente' }]);
 }
 
 /** Lista as parcelas em aberto do cliente para anexar o comprovante. */
@@ -483,13 +508,15 @@ export async function handleBotMessage(ev: BotEvent, ctx: Ctx) {
         if (MENU_WORDS.test(text) && !s.step.startsWith('ID_') && s.step !== 'HUMAN_DETAIL') { await menu(ctx, s); return; }
         // "Quero falar com atendente" digitado em qualquer momento (fora de um formulário em andamento).
         if (/(atendente|falar com (algu[eé]m|uma pessoa|humano)|pessoa real)/i.test(text) && !['FLOW', 'CONFIRM'].includes(s.step) && !s.step.startsWith('HUMAN_')) { await humanStart(ctx, s); return; }
+        // "Esqueci minha senha" digitado: vai direto para o envio do link.
+        if (/(esqueci|redefinir|recuperar|trocar|mudar).{0,12}senha/i.test(text) && !['FLOW', 'CONFIRM'].includes(s.step) && !s.step.startsWith('ID_') && !s.step.startsWith('HUMAN_')) { await helpStep({ kind: 'action', id: 'pwd:reset' }, ctx, s, db); return; }
         const helpId = ev.kind === 'action' ? ev.id : '';
         if (helpId === 'help:topics') { await helpMenu(ctx, s); return; }
         if (helpId === 'req:new' && !s.step.startsWith('ID_')) { await newRequestMenu(ctx, s); return; }
         // Botão de serviço oferecido pelo atendimento (ex.: "Quanto devo?" na tela de renegociação): segue o serviço.
         if (s.step === 'HUMAN_TOPIC' && (helpId.startsWith('svc:') || helpId === 'pay:receipt')) { delete s.data.deflected; s.step = 'MENU'; }
         // Assuntos que não precisam de identificação
-        if (['help:human', 'help:info', 'help:app', 'help:contract', 'help:dispute', 'help:menu', 'help:payment', 'help:debt', 'help:request', 'pay:key'].includes(helpId) || /^hum:/.test(helpId) || s.step.startsWith('HUMAN_')) return await helpStep(ev, ctx, s, db);
+        if (['help:human', 'help:info', 'help:app', 'help:contract', 'help:dispute', 'help:menu', 'help:payment', 'help:debt', 'help:request', 'pay:key', 'pwd:reset', 'pwd:retry'].includes(helpId) || /^hum:/.test(helpId) || s.step.startsWith('HUMAN_') || s.step === 'PWD_EMAIL') return await helpStep(ev, ctx, s, db);
         // Assuntos que mexem em dados do cliente: pedem identificação (mesmo caminho dos serviços)
         // Comprovante mexe em parcela do cliente: exige identificação (chave Pix é pública e vai direto).
         if (helpId === 'pay:receipt' && !s.verified) { s.step = 'MENU'; s.data.pendingService = helpId; }

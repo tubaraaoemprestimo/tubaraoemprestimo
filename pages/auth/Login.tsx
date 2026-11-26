@@ -309,7 +309,11 @@ export const Login: React.FC = () => {
 
   const handleForgotPassword = async () => {
     if (!resetEmail) {
-      setResetError('Digite seu email ou CPF.');
+      setResetError('Digite seu email.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resetEmail.trim())) {
+      setResetError('Digite um email válido.');
       return;
     }
 
@@ -320,10 +324,11 @@ export const Login: React.FC = () => {
 
     setResetLoading(false);
 
-    if (result.success) {
+    // apiService devolve { data, error } (não { success })
+    if (!result.error) {
       setResetSuccess(true);
     } else {
-      setResetError(result.message);
+      setResetError(result.error?.error || 'Não foi possível enviar agora. Tente de novo em instantes.');
     }
   };
 
@@ -499,7 +504,7 @@ export const Login: React.FC = () => {
                 </div>
                 <h3 className="text-lg font-bold text-white mb-2">Email Enviado!</h3>
                 <p className="text-zinc-400 text-sm mb-6">
-                  Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.
+                  Se o email estiver cadastrado, o link chega em instantes. Veja também a caixa de Spam e Promoções. O link vale 1 hora e funciona uma vez.
                 </p>
                 <Button onClick={closeForgotPasswordModal} className="w-full">
                   Voltar ao Login

@@ -47,7 +47,7 @@ export function inBusinessHours(now = new Date()) {
 
 export const INFO_TEXT = '🕘 *Atendimento humano*\nSegunda a sexta: 9h às 18h\nSábado: 9h às 13h\n\n🤖 Por aqui (botões) você é atendido *24 horas*: dívida, pagamento, solicitações e documentos.\n\n🌐 App: ' + APP_URL;
 
-export const APP_TEXT = `📱 *App Tubarão*\n${APP_URL}\n\n• *Esqueci a senha*: na tela de login toque em "Esqueci minha senha" e use o e-mail do cadastro.\n• *Primeiro acesso*: use o e-mail que você confirmou aqui no WhatsApp e toque em "Esqueci minha senha" para criar a sua.\n• Não lembra o e-mail? Toque em *Falar com atendente*.`;
+export const APP_TEXT = `📱 *App Tubarão*\n${APP_URL}\n\n• *Esqueci a senha*: toque em *🔑 Esqueci a senha* aqui embaixo e eu mando o link no seu e-mail (no app: "Esqueci minha senha" na tela de login).\n• *Primeiro acesso*: use o mesmo botão com o e-mail do cadastro para criar a sua senha.\n• Não lembra o e-mail? Toque em *Falar com atendente*.`;
 
 /**
  * Pedido de atendimento humano: fila + aviso aos admins. Fora do horário avisa quando será respondido.

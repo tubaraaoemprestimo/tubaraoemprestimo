@@ -7,6 +7,7 @@ import { authenticate, generateAccessToken, generateRefreshToken } from '../midd
 import { emailService } from '../services/email';
 import { sendWhatsAppMessage } from '../services/whatsapp';
 import { sendPushToRole } from './push';
+import { allowRequest, requestPasswordReset, resetPassword, ResetError } from '../services/passwordReset';
 
 export const authRouter = Router();
 
@@ -343,80 +344,42 @@ authRouter.post('/confirm-email', async (req: Request, res: Response) => {
 // POST /api/auth/forgot-password — Solicitar reset
 // ============================================
 authRouter.post('/forgot-password', async (req: Request, res: Response) => {
+    const ok = { success: true, message: 'Se o email existir, enviaremos um link de recuperação.' };
     try {
-        const { email } = req.body;
-
-        if (!email) {
+        const { email } = req.body || {};
+        if (!email || typeof email !== 'string') {
             res.status(400).json({ error: 'Email é obrigatório' });
             return;
         }
-
-        const user = await prisma.user.findUnique({
-            where: { email: email.toLowerCase() }
-        });
-
-        // Sempre retorna sucesso (segurança — não revela se email existe)
-        if (!user) {
-            res.json({ success: true, message: 'Se o email existir, enviaremos um link de recuperação.' });
+        // Atrás do túnel Cloudflare req.ip é o proxy; o IP real vem em cf-connecting-ip.
+        const ip = String(req.headers['cf-connecting-ip'] || req.ip);
+        if (!allowRequest(`ip:${ip}`, 10)) {
+            res.status(429).json({ error: 'Muitas tentativas. Aguarde 15 minutos e tente de novo.' });
             return;
         }
-
-        // Gera token de reset (expira em 1h)
-        const resetToken = jwt.sign(
-            { userId: user.id, type: 'password_reset' },
-            process.env.JWT_SECRET || 'default-secret',
-            { expiresIn: '1h' }
-        );
-
-        // Envia email
-        await emailService.sendPasswordReset(user.email, user.name, resetToken);
-
-        res.json({ success: true, message: 'Se o email existir, enviaremos um link de recuperação.' });
-
+        // Sempre a mesma resposta (não revela se o email existe)
+        await requestPasswordReset(email);
+        res.json(ok);
     } catch (error: any) {
-        console.error('[Auth] Forgot password error:', error);
-        res.status(500).json({ error: 'Erro ao processar solicitação' });
+        console.error('[Auth] Forgot password error:', error?.message);
+        res.json(ok);
     }
 });
 
 // ============================================
-// POST /api/auth/reset-password — Redefinir senha
+// POST /api/auth/reset-password — Redefinir senha (link de uso único)
 // ============================================
 authRouter.post('/reset-password', async (req: Request, res: Response) => {
     try {
-        const { token, newPassword } = req.body;
-
-        if (!token || !newPassword) {
-            res.status(400).json({ error: 'Token e nova senha são obrigatórios' });
-            return;
-        }
-
-        // Verifica token
-        const decoded = jwt.verify(
-            token,
-            process.env.JWT_SECRET || 'default-secret'
-        ) as { userId: string; type: string };
-
-        if (decoded.type !== 'password_reset') {
-            res.status(400).json({ error: 'Token inválido' });
-            return;
-        }
-
-        // Atualiza senha
-        const hashedPassword = await bcrypt.hash(newPassword, 12);
-        await prisma.user.update({
-            where: { id: decoded.userId },
-            data: { password: hashedPassword }
-        });
-
+        const { token, newPassword } = req.body || {};
+        await resetPassword(token, newPassword);
         res.json({ success: true, message: 'Senha redefinida com sucesso!' });
-
     } catch (error: any) {
-        if (error.name === 'TokenExpiredError') {
-            res.status(400).json({ error: 'Link expirado. Solicite um novo.' });
+        if (error instanceof ResetError) {
+            res.status(400).json({ error: error.message });
             return;
         }
-        console.error('[Auth] Reset password error:', error);
+        console.error('[Auth] Reset password error:', error?.message);
         res.status(500).json({ error: 'Erro ao redefinir senha' });
     }
 });
