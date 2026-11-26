@@ -884,10 +884,10 @@ antifraudRouter.post('/contract-signature', authenticate, async (req: Request, r
 // =============================================
 
 // GET /api/antifraud/biometric/check?user_id=xxx — Check if user has biometric credentials
-antifraudRouter.get('/biometric/check', async (req: Request, res: Response) => {
+antifraudRouter.get('/biometric/check', authenticate, async (req: Request, res: Response) => {
     try {
         const userId = String(req.query.user_id || '').trim();
-        if (!userId) {
+        if (!userId || (userId !== req.user!.id && req.user!.role !== 'ADMIN')) {
             res.json([]);
             return;
         }
@@ -903,10 +903,10 @@ antifraudRouter.get('/biometric/check', async (req: Request, res: Response) => {
 });
 
 // GET /api/antifraud/biometric/credentials?user_id=xxx — List credential IDs for a user
-antifraudRouter.get('/biometric/credentials', async (req: Request, res: Response) => {
+antifraudRouter.get('/biometric/credentials', authenticate, async (req: Request, res: Response) => {
     try {
         const userId = String(req.query.user_id || '').trim();
-        if (!userId) {
+        if (!userId || (userId !== req.user!.id && req.user!.role !== 'ADMIN')) {
             res.json([]);
             return;
         }
@@ -929,11 +929,12 @@ antifraudRouter.get('/biometric/credentials', async (req: Request, res: Response
 });
 
 // POST /api/antifraud/biometric — Save a new biometric credential
-antifraudRouter.post('/biometric', async (req: Request, res: Response) => {
+antifraudRouter.post('/biometric', authenticate, async (req: Request, res: Response) => {
     try {
-        const { user_id, user_email, credential_id, public_key, attestation_object, device_name, sign_count } = req.body;
+        const { user_id, credential_id, public_key, attestation_object, device_name } = req.body;
+        const user_email = req.user!.email, sign_count = 0;
 
-        if (!user_id || !credential_id) {
+        if (!user_id || !credential_id || user_id !== req.user!.id) {
             res.status(400).json({ error: 'user_id e credential_id são obrigatórios' });
             return;
         }
@@ -975,16 +976,8 @@ antifraudRouter.get('/biometric/verify', async (req: Request, res: Response) => 
             return;
         }
 
-        res.json({
-            id: credential.id,
-            user_id: credential.userId,
-            user_email: credential.userEmail,
-            credential_id: credential.credentialId,
-            public_key: credential.publicKey,
-            sign_count: credential.signCount,
-            device_name: credential.deviceName,
-            created_at: credential.createdAt
-        });
+        // Não expõe e-mail nem chave: o login de verdade é /api/auth/biometric/login (assinatura conferida no servidor).
+        res.json({ id: credential.id, user_id: credential.userId, credential_id: credential.credentialId });
     } catch (err: any) {
         console.error('[Biometric] verify error:', err);
         res.status(500).json({ error: 'Erro ao verificar credencial' });
@@ -992,7 +985,7 @@ antifraudRouter.get('/biometric/verify', async (req: Request, res: Response) => 
 });
 
 // PUT /api/antifraud/biometric/update-count — Update sign count after authentication
-antifraudRouter.put('/biometric/update-count', async (req: Request, res: Response) => {
+antifraudRouter.put('/biometric/update-count', authenticate, async (req: Request, res: Response) => {
     try {
         const { credential_id, sign_count, last_used_at } = req.body;
         if (!credential_id) {
@@ -1004,7 +997,7 @@ antifraudRouter.put('/biometric/update-count', async (req: Request, res: Respons
             where: { credentialId: credential_id }
         });
 
-        if (!credential) {
+        if (!credential || credential.userId !== req.user!.id) {
             res.status(404).json({ error: 'Credencial não encontrada' });
             return;
         }
@@ -1025,10 +1018,10 @@ antifraudRouter.put('/biometric/update-count', async (req: Request, res: Respons
 });
 
 // DELETE /api/antifraud/biometric?user_id=xxx — Remove all biometric credentials for a user
-antifraudRouter.delete('/biometric', async (req: Request, res: Response) => {
+antifraudRouter.delete('/biometric', authenticate, async (req: Request, res: Response) => {
     try {
         const userId = String(req.query.user_id || '').trim();
-        if (!userId) {
+        if (!userId || (userId !== req.user!.id && req.user!.role !== 'ADMIN')) {
             res.status(400).json({ error: 'user_id é obrigatório' });
             return;
         }

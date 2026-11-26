@@ -54,3 +54,6 @@ backend/scripts/backfill-logs/
 backend/scripts/_*.sh
 backend/scripts/_*.cjs
 *.tar.gz
+
+# scripts locais de manutenção
+tub-scripts/

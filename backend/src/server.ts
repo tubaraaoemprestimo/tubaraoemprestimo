@@ -8,6 +8,7 @@ dotenv.config();
 
 // Import routes
 import { authRouter } from './routes/auth';
+import { webauthnRouter } from './routes/webauthn';
 import { usersRouter } from './routes/users';
 import { customersRouter } from './routes/customers';
 import { loanRequestsRouter } from './routes/loanRequests';
@@ -124,6 +125,7 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // ============= ROUTES =============
 
+app.use('/api/auth/biometric', webauthnRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/customers', customersRouter);

@@ -8,7 +8,6 @@ import { InstallPwaButton } from '../../components/InstallPwaButton';
 import { biometricService } from '../../services/biometricService';
 import { antifraudService } from '../../services/antifraudService';
 import { locationTrackingService } from '../../services/locationTrackingService';
-import { secureStorageService } from '../../services/secureStorageService';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -19,8 +18,10 @@ export const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricHasCredential, setBiometricHasCredential] = useState(false);
-  const [biometricNeedsPassword, setBiometricNeedsPassword] = useState(false);
-  const [biometricEmail, setBiometricEmail] = useState('');
+  // Depois do login com senha: oferecer ativar a biometria do aparelho (um toque).
+  const [offerBio, setOfferBio] = useState<null | { user: any; go: string }>(null);
+  const [bioActivating, setBioActivating] = useState(false);
+  const [bioActivateError, setBioActivateError] = useState<string | null>(null);
 
   // Modal Esqueceu Senha
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
@@ -41,6 +42,7 @@ export const Login: React.FC = () => {
 
     // Verificar suporte a biometria
     const checkBiometric = async () => {
+      biometricService.purgeLegacyPasswords();
       const supported = await biometricService.isPlatformAuthenticatorAvailable();
       setBiometricAvailable(supported);
       if (supported) {
@@ -103,42 +105,17 @@ export const Login: React.FC = () => {
           }
         }
 
-        // 🔐 Biometria: salvar credenciais de forma segura e tentar cadastrar se disponível
-        if (biometricAvailable && result.user.role !== 'ADMIN') {
-          try {
-            // Armazenar credenciais criptografadas para login biométrico futuro
-            if (secureStorageService.isSupported()) {
-              await secureStorageService.setSecure(
-                `bio_auth_${result.user.id}`,
-                JSON.stringify({ email: creds.identifier, password: creds.password }),
-                result.user.id
-              );
-            } else {
-              // Fallback para base64 se Web Crypto não disponível (navegadores antigos)
-              localStorage.setItem(`bio_auth_${result.user.id}`, JSON.stringify({
-                email: creds.identifier,
-                token: btoa(creds.password),
-              }));
-            }
-
-            // Se não tem credencial biométrica, cadastrar agora (silenciosamente)
-            const hasExisting = await biometricService.hasCredential(result.user.id);
-            if (!hasExisting) {
-              const bioResult = await biometricService.register(
-                result.user.id,
-                result.user.email || creds.identifier,
-                result.user.name || 'Usuário'
-              );
-              if (bioResult.success) {
-                setBiometricHasCredential(true);
-                console.log('[Biometric] Credential registered on login');
-              }
-            } else {
-              setBiometricHasCredential(true);
-            }
-          } catch (bioErr) {
-            console.log('[Biometric] Optional registration skipped:', bioErr);
+        // 🔐 Biometria do aparelho: oferecer ativar (cliente, celular com digital/rosto, ainda não ativada aqui)
+        if (!IS_DEMO && biometricAvailable && result.user.role !== 'ADMIN') {
+          const active = await biometricService.isActiveHere(result.user.id).catch(() => false);
+          let skipped = false;
+          try { skipped = localStorage.getItem(`bio_offer_skip_${result.user.id}`) === '1'; } catch { /* ok */ }
+          if (!active && !skipped) {
+            if (!IS_DEMO) locationTrackingService.captureAndSave().catch(() => { });
+            setOfferBio({ user: result.user, go: '/client/dashboard' });
+            return;
           }
+          if (active) sessionStorage.setItem(`biometric_verified_${result.user.id}`, new Date().toISOString());
         }
 
         if (result.user.role === 'ADMIN') {
@@ -178,132 +155,64 @@ export const Login: React.FC = () => {
   };
 
 
-  const handleAdminLogin = async () => {
-    await performLogin({ identifier: 'admin@tubarao.local', password: 'tubarao2026*' });
-  };
-
-  // Simplificado: Se clicar em biometria e não tiver cadastro, crie automaticamente
-  // Esta função agora apenas tenta autenticar, e se falhar por não ter credencial,
-  // o usuário será guiado a fazer login com senha primeiro (que cadastra automaticamente)
+  // Entrar com a biometria do aparelho: o servidor confere a assinatura e devolve a sessão.
   const handleFaceIDLogin = async () => {
     if (!biometricAvailable) {
-      setError('Biometria não disponível neste dispositivo. Configure Face ID ou impressão digital nas configurações.');
+      setError('Este aparelho não tem digital ou rosto configurado. Ative nos ajustes do celular ou entre com a senha.');
       return;
     }
-
     setIsScanning(true);
     setError(null);
-
-    try {
-      if (!IS_DEMO) {
-        await antifraudService.logRiskEvent('BIOMETRIC_CHALLENGE', undefined, {
-          flow: 'LOGIN_BIOMETRIC_BUTTON',
-          stage: 'challenge_started',
-        });
-      }
-
-      const result = await biometricService.authenticate();
-
-      if (!result.success) {
-        if (!IS_DEMO) {
-          await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
-            flow: 'LOGIN_BIOMETRIC_BUTTON',
-            reason: result.error || 'auth_failed',
-          });
-        }
-        setIsScanning(false);
-        
-        // Se erro for "Nenhuma credencial", pedir senha para registrar
-        if (result.error?.includes('Nenhuma') || result.error?.includes('nenhuma') || result.error?.includes('encontrada')) {
-          setBiometricNeedsPassword(true);
-          setBiometricEmail(result.userEmail || '');
-          setError('Faça login com senha para cadastrar sua biometria automaticamente.');
-        } else {
-          setError(result.error || 'Falha na autenticação biométrica.');
-        }
-        return;
-      }
-
-      // Biometria OK! Agora fazer login real com as credenciais armazenadas
-      let email: string;
-      let password: string;
-
-      // Tentar recuperar credenciais criptografadas
-      if (secureStorageService.isSupported()) {
-        const secureData = await secureStorageService.getSecure(`bio_auth_${result.userId}`, result.userId);
-        if (!secureData) {
-          if (!IS_DEMO) {
-            await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
-              flow: 'LOGIN_BIOMETRIC_BUTTON',
-              reason: 'missing_secure_credentials',
-            });
-          }
-          setIsScanning(false);
-          setBiometricNeedsPassword(true);
-          setBiometricEmail(result.userEmail || '');
-          setError('Faça login com senha para cadastrar sua biometria automaticamente.');
-          return;
-        }
-        const parsed = JSON.parse(secureData);
-        email = parsed.email;
-        password = parsed.password;
-      } else {
-        // Fallback para base64 (navegadores antigos)
-        const storedAuth = localStorage.getItem(`bio_auth_${result.userId}`);
-        if (!storedAuth) {
-          if (!IS_DEMO) {
-            await antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, {
-              flow: 'LOGIN_BIOMETRIC_BUTTON',
-              reason: 'missing_local_password_cache',
-            });
-          }
-          setIsScanning(false);
-          setBiometricNeedsPassword(true);
-          setBiometricEmail(result.userEmail || '');
-          setError('Faça login com senha para cadastrar sua biometria automaticamente.');
-          return;
-        }
-        const parsed = JSON.parse(storedAuth);
-        email = parsed.email;
-        password = atob(parsed.token);
-      }
-
-      // Login via API com credenciais recuperadas
-      const loginResult = await apiService.auth.signIn({ identifier: email, password }) as any;
-
-      if (loginResult.user) {
-        if (!IS_DEMO) {
-          await antifraudService.logRiskEvent('LOGIN_SUCCESS', loginResult.user.id, {
-            role: loginResult.user.role,
-            method: 'BIOMETRIC',
-          });
-
-          await antifraudService.logRiskEvent('BIOMETRIC_SUCCESS', loginResult.user.id, {
-            flow: 'LOGIN_BIOMETRIC_BUTTON',
-            source: 'webauthn',
-          });
-        }
-
-        sessionStorage.setItem(`biometric_verified_${loginResult.user.id}`, new Date().toISOString());
-
-        setIsScanning(false);
-        if (loginResult.user.role === 'ADMIN') {
-          navigate('/admin');
-        } else {
-          navigate('/client/dashboard');
-        }
-      } else {
-        setIsScanning(false);
-        setBiometricNeedsPassword(true);
-        setBiometricEmail(email);
-        setError('Sessão expirada. Faça login com senha para recadastrar a biometria.');
-        // Limpar credencial inválida
-        localStorage.removeItem(`bio_auth_${result.userId}`);
-      }
-    } catch (err) {
-      console.error('[Biometric] Login error:', err);
+    const result = await biometricService.login();
+    if (!result.success || !result.user) {
       setIsScanning(false);
-      setError('Erro na autenticação biométrica.');
+      if (!IS_DEMO) antifraudService.logRiskEvent('BIOMETRIC_FAILED', undefined, { flow: 'LOGIN_BIOMETRIC_BUTTON', reason: result.error || 'auth_failed' }).catch(() => { });
+      setBiometricHasCredential(biometricService.hasLocalCredential());
+      setError(result.needsPassword
+        ? 'Biometria ainda não ativada neste aparelho. Entre com email e senha uma vez — depois é só a digital ou o rosto.'
+        : result.error || 'Não foi possível entrar com a biometria. Use a senha.');
+      return;
+    }
+    const user = result.user;
+    if (!IS_DEMO) {
+      antifraudService.logRiskEvent('LOGIN_SUCCESS', user.id, { role: user.role, method: 'BIOMETRIC' }).catch(() => { });
+      if (user.role !== 'ADMIN') {
+        const deviceCheck = await antifraudService.checkDevice();
+        if (!deviceCheck.allowed) {
+          setIsScanning(false);
+          setError(deviceCheck.message || 'Acesso bloqueado por segurança do dispositivo.');
+          apiService.auth.signOut();
+          return;
+        }
+        locationTrackingService.captureAndSave().catch(() => { });
+      }
+    }
+    sessionStorage.setItem(`biometric_verified_${user.id}`, new Date().toISOString());
+    setIsScanning(false);
+    navigate(user.role === 'ADMIN' ? '/admin' : '/client/dashboard');
+  };
+
+  const finishBioOffer = (activated: boolean) => {
+    if (!offerBio) return;
+    const { user, go } = offerBio;
+    if (activated) sessionStorage.setItem(`biometric_verified_${user.id}`, new Date().toISOString());
+    else { try { localStorage.setItem(`bio_offer_skip_${user.id}`, '1'); } catch { /* ok */ } }
+    setOfferBio(null);
+    navigate(go);
+  };
+
+  const activateBio = async () => {
+    if (!offerBio) return;
+    setBioActivating(true);
+    setBioActivateError(null);
+    const r = await biometricService.activate(offerBio.user);
+    setBioActivating(false);
+    if (r.success) {
+      setBiometricHasCredential(true);
+      if (!IS_DEMO) antifraudService.logRiskEvent('BIOMETRIC_REGISTER_SUCCESS', offerBio.user.id, { flow: 'LOGIN_OFFER' }).catch(() => { });
+      finishBioOffer(true);
+    } else {
+      setBioActivateError(r.error || 'Não foi possível ativar agora.');
     }
   };
 
@@ -461,13 +370,25 @@ export const Login: React.FC = () => {
                   ? 'border-[#D4AF37]/50 text-[#D4AF37] hover:border-[#D4AF37] hover:bg-zinc-800/80'
                   : 'border-zinc-700 text-[#D4AF37] hover:border-[#D4AF37]/50 hover:bg-zinc-800/80'
                   }`}
-                title={biometricHasCredential ? 'Entrar com Biometria' : 'Configurar Biometria (requer senha primeiro)'}
+                title="Entrar com biometria" aria-label="Entrar com biometria"
               >
                 <Fingerprint size={24} />
               </button>
             )}
           </div>
         </form>
+
+        {/* Biometria já ativada neste aparelho: entrada principal em um toque */}
+        {biometricAvailable && biometricHasCredential && (
+          <button
+            type="button"
+            onClick={handleFaceIDLogin}
+            className="mt-4 w-full py-4 rounded-xl border border-[#D4AF37]/50 bg-[#D4AF37]/10 text-[#D4AF37] font-bold flex items-center justify-center gap-3 hover:bg-[#D4AF37]/20 active:scale-[0.98] transition-all"
+          >
+            {/iPhone|iPad|Mac/i.test(navigator.userAgent) ? <ScanFace size={24} /> : <Fingerprint size={24} />}
+            Entrar com {/iPhone|iPad/i.test(navigator.userAgent) ? 'Face ID / Touch ID' : 'biometria'}
+          </button>
+        )}
 
         <div className="mt-8 text-center">
           <p className="text-zinc-400 text-base">
@@ -564,99 +485,31 @@ export const Login: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Biometria - Precisa de Senha */}
-      {biometricNeedsPassword && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <ScanFace className="text-[#D4AF37]" size={24} /> Configurar Biometria
-              </h2>
-              <button 
-                onClick={() => {
-                  setBiometricNeedsPassword(false);
-                  setBiometricEmail('');
-                  setError(null);
-                }}
-                className="text-zinc-500 hover:text-white"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="text-center mb-6">
+      {/* Convite: ativar a biometria do aparelho (aparece uma vez, logo depois do login com senha) */}
+      {offerBio && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4 animate-in fade-in">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-md p-6 shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
+            <div className="text-center">
               <div className="w-20 h-20 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center justify-center mx-auto mb-4">
-                <Smartphone size={40} className="text-[#D4AF37]" />
+                {/iPhone|iPad|Mac/i.test(navigator.userAgent) ? <ScanFace size={40} className="text-[#D4AF37]" /> : <Fingerprint size={40} className="text-[#D4AF37]" />}
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Cadastre sua biometria</h3>
-              <p className="text-zinc-400 text-sm mb-4">
-                Faça login com sua senha para registrar Face ID ou impressão digital. 
-                Depois, você poderá entrar apenas com a biometria!
+              <h2 className="text-xl font-bold text-white mb-2">Entrar só com a biometria?</h2>
+              <p className="text-zinc-400 text-sm mb-6">
+                Use a mesma digital ou o rosto que você já usa para desbloquear o celular.
+                Nas próximas vezes é só tocar no ícone — sem digitar senha.
               </p>
             </div>
-
-            <div className="space-y-4">
-              <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
-                  <Mail size={20} />
-                </div>
-                <input
-                  type="email"
-                  autoComplete="email"
-                  placeholder="Email"
-                  value={biometricEmail}
-                  onChange={(e) => setBiometricEmail(e.target.value)}
-                  className="w-full bg-black border border-zinc-700 rounded-xl py-4 pl-12 pr-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
-                />
+            {bioActivateError && (
+              <div className="flex items-center gap-2 text-red-400 text-sm bg-red-900/10 p-3 rounded-lg border border-red-900/50 mb-4">
+                <AlertCircle size={16} className="flex-shrink-0" /> {bioActivateError}
               </div>
-
-              <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
-                  <Lock size={20} />
-                </div>
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="Senha"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full bg-black border border-zinc-700 rounded-xl py-4 pl-12 pr-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
-                />
-              </div>
-
-              <Button
-                onClick={async () => {
-                  if (!biometricEmail || !formData.password) {
-                    setError('Preencha email e senha.');
-                    return;
-                  }
-                  setError(null);
-                  setLoading(true);
-                  await performLogin({ identifier: biometricEmail, password: formData.password });
-                }}
-                isLoading={loading}
-                className="w-full py-4 bg-[#D4AF37] hover:bg-[#FFF176] text-black font-bold"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="animate-spin mr-2" size={20} /> Registrando...
-                  </>
-                ) : (
-                  'Cadastrar e Entrar com Biometria'
-                )}
-              </Button>
-
-              <button
-                onClick={() => {
-                  setBiometricNeedsPassword(false);
-                  setBiometricEmail('');
-                  setError(null);
-                }}
-                className="w-full text-zinc-500 hover:text-white text-sm py-2 transition-colors"
-              >
-                Voltar ao Login Tradicional
-              </button>
-            </div>
+            )}
+            <Button onClick={activateBio} isLoading={bioActivating} className="w-full py-4 bg-[#D4AF37] hover:bg-[#FFF176] text-black font-bold">
+              {bioActivating ? <><Loader2 className="animate-spin mr-2" size={20} /> Aguardando o celular...</> : <><ShieldCheck size={20} className="mr-2" /> Ativar biometria</>}
+            </Button>
+            <button onClick={() => finishBioOffer(false)} className="w-full text-zinc-500 hover:text-white text-sm py-3 mt-1 transition-colors">
+              Agora não
+            </button>
           </div>
         </div>
       )}
