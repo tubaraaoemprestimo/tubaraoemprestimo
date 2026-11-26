@@ -329,6 +329,29 @@ inboxRouter.get('/health', async (_req, res) => {
     res.json({ state, lastWebhookAt: health.lastWebhookAt, lastConnectionEvent: health.lastConnection, lastInboundAt: lastIn?.timestamp || null, lastOutboundAt: lastOut?.timestamp || null, import: imp ? JSON.parse(imp.value) : null, realtimeClients: inboxBus.listenerCount('event') });
 });
 
+/**
+ * Conectar o WhatsApp da empresa (QR Code ou código de 8 caracteres), sempre pelo backend.
+ * Não mexe em instância já conectada. Não grava nem registra o código (permite vincular um aparelho ao número).
+ * ponytail: a Evolution gera código novo a cada renovação do QR (~1 min); se expirar, gera de novo.
+ */
+inboxRouter.post('/connect', async (req, res) => {
+    const number = str(req.body?.number, 20).replace(/\D/g, '');
+    if (number && !/^55\d{10,11}$/.test(number)) { res.status(400).json({ error: 'Informe o número com 55 + DDD, ex.: 5511999999999' }); return; }
+    try {
+        const e = await evo();
+        const cfg = { headers: { apikey: e.key }, timeout: 30000 };
+        const state = (await axios.get(`${e.base}/instance/connectionState/${e.instance}`, cfg)).data?.instance?.state || 'unknown';
+        if (state === 'open') { res.json({ state }); return; }
+        const url = `${e.base}/instance/connect/${e.instance}`;
+        let d = (await axios.get(url, { ...cfg, params: number ? { number } : {} })).data || {};
+        // O código chega logo depois do QR; consulta mais algumas vezes antes de desistir.
+        for (let i = 0; number && !d.pairingCode && i < 6; i++) { await new Promise(r => setTimeout(r, 1500)); d = (await axios.get(url, cfg)).data || {}; }
+        await prisma.auditLog.create({ data: { userId: req.user!.id, userName: req.user!.name, action: number ? 'WHATSAPP_PAIRING_CODE_REQUESTED' : 'WHATSAPP_QR_REQUESTED', entity: 'WHATSAPP', entityId: e.instance, details: `estado=${state}` } }).catch(() => {});
+        if (number && !d.pairingCode) { res.status(409).json({ error: 'A instância já está aguardando QR Code. Aguarde 1 minuto e tente o código de novo.' }); return; }
+        res.json({ state, pairingCode: d.pairingCode || null, qr: d.base64 || null });
+    } catch (err) { handle(res, err); }
+});
+
 inboxRouter.get('/settings', async (_req, res) => { res.json({ settings: await getInboxSettings() }); });
 inboxRouter.put('/settings', async (req, res) => {
     const before = await getInboxSettings(); const after = await saveInboxSettings(req.body);

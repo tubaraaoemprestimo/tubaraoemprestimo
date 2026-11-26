@@ -51,6 +51,8 @@ export const Settings: React.FC = () => {
   // Integration State
   const [waConfig, setWaConfig] = useState<WhatsappConfig>({ apiUrl: '', apiKey: '', instanceName: '', isConnected: false });
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [pairingNumber, setPairingNumber] = useState('');
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [loadingWa, setLoadingWa] = useState(false);
   const [waStatus, setWaStatus] = useState<'open' | 'close' | 'connecting' | 'unknown'>('unknown');
 
@@ -250,6 +252,24 @@ export const Settings: React.FC = () => {
     await whatsappService.updateConfig(waConfig);
     setLoadingWa(false);
     addToast('Configuração salva! Tente conectar agora.', 'success');
+  };
+
+  // Conexão por código (sem QR): o backend pede o código à Evolution; a chave não passa pelo navegador.
+  const handlePairingCode = async () => {
+    const number = pairingNumber.replace(/\D/g, '');
+    if (!/^55\d{10,11}$/.test(number)) { addToast('Informe o número da empresa com 55 + DDD, ex.: 5511999999999', 'warning'); return; }
+    setLoadingWa(true);
+    setPairingCode(null);
+    try {
+      const r = await apiService.post('/inbox/connect', { number });
+      if (r?.state === 'open') { await checkWaStatus(); addToast('WhatsApp já está conectado.', 'success'); return; }
+      setPairingCode(r?.pairingCode || null);
+      if (!r?.pairingCode) addToast('Não foi possível obter o código. Tente novamente.', 'warning');
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao gerar código', 'error');
+    } finally {
+      setLoadingWa(false);
+    }
   };
 
   const handleConnectWa = async () => {
@@ -711,6 +731,28 @@ export const Settings: React.FC = () => {
                   <Button onClick={handleConnectWa} isLoading={loadingWa} className="w-full bg-green-600 hover:bg-green-700 border-none text-white">
                     Conectar / Gerar QR
                   </Button>
+                  <div className="w-full mt-6 pt-6 border-t border-zinc-800">
+                    <label htmlFor="wa-pairing-number" className="text-xs text-zinc-500 uppercase font-bold mb-1 block">Ou conectar com código</label>
+                    <input
+                      id="wa-pairing-number"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="5511999999999 (número da empresa)"
+                      value={pairingNumber}
+                      onChange={e => setPairingNumber(e.target.value)}
+                      className={inputStyle}
+                    />
+                    <Button onClick={handlePairingCode} isLoading={loadingWa} variant="secondary" className="w-full mt-2">
+                      Gerar código
+                    </Button>
+                    {pairingCode && (
+                      <div className="mt-4 text-center" aria-live="polite">
+                        <p className="font-mono text-3xl tracking-[0.3em] text-white select-all">{pairingCode.length === 8 ? `${pairingCode.slice(0, 4)}-${pairingCode.slice(4)}` : pairingCode}</p>
+                        <p className="text-xs text-zinc-500 mt-2">No celular da empresa: WhatsApp &gt; Dispositivos conectados &gt; Conectar dispositivo &gt; <strong>Conectar com número de telefone</strong> e digite o código. Vale por cerca de 1 minuto.</p>
+                        <Button onClick={checkWaStatus} variant="secondary" className="w-full mt-3">Já digitei o código</Button>
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : (
                 <div className="flex flex-col items-center animate-in fade-in">

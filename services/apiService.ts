@@ -119,6 +119,11 @@ export const apiService = {
         if (error) throw new Error(error.error || 'Erro na requisição');
         return data;
     },
+    async post(endpoint: string, body: any) {
+        const { data, error } = await api.post(endpoint, body);
+        if (error) throw new Error(error.error || 'Erro na requisição');
+        return data;
+    },
 
     // ============= SYSTEM =============
 
