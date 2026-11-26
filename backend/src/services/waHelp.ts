@@ -58,5 +58,7 @@ export async function requestAttendant(phone: string, topic: string, detail: str
     await db.notification.create({ data: { title: `👤 Atendimento pedido: ${t}`, message: `${who.name || 'Cliente'} (WhatsApp ***${phone.slice(-4)})${d ? `: ${d}` : ''}`, type: 'WARNING' } }).catch(() => {});
     await db.auditLog.create({ data: { userId: who.userId || 'system', userName: who.name || 'WhatsApp', action: 'WA_BOT_HUMAN_REQUESTED', entity: 'WA_BOT', entityId: phone.slice(-4), details: `${t}${d ? ` — ${d}` : ''}` } }).catch(() => {});
     try { const { sendPushToRole } = await import('../routes/push'); await sendPushToRole('ADMIN', `👤 Atendente: ${t}`, `${who.name || 'Cliente'} pediu atendimento pelo WhatsApp`); } catch { /* push não bloqueia */ }
+    // Fila humana da Central (o atendente vê e responde pelo painel).
+    try { const { queueHuman } = await import('./waBotInbox'); await queueHuman(phone, t, db); } catch { /* central indisponível não bloqueia */ }
     return inBusinessHours(now);
 }

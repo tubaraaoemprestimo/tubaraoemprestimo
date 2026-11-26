@@ -293,14 +293,14 @@ async function loansStep(ev: BotEvent, ctx: Ctx, s: Session, db: any) {
     return myLoans(ctx, s, db);
 }
 
-async function myRequests(ctx: Ctx, s: Session, db: any) {
+async function myRequests(ctx: Ctx, s: Session, db: any, thenMenu = true) {
     const rows = await db.loanRequest.findMany({ where: { userId: s.userId }, orderBy: { createdAt: 'desc' }, take: 5, select: { profileType: true, status: true, amount: true, createdAt: true } });
     const label: Record<string, string> = { PENDING: '⏳ Em análise', WAITING_DOCS: '📎 Aguardando documentos', PENDING_ACCEPTANCE: '✍️ Aguardando seu aceite', APPROVED: '✅ Aprovada', REJECTED: '❌ Não aprovada', CANCELLED: 'Cancelada' };
     const text = rows.length
         ? rows.map((r: any) => `• ${PROFILE_LABEL[r.profileType as Profile] || r.profileType} — ${label[r.status] || r.status} (${new Date(r.createdAt).toLocaleDateString('pt-BR')})`).join('\n')
         : 'Você ainda não tem solicitações.';
     await ctx.send({ text: `📋 *Suas solicitações*\n\n${text}\n\nDetalhes e contratos: https://www.tubaraoemprestimo.com.br` });
-    await menu(ctx, s, false);
+    if (thenMenu) await menu(ctx, s, false);
 }
 
 async function submit(ctx: Ctx, s: Session, db: any) {
@@ -346,8 +346,42 @@ async function helpStep(ev: BotEvent, ctx: Ctx, s: Session, db: any) {
 
     // Atendente: assunto → descrição curta → fila
     if (s.step === 'HUMAN_TOPIC') {
+        if (id === 'help:menu') { delete s.data.deflected; return menu(ctx, s, false); }
         if (!id.startsWith('hum:')) return humanStart(ctx, s);
-        s.data.topic = id.slice(4); s.step = 'HUMAN_DETAIL';
+        const topic = id.slice(4);
+        // Primeiro resolve pelo bot (a maioria dos pedidos de atendente é uma destas perguntas).
+        // Só vai para a pessoa se o cliente disser que não resolveu ("Ainda preciso de atendente").
+        if (!s.data.deflected) {
+            s.data.deflected = topic;
+            const still: Button = { id: `hum:${topic}`, title: '👤 Ainda preciso de atendente' };
+            const solved = async () => ask(ctx, s, 'Isso resolveu?', [{ id: 'help:menu', title: '✅ Sim, resolveu' }, still]);
+            switch (topic) {
+                case 'Solicitação':
+                    if (!s.verified) break;
+                    await myRequests(ctx, s, db, false); s.step = 'HUMAN_TOPIC'; s.data.deflected = topic; return solved();
+                case 'Dívida': case 'Quitação':
+                    if (!s.verified) break;
+                    await myLoans(ctx, s, db); s.data.deflected = topic; s.data.deflectStep = 'LOANS';
+                    return ask(ctx, s, 'Os botões acima mostram o valor e geram o link para pagar ou quitar. Se ainda precisar:', [still]);
+                case 'Pagamento':
+                    s.step = 'HELP'; s.data.deflected = topic;
+                    return ask(ctx, s, '💸 Para pagamento você pode:', [{ id: 'svc:LOANS', title: '🔗 Link para pagar' }, { id: 'pay:receipt', title: '📎 Enviar comprovante' }, still]);
+                case 'App':
+                    await ctx.send({ text: APP_TEXT }); return solved();
+                case 'Renegociação': {
+                    const key = await pixKey(db).catch(() => null);
+                    await ctx.send({ text: `🤝 *Atraso ou renegociação*\n\n• Pagando *só os juros* o contrato fica em dia e o valor principal passa para o próximo mês.\n• Com atraso, juros e multa aumentam a cada dia — pagar logo sai mais barato.\n• Toque em *Quanto devo?* para ver o valor exato de hoje e gerar o link.${key ? `\n\nChave Pix: ${key}` : ''}` });
+                    return ask(ctx, s, 'Quer ver o valor agora?', [{ id: 'svc:DEBT', title: '🧮 Quanto devo?' }, still]);
+                }
+                case 'Cobrança indevida':
+                    s.step = 'HUMAN_DETAIL'; s.data.topic = topic; delete s.data.deflected;
+                    return ask(ctx, s, '⚖️ Conte o que aconteceu: qual cobrança, data e valor. Isso vai direto para a equipe.', [{ id: 'hum:send', title: '➡️ Enviar assim' }]);
+            }
+            // Sem identificação ou "Outro": segue para a pessoa.
+            delete s.data.deflected;
+        }
+        delete s.data.deflected;
+        s.data.topic = topic; s.step = 'HUMAN_DETAIL';
         return ask(ctx, s, `Assunto: *${s.data.topic}*.\nEscreva em uma mensagem o que você precisa (ou toque em *Enviar assim*).`, [{ id: 'hum:send', title: '➡️ Enviar assim' }]);
     }
     if (s.step === 'HUMAN_DETAIL') {
@@ -408,7 +442,7 @@ async function helpStep(ev: BotEvent, ctx: Ctx, s: Session, db: any) {
         }
         case 'pay:receipt': return receiptPick(ctx, s, db);
     }
-    if (id.startsWith('hum:')) { s.step = 'HUMAN_TOPIC'; return helpStep(ev, ctx, s, db); }
+    if (id.startsWith('hum:')) { const again = s.data.deflected === id.slice(4); s.step = 'HUMAN_TOPIC'; if (!again) delete s.data.deflected; return helpStep(ev, ctx, s, db); }
     if (/^rcl:\d$/.test(id)) {
         const inst = s.data.insts?.[Number(id.slice(4))];
         if (!inst) return receiptPick(ctx, s, db);
@@ -452,6 +486,8 @@ export async function handleBotMessage(ev: BotEvent, ctx: Ctx) {
         const helpId = ev.kind === 'action' ? ev.id : '';
         if (helpId === 'help:topics') { await helpMenu(ctx, s); return; }
         if (helpId === 'req:new' && !s.step.startsWith('ID_')) { await newRequestMenu(ctx, s); return; }
+        // Botão de serviço oferecido pelo atendimento (ex.: "Quanto devo?" na tela de renegociação): segue o serviço.
+        if (s.step === 'HUMAN_TOPIC' && (helpId.startsWith('svc:') || helpId === 'pay:receipt')) { delete s.data.deflected; s.step = 'MENU'; }
         // Assuntos que não precisam de identificação
         if (['help:human', 'help:info', 'help:app', 'help:contract', 'help:dispute', 'help:menu', 'help:payment', 'help:debt', 'help:request', 'pay:key'].includes(helpId) || /^hum:/.test(helpId) || s.step.startsWith('HUMAN_')) return await helpStep(ev, ctx, s, db);
         // Assuntos que mexem em dados do cliente: pedem identificação (mesmo caminho dos serviços)

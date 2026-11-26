@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, Send, Paperclip, Mic, Square, X, ChevronLeft, User, Bot, UserCheck, ArrowRightLeft, CheckCheck, Check, Clock, AlertTriangle, Archive, RotateCcw, PanelRightOpen, PanelRightClose, Zap, Smile, RefreshCw, Wifi, WifiOff, FileText, Play, Download, Link2, Reply } from 'lucide-react';
+import { Search, Send, Paperclip, Mic, Square, X, ChevronLeft, User, Bot, UserCheck, ArrowRightLeft, CheckCheck, Check, Clock, AlertTriangle, Archive, RotateCcw, PanelRightOpen, PanelRightClose, Zap, Smile, RefreshCw, Wifi, WifiOff, FileText, Play, Download, Link2, Reply, Tag, MousePointerClick } from 'lucide-react';
 import { api } from '../../services/apiClient';
 import { connectInbox } from '../../services/inboxRealtime';
 import { getApiBaseUrl } from '../../services/runtimeConfig';
 
 // Central WhatsApp em tempo real: lista · conversa · ficha (3 colunas no desktop, 3 telas no celular).
 
-type Conv = { id: string; remoteJid: string; phone: string | null; name: string | null; profilePicUrl: string | null; mode: string; assignedTo: string | null; operatorName: string | null; unreadCount: number; lastMessageAt: string | null; lastMessagePreview: string | null; lastMessageFromMe: boolean | null; archived: boolean; version: number; customer: null | { id: string; name: string; isLegacy: boolean; hasAccount: boolean; confirmed: boolean }; phoneMatches?: number };
+type Conv = { id: string; remoteJid: string; phone: string | null; name: string | null; profilePicUrl: string | null; mode: string; assignedTo: string | null; operatorName: string | null; unreadCount: number; lastMessageAt: string | null; lastMessagePreview: string | null; lastMessageFromMe: boolean | null; archived: boolean; version: number; customer: null | { id: string; name: string; isLegacy: boolean; hasAccount: boolean; confirmed: boolean }; phoneMatches?: number; line?: 'main' | 'buttons'; botAi?: boolean; tags?: TagT[] };
+type TagT = { id: string; name: string; color: string; count?: number };
 type Msg = { id: string; conversationId: string; externalId: string; fromMe: boolean; origin: string; senderName?: string | null; type: string; text: string | null; mediaMime: string | null; mediaName: string | null; quotedExternalId: string | null; status: string; error: string | null; timestamp: string; imported: boolean };
 
 const MODE: Record<string, { label: string; cls: string }> = {
@@ -15,6 +16,8 @@ const MODE: Record<string, { label: string; cls: string }> = {
   HUMAN_ACTIVE: { label: 'Humano atendendo', cls: 'bg-green-900/60 text-green-200' },
   CLOSED: { label: 'Finalizada', cls: 'bg-zinc-800 text-zinc-400' },
 };
+const modeOf = (c: { mode: string; line?: string; botAi?: boolean }) => (c.line === 'buttons' && c.mode === 'AI_ACTIVE' ? (c.botAi ? { label: 'IA atendendo', cls: MODE.AI_ACTIVE.cls } : { label: 'Bot de botões', cls: 'bg-sky-900/50 text-sky-200' }) : MODE[c.mode]);
+const LINES: [string, string][] = [['', 'Todos os números'], ['main', '📱 Principal'], ['buttons', '🤖 Botões']];
 const ORIGIN: Record<string, string> = { CLIENTE: 'Cliente', IA: 'IA', HUMANO: 'Atendente', AUTOMACAO: 'Automação', DISPOSITIVO_EXTERNO: 'Celular da empresa', ORIGEM_DESCONHECIDA: 'Origem não identificada' };
 const FILTERS: [string, string][] = [['all', 'Todas'], ['unread', 'Não lidas'], ['waiting', 'Aguardando'], ['ai', 'IA'], ['human', 'Humano'], ['mine', 'Meus'], ['unassigned', 'Sem responsável'], ['closed', 'Finalizadas'], ['archived', 'Arquivadas']];
 const EMOJIS = ['😀', '😊', '😉', '🙏', '👍', '👏', '🙌', '✅', '❤️', '🎉', '🤝', '📄', '💰', '📅', '⏰', '😅', '🙂', '😃'];
@@ -35,6 +38,9 @@ function StatusIcon({ s }: { s: string }) {
 
 export function WhatsAppInbox() {
   const [filter, setFilter] = useState('all');
+  const [line, setLine] = useState('');
+  const [tag, setTag] = useState('');
+  const [tags, setTags] = useState<TagT[]>([]);
   const [q, setQ] = useState('');
   const [convs, setConvs] = useState<Conv[]>([]);
   const [nextBefore, setNextBefore] = useState<string | null>(null);
@@ -52,17 +58,19 @@ export function WhatsAppInbox() {
   const myId = useMemo(me, []);
 
   const loadConvs = useCallback(async (append = false) => {
-    const { data } = await api.get<any>(`/inbox/conversations?filter=${filter}${q ? `&q=${encodeURIComponent(q)}` : ''}${append && nextBefore ? `&before=${encodeURIComponent(nextBefore)}` : ''}`);
+    const { data } = await api.get<any>(`/inbox/conversations?filter=${filter}${line ? `&line=${line}` : ''}${tag ? `&tag=${tag}` : ''}${q ? `&q=${encodeURIComponent(q)}` : ''}${append && nextBefore ? `&before=${encodeURIComponent(nextBefore)}` : ''}`);
     if (!data) return;
     setConvs(prev => append ? [...prev, ...data.items.filter((i: Conv) => !prev.some(p => p.id === i.id))] : data.items);
     setNextBefore(data.nextBefore);
-  }, [filter, q, nextBefore]);
+  }, [filter, line, tag, q, nextBefore]);
   const loadMeta = useCallback(async () => {
     const [h, d] = await Promise.all([api.get<any>('/inbox/health'), api.get<any>('/inbox/dashboard')]);
     if (h.data) setHealth(h.data); if (d.data) setDash(d.data);
   }, []);
 
-  useEffect(() => { const t = setTimeout(() => loadConvs(false), q ? 300 : 0); return () => clearTimeout(t); }, [filter, q]);
+  useEffect(() => { const t = setTimeout(() => loadConvs(false), q ? 300 : 0); return () => clearTimeout(t); }, [filter, line, tag, q]);
+  const loadTags = useCallback(async () => { const { data } = await api.get<any>('/inbox/tags'); if (data) setTags(data.items); }, []);
+  useEffect(() => { loadTags(); }, [loadTags]);
   useEffect(() => { loadMeta(); const t = setInterval(loadMeta, 60000); return () => clearInterval(t); }, [loadMeta]);
 
   const upsertConv = (c: Conv) => setConvs(prev => {
@@ -137,6 +145,10 @@ export function WhatsAppInbox() {
           <div className="space-y-2 border-b border-zinc-800 p-2">
             <div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
               <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar nome, telefone ou mensagem" aria-label="Buscar conversas" className="w-full min-h-[44px] rounded-lg border border-zinc-700 bg-black pl-9 pr-3 text-base outline-none focus:border-[#D4AF37]" /></div>
+            <div className="flex gap-2">
+              <select aria-label="Número" value={line} onChange={e => setLine(e.target.value)} className="min-h-[36px] flex-1 rounded-lg border border-zinc-700 bg-black px-2 text-sm">{LINES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+              <select aria-label="Etiqueta" value={tag} onChange={e => setTag(e.target.value)} className="min-h-[36px] flex-1 rounded-lg border border-zinc-700 bg-black px-2 text-sm"><option value="">Todas as etiquetas</option>{tags.map(t => <option key={t.id} value={t.id}>{t.name} ({t.count || 0})</option>)}</select>
+            </div>
             <div className="flex gap-1 overflow-x-auto pb-1" role="tablist">
               {FILTERS.map(([k, l]) => <button key={k} role="tab" aria-selected={filter === k} onClick={() => setFilter(k)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${filter === k ? 'bg-[#D4AF37] text-black' : 'bg-zinc-800 text-zinc-300'}`}>{l}{k === 'waiting' && dash?.waiting ? ` (${dash.waiting})` : ''}{k === 'unread' && dash?.unread ? ` (${dash.unread})` : ''}</button>)}
             </div>
@@ -153,7 +165,9 @@ export function WhatsAppInbox() {
                       {c.unreadCount > 0 && <span className="shrink-0 rounded-full bg-green-600 px-2 text-xs font-bold" aria-label={`${c.unreadCount} não lidas`}>{c.unreadCount}</span>}
                     </div>
                     <div className="mt-1 flex flex-wrap gap-1 text-[11px]">
-                      <span className={`rounded px-1.5 ${MODE[c.mode]?.cls}`}>{MODE[c.mode]?.label}</span>
+                      {c.line === 'buttons' && <span className="rounded bg-sky-950 px-1.5 text-sky-300">🤖 Botões</span>}
+                      <span className={`rounded px-1.5 ${modeOf(c)?.cls}`}>{modeOf(c)?.label}</span>
+                      {(c.tags || []).map(t => <span key={t.id} className="rounded px-1.5 text-black" style={{ background: t.color }}>{t.name}</span>)}
                       {c.operatorName && <span className="rounded bg-zinc-800 px-1.5 text-zinc-300">{c.operatorName}</span>}
                       {c.customer && <span className="rounded bg-zinc-800 px-1.5 text-[#D4AF37]">{c.customer.isLegacy ? 'Cliente antigo' : 'Cliente'}{c.customer.confirmed ? '' : ' ?'}</span>}
                     </div>
@@ -168,7 +182,7 @@ export function WhatsAppInbox() {
 
         {/* Coluna 2 — conversa */}
         <section className={`${view === 'chat' ? 'flex' : 'hidden'} md:flex min-w-0 flex-1 flex-col min-h-0`} aria-label="Conversa">
-          {sel ? <Chat key={sel.id} conv={sel} msgs={msgs} hasMore={hasMore} onOlder={older} myId={myId} act={act} onBack={() => setView('list')} onInfo={() => { setView('info'); setPanel(true); }} panel={panel} togglePanel={() => setPanel(p => !p)} onSent={upsertMsg} notify={notify} />
+          {sel ? <Chat key={sel.id} conv={sel} allTags={tags} onTagsChanged={loadTags} msgs={msgs} hasMore={hasMore} onOlder={older} myId={myId} act={act} onBack={() => setView('list')} onInfo={() => { setView('info'); setPanel(true); }} panel={panel} togglePanel={() => setPanel(p => !p)} onSent={upsertMsg} notify={notify} />
             : <div className="flex flex-1 items-center justify-center p-6 text-center text-zinc-500">Selecione uma conversa à esquerda.<br />As novas mensagens aparecem aqui sozinhas.</div>}
         </section>
 
@@ -187,13 +201,15 @@ function Avatar({ c }: { c: Conv }) {
     : <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#D4AF37] to-yellow-700 font-bold text-black">{(c.customer?.name || c.name || '?').charAt(0).toUpperCase()}</div>;
 }
 
-function Chat({ conv, msgs, hasMore, onOlder, myId, act, onBack, onInfo, panel, togglePanel, onSent, notify }: { conv: Conv; msgs: Msg[]; hasMore: boolean; onOlder: () => void; myId: string; act: (p: string, b?: any) => void; onBack: () => void; onInfo: () => void; panel: boolean; togglePanel: () => void; onSent: (m: Msg, r?: string) => void; notify: (s: string) => void }) {
+function Chat({ conv, allTags, onTagsChanged, msgs, hasMore, onOlder, myId, act, onBack, onInfo, panel, togglePanel, onSent, notify }: { conv: Conv; allTags: TagT[]; onTagsChanged: () => void; msgs: Msg[]; hasMore: boolean; onOlder: () => void; myId: string; act: (p: string, b?: any) => void; onBack: () => void; onInfo: () => void; panel: boolean; togglePanel: () => void; onSent: (m: Msg, r?: string) => void; notify: (s: string) => void }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [quote, setQuote] = useState<Msg | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [quick, setQuick] = useState<any[] | null>(null);
   const [transfer, setTransfer] = useState<any[] | null>(null);
+  const [tagMenu, setTagMenu] = useState(false);
+  const [newTag, setNewTag] = useState('');
   const [rec, setRec] = useState<{ mr: MediaRecorder; chunks: Blob[]; start: number } | null>(null);
   const [audio, setAudio] = useState<{ blob: Blob; url: string; mime: string } | null>(null);
   const bottom = useRef<HTMLDivElement>(null); const fileRef = useRef<HTMLInputElement>(null);
@@ -251,7 +267,7 @@ function Chat({ conv, msgs, hasMore, onOlder, myId, act, onBack, onInfo, panel, 
         <button onClick={onInfo} className="flex min-w-0 flex-1 items-center gap-2 text-left lg:pointer-events-none">
           <Avatar c={conv} />
           <span className="min-w-0"><span className="block truncate font-semibold">{conv.customer?.name || conv.name || fmtPhone(conv.phone) || 'Contato'}</span>
-            <span className="block truncate text-xs text-zinc-400">{fmtPhone(conv.phone) || 'Identificador privado do WhatsApp'} · <span className={`rounded px-1 ${MODE[conv.mode]?.cls}`}>{MODE[conv.mode]?.label}</span>{conv.operatorName ? ` · ${conv.operatorName}` : ''}</span></span>
+            <span className="block truncate text-xs text-zinc-400">{fmtPhone(conv.phone) || 'Identificador privado do WhatsApp'} · {conv.line === 'buttons' && <span className="rounded bg-sky-950 px-1 text-sky-300">🤖 Botões</span>} <span className={`rounded px-1 ${modeOf(conv)?.cls}`}>{modeOf(conv)?.label}</span>{conv.operatorName ? ` · ${conv.operatorName}` : ''}</span></span>
         </button>
         <button onClick={togglePanel} aria-label={panel ? 'Fechar ficha' : 'Abrir ficha'} className="hidden lg:flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-900">{panel ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}</button>
       </header>
@@ -260,12 +276,27 @@ function Chat({ conv, msgs, hasMore, onOlder, myId, act, onBack, onInfo, panel, 
       <div className="flex gap-2 overflow-x-auto border-b border-zinc-800 px-2 py-2 text-sm">
         {conv.mode !== 'HUMAN_ACTIVE' && conv.mode !== 'CLOSED' && <Btn onClick={() => act('assume')} cls="bg-[#D4AF37] text-black"><UserCheck size={16} /> Assumir atendimento</Btn>}
         {other && <span className="shrink-0 self-center rounded bg-amber-900/50 px-2 py-1 text-amber-200">Em atendimento por {conv.operatorName}</span>}
-        {conv.mode === 'HUMAN_ACTIVE' && <Btn onClick={() => act('return-ai')}><Bot size={16} /> Devolver para IA</Btn>}
+        {conv.mode === 'HUMAN_ACTIVE' && conv.line !== 'buttons' && <Btn onClick={() => act('return-ai')}><Bot size={16} /> Devolver para IA</Btn>}
+        {conv.line === 'buttons' && !(conv.mode === 'AI_ACTIVE' && conv.botAi) && conv.mode !== 'CLOSED' && <Btn onClick={() => act('bot-mode', { mode: 'ai' })}><Bot size={16} /> Passar para IA</Btn>}
+        {conv.line === 'buttons' && !(conv.mode === 'AI_ACTIVE' && !conv.botAi) && conv.mode !== 'CLOSED' && <Btn onClick={() => act('bot-mode', { mode: 'bot' })}><MousePointerClick size={16} /> Voltar para o bot</Btn>}
+        <Btn onClick={() => setTagMenu(v => !v)}><Tag size={16} /> Etiquetas{conv.tags?.length ? ` (${conv.tags.length})` : ''}</Btn>
         {conv.mode === 'HUMAN_ACTIVE' && <Btn onClick={openTransfer}><ArrowRightLeft size={16} /> Transferir</Btn>}
         {conv.mode === 'HUMAN_ACTIVE' && <Btn onClick={() => act('release')}><User size={16} /> Liberar para a fila</Btn>}
         {conv.mode !== 'CLOSED' ? <Btn onClick={() => act('close')}><Archive size={16} /> Finalizar</Btn> : <Btn onClick={() => act('reopen')} cls="bg-[#D4AF37] text-black"><RotateCcw size={16} /> Reabrir</Btn>}
       </div>
 
+      {tagMenu && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 bg-zinc-900/60 px-3 py-2" role="group" aria-label="Etiquetas da conversa">
+          {allTags.map(t => { const on = (conv.tags || []).some(x => x.id === t.id); return (
+            <button key={t.id} aria-pressed={on} onClick={async () => { await act('tags', { tagId: t.id, on: !on }); onTagsChanged(); }}
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${on ? 'text-black' : 'bg-zinc-800 text-zinc-300'}`} style={on ? { background: t.color } : undefined}>{on ? '✓ ' : ''}{t.name}</button>); })}
+          <form onSubmit={async e => { e.preventDefault(); const name = newTag.trim(); if (name.length < 2) return; const { error } = await api.post<any>('/inbox/tags', { name }); if (error) notify(`⚠️ ${errMsg(error)}`); setNewTag(''); onTagsChanged(); }} className="flex gap-1">
+            <input value={newTag} onChange={e => setNewTag(e.target.value)} placeholder="Nova etiqueta" aria-label="Nova etiqueta" maxLength={40} className="w-36 rounded-lg border border-zinc-700 bg-black px-2 py-1 text-xs" />
+            <button type="submit" className="rounded-lg bg-zinc-700 px-2 text-xs">Criar</button>
+          </form>
+        </div>
+      )}
+      {conv.line === 'buttons' && <div className="border-b border-zinc-800 bg-sky-950/40 px-3 py-1.5 text-xs text-sky-200">Número de botões: o envio é só de texto. {conv.mode === 'AI_ACTIVE' ? (conv.botAi ? 'A IA está respondendo esta conversa.' : 'O bot de botões está respondendo (sem IA).') : 'Bot e IA pausados enquanto o atendente responde.'}</div>}
       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_top,#18181b,#09090b)] px-3 py-3" aria-live="polite">
         {hasMore && <button onClick={onOlder} className="mx-auto mb-2 block rounded-full bg-zinc-800 px-4 py-1.5 text-xs text-zinc-300">Mensagens anteriores</button>}
         {msgs.map(m => {

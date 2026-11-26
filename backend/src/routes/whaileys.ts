@@ -3,6 +3,7 @@ import { prisma } from '../services/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { parseIncoming, verifySignature, whaileysConnect, whaileysEnabled, whaileysLogout, whaileysStatus } from '../services/whaileys';
 import { botSender, handleBotMessage, viaCep, signInfo, signSubmit, SignError } from '../services/waBot';
+import { recordInbound, inboxSender, aiEnabledFor, aiAnswer } from '../services/waBotInbox';
 
 /**
  * WhatsApp por botões (Whaileys): número separado da Evolution, sem IA.
@@ -29,8 +30,19 @@ whaileysWebhookRouter.post('/', express.raw({ type: '*/*', limit: '45mb' }), asy
     const ev = parseIncoming(body.message, Array.isArray(session?.options) ? (session!.options as any) : []);
     if (ev.kind === 'ignored') return;
     const media = body.media?.data && body.media?.mimetype ? { mimetype: String(body.media.mimetype), data: String(body.media.data) } : undefined;
-    handleBotMessage(ev, { phone, messageId: id, media, send: botSender(phone), cep: viaCep })
-        .catch((e: any) => console.error('[WaBot] erro ao processar:', e?.message));
+    (async () => {
+        // Admin pelo WhatsApp não entra na Central (é o painel dele).
+        const isAdmin = await prisma.waAdminPhone.findUnique({ where: { phone }, select: { active: true } }).catch(() => null);
+        if (isAdmin?.active) return handleBotMessage(ev, { phone, messageId: id, media, send: botSender(phone), cep: viaCep });
+        const conv = await recordInbound(phone, id, ev, typeof body.pushName === 'string' ? body.pushName.slice(0, 120) : null).catch((e: any) => { console.error('[WaBot] central:', e?.message); return null; });
+        // Atendente na conversa: bot e IA ficam quietos (a pessoa responde pela Central).
+        if (conv && (conv.mode === 'HUMAN_ACTIVE' || conv.mode === 'WAITING_HUMAN')) return;
+        // IA só quando o atendente passou a conversa para ela.
+        if (conv && conv.mode === 'AI_ACTIVE' && ev.kind === 'text' && await aiEnabledFor(conv.id)) {
+            if (await aiAnswer(conv.id, phone, ev.text)) return;
+        }
+        return handleBotMessage(ev, { phone, messageId: id, media, send: inboxSender(phone, 'AUTOMACAO'), cep: viaCep });
+    })().catch((e: any) => console.error('[WaBot] erro ao processar:', e?.message));
     // Limpeza da deduplicação (> 7 dias), barata e ocasional.
     if (Math.random() < 0.01) prisma.waBotInbound.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 7 * 86400000) } } }).catch(() => {});
 });

@@ -6,6 +6,7 @@ import { authenticate, requireAdmin } from '../middleware/auth';
 import { inboxBus, publish, ingestMessage, normalizeMessage, getInboxSettings, saveInboxSettings, instanceName, health, preview, phoneFromJid, clip } from '../services/inbox';
 import { assume, transfer, release, returnToAI, close, reopen, HandoffConflict } from '../services/inboxHandoff';
 import { whatsappAllowed } from '../services/collectionRules';
+import { whaileysInstanceKey, whaileysEnabled, whaileysSend } from '../services/whaileys';
 
 /**
  * Central WhatsApp (admin). Toda conversa com a Evolution passa por aqui (a chave nunca vai ao navegador).
@@ -17,6 +18,15 @@ inboxRouter.use(authenticate, requireAdmin);
 const MAX_MEDIA = 16 * 1024 * 1024;
 const ALLOWED_MIME = /^(image\/(jpeg|png|webp|gif)|video\/(mp4|3gpp|quicktime)|audio\/(ogg|mpeg|mp4|aac|webm|wav|x-m4a)|application\/(pdf|msword|vnd\.openxmlformats-officedocument\.[a-z.]+|vnd\.ms-excel|zip)|text\/plain)(;.*)?$/i;
 const actor = (req: Request) => ({ id: req.user!.id, name: req.user!.name });
+/** Instâncias que a Central mostra: número principal (Evolution) + número de botões (Whaileys), se ligado. */
+async function instances(): Promise<string[]> { return [await instanceName(), ...(whaileysEnabled() ? [whaileysInstanceKey()] : [])]; }
+/** Filtro opcional ?line=main|buttons. */
+async function lineScope(line: unknown): Promise<string[]> {
+    const all = await instances();
+    if (line === 'main') return [all[0]];
+    if (line === 'buttons') return all.slice(1);
+    return all;
+}
 const str = (v: unknown, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
 async function evo() {
@@ -36,7 +46,7 @@ inboxRouter.param('id', async (req, res, next, id) => {
     try {
         const path = req.path.split('/')[1];
         if (path !== 'messages' && path !== 'conversations') return next();
-        const scope = { id, instance: await instanceName() };
+        const scope = { id, instance: { in: await instances() } };
         const exists = path === 'messages' ? await prisma.waMessage.count({ where: scope }) : await prisma.waConversation.count({ where: scope });
         if (!exists) { res.sendStatus(404); return; }
         next();
@@ -49,7 +59,7 @@ inboxRouter.get('/conversations', async (req, res) => {
     const q = str(req.query.q, 80);
     const take = Math.min(60, Math.max(10, Number(req.query.limit || 40)));
     const cursor = req.query.before ? new Date(String(req.query.before)) : null;
-    const where: any = { instance: await instanceName(), AND: [] as any[] };
+    const where: any = { instance: { in: await lineScope(req.query.line) }, AND: [] as any[] };
     const map: Record<string, any> = {
         all: { archived: false }, unread: { unreadCount: { gt: 0 } }, waiting: { mode: 'WAITING_HUMAN' }, ai: { mode: 'AI_ACTIVE', archived: false },
         human: { mode: 'HUMAN_ACTIVE' }, mine: { mode: 'HUMAN_ACTIVE', assignedTo: req.user!.id }, unassigned: { mode: { in: ['WAITING_HUMAN', 'HUMAN_ACTIVE'] }, assignedTo: null },
@@ -57,10 +67,12 @@ inboxRouter.get('/conversations', async (req, res) => {
     };
     where.AND.push(map[filter] || map.all, { lastMessageAt: { not: null } });
     if (cursor && !Number.isNaN(cursor.getTime())) where.AND.push({ lastMessageAt: { lt: cursor } });
+    const tagFilter = str(req.query.tag, 60);
+    if (tagFilter) where.AND.push({ id: { in: (await prisma.waConversationTag.findMany({ where: { tagId: tagFilter }, select: { conversationId: true }, take: 2000 })).map(t => t.conversationId) } });
     if (q) {
         const digits = q.replace(/\D/g, '');
         // Busca por nome/telefone/última mensagem; conteúdo completo: só conversas com mensagem que contém o termo (limitado).
-        const byContent = q.length >= 3 ? (await prisma.waMessage.findMany({ where: { instance: await instanceName(), text: { contains: q, mode: 'insensitive' } }, select: { conversationId: true }, distinct: ['conversationId'], take: 50, orderBy: { timestamp: 'desc' } })).map(m => m.conversationId) : [];
+        const byContent = q.length >= 3 ? (await prisma.waMessage.findMany({ where: { instance: { in: await instances() }, text: { contains: q, mode: 'insensitive' } }, select: { conversationId: true }, distinct: ['conversationId'], take: 50, orderBy: { timestamp: 'desc' } })).map(m => m.conversationId) : [];
         where.AND.push({ OR: [{ name: { contains: q, mode: 'insensitive' } }, ...(digits.length >= 3 ? [{ phone: { contains: digits } }] : []), { lastMessagePreview: { contains: q, mode: 'insensitive' } }, ...(byContent.length ? [{ id: { in: byContent } }] : [])] });
     }
     const items = await prisma.waConversation.findMany({ where, orderBy: { lastMessageAt: 'desc' }, take });
@@ -71,19 +83,26 @@ inboxRouter.get('/conversations', async (req, res) => {
 async function decorate(items: any[]) {
     const phones = items.map(i => i.phone).filter(Boolean) as string[];
     const ops = [...new Set(items.map(i => i.assignedTo).filter(Boolean))] as string[];
-    const [customers, users] = await Promise.all([
+    const ids = items.map(i => i.id);
+    const [customers, users, tagRows] = await Promise.all([
         phones.length || items.some(i => i.customerId) ? prisma.customer.findMany({
             where: { OR: [{ id: { in: items.map(i => i.customerId).filter(Boolean) as string[] } }, ...phones.flatMap(p => [{ phone: p }, { phone: p.slice(2) }])] },
             select: { id: true, name: true, phone: true, isLegacy: true, userId: true },
         }) : [],
         ops.length ? prisma.user.findMany({ where: { id: { in: ops } }, select: { id: true, name: true } }) : [],
+        ids.length ? prisma.waConversationTag.findMany({ where: { conversationId: { in: ids } } }) : [],
     ]);
+    const tagDefs = tagRows.length ? await prisma.waTag.findMany({ where: { id: { in: [...new Set(tagRows.map(t => t.tagId))] } } }) : [];
+    const wkey = whaileysInstanceKey();
+    const aiOn = new Set((ids.length ? await prisma.systemSetting.findMany({ where: { key: { in: ids.map(id => `wa_bot_ai:${id}`) } }, select: { key: true, value: true } }) : []).filter(r => r.value === 'on').map(r => r.key.slice(10)));
     const digits = (s: string) => { let d = s.replace(/\D/g, ''); if (d.length === 10 || d.length === 11) d = '55' + d; return d; };
     return items.map(i => {
         const linked = i.customerId ? customers.find(c => c.id === i.customerId) : null;
         const byPhone = !linked && i.phone ? customers.filter(c => digits(c.phone || '') === i.phone) : [];
         return {
             ...i, operatorName: users.find(u => u.id === i.assignedTo)?.name || null,
+            line: i.instance === wkey ? 'buttons' : 'main', botAi: aiOn.has(i.id),
+            tags: tagRows.filter(t => t.conversationId === i.id).map(t => tagDefs.find(d => d.id === t.tagId)).filter(Boolean).map((d: any) => ({ id: d.id, name: d.name, color: d.color })),
             customer: linked ? { id: linked.id, name: linked.name, isLegacy: linked.isLegacy, hasAccount: !!linked.userId, confirmed: true }
                 : byPhone.length === 1 ? { id: byPhone[0].id, name: byPhone[0].name, isLegacy: byPhone[0].isLegacy, hasAccount: !!byPhone[0].userId, confirmed: false } : null,
             phoneMatches: byPhone.length,
@@ -126,7 +145,7 @@ inboxRouter.post('/conversations/:id/read', async (req, res) => {
 inboxRouter.post('/conversations/:id/send', async (req, res) => {
     const clientRequestId = str(req.body?.clientRequestId, 80);
     if (!clientRequestId) { res.status(400).json({ error: 'clientRequestId obrigatório' }); return; }
-    const dup = await prisma.waMessage.findFirst({ where: { instance: await instanceName(), clientRequestId, conversationId: String(req.params.id), senderUserId: req.user!.id } });
+    const dup = await prisma.waMessage.findFirst({ where: { instance: { in: await instances() }, clientRequestId, conversationId: String(req.params.id), senderUserId: req.user!.id } });
     if (dup) { res.json({ message: dup, duplicate: true }); return; }
     const conv = await prisma.waConversation.findUnique({ where: { id: String(req.params.id) } });
     if (!conv) { res.status(404).json({ error: 'Conversa não encontrada' }); return; }
@@ -154,6 +173,20 @@ inboxRouter.post('/conversations/:id/send', async (req, res) => {
             status: 'PENDING', statusRank: 1, clientRequestId, timestamp: new Date() },
     });
     publish('message.created', { conversationId: conv.id, message: pending });
+    if (conv.instance === whaileysInstanceKey()) {
+        if (media) { await fail(pending.id, conv.id, 'O número de botões envia só texto.'); res.status(400).json({ error: 'O número de botões envia só texto. Para enviar arquivo, use o número principal.' }); return; }
+        try {
+            const r = await whaileysSend(conv.phone || conv.remoteJid, { text });
+            const sent = await prisma.waMessage.update({ where: { id: pending.id }, data: { status: 'SENT', statusRank: 2, externalId: String(r.messageId) } });
+            // Atendente respondeu: a sessão do bot deixa de mostrar "aguardando atendente".
+            await prisma.waBotSession.updateMany({ where: { phone: conv.phone || '', step: 'HUMAN_WAIT' }, data: { step: 'HUMAN_CHAT' } });
+            await prisma.waConversation.update({ where: { id: conv.id }, data: { lastMessageAt: sent.timestamp, lastMessagePreview: preview(sent), lastMessageFromMe: true } });
+            publish('message.updated', { conversationId: conv.id, message: sent });
+            await prisma.auditLog.create({ data: { userId: req.user!.id, userName: req.user!.name, action: 'WA_MESSAGE_SENT', entity: 'WA_CONVERSATION', entityId: conv.id, details: JSON.stringify({ type: 'text', line: 'buttons' }) } }).catch(() => {});
+            res.json({ message: sent });
+        } catch (err: any) { await fail(pending.id, conv.id, err.message); res.status(502).json({ error: err.message }); }
+        return;
+    }
     let e: Awaited<ReturnType<typeof evo>>;
     try { e = await evo(); } catch (err: any) { await fail(pending.id, conv.id, err.message); res.status(503).json({ error: err.message }); return; }
     const number = conv.phone || conv.remoteJid;
@@ -229,6 +262,24 @@ const ver = (req: Request) => (typeof req.body?.version === 'number' ? req.body.
 inboxRouter.post('/conversations/:id/assume', async (req, res) => { try { res.json({ conversation: await assume(String(req.params.id), actor(req), ver(req)) }); } catch (e) { handle(res, e); } });
 inboxRouter.post('/conversations/:id/release', async (req, res) => { try { res.json({ conversation: await release(String(req.params.id), actor(req), ver(req)) }); } catch (e) { handle(res, e); } });
 inboxRouter.post('/conversations/:id/return-ai', async (req, res) => { try { res.json({ conversation: await returnToAI(String(req.params.id), actor(req), ver(req)) }); } catch (e) { handle(res, e); } });
+/**
+ * Número de botões: "Passar para IA" (IA responde nesta conversa) ou "Voltar para o bot" (menu de botões, sem IA).
+ * Número principal continua com o "Devolver para IA" de sempre.
+ */
+inboxRouter.post('/conversations/:id/bot-mode', async (req, res) => {
+    const mode = req.body?.mode === 'ai' ? 'ai' : 'bot';
+    const conv = await prisma.waConversation.findUnique({ where: { id: String(req.params.id) } });
+    if (!conv || conv.instance !== whaileysInstanceKey()) { res.status(400).json({ error: 'Só para conversas do número de botões' }); return; }
+    try {
+        const { setAi } = await import('../services/waBotInbox');
+        await setAi(conv.id, mode === 'ai', actor(req));
+        const updated = conv.mode === 'AI_ACTIVE' ? conv : await returnToAI(conv.id, actor(req), ver(req));
+        // A conversa do cliente sai do "aguardando atendente" no bot.
+        await prisma.waBotSession.updateMany({ where: { phone: conv.phone || '', step: { startsWith: 'HUMAN_' } }, data: { step: 'MENU', data: {} } });
+        const [d] = await decorate([updated]);
+        res.json({ conversation: { ...d, botAi: mode === 'ai' } });
+    } catch (e) { handle(res, e); }
+});
 inboxRouter.post('/conversations/:id/close', async (req, res) => { try { res.json({ conversation: await close(String(req.params.id), actor(req), ver(req), req.body?.archive !== false) }); } catch (e) { handle(res, e); } });
 inboxRouter.post('/conversations/:id/reopen', async (req, res) => { try { res.json({ conversation: await reopen(String(req.params.id), actor(req), ver(req)) }); } catch (e) { handle(res, e); } });
 inboxRouter.post('/conversations/:id/transfer', async (req, res) => { try { res.json({ conversation: await transfer(String(req.params.id), actor(req), str(req.body?.toUserId, 60), ver(req)) }); } catch (e) { handle(res, e); } });
@@ -277,7 +328,7 @@ inboxRouter.get('/stream', (req, res) => {
 inboxRouter.get('/changes', async (req, res) => {
     const since = new Date(String(req.query.since || 0));
     const from = Number.isNaN(since.getTime()) ? new Date(Date.now() - 5 * 60000) : since;
-    const instance = await instanceName();
+    const instance = { in: await instances() };
     const upper = new Date();
     const [convs, msgs] = await Promise.all([
         prisma.waConversation.findMany({ where: { instance, updatedAt: { gt: from, lte: upper } }, orderBy: { updatedAt: 'asc' }, take: 200 }),
@@ -350,6 +401,38 @@ inboxRouter.post('/connect', async (req, res) => {
         if (number && !d.pairingCode) { res.status(409).json({ error: 'A instância já está aguardando QR Code. Aguarde 1 minuto e tente o código de novo.' }); return; }
         res.json({ state, pairingCode: d.pairingCode || null, qr: d.base64 || null });
     } catch (err) { handle(res, err); }
+});
+
+// ───────── Etiquetas (classificação de clientes e leads) ─────────
+const COLOR = /^#[0-9a-f]{6}$/i;
+inboxRouter.get('/tags', async (_req, res) => {
+    const [tags, counts] = await Promise.all([prisma.waTag.findMany({ orderBy: { name: 'asc' } }), prisma.waConversationTag.groupBy({ by: ['tagId'], _count: true })]);
+    res.json({ items: tags.map(t => ({ ...t, count: counts.find(c => c.tagId === t.id)?._count || 0 })) });
+});
+inboxRouter.post('/tags', async (req, res) => {
+    const name = str(req.body?.name, 40);
+    if (name.length < 2) { res.status(400).json({ error: 'Nome da etiqueta muito curto' }); return; }
+    const color = COLOR.test(String(req.body?.color || '')) ? String(req.body.color) : '#D4AF37';
+    try { res.json({ tag: await prisma.waTag.create({ data: { name, color } }) }); }
+    catch { res.status(409).json({ error: 'Já existe uma etiqueta com esse nome' }); }
+});
+inboxRouter.delete('/tags/:tagId', async (req, res) => {
+    const id = String(req.params.tagId);
+    await prisma.waConversationTag.deleteMany({ where: { tagId: id } });
+    await prisma.waTag.delete({ where: { id } }).catch(() => null);
+    await prisma.auditLog.create({ data: { userId: req.user!.id, userName: req.user!.name, action: 'WA_TAG_DELETED', entity: 'WA_TAG', entityId: id, details: '' } }).catch(() => {});
+    res.json({ ok: true });
+});
+inboxRouter.post('/conversations/:id/tags', async (req, res) => {
+    const tagId = str(req.body?.tagId, 60), on = req.body?.on !== false;
+    if (!tagId || !(await prisma.waTag.count({ where: { id: tagId } }))) { res.status(404).json({ error: 'Etiqueta não encontrada' }); return; }
+    const conversationId = String(req.params.id);
+    if (on) await prisma.waConversationTag.upsert({ where: { conversationId_tagId: { conversationId, tagId } }, update: {}, create: { conversationId, tagId, createdBy: req.user!.id } });
+    else await prisma.waConversationTag.deleteMany({ where: { conversationId, tagId } });
+    const conv = await prisma.waConversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
+    const [d] = await decorate([conv]);
+    publish('conversation.updated', { conversation: d });
+    res.json({ conversation: d });
 });
 
 inboxRouter.get('/settings', async (_req, res) => { res.json({ settings: await getInboxSettings() }); });

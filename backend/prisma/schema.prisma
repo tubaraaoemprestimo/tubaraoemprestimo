@@ -1946,3 +1946,24 @@ model WaAdminPhone {
   @@index([userId])
   @@map("wa_admin_phones")
 }
+
+/// Etiquetas de classificação das conversas da Central (ex.: Interessado, Documentação pendente).
+model WaTag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("#D4AF37")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("wa_tags")
+}
+
+model WaConversationTag {
+  conversationId String   @map("conversation_id")
+  tagId          String   @map("tag_id")
+  createdBy      String?  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@id([conversationId, tagId])
+  @@index([tagId])
+  @@map("wa_conversation_tags")
+}

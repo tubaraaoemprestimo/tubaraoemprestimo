@@ -19,6 +19,8 @@ function call<T>(method: 'get' | 'post' | 'delete', path: string, data?: unknown
         .catch(e => { throw new Error(e?.response?.data?.error || `Whaileys indisponível (${e?.response?.status || e?.code || 'rede'})`); });
 }
 const inst = () => encodeURIComponent(process.env.WHAILEYS_INSTANCE!);
+/** Nome da "instância" das conversas do número de botões na Central (separa do número principal). */
+export const whaileysInstanceKey = () => `whaileys:${process.env.WHAILEYS_INSTANCE || 'botoes'}`;
 export const whaileysStatus = () => call<WhaileysStatus>('get', `/sessions/${inst()}`);
 export const whaileysConnect = (phone?: string) => call<WhaileysStatus>('post', `/sessions/${inst()}/connect`, phone ? { phone } : {});
 export const whaileysLogout = () => call<{ ok: boolean }>('delete', `/sessions/${inst()}`);
