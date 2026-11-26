@@ -6,8 +6,8 @@
 |---|---|
 | Backend `tsc -p tsconfig.json` | OK, 0 erros |
 | `prisma validate` / `generate` | OK |
-| `inbox.test.ts` (17 testes novos) | **17/17** |
-| Suíte backend completa | **175 aprovados / 5 falhas preexistentes** |
+| `inbox.test.ts` (18 testes novos) | **18/18** |
+| Suíte backend completa | **176 aprovados / 5 falhas preexistentes** |
 | Frontend `vite build` | OK |
 | Migração em PostgreSQL 15 isolado (2×) | OK, 3 tabelas, idempotente |
 
