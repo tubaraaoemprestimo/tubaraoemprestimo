@@ -124,6 +124,11 @@ export const apiService = {
         if (error) throw new Error(error.error || 'Erro na requisição');
         return data;
     },
+    async delete(endpoint: string) {
+        const { data, error } = await api.delete(endpoint);
+        if (error) throw new Error(error.error || 'Erro na requisição');
+        return data;
+    },
 
     // ============= SYSTEM =============
 

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { authenticate, requireAdmin } from '../middleware/auth';
 import { PrismaClient } from '@prisma/client';
 
 const router = Router();
@@ -72,7 +73,7 @@ router.post('/', async (req, res) => {
 });
 
 // GET /api/qualification-leads - Listar leads com filtros
-router.get('/', async (req, res) => {
+router.get('/', authenticate, requireAdmin, async (req, res) => {
   try {
     const { status, tags, search } = req.query;
 
@@ -110,9 +111,9 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/qualification-leads/:id - Buscar lead específico
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const lead = await prisma.qualificationLead.findUnique({
       where: { id }
@@ -130,9 +131,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // PATCH /api/qualification-leads/:id - Atualizar lead
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { status, notes } = req.body;
 
     const lead = await prisma.qualificationLead.update({
@@ -151,9 +152,9 @@ router.patch('/:id', async (req, res) => {
 });
 
 // DELETE /api/qualification-leads/:id - Deletar lead
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     await prisma.qualificationLead.delete({
       where: { id }

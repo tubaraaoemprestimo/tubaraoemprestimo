@@ -38,6 +38,13 @@ export const WhatsAppButtonsConnect: React.FC = () => {
 
   if (!st) return null;
   return (
+    <>
+    {renderMain()}
+    {st.enabled && <AdminPhones />}
+    </>
+  );
+
+  function renderMain() { return (
     <div className="mt-8 border-t border-zinc-800 pt-8">
       <h2 className="text-xl font-bold flex items-center gap-2 mb-2"><MousePointerClick size={20} className="text-green-500" /> WhatsApp por botões (autoatendimento)</h2>
       <p className="text-zinc-400 text-sm mb-6">Número separado, sem IA: o cliente faz pelo WhatsApp tudo o que faz no app, tocando em botões. Use um chip diferente do WhatsApp acima.</p>
@@ -77,6 +84,52 @@ export const WhatsAppButtonsConnect: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+    </div>
+  ); }
+};
+
+type AdminRow = { phone: string; label: string | null; active: boolean; hasPin: boolean; locked: boolean; user: { name: string; email: string } | null };
+
+/** Números que podem usar o painel pelo WhatsApp de botões (com PIN de 6 dígitos). */
+const AdminPhones: React.FC = () => {
+  const { addToast } = useToast();
+  const [rows, setRows] = useState<AdminRow[]>([]);
+  const [phone, setPhone] = useState('');
+  const [label, setLabel] = useState('');
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => { try { setRows((await apiService.get('/whatsapp-buttons/admins')).items || []); } catch { /* sem acesso */ } }, []);
+  useEffect(() => { load(); }, [load]);
+  const run = async (fn: () => Promise<any>, ok: string) => { setBusy(true); try { await fn(); addToast(ok, 'success'); await load(); } catch (e: any) { addToast(e?.message || 'Falha', 'error'); } finally { setBusy(false); } };
+  const add = () => {
+    const n = phone.replace(/\D/g, '');
+    if (!/^55\d{10,11}$/.test(n)) { addToast('Use 55 + DDD + número', 'warning'); return; }
+    run(() => apiService.post('/whatsapp-buttons/admins', { phone: n, label }), 'Número autorizado. Ele cria o PIN no primeiro acesso.').then(() => { setPhone(''); setLabel(''); });
+  };
+  return (
+    <div className="mt-6 bg-black p-6 rounded-xl border border-zinc-800 max-w-2xl">
+      <h3 className="font-bold mb-1">🛠️ Administradores pelo WhatsApp</h3>
+      <p className="text-zinc-400 text-sm mb-4">Estes números entram no painel pelo WhatsApp de botões. Na primeira mensagem criam um PIN de 6 dígitos; a sessão expira em 15 min e aprovações pedem o PIN de novo.</p>
+      <div className="flex flex-col md:flex-row gap-2 mb-4">
+        <input aria-label="Número do administrador" inputMode="numeric" placeholder="5511999999999" value={phone} onChange={e => setPhone(e.target.value)} className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none" />
+        <input aria-label="Nome ou apelido" placeholder="Ex.: Jefferson" value={label} onChange={e => setLabel(e.target.value)} className="flex-1 bg-black border border-zinc-700 rounded-lg p-3 text-white focus:border-[#D4AF37] outline-none" />
+        <Button onClick={add} isLoading={busy} className="bg-green-600 border-none text-white">Autorizar</Button>
+      </div>
+      {rows.length === 0 ? <p className="text-sm text-zinc-500">Nenhum número autorizado.</p> : (
+        <ul className="divide-y divide-zinc-800">
+          {rows.map(r => (
+            <li key={r.phone} className="py-3 flex flex-wrap items-center gap-2 justify-between">
+              <div className="text-sm">
+                <p className="font-mono">{r.phone}</p>
+                <p className="text-zinc-500">{r.label || r.user?.name || '-'} · {r.locked ? '🔒 bloqueado' : r.hasPin ? 'PIN criado' : 'aguardando primeiro acesso'}</p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="secondary" isLoading={busy} onClick={() => run(() => apiService.post(`/whatsapp-buttons/admins/${r.phone}/reset-pin`, {}), 'PIN apagado; será criado de novo no próximo acesso.')}>Redefinir PIN</Button>
+                <Button size="sm" variant="danger" isLoading={busy} onClick={() => { if (confirm(`Remover o acesso de admin de ${r.phone}?`)) run(() => apiService.delete(`/whatsapp-buttons/admins/${r.phone}`), 'Acesso removido.'); }}>Remover</Button>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

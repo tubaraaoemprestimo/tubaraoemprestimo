@@ -90,3 +90,38 @@ signRouter.post('/:token', express.json({ limit: '15mb' }), async (req, res) => 
     if (limited(ipOf(req), 10)) { res.status(429).json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }); return; }
     try { res.json(await signSubmit(req.params.token, req.body, { ip: ipOf(req), ua: String(req.get('user-agent') || '') })); } catch (e) { signFail(res, e); }
 });
+
+// ───────── Números autorizados como admin no WhatsApp de botões ─────────
+const adminPhone = (v: unknown) => { const d = String(v || '').replace(/\D/g, ''); return /^55\d{10,11}$/.test(d) ? d : null; };
+whaileysAdminRouter.get('/admins', async (_req, res) => {
+    const rows = await prisma.waAdminPhone.findMany({ orderBy: { createdAt: 'asc' } });
+    const users = await prisma.user.findMany({ where: { id: { in: rows.map(r => r.userId) } }, select: { id: true, name: true, email: true } });
+    res.json({ items: rows.map(r => ({ phone: r.phone, label: r.label, active: r.active, hasPin: !!r.pinHash, locked: !!(r.lockedUntil && r.lockedUntil > new Date()), user: users.find(u => u.id === r.userId) || null, createdAt: r.createdAt })) });
+});
+whaileysAdminRouter.post('/admins', async (req, res) => {
+    const phone = adminPhone(req.body?.phone);
+    if (!phone) { res.status(400).json({ error: 'Número inválido: use 55 + DDD + número' }); return; }
+    const userId = typeof req.body?.userId === 'string' ? req.body.userId : req.user!.id;
+    const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (u?.role !== 'ADMIN') { res.status(400).json({ error: 'O usuário vinculado precisa ser administrador' }); return; }
+    const label = typeof req.body?.label === 'string' ? req.body.label.trim().slice(0, 60) : null;
+    // Novo cadastro sempre sem PIN: o dono do número cria o PIN no primeiro acesso.
+    await prisma.waAdminPhone.upsert({ where: { phone }, update: { userId, label, active: true, pinHash: null, pinTries: 0, lockedUntil: null, sessionUntil: null }, create: { phone, userId, label, createdBy: req.user!.id } });
+    await prisma.auditLog.create({ data: { userId: req.user!.id, userName: req.user!.name, action: 'WA_ADMIN_PHONE_ADDED', entity: 'WA_ADMIN', entityId: phone.slice(-4), details: label || '' } }).catch(() => {});
+    res.json({ ok: true });
+});
+whaileysAdminRouter.post('/admins/:phone/reset-pin', async (req, res) => {
+    const phone = adminPhone(req.params.phone);
+    if (!phone) { res.sendStatus(400); return; }
+    await prisma.waAdminPhone.update({ where: { phone }, data: { pinHash: null, pinTries: 0, lockedUntil: null, sessionUntil: null } }).catch(() => null);
+    await prisma.auditLog.create({ data: { userId: req.user!.id, userName: req.user!.name, action: 'WA_ADMIN_PIN_RESET', entity: 'WA_ADMIN', entityId: phone.slice(-4), details: '' } }).catch(() => {});
+    res.json({ ok: true });
+});
+whaileysAdminRouter.delete('/admins/:phone', async (req, res) => {
+    const phone = adminPhone(req.params.phone);
+    if (!phone) { res.sendStatus(400); return; }
+    await prisma.waAdminPhone.delete({ where: { phone } }).catch(() => null);
+    await prisma.waBotSession.update({ where: { phone }, data: { step: 'MENU', data: {}, options: [] } }).catch(() => null);
+    await prisma.auditLog.create({ data: { userId: req.user!.id, userName: req.user!.name, action: 'WA_ADMIN_PHONE_REMOVED', entity: 'WA_ADMIN', entityId: phone.slice(-4), details: '' } }).catch(() => {});
+    res.json({ ok: true });
+});

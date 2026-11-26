@@ -1926,3 +1926,21 @@ model WaBotInbound {
   @@index([createdAt])
   @@map("wa_bot_inbound")
 }
+
+/// Números de WhatsApp autorizados a operar o painel por botões. PIN só como hash (bcrypt).
+model WaAdminPhone {
+  phone       String    @id
+  userId      String    @map("user_id")
+  label       String?
+  active      Boolean   @default(true)
+  pinHash     String?   @map("pin_hash")
+  pinTries    Int       @default(0) @map("pin_tries")
+  lockedUntil DateTime? @map("locked_until")
+  sessionUntil DateTime? @map("session_until")
+  createdBy   String?   @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("wa_admin_phones")
+}

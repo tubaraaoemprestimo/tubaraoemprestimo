@@ -6,6 +6,7 @@ import { emailService } from './email';
 import { saveBufferToStorage } from './storageService';
 import { submitLoanRequest } from '../routes/loanRequests';
 import { ChargeError, getInfinitePayService } from './infinitepay/infinitepayService';
+import { adminFor, handleAdmin } from './waAdmin';
 import { BotEvent, Button, Card, numbered, whaileysSend } from './whaileys';
 import { Answers, Profile, PROFILES, PROFILE_LABEL, Step, buildPayload, guaranteeOk, isErr, nextStep, summary, CepLookup } from './waBotSteps';
 
@@ -287,6 +288,15 @@ async function submit(ctx: Ctx, s: Session, db: any) {
 /** Uma mensagem recebida. Sempre responde algo; nunca lança para o webhook. */
 export async function handleBotMessage(ev: BotEvent, ctx: Ctx) {
     const db = ctx.db || prisma;
+    // Número cadastrado como admin: painel por botões (PIN + sessão). Nunca cai no fluxo de cliente.
+    const admin = await adminFor(ctx.phone, db).catch(() => null);
+    if (admin) {
+        const s = await load(db, ctx.phone);
+        const st = { step: s.step.startsWith('ADM_') ? s.step : 'ADM_MENU', data: s.step.startsWith('ADM_') ? s.data : {}, options: s.options };
+        try { await handleAdmin(ev, ctx, st, admin, { db }); }
+        finally { await db.waBotSession.update({ where: { phone: ctx.phone }, data: { step: st.step, data: st.data, options: st.options } }).catch(() => {}); }
+        return;
+    }
     const s = await load(db, ctx.phone);
     if (!s.data.phone) s.data.phone = ctx.phone.replace(/^55/, '');
     const text = ev.kind === 'text' ? ev.text.trim() : '';

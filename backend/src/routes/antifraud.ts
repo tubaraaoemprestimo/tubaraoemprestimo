@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../services/prisma';
-import { authenticate } from '../middleware/auth';
+import { authenticate, requireAdmin } from '../middleware/auth';
 
 export const antifraudRouter = Router();
 
@@ -248,7 +248,7 @@ antifraudRouter.put('/device/:id/activity', authenticate, async (req: Request, r
 
 // DELETE /api/antifraud/device/reset?user_id=... - Reset all devices for user
 // NOTE: Must be BEFORE /device/:id to prevent Express matching 'reset' as :id
-antifraudRouter.delete('/device/reset', authenticate, async (req: Request, res: Response) => {
+antifraudRouter.delete('/device/reset', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         const userId = String(req.query.user_id || req.user!.id);
         await prisma.trustedDevice.deleteMany({ where: { userId } });
@@ -260,7 +260,7 @@ antifraudRouter.delete('/device/reset', authenticate, async (req: Request, res: 
 });
 
 // DELETE /api/antifraud/device/:id - Remover dispositivo
-antifraudRouter.delete('/device/:id', authenticate, async (req: Request, res: Response) => {
+antifraudRouter.delete('/device/:id', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         const id = String(req.params.id);
         await prisma.trustedDevice.delete({ where: { id } });
@@ -470,7 +470,7 @@ antifraudRouter.get('/security-block/check', authenticate, async (req: Request, 
 });
 
 // PUT /api/antifraud/security-block/:id/resolve - Resolver bloqueio
-antifraudRouter.put('/security-block/:id/resolve', authenticate, async (req: Request, res: Response) => {
+antifraudRouter.put('/security-block/:id/resolve', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         const id = String(req.params.id);
         const { resolved_by, resolution_notes } = req.body;
@@ -519,7 +519,7 @@ antifraudRouter.put('/security-block/:id/resolve', authenticate, async (req: Req
 });
 
 // PUT /api/antifraud/security-block/unblock-user - Desbloquear todos os bloqueios do usuário
-antifraudRouter.put('/security-block/unblock-user', authenticate, async (req: Request, res: Response) => {
+antifraudRouter.put('/security-block/unblock-user', authenticate, requireAdmin, async (req: Request, res: Response) => {
     try {
         const { user_id, resolved_by, resolution_notes } = req.body;
 
