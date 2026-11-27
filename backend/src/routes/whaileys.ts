@@ -4,6 +4,7 @@ import { authenticate, requireAdmin } from '../middleware/auth';
 import { parseIncoming, verifySignature, whaileysConnect, whaileysEnabled, whaileysLogout, whaileysStatus } from '../services/whaileys';
 import { botSender, handleBotMessage, viaCep, signInfo, signSubmit, SignError } from '../services/waBot';
 import { recordInbound, inboxSender, aiEnabledFor, aiAnswer } from '../services/waBotInbox';
+import { alertFromMessage } from '../services/waAlert';
 
 /**
  * WhatsApp por botões (Whaileys): número separado da Evolution, sem IA.
@@ -35,6 +36,8 @@ whaileysWebhookRouter.post('/', express.raw({ type: '*/*', limit: '45mb' }), asy
         const isAdmin = await prisma.waAdminPhone.findUnique({ where: { phone }, select: { active: true } }).catch(() => null);
         if (isAdmin?.active) return handleBotMessage(ev, { phone, messageId: id, media, send: botSender(phone), cep: viaCep });
         const conv = await recordInbound(phone, id, ev, typeof body.pushName === 'string' ? body.pushName.slice(0, 120) : null).catch((e: any) => { console.error('[WaBot] central:', e?.message); return null; });
+        // O aviso é interno: não assume a conversa nem atrasa a resposta do bot.
+        void alertFromMessage(ev, phone);
         // Atendente na conversa: bot e IA ficam quietos (a pessoa responde pela Central).
         if (conv && (conv.mode === 'HUMAN_ACTIVE' || conv.mode === 'WAITING_HUMAN')) return;
         // IA só quando o atendente passou a conversa para ela.
